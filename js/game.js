@@ -9,6 +9,12 @@ class Game {
         this.canvas.width = CONSTANTS.CANVAS_WIDTH;
         this.canvas.height = CONSTANTS.CANVAS_HEIGHT;
         
+        // Initialize renderer (try WebGL first)
+        this.renderer = new Renderer(canvas, true);
+        
+        // Initialize performance optimizations
+        this.dirtyRectManager = new DirtyRectManager(this.canvas.width, this.canvas.height);
+        
         // Game components
         this.terrain = null;
         this.physics = new Physics();
@@ -16,6 +22,9 @@ class Game {
         this.effectsSystem = new EffectsSystem();
         this.shop = new Shop();
         this.soundSystem = new SoundSystem();
+        
+        // Initialize spatial grid in physics
+        this.physics.initSpatialGrid(this.canvas.width, this.canvas.height);
         
         // Game state
         this.tanks = [];
@@ -33,6 +42,9 @@ class Game {
         // Animation
         this.lastTime = 0;
         this.animationId = null;
+        
+        // Debug mode
+        this.debugMode = false;
     }
     
     startNewGame(settings) {
@@ -57,18 +69,25 @@ class Game {
         // Generate new terrain
         this.terrain = new Terrain(this.canvas.width, this.canvas.height);
         
-        // Clear effects
+        // Clear effects and spatial grid
         this.projectileManager.clear();
         this.effectsSystem.clear();
+        this.physics.spatialGrid.clear();
         
         // Create tanks
         this.createTanks();
+        
+        // Add tanks to spatial grid
+        this.updateSpatialGrid();
         
         // Update wind
         this.physics.updateWind();
         
         // Determine turn order
         this.currentPlayer = Math.floor(Math.random() * this.tanks.length);
+        
+        // Mark full redraw needed
+        this.dirtyRectManager.markFullDirty();
         
         // Start with shop phase if players have money
         if (this.settings.startingCash > 0 || this.currentRound > 1) {
@@ -321,22 +340,73 @@ class Game {
     update(deltaTime) {
         if (this.gameState !== CONSTANTS.GAME_STATES.PLAYING) return;
         
+        // Clear dirty rects for this frame
+        this.dirtyRectManager.clear();
+        
         // Apply terrain collapse physics periodically
         if (!this.projectileActive) {
             // Only collapse terrain when no projectiles are active
-            this.terrain.applyTerrainCollapse(this.effectsSystem, this.soundSystem);
+            const collapsed = this.terrain.applyTerrainCollapse(this.effectsSystem, this.soundSystem);
+            if (collapsed) {
+                // Mark terrain area as dirty
+                this.dirtyRectManager.markFullDirty(); // Terrain changes affect whole screen
+            }
         }
         
-        // Update tanks
+        // Update tanks and track dirty regions
         for (let tank of this.tanks) {
+            const prevX = tank.x;
+            const prevY = tank.y;
+            
             tank.update(deltaTime, this.terrain, this.physics);
+            
+            // If tank moved, mark dirty
+            if (tank.x !== prevX || tank.y !== prevY) {
+                // Mark old position
+                this.dirtyRectManager.markDirty(
+                    prevX - CONSTANTS.TANK_WIDTH,
+                    prevY - CONSTANTS.TANK_HEIGHT * 2,
+                    CONSTANTS.TANK_WIDTH * 2,
+                    CONSTANTS.TANK_HEIGHT * 3
+                );
+                // Mark new position
+                this.dirtyRectManager.markDirty(
+                    tank.x - CONSTANTS.TANK_WIDTH,
+                    tank.y - CONSTANTS.TANK_HEIGHT * 2,
+                    CONSTANTS.TANK_WIDTH * 2,
+                    CONSTANTS.TANK_HEIGHT * 3
+                );
+            }
         }
         
-        // Update projectiles
+        // Update projectiles and mark their areas dirty
+        const activeProjectiles = this.projectileManager.projectiles.filter(p => p.active);
+        for (let projectile of activeProjectiles) {
+            // Mark current position dirty
+            this.dirtyRectManager.markDirty(
+                projectile.x - 50,
+                projectile.y - 50,
+                100,
+                100
+            );
+        }
+        
         this.projectileManager.update(deltaTime, this.physics, this.terrain, this.tanks, this.effectsSystem, this.soundSystem);
         
-        // Update effects
+        // Update effects and mark their areas dirty
+        for (let particle of this.effectsSystem.particles) {
+            this.dirtyRectManager.markDirty(
+                particle.x - particle.size,
+                particle.y - particle.size,
+                particle.size * 2,
+                particle.size * 2
+            );
+        }
+        
         this.effectsSystem.update(deltaTime);
+        
+        // Update spatial grid if tanks moved
+        this.updateSpatialGrid();
         
         // Check if projectile phase is over
         if (this.projectileActive && !this.projectileManager.hasActiveProjectiles()) {
@@ -346,6 +416,9 @@ class Game {
             let collapseFrames = 0;
             const collapseInterval = setInterval(() => {
                 const hasCollapsed = this.terrain.applyTerrainCollapse(this.effectsSystem, this.soundSystem);
+                if (hasCollapsed) {
+                    this.dirtyRectManager.markFullDirty();
+                }
                 collapseFrames++;
                 
                 // Stop after 10 frames or when terrain stabilizes
@@ -463,5 +536,31 @@ class Game {
             this.ctx.fillRect(star.x, star.y, star.size, star.size);
         }
         this.ctx.globalAlpha = 1;
+    }
+    
+    // Update spatial grid with tank positions
+    updateSpatialGrid() {
+        // Clear and re-add all tanks
+        this.physics.spatialGrid.clear();
+        
+        for (let i = 0; i < this.tanks.length; i++) {
+            const tank = this.tanks[i];
+            if (tank.state !== CONSTANTS.TANK_STATES.DESTROYED) {
+                this.physics.spatialGrid.add(
+                    { type: 'tank', tank: tank, index: i },
+                    tank.x - CONSTANTS.TANK_WIDTH/2,
+                    tank.y - CONSTANTS.TANK_HEIGHT,
+                    CONSTANTS.TANK_WIDTH,
+                    CONSTANTS.TANK_HEIGHT
+                );
+            }
+        }
+    }
+    
+    // Toggle debug mode
+    toggleDebug() {
+        this.debugMode = !this.debugMode;
+        this.renderer.setDebugMode(this.debugMode);
+        console.log('Debug mode:', this.debugMode ? 'ON' : 'OFF');
     }
 }

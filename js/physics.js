@@ -6,6 +6,14 @@ class Physics {
         this.windType = 'random';
         this.wallBehavior = 'wrap';
         this.ceilingBehavior = 'wrap';
+        
+        // Initialize spatial grid for collision detection
+        this.spatialGrid = null;
+    }
+    
+    // Initialize spatial grid with canvas dimensions
+    initSpatialGrid(width, height) {
+        this.spatialGrid = new SpatialGrid(width, height, 50);
     }
     
     setGravity(value) {
@@ -124,6 +132,25 @@ class Physics {
     
     // Check if a projectile would hit a tank
     checkTankCollision(x, y, tanks) {
+        // Use spatial grid if available for better performance
+        if (this.spatialGrid) {
+            const nearbyObjects = this.spatialGrid.getNearby(x, y, CONSTANTS.TANK_WIDTH);
+            
+            for (let obj of nearbyObjects) {
+                if (obj.type === 'tank' && obj.tank.state !== CONSTANTS.TANK_STATES.DESTROYED) {
+                    const dx = x - obj.tank.x;
+                    const dy = y - obj.tank.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < CONSTANTS.TANK_WIDTH / 2) {
+                        return obj.tank;
+                    }
+                }
+            }
+            return null;
+        }
+        
+        // Fallback to brute force if no spatial grid
         for (let tank of tanks) {
             if (tank.state === CONSTANTS.TANK_STATES.DESTROYED) continue;
             
@@ -140,6 +167,30 @@ class Physics {
     
     // Apply explosion force to nearby objects
     applyExplosionForce(x, y, radius, force, tanks) {
+        // Use spatial grid if available
+        if (this.spatialGrid) {
+            const nearbyObjects = this.spatialGrid.getNearby(x, y, radius);
+            
+            for (let obj of nearbyObjects) {
+                if (obj.type === 'tank' && obj.tank.state !== CONSTANTS.TANK_STATES.DESTROYED) {
+                    const tank = obj.tank;
+                    const dx = tank.x - x;
+                    const dy = tank.y - y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < radius && distance > 0) {
+                        const forceMagnitude = force * (1 - distance / radius);
+                        const forceX = (dx / distance) * forceMagnitude;
+                        const forceY = (dy / distance) * forceMagnitude;
+                        
+                        tank.applyForce(forceX, forceY);
+                    }
+                }
+            }
+            return;
+        }
+        
+        // Fallback to brute force
         for (let tank of tanks) {
             if (tank.state === CONSTANTS.TANK_STATES.DESTROYED) continue;
             
