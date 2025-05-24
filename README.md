@@ -2,6 +2,10 @@
 
 A faithful browser-based recreation of the classic 1991 MS-DOS turn-based artillery game Scorched Earth, enhanced with modern retro synthwave aesthetics.
 
+🎮 **[Play the game online](https://joshdaws.github.io/scorched-earth-clone/)** (if GitHub Pages is enabled)
+
+📦 **[View on GitHub](https://github.com/joshdaws/scorched-earth-clone)**
+
 ## Features
 
 - **Classic Gameplay**: Turn-based artillery combat with destructible terrain
