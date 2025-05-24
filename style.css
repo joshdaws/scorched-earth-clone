@@ -1,0 +1,580 @@
+/* Reset and Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Courier New', monospace;
+    background-color: #000;
+    color: #00ffff;
+    overflow: hidden;
+    text-shadow: 0 0 5px currentColor;
+}
+
+/* Game Container */
+#game-container {
+    width: 100vw;
+    height: 100vh;
+    position: relative;
+}
+
+/* Screens */
+.screen {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background-color: #000;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Main Menu */
+#main-menu {
+    position: relative;
+    overflow: hidden;
+    background: #0a0015;
+}
+
+#menu-background {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+}
+
+.menu-content {
+    position: relative;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+}
+
+#main-menu h1 {
+    font-size: 96px;
+    color: #00ffff;
+    text-align: center;
+    line-height: 0.9;
+    margin-bottom: 80px;
+    font-weight: bold;
+    letter-spacing: 12px;
+    text-shadow: 
+        0 0 20px #00ffff,
+        0 0 40px #00ffff,
+        0 0 60px #00ffff,
+        0 0 80px #0088ff,
+        3px 3px 0 #ff00ff,
+        4px 4px 0 #ff0066;
+    animation: glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes glow {
+    from { 
+        text-shadow: 
+            0 0 20px #00ffff,
+            0 0 40px #00ffff,
+            0 0 60px #00ffff,
+            0 0 80px #0088ff,
+            3px 3px 0 #ff00ff,
+            4px 4px 0 #ff0066;
+    }
+    to { 
+        text-shadow: 
+            0 0 30px #00ffff,
+            0 0 50px #00ffff,
+            0 0 70px #00ffff,
+            0 0 90px #0088ff,
+            3px 3px 0 #ff00ff,
+            4px 4px 0 #ff0066;
+    }
+}
+
+/* Tank Silhouettes */
+.tank-silhouettes {
+    position: absolute;
+    bottom: 150px;
+    left: 0;
+    width: 100%;
+    height: 100px;
+    z-index: 2;
+}
+
+.tank-left, .tank-right {
+    position: absolute;
+    width: 80px;
+    height: 60px;
+    bottom: 0;
+}
+
+.tank-left {
+    left: 10%;
+    background: linear-gradient(to right, #0066ff, #0088ff);
+    clip-path: polygon(
+        0% 100%, 
+        0% 60%, 
+        20% 60%, 
+        20% 40%, 
+        25% 40%, 
+        25% 20%, 
+        60% 20%, 
+        60% 0%, 
+        65% 0%, 
+        65% 20%, 
+        80% 20%, 
+        80% 40%, 
+        85% 40%, 
+        85% 60%, 
+        100% 60%, 
+        100% 100%
+    );
+    filter: drop-shadow(0 0 20px #0088ff);
+}
+
+.tank-right {
+    right: 10%;
+    background: linear-gradient(to left, #ff0066, #ff3366);
+    clip-path: polygon(
+        0% 100%, 
+        0% 60%, 
+        15% 60%, 
+        15% 40%, 
+        20% 40%, 
+        20% 20%, 
+        35% 20%, 
+        35% 0%, 
+        40% 0%, 
+        40% 20%, 
+        75% 20%, 
+        75% 40%, 
+        80% 40%, 
+        80% 60%, 
+        100% 60%, 
+        100% 100%
+    );
+    filter: drop-shadow(0 0 20px #ff0066);
+}
+
+.menu-options {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.menu-btn {
+    padding: 20px 60px;
+    font-size: 28px;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    background: rgba(0, 0, 0, 0.8);
+    color: #00ffff;
+    border: 3px solid #00ffff;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-shadow: 0 0 10px currentColor;
+    box-shadow: 
+        0 0 20px #00ffff,
+        inset 0 0 20px rgba(0, 255, 255, 0.2);
+    letter-spacing: 2px;
+    min-width: 300px;
+}
+
+.menu-btn:hover {
+    background: rgba(0, 255, 255, 0.2);
+    color: #ffffff;
+    border-color: #ffffff;
+    box-shadow: 
+        0 0 30px #00ffff,
+        inset 0 0 30px rgba(0, 255, 255, 0.4);
+    transform: scale(1.05) translateZ(0);
+    text-shadow: 0 0 20px #ffffff;
+}
+
+/* Game Setup */
+#game-setup {
+    padding: 20px;
+}
+
+#game-setup h2 {
+    color: #ff0;
+    margin-bottom: 30px;
+    font-size: 32px;
+}
+
+.setup-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 30px;
+    margin-bottom: 30px;
+}
+
+.setup-section {
+    background-color: #111;
+    padding: 20px;
+    border: 1px solid #0f0;
+}
+
+.setup-section h3 {
+    color: #0ff;
+    margin-bottom: 15px;
+}
+
+.setup-section label {
+    display: block;
+    margin-bottom: 10px;
+}
+
+.setup-section input,
+.setup-section select {
+    background-color: #000;
+    color: #0f0;
+    border: 1px solid #0f0;
+    padding: 5px;
+    font-family: inherit;
+}
+
+.setup-buttons {
+    display: flex;
+    gap: 20px;
+}
+
+/* Game Screen */
+#game-screen {
+    padding: 0;
+    justify-content: flex-start;
+}
+
+/* HUD */
+#hud {
+    width: 100%;
+    background: linear-gradient(to bottom, #1a0033, #0a0015);
+    border-bottom: 2px solid #ff00ff;
+    padding: 10px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+    box-shadow: 0 0 20px rgba(255,0,255,0.5);
+}
+
+.hud-section {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+}
+
+.hud-section span {
+    color: #00ffff;
+    text-shadow: 0 0 5px currentColor;
+}
+
+#current-player {
+    color: #ffff00;
+    font-weight: bold;
+    text-shadow: 0 0 10px #ffff00;
+}
+
+/* Game Canvas */
+#game-canvas {
+    width: 100%;
+    flex-grow: 1;
+    background: linear-gradient(to bottom, #001, #003);
+    display: block;
+}
+
+/* Controls */
+#controls {
+    background-color: #111;
+    border-top: 2px solid #0f0;
+    padding: 15px;
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    align-items: center;
+}
+
+.control-group {
+    display: flex;
+    gap: 5px;
+}
+
+.control-group button,
+#inventory-btn {
+    padding: 8px 12px;
+    background: linear-gradient(45deg, #1a0033, #330066);
+    color: #00ffff;
+    border: 1px solid #00ffff;
+    cursor: pointer;
+    font-family: inherit;
+    text-shadow: 0 0 5px currentColor;
+}
+
+.control-group button:hover,
+#inventory-btn:hover {
+    background: linear-gradient(45deg, #330066, #6600cc);
+    color: #ffffff;
+    border-color: #ff00ff;
+    box-shadow: 0 0 10px #ff00ff;
+}
+
+.fire-button {
+    padding: 15px 40px;
+    font-size: 24px;
+    background: linear-gradient(45deg, #cc0066, #ff0066);
+    color: #ffff00;
+    border: 2px solid #ff00ff;
+    cursor: pointer;
+    font-weight: bold;
+    font-family: inherit;
+    text-shadow: 0 0 10px currentColor;
+    box-shadow: 0 0 15px #ff0066;
+    animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 15px #ff0066; }
+    50% { box-shadow: 0 0 25px #ff0066, 0 0 35px #ff00ff; }
+    100% { box-shadow: 0 0 15px #ff0066; }
+}
+
+.fire-button:hover {
+    background: linear-gradient(45deg, #ff0066, #ff3366);
+    box-shadow: 0 0 30px #ff0066, 0 0 40px #ff00ff;
+    transform: scale(1.05);
+}
+
+.fire-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Volume Control */
+.volume-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: 10px;
+}
+
+.volume-control label {
+    font-size: 16px;
+}
+
+#volume-slider {
+    width: 80px;
+    height: 20px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    outline: none;
+}
+
+#volume-slider::-webkit-slider-track {
+    width: 100%;
+    height: 4px;
+    background: #333;
+    border: 1px solid #666;
+    border-radius: 2px;
+}
+
+#volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background: #0ff;
+    border: 2px solid #000;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+#volume-slider::-moz-range-track {
+    width: 100%;
+    height: 4px;
+    background: #333;
+    border: 1px solid #666;
+    border-radius: 2px;
+}
+
+#volume-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: #0ff;
+    border: 2px solid #000;
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+}
+
+/* Shop Screen */
+#shop-screen {
+    padding: 20px;
+}
+
+#shop-screen h2 {
+    color: #ff0;
+    margin-bottom: 20px;
+}
+
+.shop-header {
+    margin-bottom: 20px;
+    font-size: 20px;
+}
+
+.shop-section {
+    margin-bottom: 30px;
+}
+
+.shop-section h3 {
+    color: #0ff;
+    margin-bottom: 15px;
+    font-size: 20px;
+}
+
+.shop-items-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 10px;
+}
+
+.shop-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 30px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.shop-item {
+    background-color: #111;
+    border: 1px solid #0f0;
+    padding: 15px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.shop-item:hover {
+    background-color: #222;
+    box-shadow: 0 0 10px #0f0;
+}
+
+.shop-item.selected {
+    background-color: #030;
+    border-color: #0ff;
+}
+
+.shop-item h4 {
+    color: #0ff;
+    margin-bottom: 5px;
+}
+
+.shop-item .price {
+    color: #ff0;
+}
+
+.shop-item .owned {
+    color: #080;
+    font-size: 12px;
+    margin-top: 5px;
+}
+
+.shop-item .pending {
+    color: #ff0;
+    font-size: 12px;
+    margin-top: 5px;
+}
+
+.shop-item .quantity {
+    color: #888;
+    font-size: 11px;
+    margin-top: 3px;
+}
+
+.shop-buttons {
+    display: flex;
+    justify-content: center;
+}
+
+/* Modal */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background-color: #111;
+    border: 2px solid #0f0;
+    padding: 30px;
+    min-width: 400px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.modal-content h3 {
+    color: #ff0;
+    margin-bottom: 20px;
+}
+
+#inventory-list {
+    margin-bottom: 20px;
+}
+
+.inventory-item {
+    padding: 10px;
+    margin-bottom: 5px;
+    background-color: #222;
+    border: 1px solid #080;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+}
+
+.inventory-item:hover {
+    background-color: #333;
+    border-color: #0f0;
+}
+
+.inventory-item.selected {
+    background-color: #030;
+    border-color: #0ff;
+}
+
+/* Player Setup */
+.player-slot {
+    margin-bottom: 10px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.player-slot select {
+    flex-grow: 1;
+}
+
+/* Animations */
+@keyframes explosion {
+    0% { transform: scale(0); opacity: 1; }
+    100% { transform: scale(3); opacity: 0; }
+}
+
+.explosion {
+    animation: explosion 0.5s ease-out;
+}
