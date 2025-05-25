@@ -23,28 +23,40 @@ class UIManager {
     }
     
     setupEventListeners() {
+        // Helper function to add both click and touch events
+        const addClickAndTouch = (elementId, handler) => {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.addEventListener('click', handler);
+                element.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    handler();
+                });
+            }
+        };
+        
         // Main menu
-        document.getElementById('new-game-btn').addEventListener('click', () => this.showGameSetup());
-        document.getElementById('options-btn').addEventListener('click', () => this.showOptions());
-        document.getElementById('help-btn').addEventListener('click', () => this.showHelp());
+        addClickAndTouch('new-game-btn', () => this.showGameSetup());
+        addClickAndTouch('options-btn', () => this.showOptions());
+        addClickAndTouch('help-btn', () => this.showHelp());
         
         // Game setup
-        document.getElementById('back-btn').addEventListener('click', () => this.showMainMenu());
-        document.getElementById('start-game-btn').addEventListener('click', () => this.startGame());
+        addClickAndTouch('back-btn', () => this.showMainMenu());
+        addClickAndTouch('start-game-btn', () => this.startGame());
         
         // Game controls
-        document.getElementById('angle-down-coarse').addEventListener('click', () => this.adjustAngle(-3));
-        document.getElementById('angle-down').addEventListener('click', () => this.adjustAngle(-1));
-        document.getElementById('angle-up').addEventListener('click', () => this.adjustAngle(1));
-        document.getElementById('angle-up-coarse').addEventListener('click', () => this.adjustAngle(3));
+        addClickAndTouch('angle-down-coarse', () => this.adjustAngle(-3));
+        addClickAndTouch('angle-down', () => this.adjustAngle(-1));
+        addClickAndTouch('angle-up', () => this.adjustAngle(1));
+        addClickAndTouch('angle-up-coarse', () => this.adjustAngle(3));
         
-        document.getElementById('power-down-coarse').addEventListener('click', () => this.adjustPower(-3));
-        document.getElementById('power-down').addEventListener('click', () => this.adjustPower(-1));
-        document.getElementById('power-up').addEventListener('click', () => this.adjustPower(1));
-        document.getElementById('power-up-coarse').addEventListener('click', () => this.adjustPower(3));
+        addClickAndTouch('power-down-coarse', () => this.adjustPower(-3));
+        addClickAndTouch('power-down', () => this.adjustPower(-1));
+        addClickAndTouch('power-up', () => this.adjustPower(1));
+        addClickAndTouch('power-up-coarse', () => this.adjustPower(3));
         
-        document.getElementById('fire-btn').addEventListener('click', () => this.fire());
-        document.getElementById('inventory-btn').addEventListener('click', () => this.showInventory());
+        addClickAndTouch('fire-btn', () => this.fire());
+        addClickAndTouch('inventory-btn', () => this.showInventory());
         
         // Shop
         document.getElementById('shop-done-btn').addEventListener('click', () => this.closeShop());
@@ -95,6 +107,11 @@ class UIManager {
         // Show requested screen
         document.getElementById(screenId).classList.remove('hidden');
         this.currentScreen = screenId;
+        
+        // Update canvas size when showing game screen
+        if (screenId === 'game-screen' && window.game) {
+            window.game.updateCanvasSize();
+        }
     }
     
     showMainMenu() {
@@ -111,12 +128,21 @@ class UIManager {
     }
     
     showHelp() {
-        alert('Controls:\n' +
-              'Arrow Keys: Adjust angle/power\n' +
-              'Ctrl + Arrow: Larger adjustments\n' +
-              'Space/Enter: Fire\n' +
-              'W: Select weapon\n' +
-              'I: Open inventory');
+        const isMobile = 'ontouchstart' in window;
+        if (isMobile) {
+            alert('Mobile Controls:\n' +
+                  'Tap angle/power buttons to adjust\n' +
+                  'Drag on game canvas to aim\n' +
+                  'Tap FIRE! button to shoot\n' +
+                  'Tap Inventory to select weapons');
+        } else {
+            alert('Controls:\n' +
+                  'Arrow Keys: Adjust angle/power\n' +
+                  'Ctrl + Arrow: Larger adjustments\n' +
+                  'Space/Enter: Fire\n' +
+                  'W: Select weapon\n' +
+                  'I: Open inventory');
+        }
     }
     
     createPlayerSetup() {

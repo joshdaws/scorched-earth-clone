@@ -18,23 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Show main menu
     ui.showMainMenu();
     
-    // Handle window resize
-    function handleResize() {
-        const container = document.getElementById('game-screen');
-        if (container && !container.classList.contains('hidden')) {
-            const rect = canvas.parentElement.getBoundingClientRect();
-            const scale = Math.min(
-                rect.width / CONSTANTS.CANVAS_WIDTH,
-                rect.height / CONSTANTS.CANVAS_HEIGHT
-            );
-            
-            canvas.style.width = `${CONSTANTS.CANVAS_WIDTH * scale}px`;
-            canvas.style.height = `${CONSTANTS.CANVAS_HEIGHT * scale}px`;
-        }
-    }
-    
-    window.addEventListener('resize', handleResize);
-    handleResize();
+    // Canvas sizing is now handled in Game class
     
     // Debug - quick start game for testing
     if (window.location.hash === '#debug') {

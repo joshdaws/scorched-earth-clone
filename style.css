@@ -11,6 +11,10 @@ body {
     color: #00ffff;
     overflow: hidden;
     text-shadow: 0 0 5px currentColor;
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 /* Game Container */
@@ -50,6 +54,7 @@ body {
     width: 100%;
     height: 100%;
     z-index: 1;
+    display: block;
 }
 
 .menu-content {
@@ -63,107 +68,60 @@ body {
 }
 
 #main-menu h1 {
-    font-size: 96px;
-    color: #00ffff;
+    font-family: 'Courier New', monospace;
+    font-size: clamp(32px, 6vw, 96px); /* Responsive with limits */
+    font-weight: 900; /* Extra bold for chunky look */
+    color: #25F6FF;
     text-align: center;
     line-height: 0.9;
-    margin-bottom: 80px;
-    font-weight: bold;
-    letter-spacing: 12px;
+    margin-bottom: 60px;
+    letter-spacing: 0.1em;
+    width: 90%; /* More width on mobile */
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+    margin-top: 15vh; /* Top edge at ~30% from top */
     text-shadow: 
-        0 0 20px #00ffff,
-        0 0 40px #00ffff,
-        0 0 60px #00ffff,
-        0 0 80px #0088ff,
-        3px 3px 0 #ff00ff,
-        4px 4px 0 #ff0066;
+        0 0 10px #00e0ff,
+        0 0 20px #00e0ff,
+        0 0 40px #fff,
+        0 0 80px #25f6ff,
+        3px 3px 0 #FF20B8,
+        4px 4px 0 #FF5523;
     animation: glow 2s ease-in-out infinite alternate;
 }
 
 @keyframes glow {
     from { 
         text-shadow: 
-            0 0 20px #00ffff,
-            0 0 40px #00ffff,
-            0 0 60px #00ffff,
-            0 0 80px #0088ff,
-            3px 3px 0 #ff00ff,
-            4px 4px 0 #ff0066;
+            0 0 10px #00e0ff,
+            0 0 20px #00e0ff,
+            0 0 40px #fff,
+            0 0 80px #25f6ff,
+            3px 3px 0 #FF20B8,
+            4px 4px 0 #FF5523;
     }
     to { 
         text-shadow: 
-            0 0 30px #00ffff,
-            0 0 50px #00ffff,
-            0 0 70px #00ffff,
-            0 0 90px #0088ff,
-            3px 3px 0 #ff00ff,
-            4px 4px 0 #ff0066;
+            0 0 20px #00e0ff,
+            0 0 30px #00e0ff,
+            0 0 60px #fff,
+            0 0 100px #25f6ff,
+            3px 3px 0 #FF20B8,
+            4px 4px 0 #FF5523;
     }
 }
 
-/* Tank Silhouettes */
-.tank-silhouettes {
+/* Tank Sprites Canvas */
+#tank-sprites {
     position: absolute;
-    bottom: 150px;
+    bottom: 0;
     left: 0;
     width: 100%;
-    height: 100px;
+    height: 200px;
     z-index: 2;
-}
-
-.tank-left, .tank-right {
-    position: absolute;
-    width: 80px;
-    height: 60px;
-    bottom: 0;
-}
-
-.tank-left {
-    left: 10%;
-    background: linear-gradient(to right, #0066ff, #0088ff);
-    clip-path: polygon(
-        0% 100%, 
-        0% 60%, 
-        20% 60%, 
-        20% 40%, 
-        25% 40%, 
-        25% 20%, 
-        60% 20%, 
-        60% 0%, 
-        65% 0%, 
-        65% 20%, 
-        80% 20%, 
-        80% 40%, 
-        85% 40%, 
-        85% 60%, 
-        100% 60%, 
-        100% 100%
-    );
-    filter: drop-shadow(0 0 20px #0088ff);
-}
-
-.tank-right {
-    right: 10%;
-    background: linear-gradient(to left, #ff0066, #ff3366);
-    clip-path: polygon(
-        0% 100%, 
-        0% 60%, 
-        15% 60%, 
-        15% 40%, 
-        20% 40%, 
-        20% 20%, 
-        35% 20%, 
-        35% 0%, 
-        40% 0%, 
-        40% 20%, 
-        75% 20%, 
-        75% 40%, 
-        80% 40%, 
-        80% 60%, 
-        100% 60%, 
-        100% 100%
-    );
-    filter: drop-shadow(0 0 20px #ff0066);
+    pointer-events: none;
+    display: block;
 }
 
 .menu-options {
@@ -173,32 +131,35 @@ body {
 }
 
 .menu-btn {
-    padding: 20px 60px;
-    font-size: 28px;
-    font-family: 'Courier New', monospace;
-    font-weight: bold;
-    background: rgba(0, 0, 0, 0.8);
-    color: #00ffff;
-    border: 3px solid #00ffff;
+    font-family: 'Press Start 2P', 'Courier New', monospace;
+    font-size: clamp(12px, 2vw, 24px); /* Responsive with limits */
+    font-weight: normal;
+    padding: 16px 32px; /* Fixed padding for touch targets */
+    background: #1C1030; /* Button Fill - exact color */
+    color: #27F7FE; /* Menu Text Blue - exact color */
+    border: 3px solid #6C41FF; /* Grid Neon Purple - exact color */
     cursor: pointer;
     transition: all 0.2s;
     text-shadow: 0 0 10px currentColor;
     box-shadow: 
-        0 0 20px #00ffff,
-        inset 0 0 20px rgba(0, 255, 255, 0.2);
-    letter-spacing: 2px;
-    min-width: 300px;
+        0 0 20px #6C41FF,
+        inset 0 0 20px rgba(108, 65, 255, 0.2);
+    letter-spacing: 0.1em;
+    width: 80%; /* Wider on mobile */
+    max-width: 300px;
+    margin: 10px 0;
+    text-transform: uppercase;
 }
 
 .menu-btn:hover {
-    background: rgba(0, 255, 255, 0.2);
-    color: #ffffff;
-    border-color: #ffffff;
+    background: rgba(108, 65, 255, 0.3);
+    color: #25F6FF; /* Neon Blue (Text/UI) */
+    border-color: #25F6FF;
     box-shadow: 
-        0 0 30px #00ffff,
-        inset 0 0 30px rgba(0, 255, 255, 0.4);
+        0 0 30px #6C41FF,
+        inset 0 0 30px rgba(108, 65, 255, 0.4);
     transform: scale(1.05) translateZ(0);
-    text-shadow: 0 0 20px #ffffff;
+    text-shadow: 0 0 20px #25F6FF;
 }
 
 /* Game Setup */
@@ -287,20 +248,25 @@ body {
 /* Game Canvas */
 #game-canvas {
     width: 100%;
-    flex-grow: 1;
+    height: 100%;
+    max-width: 100vw;
+    max-height: calc(100vh - 150px); /* Account for UI */
     background: linear-gradient(to bottom, #001, #003);
     display: block;
+    margin: 0 auto;
+    touch-action: none; /* Prevent default touch behaviors */
 }
 
 /* Controls */
 #controls {
     background-color: #111;
     border-top: 2px solid #0f0;
-    padding: 15px;
+    padding: 10px;
     display: flex;
     justify-content: center;
-    gap: 30px;
+    gap: 10px;
     align-items: center;
+    flex-wrap: wrap;
 }
 
 .control-group {
@@ -310,13 +276,16 @@ body {
 
 .control-group button,
 #inventory-btn {
-    padding: 8px 12px;
+    padding: 12px 16px;
     background: linear-gradient(45deg, #1a0033, #330066);
     color: #00ffff;
     border: 1px solid #00ffff;
     cursor: pointer;
     font-family: inherit;
     text-shadow: 0 0 5px currentColor;
+    min-width: 44px; /* Touch target minimum */
+    min-height: 44px;
+    font-size: clamp(14px, 2vw, 18px);
 }
 
 .control-group button:hover,
@@ -328,8 +297,8 @@ body {
 }
 
 .fire-button {
-    padding: 15px 40px;
-    font-size: 24px;
+    padding: 16px 32px;
+    font-size: clamp(18px, 3vw, 24px);
     background: linear-gradient(45deg, #cc0066, #ff0066);
     color: #ffff00;
     border: 2px solid #ff00ff;
@@ -339,6 +308,8 @@ body {
     text-shadow: 0 0 10px currentColor;
     box-shadow: 0 0 15px #ff0066;
     animation: pulse 1s ease-in-out infinite;
+    min-width: 100px;
+    min-height: 50px;
 }
 
 @keyframes pulse {
@@ -577,4 +548,90 @@ body {
 
 .explosion {
     animation: explosion 0.5s ease-out;
+}
+
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+    /* HUD adjustments */
+    #hud {
+        font-size: 12px;
+        padding: 8px;
+        flex-wrap: wrap;
+    }
+    
+    .hud-section {
+        gap: 10px;
+        margin: 2px 0;
+    }
+    
+    /* Setup screen */
+    .setup-grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+    
+    /* Shop grid */
+    .shop-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 10px;
+        max-height: 50vh;
+    }
+    
+    /* Control group adjustments */
+    .control-group {
+        gap: 2px;
+    }
+    
+    /* Modal adjustments */
+    .modal-content {
+        min-width: 90vw;
+        max-width: 90vw;
+        padding: 20px;
+    }
+    
+    /* Volume control */
+    .volume-control {
+        display: none; /* Hide on mobile to save space */
+    }
+    
+    /* Inventory button */
+    #inventory-btn {
+        padding: 8px 12px;
+        font-size: 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    /* Even smaller screens */
+    #hud {
+        font-size: 11px;
+    }
+    
+    .control-group button {
+        padding: 10px 12px;
+        font-size: 14px;
+        min-width: 40px;
+        min-height: 40px;
+    }
+    
+    .fire-button {
+        padding: 12px 24px;
+        font-size: 16px;
+    }
+}
+
+/* Landscape orientation specific */
+@media (orientation: landscape) and (max-height: 600px) {
+    #hud {
+        padding: 5px;
+        font-size: 11px;
+    }
+    
+    #controls {
+        padding: 5px;
+    }
+    
+    #game-canvas {
+        max-height: calc(100vh - 120px);
+    }
 }

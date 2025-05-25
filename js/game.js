@@ -5,9 +5,13 @@ class Game {
         this.ctx = canvas.getContext('2d');
         this.ui = ui;
         
-        // Set canvas size
+        // Set initial canvas size
         this.canvas.width = CONSTANTS.CANVAS_WIDTH;
         this.canvas.height = CONSTANTS.CANVAS_HEIGHT;
+        
+        // Listen for resize events
+        window.addEventListener('resize', () => this.updateCanvasSize());
+        window.addEventListener('orientationchange', () => this.updateCanvasSize());
         
         // Initialize renderer (try WebGL first)
         this.renderer = new Renderer(canvas, true);
@@ -45,6 +49,131 @@ class Game {
         
         // Debug mode
         this.debugMode = false;
+        
+        // Touch/mobile support
+        this.touchSupport = 'ontouchstart' in window;
+        this.touchDragInfo = null; // Store touch drag info for visual feedback
+        this.setupTouchControls();
+    }
+    
+    updateCanvasSize() {
+        const container = this.canvas.parentElement;
+        if (!container) return;
+        
+        // Only update size if game screen is visible
+        const gameScreen = document.getElementById('game-screen');
+        if (!gameScreen || gameScreen.classList.contains('hidden')) return;
+        
+        const rect = container.getBoundingClientRect();
+        const maxWidth = Math.min(rect.width, window.innerWidth);
+        const maxHeight = Math.min(rect.height, window.innerHeight - 150); // Account for UI
+        
+        // Calculate scale to fit while maintaining aspect ratio
+        const targetRatio = CONSTANTS.CANVAS_WIDTH / CONSTANTS.CANVAS_HEIGHT;
+        let width = maxWidth;
+        let height = width / targetRatio;
+        
+        if (height > maxHeight) {
+            height = maxHeight;
+            width = height * targetRatio;
+        }
+        
+        // Set actual canvas resolution
+        this.canvas.width = CONSTANTS.CANVAS_WIDTH;
+        this.canvas.height = CONSTANTS.CANVAS_HEIGHT;
+        
+        // Set CSS size for scaling
+        this.canvas.style.width = `${width}px`;
+        this.canvas.style.height = `${height}px`;
+        
+        // Store scale factor for touch coordinates
+        this.scaleX = CONSTANTS.CANVAS_WIDTH / width;
+        this.scaleY = CONSTANTS.CANVAS_HEIGHT / height;
+        
+        // Mark for redraw
+        if (this.dirtyRectManager) {
+            this.dirtyRectManager.markFullDirty();
+        }
+    }
+    
+    setupTouchControls() {
+        if (!this.touchSupport) return;
+        
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchStartPower = 0;
+        let touchStartAngle = 0;
+        let isDragging = false;
+        
+        this.canvas.addEventListener('touchstart', (e) => {
+            if (this.gameState !== CONSTANTS.GAME_STATES.PLAYING || this.projectileActive) return;
+            
+            const touch = e.touches[0];
+            const rect = this.canvas.getBoundingClientRect();
+            touchStartX = (touch.clientX - rect.left) * this.scaleX;
+            touchStartY = (touch.clientY - rect.top) * this.scaleY;
+            
+            const currentTank = this.tanks[this.currentPlayer];
+            if (currentTank && !currentTank.isAI) {
+                touchStartPower = currentTank.power;
+                touchStartAngle = currentTank.angle;
+                isDragging = true;
+                
+                // Store drag info for visual feedback
+                this.touchDragInfo = {
+                    startX: touchStartX,
+                    startY: touchStartY,
+                    currentX: touchStartX,
+                    currentY: touchStartY,
+                    tankX: currentTank.x,
+                    tankY: currentTank.y
+                };
+            }
+            
+            e.preventDefault();
+        });
+        
+        this.canvas.addEventListener('touchmove', (e) => {
+            if (!isDragging || this.gameState !== CONSTANTS.GAME_STATES.PLAYING) return;
+            
+            const touch = e.touches[0];
+            const rect = this.canvas.getBoundingClientRect();
+            const touchX = (touch.clientX - rect.left) * this.scaleX;
+            const touchY = (touch.clientY - rect.top) * this.scaleY;
+            
+            const currentTank = this.tanks[this.currentPlayer];
+            if (currentTank && !currentTank.isAI) {
+                // Calculate angle based on drag direction
+                const dx = touchX - touchStartX;
+                const dy = touchY - touchStartY;
+                const angleChange = dx * 0.5; // Sensitivity factor
+                currentTank.angle = Math.max(0, Math.min(180, touchStartAngle + angleChange));
+                
+                // Calculate power based on drag distance
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const powerChange = distance * 0.5; // Sensitivity factor
+                currentTank.power = Math.max(10, Math.min(100, touchStartPower + powerChange));
+                
+                // Update touch drag info for visual feedback
+                if (this.touchDragInfo) {
+                    this.touchDragInfo.currentX = touchX;
+                    this.touchDragInfo.currentY = touchY;
+                }
+                
+                // Update UI
+                this.ui.updateHUD();
+                this.dirtyRectManager.markDirty(0, 0, this.canvas.width, this.canvas.height);
+            }
+            
+            e.preventDefault();
+        });
+        
+        this.canvas.addEventListener('touchend', (e) => {
+            isDragging = false;
+            this.touchDragInfo = null; // Clear visual feedback
+            this.dirtyRectManager.markDirty(0, 0, this.canvas.width, this.canvas.height);
+            e.preventDefault();
+        });
     }
     
     startNewGame(settings) {
@@ -150,7 +279,7 @@ class Game {
                 
                 // Create flat spot for tank
                 const flatY = this.terrain.createFlatSpot(x, CONSTANTS.TANK_WIDTH * 2);
-                y = flatY - CONSTANTS.TANK_HEIGHT;
+                y = flatY - 12; // Pixel art tank height
                 
                 // Check distance from other tanks
                 validPosition = true;
@@ -463,6 +592,34 @@ class Game {
         
         // Draw effects
         this.effectsSystem.draw(this.ctx);
+        
+        // Draw touch drag feedback
+        if (this.touchDragInfo) {
+            this.ctx.save();
+            
+            // Draw line from tank to current touch position
+            this.ctx.strokeStyle = '#00ffff';
+            this.ctx.lineWidth = 2;
+            this.ctx.setLineDash([5, 5]);
+            this.ctx.beginPath();
+            this.ctx.moveTo(this.touchDragInfo.tankX, this.touchDragInfo.tankY);
+            this.ctx.lineTo(this.touchDragInfo.currentX, this.touchDragInfo.currentY);
+            this.ctx.stroke();
+            
+            // Draw power indicator circle
+            const distance = Math.sqrt(
+                Math.pow(this.touchDragInfo.currentX - this.touchDragInfo.startX, 2) +
+                Math.pow(this.touchDragInfo.currentY - this.touchDragInfo.startY, 2)
+            );
+            this.ctx.strokeStyle = '#ffff00';
+            this.ctx.lineWidth = 3;
+            this.ctx.setLineDash([]);
+            this.ctx.beginPath();
+            this.ctx.arc(this.touchDragInfo.tankX, this.touchDragInfo.tankY, Math.min(distance * 0.5, 100), 0, Math.PI * 2);
+            this.ctx.stroke();
+            
+            this.ctx.restore();
+        }
     }
     
     animate(currentTime = 0) {
