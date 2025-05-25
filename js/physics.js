@@ -138,12 +138,13 @@ class Physics {
             
             for (let obj of nearbyObjects) {
                 if (obj.type === 'tank' && obj.tank.state !== CONSTANTS.TANK_STATES.DESTROYED) {
-                    const dx = x - obj.tank.x;
-                    const dy = y - obj.tank.y;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-                    
-                    if (distance < CONSTANTS.TANK_WIDTH / 2) {
-                        return obj.tank;
+                    const tank = obj.tank;
+                    // Check if projectile is within tank's bounding box
+                    // tank.y is the bottom of the tank
+                    const halfWidth = CONSTANTS.TANK_WIDTH / 2;
+                    if (x >= tank.x - halfWidth && x <= tank.x + halfWidth &&
+                        y >= tank.y - CONSTANTS.TANK_HEIGHT && y <= tank.y) {
+                        return tank;
                     }
                 }
             }
@@ -154,11 +155,11 @@ class Physics {
         for (let tank of tanks) {
             if (tank.state === CONSTANTS.TANK_STATES.DESTROYED) continue;
             
-            const dx = x - tank.x;
-            const dy = y - tank.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            
-            if (distance < CONSTANTS.TANK_WIDTH / 2) {
+            // Check if projectile is within tank's bounding box
+            // tank.y is the bottom of the tank
+            const halfWidth = CONSTANTS.TANK_WIDTH / 2;
+            if (x >= tank.x - halfWidth && x <= tank.x + halfWidth &&
+                y >= tank.y - CONSTANTS.TANK_HEIGHT && y <= tank.y) {
                 return tank;
             }
         }

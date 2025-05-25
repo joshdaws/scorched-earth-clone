@@ -141,6 +141,35 @@ class EffectsSystem {
         }
     }
     
+    createFallingDirt(x, y, fallSpeed) {
+        // Create dirt particles that fall naturally
+        const numParticles = 5 + Math.floor(Math.random() * 5);
+        
+        for (let i = 0; i < numParticles; i++) {
+            const size = 1 + Math.random() * 3;
+            const horizontalSpread = (Math.random() - 0.5) * 10;
+            
+            // Use terrain colors with some variation
+            const hue = 280 + Math.random() * 20; // Purple-tinted
+            const saturation = 20 + Math.random() * 30;
+            const lightness = 20 + Math.random() * 20;
+            
+            this.particles.push({
+                x: x + horizontalSpread,
+                y: y,
+                vx: horizontalSpread * 0.1,
+                vy: fallSpeed + Math.random() * 5,
+                size: size,
+                color: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
+                lifetime: 2000 + Math.random() * 1000,
+                maxLifetime: 3000,
+                gravity: 300,
+                bounce: true, // New property for dirt particles
+                bounceDamping: 0.3
+            });
+        }
+    }
+    
     createFireEffect(x, y, radius) {
         // Create lingering fire particles
         setInterval(() => {
@@ -174,16 +203,37 @@ class EffectsSystem {
         });
     }
     
-    update(deltaTime) {
+    update(deltaTime, terrain = null) {
         // Update particles
         for (let particle of this.particles) {
+            // Update position
             particle.x += particle.vx * deltaTime / 1000;
             particle.y += particle.vy * deltaTime / 1000;
             particle.vy += particle.gravity * deltaTime / 1000;
             particle.lifetime -= deltaTime;
             
+            // Apply fade effect
             if (particle.fade) {
                 particle.size *= 0.98;
+            }
+            
+            // Handle bouncing dirt particles
+            if (particle.bounce && terrain) {
+                const groundY = terrain.getHeightAt(particle.x);
+                if (particle.y >= groundY) {
+                    // Particle hit the ground
+                    particle.y = groundY;
+                    particle.vy = -particle.vy * particle.bounceDamping;
+                    particle.vx *= 0.8; // Friction on bounce
+                    
+                    // Stop bouncing if velocity is too low
+                    if (Math.abs(particle.vy) < 10) {
+                        particle.bounce = false;
+                        particle.vy = 0;
+                        particle.vx = 0;
+                        particle.lifetime = Math.min(particle.lifetime, 500); // Fade out quickly once settled
+                    }
+                }
             }
         }
         

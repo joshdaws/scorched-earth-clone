@@ -257,43 +257,20 @@ body {
     touch-action: none; /* Prevent default touch behaviors */
 }
 
-/* Controls */
-#controls {
-    background-color: #111;
-    border-top: 2px solid #0f0;
-    padding: 10px;
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-    align-items: center;
-    flex-wrap: wrap;
+/* Fire Button Positioning */
+#fire-btn {
+    position: absolute;
+    bottom: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
 }
 
-.control-group {
-    display: flex;
-    gap: 5px;
-}
-
-.control-group button,
-#inventory-btn {
-    padding: 12px 16px;
-    background: linear-gradient(45deg, #1a0033, #330066);
-    color: #00ffff;
-    border: 1px solid #00ffff;
-    cursor: pointer;
-    font-family: inherit;
-    text-shadow: 0 0 5px currentColor;
-    min-width: 44px; /* Touch target minimum */
-    min-height: 44px;
-    font-size: clamp(14px, 2vw, 18px);
-}
-
-.control-group button:hover,
-#inventory-btn:hover {
-    background: linear-gradient(45deg, #330066, #6600cc);
-    color: #ffffff;
-    border-color: #ff00ff;
-    box-shadow: 0 0 10px #ff00ff;
+/* Hide Fire button on mobile devices */
+@media (max-width: 768px), (pointer: coarse) {
+    #fire-btn {
+        display: none;
+    }
 }
 
 .fire-button {
@@ -310,6 +287,7 @@ body {
     animation: pulse 1s ease-in-out infinite;
     min-width: 100px;
     min-height: 50px;
+    border-radius: 8px;
 }
 
 @keyframes pulse {

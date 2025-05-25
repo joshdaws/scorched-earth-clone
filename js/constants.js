@@ -9,8 +9,8 @@ const CONSTANTS = {
     WIND_MAX: 10,
     
     // Tank settings
-    TANK_WIDTH: 20,
-    TANK_HEIGHT: 15,
+    TANK_WIDTH: 24,
+    TANK_HEIGHT: 12,
     TANK_MIN_DISTANCE: 80,
     TANK_FALL_DAMAGE_HEIGHT: 50,
     
@@ -23,7 +23,7 @@ const CONSTANTS = {
             name: 'Missile',
             cost: 0,
             damage: 100,  // Direct hit should kill
-            radius: 20,
+            radius: 30,  // Increased from 20
             quantity: -1, // unlimited
             projectileType: 'ballistic',
             color: '#fff'
@@ -32,7 +32,7 @@ const CONSTANTS = {
             name: 'Baby Nuke',
             cost: 500,
             damage: 150,  // Ensures kill even with shields
-            radius: 50,
+            radius: 75,  // Increased from 50
             quantity: 1,
             projectileType: 'ballistic',
             color: '#ff0'
@@ -41,7 +41,7 @@ const CONSTANTS = {
             name: 'Nuke',
             cost: 1000,
             damage: 200,  // Massive damage
-            radius: 100,
+            radius: 150,  // Increased from 100
             quantity: 1,
             projectileType: 'ballistic',
             color: '#f00'
@@ -50,7 +50,7 @@ const CONSTANTS = {
             name: 'Dirt Bomb',
             cost: 300,
             damage: 0,
-            radius: 40,
+            radius: 60,  // Increased from 40
             quantity: 5,
             projectileType: 'dirt',
             color: '#840'
@@ -59,7 +59,7 @@ const CONSTANTS = {
             name: 'Napalm',
             cost: 800,
             damage: 120,  // Direct hit kills, plus fire damage
-            radius: 60,
+            radius: 90,  // Increased from 60
             quantity: 2,
             projectileType: 'fire',
             color: '#f80'
@@ -68,7 +68,7 @@ const CONSTANTS = {
             name: 'Funky Bomb',
             cost: 1500,
             damage: 80,  // Each submunition does good damage
-            radius: 30,
+            radius: 45,  // Increased from 30
             quantity: 1,
             projectileType: 'cluster',
             subMunitions: 8,
@@ -178,6 +178,7 @@ const CONSTANTS = {
         DAMAGED: 'damaged',
         BURIED: 'buried',
         FALLING: 'falling',
+        SLIDING: 'sliding',
         DESTROYED: 'destroyed'
     },
     

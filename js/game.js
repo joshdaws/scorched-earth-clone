@@ -143,16 +143,22 @@ class Game {
             
             const currentTank = this.tanks[this.currentPlayer];
             if (currentTank && !currentTank.isAI) {
-                // Calculate angle based on drag direction
-                const dx = touchX - touchStartX;
-                const dy = touchY - touchStartY;
-                const angleChange = dx * 0.5; // Sensitivity factor
-                currentTank.angle = Math.max(0, Math.min(180, touchStartAngle + angleChange));
+                // Slingshot behavior - trajectory is opposite to drag direction
+                const dx = touchX - currentTank.x;
+                const dy = touchY - currentTank.y;
                 
-                // Calculate power based on drag distance
+                // Calculate angle from tank to touch point, then flip 180 degrees
+                let angle = Math.atan2(-dy, dx) * 180 / Math.PI; // Negative dy because canvas Y is flipped
+                angle = (angle + 180) % 360; // Flip 180 degrees for slingshot effect
+                
+                // Clamp to valid firing range (0-180 degrees)
+                if (angle > 180) angle = 360 - angle;
+                currentTank.angle = Math.max(0, Math.min(180, angle));
+                
+                // Calculate power based on drag distance from tank (farther = more power)
                 const distance = Math.sqrt(dx * dx + dy * dy);
-                const powerChange = distance * 0.5; // Sensitivity factor
-                currentTank.power = Math.max(10, Math.min(100, touchStartPower + powerChange));
+                const powerChange = distance * 1.0; // Sensitivity for slingshot
+                currentTank.power = Math.max(10, Math.min(500, powerChange));
                 
                 // Update touch drag info for visual feedback
                 if (this.touchDragInfo) {
@@ -161,7 +167,7 @@ class Game {
                 }
                 
                 // Update UI
-                this.ui.updateHUD();
+                this.ui.updateHUD(this.getGameState());
                 this.dirtyRectManager.markDirty(0, 0, this.canvas.width, this.canvas.height);
             }
             
@@ -169,6 +175,11 @@ class Game {
         });
         
         this.canvas.addEventListener('touchend', (e) => {
+            if (isDragging && this.gameState === CONSTANTS.GAME_STATES.PLAYING && !this.projectileActive) {
+                // Auto-fire on release (slingshot behavior)
+                this.fireCurrentTank();
+            }
+            
             isDragging = false;
             this.touchDragInfo = null; // Clear visual feedback
             this.dirtyRectManager.markDirty(0, 0, this.canvas.width, this.canvas.height);
@@ -279,7 +290,7 @@ class Game {
                 
                 // Create flat spot for tank
                 const flatY = this.terrain.createFlatSpot(x, CONSTANTS.TANK_WIDTH * 2);
-                y = flatY - 12; // Pixel art tank height
+                y = flatY; // Tank y position is at ground level
                 
                 // Check distance from other tanks
                 validPosition = true;
@@ -343,8 +354,9 @@ class Game {
     }
     
     startTurn() {
-        // Skip destroyed tanks
-        while (this.tanks[this.currentPlayer].state === CONSTANTS.TANK_STATES.DESTROYED) {
+        // Skip destroyed and buried tanks
+        while (this.tanks[this.currentPlayer].state === CONSTANTS.TANK_STATES.DESTROYED ||
+               this.tanks[this.currentPlayer].state === CONSTANTS.TANK_STATES.BURIED) {
             this.nextPlayer();
             
             // Check if round is over
@@ -433,7 +445,10 @@ class Game {
     }
     
     countAliveTanks() {
-        return this.tanks.filter(t => t.state !== CONSTANTS.TANK_STATES.DESTROYED).length;
+        return this.tanks.filter(t => 
+            t.state !== CONSTANTS.TANK_STATES.DESTROYED && 
+            t.state !== CONSTANTS.TANK_STATES.BURIED
+        ).length;
     }
     
     endRound() {
@@ -532,7 +547,7 @@ class Game {
             );
         }
         
-        this.effectsSystem.update(deltaTime);
+        this.effectsSystem.update(deltaTime, this.terrain);
         
         // Update spatial grid if tanks moved
         this.updateSpatialGrid();
@@ -543,19 +558,28 @@ class Game {
             
             // Apply terrain collapse after explosions
             let collapseFrames = 0;
+            const maxCollapseFrames = 30; // More frames for smoother animation
             const collapseInterval = setInterval(() => {
                 const hasCollapsed = this.terrain.applyTerrainCollapse(this.effectsSystem, this.soundSystem);
+                
+                // Update tank positions during collapse
+                for (let tank of this.tanks) {
+                    if (tank.state !== CONSTANTS.TANK_STATES.DESTROYED) {
+                        tank.update(16, this.terrain, this.physics); // ~60fps update
+                    }
+                }
+                
                 if (hasCollapsed) {
                     this.dirtyRectManager.markFullDirty();
                 }
                 collapseFrames++;
                 
-                // Stop after 10 frames or when terrain stabilizes
-                if (collapseFrames >= 10 || !hasCollapsed) {
+                // Stop after max frames or when terrain stabilizes
+                if (collapseFrames >= maxCollapseFrames || (!hasCollapsed && collapseFrames > 5)) {
                     clearInterval(collapseInterval);
                     setTimeout(() => this.endTurn(), 500);
                 }
-            }, 50);
+            }, 33); // ~30fps for smoother animation
         }
         
         // Update UI
@@ -593,30 +617,68 @@ class Game {
         // Draw effects
         this.effectsSystem.draw(this.ctx);
         
-        // Draw touch drag feedback
+        // Draw touch drag feedback (slingshot style)
         if (this.touchDragInfo) {
             this.ctx.save();
             
-            // Draw line from tank to current touch position
-            this.ctx.strokeStyle = '#00ffff';
-            this.ctx.lineWidth = 2;
-            this.ctx.setLineDash([5, 5]);
-            this.ctx.beginPath();
-            this.ctx.moveTo(this.touchDragInfo.tankX, this.touchDragInfo.tankY);
-            this.ctx.lineTo(this.touchDragInfo.currentX, this.touchDragInfo.currentY);
-            this.ctx.stroke();
-            
-            // Draw power indicator circle
-            const distance = Math.sqrt(
-                Math.pow(this.touchDragInfo.currentX - this.touchDragInfo.startX, 2) +
-                Math.pow(this.touchDragInfo.currentY - this.touchDragInfo.startY, 2)
-            );
-            this.ctx.strokeStyle = '#ffff00';
-            this.ctx.lineWidth = 3;
-            this.ctx.setLineDash([]);
-            this.ctx.beginPath();
-            this.ctx.arc(this.touchDragInfo.tankX, this.touchDragInfo.tankY, Math.min(distance * 0.5, 100), 0, Math.PI * 2);
-            this.ctx.stroke();
+            const currentTank = this.tanks[this.currentPlayer];
+            if (currentTank) {
+                // Draw slingshot line (from tank to drag point)
+                this.ctx.strokeStyle = '#00ffff';
+                this.ctx.lineWidth = 2;
+                this.ctx.setLineDash([5, 5]);
+                this.ctx.beginPath();
+                this.ctx.moveTo(this.touchDragInfo.tankX, this.touchDragInfo.tankY);
+                this.ctx.lineTo(this.touchDragInfo.currentX, this.touchDragInfo.currentY);
+                this.ctx.stroke();
+                
+                // Draw trajectory line (opposite direction from drag)
+                const dx = this.touchDragInfo.currentX - this.touchDragInfo.tankX;
+                const dy = this.touchDragInfo.currentY - this.touchDragInfo.tankY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance > 5) { // Only show if dragging significantly
+                    // Calculate trajectory endpoint (opposite direction)
+                    const trajectoryLength = Math.min(distance * 0.8, 150);
+                    const trajectoryEndX = this.touchDragInfo.tankX - (dx / distance) * trajectoryLength;
+                    const trajectoryEndY = this.touchDragInfo.tankY - (dy / distance) * trajectoryLength;
+                    
+                    // Draw trajectory arrow
+                    this.ctx.strokeStyle = '#ff00ff';
+                    this.ctx.lineWidth = 3;
+                    this.ctx.setLineDash([]);
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(this.touchDragInfo.tankX, this.touchDragInfo.tankY);
+                    this.ctx.lineTo(trajectoryEndX, trajectoryEndY);
+                    this.ctx.stroke();
+                    
+                    // Draw arrowhead
+                    const arrowSize = 10;
+                    const angle = Math.atan2(trajectoryEndY - this.touchDragInfo.tankY, trajectoryEndX - this.touchDragInfo.tankX);
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(trajectoryEndX, trajectoryEndY);
+                    this.ctx.lineTo(
+                        trajectoryEndX - arrowSize * Math.cos(angle - Math.PI / 6),
+                        trajectoryEndY - arrowSize * Math.sin(angle - Math.PI / 6)
+                    );
+                    this.ctx.moveTo(trajectoryEndX, trajectoryEndY);
+                    this.ctx.lineTo(
+                        trajectoryEndX - arrowSize * Math.cos(angle + Math.PI / 6),
+                        trajectoryEndY - arrowSize * Math.sin(angle + Math.PI / 6)
+                    );
+                    this.ctx.stroke();
+                }
+                
+                // Draw power indicator circle
+                const power = Math.min(distance * 1.0, 500);
+                const radius = Math.min(power * 0.2, 100);
+                this.ctx.strokeStyle = '#ffff00';
+                this.ctx.lineWidth = 2;
+                this.ctx.setLineDash([3, 3]);
+                this.ctx.beginPath();
+                this.ctx.arc(this.touchDragInfo.tankX, this.touchDragInfo.tankY, radius, 0, Math.PI * 2);
+                this.ctx.stroke();
+            }
             
             this.ctx.restore();
         }

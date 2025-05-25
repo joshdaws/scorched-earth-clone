@@ -26,36 +26,67 @@ class Terrain {
         this.renderTerrain();
     }
     
+    clampTerrainAboveButton() {
+        // Ensure terrain stays above fire button
+        const fireButtonHeight = 120;
+        const minHeight = this.height - fireButtonHeight;
+        for (let i = 0; i < this.heightMap.length; i++) {
+            this.heightMap[i] = Math.max(minHeight, this.heightMap[i]);
+        }
+    }
+    
     generateRandom() {
         // Use midpoint displacement algorithm
         const points = this.heightMap.length;
-        const minHeight = this.height * 0.3;
-        const maxHeight = this.height * 0.8;
+        const fireButtonHeight = 120; // Reserve space for fire button (60px + padding)
+        const minHeight = Math.max(this.height * 0.15, this.height - fireButtonHeight);  // Ensure terrain stays above fire button
+        const maxHeight = this.height * 0.9;   // Higher maximum for taller peaks
         
-        // Set initial endpoints
+        // Set initial endpoints with more variation
         this.heightMap[0] = Math.random() * (maxHeight - minHeight) + minHeight;
         this.heightMap[points - 1] = Math.random() * (maxHeight - minHeight) + minHeight;
         
-        // Recursive midpoint displacement
-        this.midpointDisplacement(0, points - 1, (maxHeight - minHeight) * 0.5);
+        // Recursive midpoint displacement with more displacement for rougher terrain
+        this.midpointDisplacement(0, points - 1, (maxHeight - minHeight) * 0.7);
         
-        // Smooth the terrain
-        this.smoothTerrain(3);
+        // Add some random peaks and valleys
+        const numFeatures = 3 + Math.floor(Math.random() * 3);
+        for (let f = 0; f < numFeatures; f++) {
+            const featureX = Math.floor(Math.random() * points);
+            const featureSize = 20 + Math.floor(Math.random() * 40);
+            const featureHeight = (Math.random() - 0.5) * this.height * 0.3;
+            
+            for (let i = Math.max(0, featureX - featureSize); 
+                 i < Math.min(points, featureX + featureSize); i++) {
+                const dist = Math.abs(i - featureX);
+                const factor = Math.cos((dist / featureSize) * Math.PI / 2);
+                this.heightMap[i] += featureHeight * factor * factor;
+                // Clamp
+                this.heightMap[i] = Math.max(this.height * 0.1, 
+                    Math.min(this.height * 0.95, this.heightMap[i]));
+            }
+        }
+        
+        // Less smoothing for more dramatic terrain
+        this.smoothTerrain(1);
+        
+        // Final clamp to ensure terrain stays above fire button
+        this.clampTerrainAboveButton();
     }
     
     generateMountains() {
         const points = this.heightMap.length;
-        const baseHeight = this.height * 0.6;
+        const baseHeight = this.height * 0.7;  // Higher base for more dramatic mountains
         
         // Create multiple mountain peaks
-        const numPeaks = 3 + Math.floor(Math.random() * 3);
+        const numPeaks = 2 + Math.floor(Math.random() * 3);
         for (let i = 0; i < points; i++) {
             let height = baseHeight;
             
             for (let p = 0; p < numPeaks; p++) {
                 const peakX = (p + 0.5) * points / numPeaks;
-                const peakHeight = this.height * (0.2 + Math.random() * 0.3);
-                const peakWidth = points / (numPeaks * 2);
+                const peakHeight = this.height * (0.4 + Math.random() * 0.4);  // Taller peaks
+                const peakWidth = points / (numPeaks * 1.5);  // Wider peaks
                 
                 const dist = Math.abs(i - peakX);
                 if (dist < peakWidth) {
@@ -64,27 +95,47 @@ class Terrain {
                 }
             }
             
-            this.heightMap[i] = height + (Math.random() - 0.5) * 20;
+            this.heightMap[i] = height + (Math.random() - 0.5) * 30;  // More noise
         }
         
-        this.smoothTerrain(2);
+        this.smoothTerrain(1);  // Less smoothing for sharper peaks
+        
+        // Final clamp to ensure terrain stays above fire button
+        this.clampTerrainAboveButton();
     }
     
     generateValleys() {
         const points = this.heightMap.length;
-        const baseHeight = this.height * 0.4;
+        const baseHeight = this.height * 0.5;
         
-        // Create rolling valleys
+        // Create dramatic valleys with high walls
         for (let i = 0; i < points; i++) {
             const x = i / points;
+            // Multiple sine waves for complex terrain
             const height = baseHeight + 
-                Math.sin(x * Math.PI * 4) * this.height * 0.1 +
-                Math.sin(x * Math.PI * 7) * this.height * 0.05 +
-                (Math.random() - 0.5) * 20;
+                Math.sin(x * Math.PI * 3) * this.height * 0.3 +    // Big valleys
+                Math.sin(x * Math.PI * 8) * this.height * 0.1 +    // Smaller variations
+                Math.cos(x * Math.PI * 5) * this.height * 0.15 +   // More complexity
+                (Math.random() - 0.5) * 40;                        // More noise
             this.heightMap[i] = height;
         }
         
-        this.smoothTerrain(2);
+        // Add some steep cliffs
+        const numCliffs = 1 + Math.floor(Math.random() * 2);
+        for (let c = 0; c < numCliffs; c++) {
+            const cliffX = Math.floor(Math.random() * (points - 40)) + 20;
+            const cliffHeight = this.height * (0.2 + Math.random() * 0.2);
+            
+            for (let i = cliffX; i < Math.min(cliffX + 20, points); i++) {
+                const t = (i - cliffX) / 20;
+                this.heightMap[i] -= cliffHeight * (1 - t);
+            }
+        }
+        
+        this.smoothTerrain(1);  // Less smoothing for sharper features
+        
+        // Final clamp to ensure terrain stays above fire button
+        this.clampTerrainAboveButton();
     }
     
     midpointDisplacement(left, right, displacement) {
@@ -94,13 +145,13 @@ class Terrain {
         this.heightMap[mid] = (this.heightMap[left] + this.heightMap[right]) / 2 + 
             (Math.random() - 0.5) * displacement;
         
-        // Clamp to valid range
-        this.heightMap[mid] = Math.max(this.height * 0.2, 
-            Math.min(this.height * 0.9, this.heightMap[mid]));
+        // Clamp to valid range with wider range for more variation
+        this.heightMap[mid] = Math.max(this.height * 0.1, 
+            Math.min(this.height * 0.95, this.heightMap[mid]));
         
-        // Recurse
-        this.midpointDisplacement(left, mid, displacement * 0.6);
-        this.midpointDisplacement(mid, right, displacement * 0.6);
+        // Recurse with slower displacement reduction for rougher terrain
+        this.midpointDisplacement(left, mid, displacement * 0.65);
+        this.midpointDisplacement(mid, right, displacement * 0.65);
     }
     
     smoothTerrain(passes) {
@@ -337,41 +388,50 @@ class Terrain {
     // Apply terrain collapse physics
     applyTerrainCollapse(effectsSystem = null, soundSystem = null) {
         let changed = false;
-        const collapseRate = 3; // How fast terrain collapses
         const collapseLocations = [];
         
+        // First pass: detect unsupported terrain segments
+        const unsupportedSegments = [];
         for (let i = 1; i < this.heightMap.length - 1; i++) {
             if (!this.checkTerrainSupport(i)) {
-                // This point has no support, make it collapse
-                const leftHeight = this.heightMap[i - 1];
-                const rightHeight = this.heightMap[i + 1];
-                const avgNeighborHeight = (leftHeight + rightHeight) / 2;
-                
-                // Collapse towards the lower of the neighbors
-                const targetHeight = Math.max(leftHeight, rightHeight);
-                
-                // Gradually collapse towards target height
-                if (this.heightMap[i] < targetHeight - 5) {
-                    const oldHeight = this.heightMap[i];
-                    this.heightMap[i] = Math.min(this.heightMap[i] + collapseRate, targetHeight);
-                    
-                    // Record collapse location for particle effects
-                    if (effectsSystem && Math.random() < 0.3) {
-                        collapseLocations.push({
-                            x: i * CONSTANTS.TERRAIN_RESOLUTION,
-                            y: oldHeight
-                        });
-                    }
-                    changed = true;
-                }
+                unsupportedSegments.push(i);
             }
         }
         
-        // Create dirt particles for collapsing terrain
-        if (effectsSystem) {
-            for (let loc of collapseLocations) {
-                effectsSystem.createDirtSpray(loc.x, loc.y, Math.PI / 2); // Falling down
+        // Second pass: make unsupported terrain fall
+        for (let i of unsupportedSegments) {
+            const oldHeight = this.heightMap[i];
+            const leftHeight = this.heightMap[i - 1];
+            const rightHeight = this.heightMap[i + 1];
+            
+            // Find the target height (where the dirt should settle)
+            const targetHeight = Math.max(leftHeight, rightHeight);
+            
+            // Make terrain fall with gravity-like acceleration
+            const fallDistance = targetHeight - oldHeight;
+            if (fallDistance > 2) {
+                // Fall faster for larger gaps
+                const fallSpeed = Math.min(fallDistance * 0.3, 10);
+                this.heightMap[i] = oldHeight + fallSpeed;
+                
+                // Create falling dirt particles
+                if (effectsSystem) {
+                    // Multiple particles for more realistic effect
+                    for (let j = 0; j < 3; j++) {
+                        const particleX = i * CONSTANTS.TERRAIN_RESOLUTION + (Math.random() - 0.5) * 5;
+                        const particleY = oldHeight + Math.random() * 10;
+                        effectsSystem.createFallingDirt(particleX, particleY, fallSpeed);
+                    }
+                }
+                
+                changed = true;
+                collapseLocations.push({ x: i * CONSTANTS.TERRAIN_RESOLUTION, y: oldHeight });
             }
+        }
+        
+        // Third pass: smooth the terrain to simulate dirt settling
+        if (changed) {
+            this.smoothCollapsedTerrain(unsupportedSegments);
         }
         
         // Play collapse sound if terrain changed
@@ -384,6 +444,19 @@ class Terrain {
         }
         
         return changed;
+    }
+    
+    // Smooth collapsed terrain sections
+    smoothCollapsedTerrain(segments) {
+        for (let i of segments) {
+            if (i > 0 && i < this.heightMap.length - 1) {
+                // Average with neighbors to create natural settling
+                const prev = this.heightMap[i - 1];
+                const curr = this.heightMap[i];
+                const next = this.heightMap[i + 1];
+                this.heightMap[i] = (prev * 0.25 + curr * 0.5 + next * 0.25);
+            }
+        }
     }
     
     draw(ctx) {

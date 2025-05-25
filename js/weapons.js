@@ -278,16 +278,19 @@ class WeaponSystem {
         for (let tank of tanks) {
             if (tank.state === CONSTANTS.TANK_STATES.DESTROYED) continue;
             
-            const dist = Math.sqrt((tank.x - x) ** 2 + (tank.y - y) ** 2);
+            // Calculate distance from explosion center to tank center
+            // tank.y is the bottom of the tank, so tank center is at y - TANK_HEIGHT/2
+            const tankCenterY = tank.y - CONSTANTS.TANK_HEIGHT / 2;
+            const dist = Math.sqrt((tank.x - x) ** 2 + (tankCenterY - y) ** 2);
             
             if (tank === directHitTank) {
                 // Direct hit
-                this.damageTarget(tank, projectile, true, null, effectsSystem);
+                this.damageTarget(tank, projectile, true, null, effectsSystem, soundSystem);
             } else if (dist < weapon.radius) {
                 // Splash damage
                 const damageFactor = 1 - (dist / weapon.radius);
-                const damage = Math.floor(weapon.damage * damageFactor * 0.5);
-                this.damageTarget(tank, projectile, false, damage, effectsSystem);
+                const damage = Math.max(1, Math.floor(weapon.damage * damageFactor * 0.75)); // Increased multiplier and minimum 1 damage
+                this.damageTarget(tank, projectile, false, damage, effectsSystem, soundSystem);
             }
         }
         
@@ -297,7 +300,7 @@ class WeaponSystem {
         }
     }
     
-    static damageTarget(tank, projectile, directHit = false, overrideDamage = null, effectsSystem = null) {
+    static damageTarget(tank, projectile, directHit = false, overrideDamage = null, effectsSystem = null, soundSystem = null) {
         if (tank === projectile.owner && !directHit) {
             // Reduced self-damage from splash
             overrideDamage = Math.floor((overrideDamage || projectile.weapon.damage) * 0.5);

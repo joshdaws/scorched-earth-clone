@@ -51,6 +51,22 @@ async function takeScreenshot() {
                 await page.click('#start-game-btn');
                 await new Promise(resolve => setTimeout(resolve, 2000));
                 
+                // Click Start Next Round button to skip shop
+                try {
+                    await page.waitForSelector('button', { timeout: 1000 });
+                    const buttons = await page.$$('button');
+                    for (const button of buttons) {
+                        const text = await page.evaluate(el => el.textContent, button);
+                        if (text.includes('Start Next Round')) {
+                            await button.click();
+                            break;
+                        }
+                    }
+                } catch (e) {
+                    // Shop might not appear
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 2000));
                 console.log('Taking screenshot of gameplay...');
                 break;
                 

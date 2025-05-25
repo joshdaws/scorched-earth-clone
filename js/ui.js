@@ -45,16 +45,6 @@ class UIManager {
         addClickAndTouch('start-game-btn', () => this.startGame());
         
         // Game controls
-        addClickAndTouch('angle-down-coarse', () => this.adjustAngle(-3));
-        addClickAndTouch('angle-down', () => this.adjustAngle(-1));
-        addClickAndTouch('angle-up', () => this.adjustAngle(1));
-        addClickAndTouch('angle-up-coarse', () => this.adjustAngle(3));
-        
-        addClickAndTouch('power-down-coarse', () => this.adjustPower(-3));
-        addClickAndTouch('power-down', () => this.adjustPower(-1));
-        addClickAndTouch('power-up', () => this.adjustPower(1));
-        addClickAndTouch('power-up-coarse', () => this.adjustPower(3));
-        
         addClickAndTouch('fire-btn', () => this.fire());
         addClickAndTouch('inventory-btn', () => this.showInventory());
         
@@ -391,11 +381,11 @@ class UIManager {
         
         switch(key) {
             case 'arrowleft':
-                this.adjustAngle(ctrl ? -5 : -1);
+                this.adjustAngle(ctrl ? 5 : 1);
                 e.preventDefault();
                 break;
             case 'arrowright':
-                this.adjustAngle(ctrl ? 5 : 1);
+                this.adjustAngle(ctrl ? -5 : -1);
                 e.preventDefault();
                 break;
             case 'arrowup':
