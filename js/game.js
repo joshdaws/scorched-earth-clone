@@ -420,9 +420,12 @@ class Game {
             }
         } else {
             // No projectile created - check if tank destroyed itself while buried
+            console.log('No projectile created, tank state:', currentTank.state);
             if (currentTank.state === CONSTANTS.TANK_STATES.DESTROYED) {
                 // Tank destroyed itself - check for round end
-                if (this.countAliveTanks() < 2) {
+                const aliveCount = this.countAliveTanks();
+                console.log('Tank destroyed itself, alive tanks:', aliveCount);
+                if (aliveCount < 2) {
                     setTimeout(() => this.endRound(), 1000);
                 } else {
                     setTimeout(() => this.endTurn(), 500);
@@ -456,8 +459,7 @@ class Game {
     
     countAliveTanks() {
         return this.tanks.filter(t => 
-            t.state !== CONSTANTS.TANK_STATES.DESTROYED && 
-            t.state !== CONSTANTS.TANK_STATES.BURIED
+            t.state !== CONSTANTS.TANK_STATES.DESTROYED
         ).length;
     }
     
@@ -467,7 +469,30 @@ class Game {
             t.state !== CONSTANTS.TANK_STATES.DESTROYED && 
             t.state !== CONSTANTS.TANK_STATES.BURIED
         );
-        const winner = aliveTanks.length === 1 ? aliveTanks[0] : null;
+        
+        console.log('Round ending:', {
+            totalTanks: this.tanks.length,
+            aliveTanks: aliveTanks.length,
+            tankStates: this.tanks.map(t => ({
+                name: t.playerName,
+                state: t.state,
+                health: t.health
+            }))
+        });
+        
+        // If exactly 1 tank alive (not buried/destroyed), they win
+        // If 0 tanks alive, it's a true draw (all destroyed)
+        // If more than 1 alive, round shouldn't have ended (bug)
+        let winner = null;
+        if (aliveTanks.length === 1) {
+            winner = aliveTanks[0];
+        } else if (aliveTanks.length > 1) {
+            console.error('ERROR: Round ended with multiple tanks alive!', aliveTanks.length);
+            // Pick the one with most health as winner to avoid draw
+            winner = aliveTanks.reduce((best, tank) => 
+                tank.health > best.health ? tank : best
+            );
+        }
         
         // Give kill credit to the last tank standing if there's a winner
         if (winner && aliveTanks.length === 1) {

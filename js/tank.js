@@ -275,7 +275,9 @@ class Tank {
 
     if (this.state === CONSTANTS.TANK_STATES.BURIED) {
       // Firing while buried destroys the tank
+      console.log('Tank firing while buried, state before:', this.state);
       this.takeDamage(999); // Ensure destruction
+      console.log('Tank state after damage:', this.state, 'health:', this.health);
       this.showMessage("Catastrophic self-damage!");
       return null;
     }
