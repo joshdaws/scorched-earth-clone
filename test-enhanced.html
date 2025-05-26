@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Enhanced Features</title>
+    <style>
+        body {
+            background: #000;
+            color: #fff;
+            font-family: monospace;
+            padding: 20px;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            background: #111;
+            border: 1px solid #333;
+        }
+        .success { color: #0f0; }
+        .error { color: #f00; }
+        #test-canvas {
+            border: 1px solid #666;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Enhanced Features Test</h1>
+    <div id="status"></div>
+    <canvas id="test-canvas" width="800" height="600"></canvas>
+    
+    <!-- Load libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.3.2/pixi.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    
+    <script>
+        const status = document.getElementById('status');
+        
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.textContent = message;
+            status.appendChild(div);
+        }
+        
+        // Test Matter.js
+        if (typeof Matter !== 'undefined') {
+            log('✓ Matter.js loaded successfully', 'success');
+            
+            // Create a simple physics demo
+            const engine = Matter.Engine.create();
+            const world = engine.world;
+            
+            // Create a box
+            const box = Matter.Bodies.rectangle(400, 200, 80, 80);
+            Matter.World.add(world, box);
+            
+            log('✓ Matter.js engine created', 'success');
+        } else {
+            log('✗ Matter.js failed to load', 'error');
+        }
+        
+        // Test PIXI.js
+        if (typeof PIXI !== 'undefined') {
+            log('✓ PIXI.js loaded successfully', 'success');
+            
+            // Create a simple PIXI app
+            const app = new PIXI.Application({
+                width: 800,
+                height: 600,
+                view: document.getElementById('test-canvas'),
+                backgroundColor: 0x1a0033
+            });
+            
+            // Create a circle
+            const graphics = new PIXI.Graphics();
+            graphics.beginFill(0xff00ff);
+            graphics.drawCircle(400, 300, 50);
+            graphics.endFill();
+            app.stage.addChild(graphics);
+            
+            log('✓ PIXI.js renderer created', 'success');
+            
+            // Animate the circle
+            app.ticker.add(() => {
+                graphics.rotation += 0.01;
+            });
+        } else {
+            log('✗ PIXI.js failed to load', 'error');
+        }
+        
+        // Test GSAP
+        if (typeof gsap !== 'undefined') {
+            log('✓ GSAP loaded successfully', 'success');
+            
+            // Create a simple animation
+            const testDiv = document.createElement('div');
+            testDiv.style.cssText = 'position: absolute; top: 100px; left: 20px; width: 50px; height: 50px; background: #00ffff;';
+            document.body.appendChild(testDiv);
+            
+            gsap.to(testDiv, {
+                x: 200,
+                rotation: 360,
+                duration: 2,
+                repeat: -1,
+                yoyo: true,
+                ease: "power2.inOut"
+            });
+            
+            log('✓ GSAP animation created', 'success');
+        } else {
+            log('✗ GSAP failed to load', 'error');
+        }
+        
+        log('All tests completed!', 'info');
+    </script>
+</body>
+</html>

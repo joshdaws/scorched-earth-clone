@@ -32,5 +32,12 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/joshdaws/scorched-earth-clone.git"
+  },
+  "dependencies": {
+    "@capacitor/app": "^7.0.1",
+    "@capacitor/core": "^7.2.0",
+    "gsap": "^3.13.0",
+    "matter-js": "^0.20.0",
+    "pixi.js": "^8.9.2"
   }
 }

@@ -12,6 +12,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // Make game accessible globally for UI
     window.game = game;
     
+    // Initialize enhanced features if available
+    if (window.GameEnhanced) {
+        const enhanced = new GameEnhanced(game);
+        enhanced.initializeEnhancements();
+        window.gameEnhanced = enhanced;
+        
+        // Add performance monitoring in debug mode
+        if (window.location.hash === '#debug') {
+            enhanced.startPerformanceMonitoring();
+        }
+    }
+    
     // Sound system initializes automatically with Howler.js
     // No need for user interaction with the new implementation
     
