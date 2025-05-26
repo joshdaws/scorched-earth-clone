@@ -452,9 +452,22 @@ class Game {
     }
     
     endRound() {
-        // Find winner
-        const aliveTanks = this.tanks.filter(t => t.state !== CONSTANTS.TANK_STATES.DESTROYED);
+        // Find winner - exclude both destroyed and buried tanks
+        const aliveTanks = this.tanks.filter(t => 
+            t.state !== CONSTANTS.TANK_STATES.DESTROYED && 
+            t.state !== CONSTANTS.TANK_STATES.BURIED
+        );
         const winner = aliveTanks.length === 1 ? aliveTanks[0] : null;
+        
+        // Give kill credit to the last tank standing if there's a winner
+        if (winner && aliveTanks.length === 1) {
+            const destroyedTanks = this.tanks.filter(t => 
+                t.state === CONSTANTS.TANK_STATES.DESTROYED || 
+                t.state === CONSTANTS.TANK_STATES.BURIED
+            );
+            // Award bonus for being sole survivor
+            winner.kills += Math.max(0, destroyedTanks.length - winner.kills);
+        }
         
         this.ui.showRoundEnd(winner);
         

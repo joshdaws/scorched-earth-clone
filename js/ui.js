@@ -114,25 +114,42 @@ class UIManager {
     }
     
     showOptions() {
-        alert('Options menu not yet implemented');
+        this.showModal('Options', 'Options menu coming soon!', [
+            { text: 'OK', action: () => this.closeModal() }
+        ]);
     }
     
     showHelp() {
         const isMobile = 'ontouchstart' in window;
+        const content = document.createElement('div');
+        content.style.cssText = 'text-align: left; font-size: 16px;';
+        
         if (isMobile) {
-            alert('Mobile Controls:\n' +
-                  'Tap angle/power buttons to adjust\n' +
-                  'Drag on game canvas to aim\n' +
-                  'Tap FIRE! button to shoot\n' +
-                  'Tap Inventory to select weapons');
+            content.innerHTML = `
+                <h3 style="color: #00ffff; margin-bottom: 15px;">Mobile Controls</h3>
+                <ul style="list-style: none; padding: 0;">
+                    <li>🎯 <strong>Aim:</strong> Drag on game canvas</li>
+                    <li>🔼 <strong>Adjust:</strong> Tap angle/power buttons</li>
+                    <li>💥 <strong>Fire:</strong> Tap FIRE! button</li>
+                    <li>🎒 <strong>Weapons:</strong> Tap Inventory</li>
+                </ul>
+            `;
         } else {
-            alert('Controls:\n' +
-                  'Arrow Keys: Adjust angle/power\n' +
-                  'Ctrl + Arrow: Larger adjustments\n' +
-                  'Space/Enter: Fire\n' +
-                  'W: Select weapon\n' +
-                  'I: Open inventory');
+            content.innerHTML = `
+                <h3 style="color: #00ffff; margin-bottom: 15px;">Keyboard Controls</h3>
+                <ul style="list-style: none; padding: 0;">
+                    <li>⬆️⬇️ <strong>Arrow Keys:</strong> Adjust angle/power</li>
+                    <li>⌨️ <strong>Ctrl + Arrow:</strong> Larger adjustments</li>
+                    <li>🏯 <strong>Space/Enter:</strong> Fire</li>
+                    <li>🆆 <strong>W:</strong> Select weapon</li>
+                    <li>🅸 <strong>I:</strong> Open inventory</li>
+                </ul>
+            `;
         }
+        
+        this.showModal('How to Play', content, [
+            { text: 'Got it!', action: () => this.closeModal() }
+        ]);
     }
     
     createPlayerSetup() {
@@ -417,18 +434,406 @@ class UIManager {
     }
     
     showRoundEnd(winner) {
-        alert(`Round Over!\n${winner ? `Winner: ${winner.playerName}` : 'Draw!'}`);
+        // Create round end overlay
+        const overlay = document.createElement('div');
+        overlay.id = 'round-end-overlay';
+        overlay.className = 'game-overlay';
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        `;
+        
+        const content = document.createElement('div');
+        content.className = 'round-end-content';
+        content.style.cssText = `
+            text-align: center;
+            padding: 40px;
+            background: linear-gradient(135deg, #1a0033 0%, #2d004d 100%);
+            border: 2px solid #ff00ff;
+            border-radius: 20px;
+            box-shadow: 0 0 40px #ff00ff;
+        `;
+        
+        const title = document.createElement('h2');
+        title.style.cssText = `
+            font-size: 48px;
+            margin-bottom: 20px;
+            color: ${winner ? '#00ff00' : '#ffff00'};
+            text-shadow: 0 0 20px currentColor;
+        `;
+        title.textContent = 'ROUND OVER!';
+        
+        const result = document.createElement('p');
+        result.style.cssText = `
+            font-size: 32px;
+            margin-bottom: 30px;
+            color: #ffffff;
+        `;
+        result.textContent = winner ? `Winner: ${winner.playerName}` : 'DRAW!';
+        
+        const continueBtn = document.createElement('button');
+        continueBtn.textContent = 'Continue';
+        continueBtn.className = 'menu-btn';
+        continueBtn.onclick = () => {
+            document.body.removeChild(overlay);
+        };
+        
+        content.appendChild(title);
+        content.appendChild(result);
+        content.appendChild(continueBtn);
+        overlay.appendChild(content);
+        document.body.appendChild(overlay);
+        
+        // Animate with GSAP if available
+        if (window.gsap && window.UIAnimations) {
+            const animations = new UIAnimations();
+            gsap.from(content, {
+                scale: 0.5,
+                opacity: 0,
+                duration: 0.5,
+                ease: 'back.out(1.7)'
+            });
+            gsap.from(title, {
+                y: -50,
+                opacity: 0,
+                delay: 0.2,
+                duration: 0.5,
+                ease: 'power3.out'
+            });
+            gsap.from(result, {
+                x: -100,
+                opacity: 0,
+                delay: 0.4,
+                duration: 0.5,
+                ease: 'power3.out'
+            });
+            gsap.from(continueBtn, {
+                y: 50,
+                opacity: 0,
+                delay: 0.6,
+                duration: 0.5,
+                ease: 'power3.out'
+            });
+        }
+        
+        // Auto-continue after 5 seconds
+        setTimeout(() => {
+            if (document.getElementById('round-end-overlay')) {
+                document.body.removeChild(overlay);
+            }
+        }, 5000);
     }
     
     showGameOver(stats) {
-        let message = 'Game Over!\n\nFinal Scores:\n';
+        // Create game over overlay
+        const overlay = document.createElement('div');
+        overlay.id = 'game-over-overlay';
+        overlay.className = 'game-overlay';
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        `;
+        
+        const content = document.createElement('div');
+        content.className = 'game-over-content';
+        content.style.cssText = `
+            text-align: center;
+            padding: 40px;
+            background: linear-gradient(135deg, #0a0015 0%, #1a0033 50%, #2d004d 100%);
+            border: 3px solid #ff00ff;
+            border-radius: 20px;
+            box-shadow: 0 0 60px #ff00ff;
+            max-width: 600px;
+        `;
+        
+        const title = document.createElement('h1');
+        title.style.cssText = `
+            font-size: 64px;
+            margin-bottom: 30px;
+            color: #ff0066;
+            text-shadow: 0 0 30px #ff0066;
+            animation: pulse 2s infinite;
+        `;
+        title.textContent = 'GAME OVER';
+        
+        const scoresDiv = document.createElement('div');
+        scoresDiv.style.cssText = `
+            margin: 30px 0;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+        `;
+        
+        const scoresTitle = document.createElement('h3');
+        scoresTitle.style.cssText = `
+            font-size: 28px;
+            color: #00ffff;
+            margin-bottom: 20px;
+        `;
+        scoresTitle.textContent = 'FINAL SCORES';
+        scoresDiv.appendChild(scoresTitle);
         
         const sortedTanks = stats.sort((a, b) => b.kills - a.kills);
         sortedTanks.forEach((tank, index) => {
-            message += `${index + 1}. ${tank.playerName}: ${tank.kills} kills\n`;
+            const scoreRow = document.createElement('div');
+            scoreRow.style.cssText = `
+                font-size: 20px;
+                margin: 10px 0;
+                color: ${index === 0 ? '#ffff00' : '#ffffff'};
+                text-shadow: ${index === 0 ? '0 0 10px #ffff00' : 'none'};
+            `;
+            
+            const medal = index === 0 ? '🏆' : index === 1 ? '🥈' : index === 2 ? '🥉' : '';
+            scoreRow.textContent = `${medal} ${index + 1}. ${tank.playerName}: ${tank.kills} kills`;
+            scoresDiv.appendChild(scoreRow);
         });
         
-        alert(message);
-        this.showMainMenu();
+        const winner = sortedTanks[0];
+        const winnerText = document.createElement('h2');
+        winnerText.style.cssText = `
+            font-size: 36px;
+            margin: 20px 0;
+            color: #00ff00;
+            text-shadow: 0 0 20px #00ff00;
+        `;
+        winnerText.textContent = `🎉 ${winner.playerName} WINS! 🎉`;
+        
+        const menuBtn = document.createElement('button');
+        menuBtn.textContent = 'Return to Menu';
+        menuBtn.className = 'menu-btn';
+        menuBtn.style.marginTop = '30px';
+        menuBtn.onclick = () => {
+            document.body.removeChild(overlay);
+            this.showMainMenu();
+        };
+        
+        content.appendChild(title);
+        content.appendChild(winnerText);
+        content.appendChild(scoresDiv);
+        content.appendChild(menuBtn);
+        overlay.appendChild(content);
+        document.body.appendChild(overlay);
+        
+        // Add CSS animation for pulse effect
+        if (!document.getElementById('game-over-styles')) {
+            const style = document.createElement('style');
+            style.id = 'game-over-styles';
+            style.textContent = `
+                @keyframes pulse {
+                    0% { transform: scale(1); }
+                    50% { transform: scale(1.05); }
+                    100% { transform: scale(1); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        // Animate with GSAP if available
+        if (window.gsap) {
+            gsap.from(content, {
+                scale: 0,
+                rotation: 720,
+                duration: 1,
+                ease: 'back.out(1.7)'
+            });
+            
+            gsap.from(title, {
+                y: -100,
+                opacity: 0,
+                delay: 0.3,
+                duration: 0.8,
+                ease: 'elastic.out(1, 0.5)'
+            });
+            
+            gsap.from(winnerText, {
+                scale: 0,
+                opacity: 0,
+                delay: 0.6,
+                duration: 0.8,
+                ease: 'elastic.out(1, 0.5)'
+            });
+            
+            const scoreRows = scoresDiv.querySelectorAll('div');
+            gsap.from(scoreRows, {
+                x: -200,
+                opacity: 0,
+                delay: 0.8,
+                duration: 0.5,
+                stagger: 0.1,
+                ease: 'power3.out'
+            });
+            
+            gsap.from(menuBtn, {
+                y: 50,
+                opacity: 0,
+                delay: 1.2,
+                duration: 0.5,
+                ease: 'power3.out'
+            });
+            
+            // Fireworks effect for winner
+            if (window.UIAnimations) {
+                for (let i = 0; i < 5; i++) {
+                    setTimeout(() => {
+                        this.createFirework(overlay);
+                    }, i * 500);
+                }
+            }
+        }
+    }
+    
+    showModal(title, content, buttons = []) {
+        // Create modal overlay
+        const overlay = document.createElement('div');
+        overlay.id = 'modal-overlay';
+        overlay.className = 'modal-overlay';
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        `;
+        
+        const modal = document.createElement('div');
+        modal.className = 'modal-content';
+        modal.style.cssText = `
+            background: linear-gradient(135deg, #1a0033 0%, #2d004d 100%);
+            border: 2px solid #ff00ff;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 500px;
+            box-shadow: 0 0 40px #ff00ff;
+        `;
+        
+        const modalTitle = document.createElement('h2');
+        modalTitle.style.cssText = `
+            color: #ff0066;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 32px;
+            text-shadow: 0 0 20px #ff0066;
+        `;
+        modalTitle.textContent = title;
+        
+        const modalContent = document.createElement('div');
+        modalContent.style.cssText = 'color: #ffffff; margin-bottom: 20px;';
+        if (typeof content === 'string') {
+            modalContent.textContent = content;
+        } else {
+            modalContent.appendChild(content);
+        }
+        
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.cssText = 'text-align: center; margin-top: 20px;';
+        
+        buttons.forEach(btn => {
+            const button = document.createElement('button');
+            button.textContent = btn.text;
+            button.className = 'menu-btn';
+            button.style.margin = '0 10px';
+            button.onclick = btn.action;
+            buttonContainer.appendChild(button);
+        });
+        
+        modal.appendChild(modalTitle);
+        modal.appendChild(modalContent);
+        modal.appendChild(buttonContainer);
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+        
+        // Animate modal
+        if (window.gsap) {
+            gsap.from(modal, {
+                scale: 0.5,
+                opacity: 0,
+                duration: 0.3,
+                ease: 'back.out(1.7)'
+            });
+        }
+    }
+    
+    closeModal() {
+        const overlay = document.getElementById('modal-overlay');
+        if (overlay) {
+            document.body.removeChild(overlay);
+        }
+    }
+    
+    createFirework(container) {
+        const x = Math.random() * window.innerWidth;
+        const y = window.innerHeight;
+        const targetY = Math.random() * window.innerHeight * 0.5;
+        
+        const rocket = document.createElement('div');
+        rocket.style.cssText = `
+            position: absolute;
+            width: 4px;
+            height: 20px;
+            background: #ffff00;
+            left: ${x}px;
+            top: ${y}px;
+            box-shadow: 0 0 10px #ffff00;
+        `;
+        container.appendChild(rocket);
+        
+        gsap.to(rocket, {
+            y: targetY - y,
+            duration: 1,
+            ease: 'power2.out',
+            onComplete: () => {
+                rocket.remove();
+                
+                // Create explosion
+                for (let i = 0; i < 20; i++) {
+                    const particle = document.createElement('div');
+                    const color = ['#ff0066', '#00ff00', '#00ffff', '#ffff00'][Math.floor(Math.random() * 4)];
+                    particle.style.cssText = `
+                        position: absolute;
+                        width: 6px;
+                        height: 6px;
+                        background: ${color};
+                        left: ${x}px;
+                        top: ${targetY}px;
+                        border-radius: 50%;
+                        box-shadow: 0 0 6px ${color};
+                    `;
+                    container.appendChild(particle);
+                    
+                    const angle = (Math.PI * 2 * i) / 20;
+                    const distance = 50 + Math.random() * 100;
+                    
+                    gsap.to(particle, {
+                        x: Math.cos(angle) * distance,
+                        y: Math.sin(angle) * distance + 50,
+                        opacity: 0,
+                        duration: 1.5,
+                        ease: 'power2.out',
+                        onComplete: () => particle.remove()
+                    });
+                }
+            }
+        });
     }
 }
