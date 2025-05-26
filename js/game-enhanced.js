@@ -44,8 +44,11 @@ class GameEnhanced {
             console.log('Game enhancements initialized successfully');
             
         } catch (error) {
-            console.error('Failed to initialize enhancements:', error);
-            console.log('Falling back to standard game mode');
+            // Don't log WebGL errors as they're expected on some devices
+            if (!error.message.includes('WebGL')) {
+                console.error('Failed to initialize enhancements:', error);
+            }
+            console.log('Using standard game mode (enhancements not available on this device)');
         }
     }
     
