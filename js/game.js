@@ -418,6 +418,16 @@ class Game {
                         break;
                 }
             }
+        } else {
+            // No projectile created - check if tank destroyed itself while buried
+            if (currentTank.state === CONSTANTS.TANK_STATES.DESTROYED) {
+                // Tank destroyed itself - check for round end
+                if (this.countAliveTanks() < 2) {
+                    setTimeout(() => this.endRound(), 1000);
+                } else {
+                    setTimeout(() => this.endTurn(), 500);
+                }
+            }
         }
     }
     
@@ -569,6 +579,13 @@ class Game {
         if (this.projectileActive && !this.projectileManager.hasActiveProjectiles()) {
             this.projectileActive = false;
             
+            // Check if round should end immediately (before terrain collapse)
+            if (this.countAliveTanks() < 2) {
+                // End round immediately if less than 2 tanks alive
+                setTimeout(() => this.endRound(), 1000);
+                return;
+            }
+            
             // Apply terrain collapse after explosions
             let collapseFrames = 0;
             const maxCollapseFrames = 30; // More frames for smoother animation
@@ -590,7 +607,13 @@ class Game {
                 // Stop after max frames or when terrain stabilizes
                 if (collapseFrames >= maxCollapseFrames || (!hasCollapsed && collapseFrames > 5)) {
                     clearInterval(collapseInterval);
-                    setTimeout(() => this.endTurn(), 500);
+                    
+                    // Check again after terrain collapse
+                    if (this.countAliveTanks() < 2) {
+                        setTimeout(() => this.endRound(), 500);
+                    } else {
+                        setTimeout(() => this.endTurn(), 500);
+                    }
                 }
             }, 33); // ~30fps for smoother animation
         }

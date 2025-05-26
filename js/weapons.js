@@ -302,8 +302,8 @@ class WeaponSystem {
     
     static damageTarget(tank, projectile, directHit = false, overrideDamage = null, effectsSystem = null, soundSystem = null) {
         if (tank === projectile.owner && !directHit) {
-            // Reduced self-damage from splash
-            overrideDamage = Math.floor((overrideDamage || projectile.weapon.damage) * 0.5);
+            // Full self-damage from splash to ensure self-kills work properly
+            overrideDamage = overrideDamage || projectile.weapon.damage;
         }
         
         const damage = overrideDamage || projectile.weapon.damage;
@@ -321,27 +321,33 @@ class WeaponSystem {
         const actualDamage = healthBefore - tank.health;
         
         // Track stats
-        if (projectile.owner && projectile.owner !== tank) {
-            projectile.owner.damageDealt += actualDamage;
-            
-            if (tank.state === CONSTANTS.TANK_STATES.DESTROYED) {
-                projectile.owner.kills++;
-                projectile.owner.money += CONSTANTS.KILL_REWARD;
-                projectile.owner.showMessage(`Kill! +$${CONSTANTS.KILL_REWARD}`);
+        if (projectile.owner) {
+            if (projectile.owner !== tank) {
+                // Damage to other tanks
+                projectile.owner.damageDealt += actualDamage;
                 
-                // Trigger tank explosion effect and sound
+                if (tank.state === CONSTANTS.TANK_STATES.DESTROYED) {
+                    projectile.owner.kills++;
+                    projectile.owner.money += CONSTANTS.KILL_REWARD;
+                    projectile.owner.showMessage(`Kill! +$${CONSTANTS.KILL_REWARD}`);
+                } else {
+                    projectile.owner.money += Math.floor(actualDamage * CONSTANTS.DAMAGE_REWARD);
+                }
+            } else if (tank.state === CONSTANTS.TANK_STATES.DESTROYED) {
+                // Self-kill - ensure tank is destroyed, not buried
+                tank.showMessage("Self-destruct!");
+            }
+            
+            // Play sounds and effects for all tank destructions
+            if (tank.state === CONSTANTS.TANK_STATES.DESTROYED) {
                 if (effectsSystem) {
                     effectsSystem.createTankExplosion(tank.x, tank.y);
                 }
                 if (soundSystem) {
                     soundSystem.play('tankDestroyed');
                 }
-            } else {
-                projectile.owner.money += Math.floor(actualDamage * CONSTANTS.DAMAGE_REWARD);
-                // Play tank hit sound
-                if (soundSystem && actualDamage > 0) {
-                    soundSystem.play('tankHit');
-                }
+            } else if (soundSystem && actualDamage > 0) {
+                soundSystem.play('tankHit');
             }
         }
     }
