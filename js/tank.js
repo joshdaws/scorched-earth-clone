@@ -54,6 +54,11 @@ class Tank {
       }
     }
 
+    // Don't update physics for destroyed tanks
+    if (this.state === CONSTANTS.TANK_STATES.DESTROYED) {
+      return;
+    }
+
     // Get terrain height at tank position
     const tankBottom = this.y; // this.y IS the bottom of the tank
     const groundY = terrain.getHeightAt(this.x);
@@ -76,20 +81,22 @@ class Tank {
     } else if (this.state === CONSTANTS.TANK_STATES.SLIDING) {
       // Handle sliding on slopes
       this.handleSliding(deltaTime, terrain, physics);
-    } else {
+    } else if (this.state !== CONSTANTS.TANK_STATES.BURIED) {
       // Normal state - check if we should start falling or sliding
       const gap = groundY - tankBottom;
 
       if (gap > 2) {
-        // Tank is in the air, start falling
-        this.state = CONSTANTS.TANK_STATES.FALLING;
-        this.fallHeight = 0;
-        this.velocity.y = 0;
+        // Tank is in the air, start falling (only if not already falling)
+        if (this.state !== CONSTANTS.TANK_STATES.FALLING) {
+          this.state = CONSTANTS.TANK_STATES.FALLING;
+          this.fallHeight = 0;
+          this.velocity.y = 0;
 
-        if (this.hasParachute) {
-          this.showMessage("Deploying parachute!");
-        } else if (window.game && window.game.soundSystem) {
-          window.game.soundSystem.play("tankFalling");
+          if (this.hasParachute) {
+            this.showMessage("Deploying parachute!");
+          } else if (window.game && window.game.soundSystem) {
+            window.game.soundSystem.play("tankFalling");
+          }
         }
       } else if (gap < -1) {
         // Tank is below ground, push it up
@@ -112,8 +119,10 @@ class Tank {
       }
     }
 
-    // Check if buried
-    this.checkIfBuried(terrain);
+    // Check if buried (only for non-destroyed tanks)
+    if (this.state !== CONSTANTS.TANK_STATES.DESTROYED) {
+      this.checkIfBuried(terrain);
+    }
   }
 
   checkIfBuried(terrain) {
