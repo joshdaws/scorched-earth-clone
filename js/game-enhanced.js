@@ -224,8 +224,14 @@ class GameEnhanced {
     
     // Override UI methods to add animations
     overrideUIMethods() {
-        const uiManager = this.game.uiManager;
+        const uiManager = this.game.ui;  // Fixed: use this.game.ui not this.game.uiManager
         const animations = this.uiAnimations;
+        
+        // Check if UI manager exists
+        if (!uiManager) {
+            console.warn('UI manager not found, skipping UI enhancements');
+            return;
+        }
         
         // Animate shop open/close
         const originalShowShop = uiManager.showShop.bind(uiManager);
