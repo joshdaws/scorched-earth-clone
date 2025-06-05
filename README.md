@@ -90,6 +90,8 @@ scorched-earth/
 └── screenshots/        # Generated screenshots
 ```
 
+Note: The `screenshots/` directory is created at runtime by `scripts/screenshot.js` and may not exist in a fresh clone.
+
 ## Debug Mode
 
 Add `#debug` to the URL to quickly start a test game with preset players.
