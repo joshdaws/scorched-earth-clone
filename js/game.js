@@ -1,6 +1,6 @@
 // Main Game Class
 class Game {
-    constructor(canvas, ui) {
+    constructor(canvas, ui, fxCanvas = null) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.ui = ui;
@@ -23,7 +23,11 @@ class Game {
         this.terrain = null;
         this.physics = new Physics();
         this.projectileManager = new ProjectileManager();
-        this.effectsSystem = new EffectsSystem();
+        if (fxCanvas && window.PIXI) {
+            this.effectsSystem = new PixiEffectsSystem(fxCanvas);
+        } else {
+            this.effectsSystem = new EffectsSystem();
+        }
         this.shop = new Shop();
         this.soundSystem = new SoundSystem();
         
