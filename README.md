@@ -63,6 +63,7 @@ Simply open `index.html` in a modern web browser
 - HTML5 Canvas for rendering
 - Web Audio API for sound generation
 - CSS3 with custom animations
+- Motion One for UI transitions
 - Puppeteer for visual testing
 
 ## Project Structure
