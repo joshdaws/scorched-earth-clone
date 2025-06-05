@@ -78,7 +78,7 @@ class ProjectileManager {
                 ctx.globalAlpha = smokeAlpha;
                 ctx.fillStyle = '#666';
                 ctx.beginPath();
-                ctx.arc(effect.x, effect.y - (1 - alpha) * 20, effect.radius, 0, Math.PI * 2);
+                ctx.arc(effect.x, effect.y - (1 - smokeAlpha) * 20, effect.radius, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.restore();
                 break;
