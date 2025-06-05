@@ -200,10 +200,15 @@ class UIManager {
         
         // Add event listeners
         container.querySelectorAll('.player-name').forEach(input => {
-            input.addEventListener('change', (e) => {
+            const updateName = (e) => {
                 const index = parseInt(e.target.dataset.index);
                 this.gameSettings.players[index].name = e.target.value;
-            });
+            };
+            // Use the input event so the latest value is captured even if the
+            // user does not blur the field before starting the game
+            input.addEventListener('input', updateName);
+            // Fallback for older behaviour
+            input.addEventListener('change', updateName);
         });
         
         container.querySelectorAll('.player-type').forEach(select => {
