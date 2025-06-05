@@ -2,10 +2,26 @@ const puppeteer = require('puppeteer');
 const path = require('path');
 const fs = require('fs');
 
+// Simple check to ensure the dev server is running
+async function verifyServer() {
+    console.log('Checking if local server is running...');
+    try {
+        const res = await fetch('http://localhost:8080', { method: 'HEAD' });
+        if (!res.ok) {
+            throw new Error(`status ${res.status}`);
+        }
+    } catch (err) {
+        console.error('Error: Could not reach http://localhost:8080.');
+        console.error('Make sure the server is running (npm start) and try again.');
+        process.exit(1);
+    }
+}
+
 // Get the screenshot type from command line arguments
 const screenshotType = process.argv[2] || 'menu';
 
 async function takeScreenshot() {
+    await verifyServer();
     console.log('Starting Puppeteer...');
     
     // Launch browser
