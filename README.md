@@ -108,4 +108,4 @@ MIT License - Feel free to use this code for your own projects!
 ## Credits
 
 - Original Scorched Earth created by Wendell Hicken (1991)
-- This clone created with ❤️ and lots of neon glow effects
+- This clone created with ❤️ and lots of neon glow effects.
