@@ -15,6 +15,7 @@ A faithful browser-based recreation of the classic 1991 MS-DOS turn-based artill
 - **Shop System**: Buy weapons and utilities between rounds
 - **Sound Effects**: Procedurally generated retro sounds with volume control
 - **Responsive Controls**: Keyboard and mouse support
+- **WebGL Particle Effects**: Powered by PixiJS for enhanced explosions
 
 ## Quick Start
 
@@ -64,6 +65,7 @@ Simply open `index.html` in a modern web browser
 - Web Audio API for sound generation
 - CSS3 with custom animations
 - Motion One for UI transitions
+- PixiJS for WebGL particle effects
 - Puppeteer for visual testing
 
 ## Project Structure

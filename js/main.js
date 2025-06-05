@@ -2,12 +2,13 @@
 document.addEventListener('DOMContentLoaded', () => {
     // Get canvas
     const canvas = document.getElementById('game-canvas');
+    const fxCanvas = document.getElementById('fx-canvas');
     
     // Create UI manager
     const ui = new UIManager();
     
     // Create game instance
-    const game = new Game(canvas, ui);
+    const game = new Game(canvas, ui, fxCanvas);
     
     // Make game accessible globally for UI
     window.game = game;
