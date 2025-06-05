@@ -89,16 +89,26 @@ class UIManager {
     }
     
     showScreen(screenId) {
-        // Hide all screens
-        document.querySelectorAll('.screen').forEach(screen => {
-            screen.classList.add('hidden');
-        });
-        
-        // Show requested screen
-        document.getElementById(screenId).classList.remove('hidden');
+        const current = document.querySelector('.screen:not(.hidden)');
+        const next = document.getElementById(screenId);
+
+        if (!next || current === next) return;
+
+        if (current) {
+            window.motion
+                ? window.motion.animate(current, { opacity: 0 }, { duration: 0.25 })
+                      .finished.then(() => current.classList.add('hidden'))
+                : current.classList.add('hidden');
+        }
+
+        next.classList.remove('hidden');
+        if (window.motion) {
+            next.style.opacity = 0;
+            window.motion.animate(next, { opacity: 1 }, { duration: 0.25 });
+        }
+
         this.currentScreen = screenId;
-        
-        // Update canvas size when showing game screen
+
         if (screenId === 'game-screen' && window.game) {
             window.game.updateCanvasSize();
         }
@@ -346,12 +356,25 @@ class UIManager {
         
         inventoryList.appendChild(itemsDiv);
         
-        // Show modal
-        document.getElementById('inventory-modal').classList.remove('hidden');
+        // Show modal with animation
+        const modal = document.getElementById('inventory-modal');
+        modal.classList.remove('hidden');
+        if (window.motion) {
+            modal.style.opacity = 0;
+            modal.style.transform = 'scale(0.95)';
+            window.motion.animate(modal, { opacity: 1, scale: 1 }, { duration: 0.2 });
+        }
     }
-    
+
     hideInventory() {
-        document.getElementById('inventory-modal').classList.add('hidden');
+        const modal = document.getElementById('inventory-modal');
+        if (window.motion) {
+            window.motion
+                .animate(modal, { opacity: 0, scale: 0.95 }, { duration: 0.2 })
+                .finished.then(() => modal.classList.add('hidden'));
+        } else {
+            modal.classList.add('hidden');
+        }
     }
     
     closeShop() {
