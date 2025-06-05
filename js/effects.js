@@ -8,42 +8,45 @@ class EffectsSystem {
     createExplosion(x, y, radius, type = 'standard') {
         // Create multiple layers of particles for more dramatic effect
         const layers = 3;
-        
+
         for (let layer = 0; layer < layers; layer++) {
             const numParticles = Math.floor(radius * (3 - layer));
             const layerDelay = layer * 50; // Stagger particle creation
-            
+
             setTimeout(() => {
                 for (let i = 0; i < numParticles; i++) {
                     const angle = (Math.PI * 2 * i) / numParticles + (Math.random() - 0.5) * 0.5;
                     const speed = radius * (0.3 + Math.random() * 0.7) * (1 + layer * 0.3);
                     const size = (4 - layer) + Math.random() * 6;
-                    
+
                     let color;
                     switch(type) {
                         case 'fire':
-                            // Bright oranges, reds, and pinks
-                            const fireColors = ['#ff0066', '#ff3366', '#ff6600', '#ffcc00', '#ff99ff'];
+                            // Warmer fire palette
+                            const fireColors = ['#ffb347', '#ff7747', '#ff9429'];
                             color = fireColors[Math.floor(Math.random() * fireColors.length)];
                             break;
                         case 'dirt':
-                            // Purple-tinted dirt
-                            color = `hsl(280, ${40 + Math.random() * 20}%, ${30 + Math.random() * 20}%)`;
+                            // Earthy dirt
+                            color = `hsl(30, ${40 + Math.random() * 20}%, ${30 + Math.random() * 20}%)`;
                             break;
                         case 'cluster':
                             // Rainbow neon colors
                             color = `hsl(${Math.random() * 360}, 100%, ${70 + Math.random() * 30}%)`;
                             break;
                         default:
-                            // Bright neon explosion colors
+                            // More natural explosion colors
                             if (layer === 0) {
                                 color = '#ffffff';
-                            } else {
-                                const explosionColors = ['#ffff00', '#ff00ff', '#00ffff', '#ff0066', '#66ff00'];
+                            } else if (layer === 1) {
+                                const explosionColors = ['#fbdc65', '#f7a541', '#d96629'];
                                 color = explosionColors[Math.floor(Math.random() * explosionColors.length)];
+                            } else {
+                                const smokeColors = ['#555', '#444', '#666'];
+                                color = smokeColors[Math.floor(Math.random() * smokeColors.length)];
                             }
                     }
-                    
+
                     this.particles.push({
                         x: x + (Math.random() - 0.5) * radius * 0.2,
                         y: y + (Math.random() - 0.5) * radius * 0.2,
@@ -59,7 +62,7 @@ class EffectsSystem {
                 }
             }, layerDelay);
         }
-        
+
         // Add central flash for big explosions
         if (radius > 30 && type !== 'dirt') {
             this.animations.push({
@@ -69,8 +72,12 @@ class EffectsSystem {
                 radius: radius * 2,
                 lifetime: 200,
                 maxLifetime: 200,
-                color: type === 'fire' ? '#ff8800' : '#ffff00'
+                color: type === 'fire' ? '#ffb347' : '#fbdc65'
             });
+        }
+
+        if (type === 'standard' || type === 'fire') {
+            this.createSmoke(x, y, radius);
         }
     }
     
@@ -201,6 +208,27 @@ class EffectsSystem {
             lifetime: 5000,
             maxLifetime: 5000
         });
+    }
+
+    createSmoke(x, y, radius) {
+        const numParticles = Math.floor(radius * 1.5);
+        for (let i = 0; i < numParticles; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 20;
+
+            this.particles.push({
+                x: x,
+                y: y,
+                vx: Math.cos(angle) * speed * 0.3,
+                vy: Math.sin(angle) * speed * 0.3 - Math.random() * 20,
+                size: 6 + Math.random() * 8,
+                color: `rgba(80,80,80,${0.5 + Math.random() * 0.3})`,
+                lifetime: 2000 + Math.random() * 2000,
+                maxLifetime: 4000,
+                gravity: -20,
+                fade: true
+            });
+        }
     }
     
     update(deltaTime, terrain = null) {
