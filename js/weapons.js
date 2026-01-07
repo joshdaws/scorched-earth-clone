@@ -1,6 +1,6 @@
 // Weapon System
 class WeaponSystem {
-    static createProjectile(weaponKey, x, y, angle, power, owner, tracer = false) {
+    static createProjectile(weaponKey, x, y, angle, power, owner, tracer = false, game = null) {
         const weapon = CONSTANTS.WEAPONS[weaponKey];
         if (!weapon) return null;
         
@@ -17,7 +17,8 @@ class WeaponSystem {
             tracer: tracer,
             trail: [],
             active: true,
-            subMunitions: []
+            subMunitions: [],
+            game: game
         };
         
         // Initialize velocity based on weapon type
@@ -123,6 +124,17 @@ class WeaponSystem {
         // Check if projectile is too far off screen
         if (projectile.y > CONSTANTS.CANVAS_HEIGHT + 100) {
             projectile.active = false;
+            
+            // Track missed shot for human players
+            if (!projectile.owner.isAI && projectile.game && projectile.game.progression) {
+                projectile.game.progression.recordShot(false);
+                
+                // Show random miss one-liner
+                const oneLiner = projectile.game.progression.getRandomOneLiner('miss');
+                if (oneLiner) {
+                    projectile.owner.showMessage(oneLiner);
+                }
+            }
         }
     }
     
@@ -329,13 +341,64 @@ class WeaponSystem {
                 if (tank.state === CONSTANTS.TANK_STATES.DESTROYED) {
                     projectile.owner.kills++;
                     projectile.owner.money += CONSTANTS.KILL_REWARD;
-                    projectile.owner.showMessage(`Kill! +$${CONSTANTS.KILL_REWARD}`);
+                    
+                    // Track kill in progression system if owner is human player
+                    if (!projectile.owner.isAI && projectile.game && projectile.game.progression) {
+                        const distance = Math.sqrt(
+                            Math.pow(projectile.startX - tank.x, 2) + 
+                            Math.pow(projectile.startY - tank.y, 2)
+                        );
+                        const killResult = projectile.game.progression.recordKill(
+                            tank, 
+                            projectile.weaponKey, 
+                            distance
+                        );
+                        
+                        // Show kill message with one-liner
+                        projectile.owner.showMessage(`Kill! +$${CONSTANTS.KILL_REWARD}`);
+                        if (killResult.oneLiner) {
+                            setTimeout(() => {
+                                projectile.owner.showMessage(killResult.oneLiner);
+                            }, 1000);
+                        }
+                        
+                        // Show XP gain
+                        if (killResult.xpGained > 0) {
+                            setTimeout(() => {
+                                projectile.owner.showMessage(`+${killResult.xpGained} XP!`);
+                            }, 2000);
+                        }
+                        
+                        // Show level up
+                        if (killResult.leveledUp) {
+                            setTimeout(() => {
+                                projectile.owner.showMessage(`LEVEL ${killResult.newLevel}!`);
+                            }, 3000);
+                        }
+                    } else {
+                        projectile.owner.showMessage(`Kill! +$${CONSTANTS.KILL_REWARD}`);
+                    }
                 } else {
                     projectile.owner.money += Math.floor(actualDamage * CONSTANTS.DAMAGE_REWARD);
+                    
+                    // Track shot accuracy for human players
+                    if (!projectile.owner.isAI && projectile.game && projectile.game.progression) {
+                        projectile.game.progression.recordShot(true);
+                    }
                 }
             } else if (tank.state === CONSTANTS.TANK_STATES.DESTROYED) {
                 // Self-kill - ensure tank is destroyed, not buried
                 tank.showMessage("Self-destruct!");
+                
+                // Track death for human players
+                if (!tank.isAI && projectile.game && projectile.game.progression) {
+                    const deathResult = projectile.game.progression.recordDeath();
+                    if (deathResult.oneLiner) {
+                        setTimeout(() => {
+                            tank.showMessage(deathResult.oneLiner);
+                        }, 1000);
+                    }
+                }
             }
             
             // Play sounds and effects for all tank destructions

@@ -266,6 +266,36 @@ class UIManager {
         // Update fire button state
         const fireBtn = document.getElementById('fire-btn');
         fireBtn.disabled = gameState.projectileActive || currentTank.state === CONSTANTS.TANK_STATES.DESTROYED;
+        
+        // Update player progression if human player
+        if (!currentTank.isAI && window.game && window.game.progression) {
+            const stats = window.game.progression.getStats();
+            const xpProgress = stats.xpProgress;
+            
+            // Create or update progression display
+            let progDisplay = document.getElementById('progression-display');
+            if (!progDisplay) {
+                progDisplay = document.createElement('div');
+                progDisplay.id = 'progression-display';
+                progDisplay.style.cssText = `
+                    position: absolute;
+                    top: 5px;
+                    right: 10px;
+                    text-align: right;
+                    color: #ff00ff;
+                    font-size: 12px;
+                    text-shadow: 0 0 5px rgba(255, 0, 255, 0.5);
+                `;
+                document.getElementById('hud').appendChild(progDisplay);
+            }
+            
+            progDisplay.innerHTML = `
+                Level ${stats.level}<br>
+                <div style="display: inline-block; width: 100px; height: 8px; background: rgba(255,0,255,0.2); border: 1px solid #ff00ff; margin-top: 2px;">
+                    <div style="width: ${xpProgress.percentage}%; height: 100%; background: #ff00ff;"></div>
+                </div>
+            `;
+        }
     }
     
     adjustAngle(delta) {

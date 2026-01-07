@@ -3,7 +3,7 @@
 
 class PIXIRenderer {
     constructor(canvas, options = {}) {
-        // Initialize PIXI Application with Canvas2D fallback
+        // Initialize PIXI Application (requires WebGL)
         try {
             this.app = new PIXI.Application({
                 width: canvas.width,
@@ -13,12 +13,11 @@ class PIXIRenderer {
                 antialias: true,
                 resolution: window.devicePixelRatio || 1,
                 autoDensity: true,
-                forceCanvas: true,  // Force Canvas2D renderer instead of WebGL
                 ...options
             });
         } catch (error) {
             console.warn('PIXI.js initialization failed:', error);
-            throw new Error('PIXI renderer not available');
+            throw new Error('PIXI renderer requires WebGL support');
         }
         
         // Container hierarchy

@@ -1,0 +1,327 @@
+/* Synthwave Theme - Consistent 80s Retro Style */
+
+:root {
+    /* Primary Colors */
+    --neon-pink: #ff00ff;
+    --neon-cyan: #00ffff;
+    --neon-yellow: #ffff00;
+    --hot-pink: #ff0066;
+    --electric-blue: #0099ff;
+    
+    /* Background Gradient Colors */
+    --bg-dark-purple: #0a0015;
+    --bg-purple: #1a0033;
+    --bg-mid-purple: #2d004d;
+    --bg-light-purple: #400066;
+    
+    /* UI Colors */
+    --ui-bg: rgba(0, 0, 0, 0.8);
+    --ui-border: var(--neon-pink);
+    --ui-hover: rgba(255, 0, 255, 0.2);
+    --ui-active: rgba(255, 0, 255, 0.4);
+    
+    /* Text Colors */
+    --text-primary: var(--neon-cyan);
+    --text-secondary: var(--neon-pink);
+    --text-highlight: var(--neon-yellow);
+    
+    /* Glow Effects */
+    --glow-small: 0 0 10px;
+    --glow-medium: 0 0 20px;
+    --glow-large: 0 0 40px;
+}
+
+/* Retro CRT Effect Overlay */
+.crt-overlay {
+    pointer-events: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: 
+        repeating-linear-gradient(
+            0deg,
+            transparent,
+            transparent 2px,
+            rgba(255, 255, 255, 0.03) 2px,
+            rgba(255, 255, 255, 0.03) 4px
+        );
+    z-index: 9999;
+    animation: crt-flicker 0.15s infinite;
+}
+
+@keyframes crt-flicker {
+    0% { opacity: 0.9; }
+    100% { opacity: 1; }
+}
+
+/* Synthwave Background Pattern */
+.synthwave-bg {
+    background: 
+        linear-gradient(180deg, 
+            var(--bg-dark-purple) 0%, 
+            var(--bg-purple) 20%, 
+            var(--bg-mid-purple) 50%, 
+            var(--bg-light-purple) 100%
+        );
+    position: relative;
+    overflow: hidden;
+}
+
+.synthwave-bg::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 60%;
+    background-image: 
+        linear-gradient(0deg, transparent 24%, rgba(255, 0, 255, 0.05) 25%, rgba(255, 0, 255, 0.05) 26%, transparent 27%, transparent 74%, rgba(255, 0, 255, 0.05) 75%, rgba(255, 0, 255, 0.05) 76%, transparent 77%, transparent),
+        linear-gradient(90deg, transparent 24%, rgba(0, 255, 255, 0.05) 25%, rgba(0, 255, 255, 0.05) 26%, transparent 27%, transparent 74%, rgba(0, 255, 255, 0.05) 75%, rgba(0, 255, 255, 0.05) 76%, transparent 77%, transparent);
+    background-size: 50px 50px;
+    transform: perspective(200px) rotateX(60deg);
+    transform-origin: bottom;
+}
+
+/* Neon Text Styles */
+.neon-text {
+    color: var(--text-primary);
+    text-shadow: 
+        var(--glow-small) currentColor,
+        var(--glow-medium) currentColor,
+        var(--glow-large) currentColor;
+    animation: neon-pulse 2s ease-in-out infinite alternate;
+}
+
+.neon-text-pink {
+    color: var(--neon-pink);
+    text-shadow: 
+        var(--glow-small) var(--neon-pink),
+        var(--glow-medium) var(--neon-pink),
+        var(--glow-large) var(--hot-pink);
+}
+
+@keyframes neon-pulse {
+    from { filter: brightness(1); }
+    to { filter: brightness(1.2); }
+}
+
+/* Retro Button Style */
+.retro-button {
+    background: linear-gradient(135deg, var(--bg-purple) 0%, var(--bg-mid-purple) 100%);
+    border: 2px solid var(--neon-pink);
+    color: var(--text-primary);
+    padding: 15px 30px;
+    font-family: 'Press Start 2P', 'Courier New', monospace;
+    font-size: 14px;
+    text-transform: uppercase;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    box-shadow: 
+        0 0 20px rgba(255, 0, 255, 0.5),
+        inset 0 0 20px rgba(255, 0, 255, 0.1);
+}
+
+.retro-button::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(45deg, var(--neon-pink), var(--neon-cyan), var(--neon-pink));
+    z-index: -1;
+    filter: blur(10px);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.retro-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 
+        0 5px 30px rgba(255, 0, 255, 0.7),
+        inset 0 0 30px rgba(255, 0, 255, 0.2);
+}
+
+.retro-button:hover::before {
+    opacity: 1;
+}
+
+.retro-button:active {
+    transform: translateY(0);
+}
+
+/* Panel/Card Style */
+.synthwave-panel {
+    background: var(--ui-bg);
+    border: 2px solid var(--ui-border);
+    box-shadow: 
+        0 0 30px rgba(255, 0, 255, 0.3),
+        inset 0 0 30px rgba(255, 0, 255, 0.1);
+    position: relative;
+    padding: 20px;
+}
+
+.synthwave-panel::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, 
+        transparent, 
+        var(--neon-pink), 
+        var(--neon-cyan), 
+        var(--neon-pink), 
+        transparent
+    );
+    animation: panel-scan 3s linear infinite;
+}
+
+@keyframes panel-scan {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+/* Chrome Text Effect */
+.chrome-text {
+    background: linear-gradient(180deg,
+        #eee 0%,
+        #999 50%,
+        #777 51%,
+        #555 100%
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+
+/* Glitch Effect */
+.glitch {
+    position: relative;
+    animation: glitch-skew 1s infinite linear alternate-reverse;
+}
+
+.glitch::before,
+.glitch::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.glitch::before {
+    animation: glitch-1 0.5s infinite linear alternate-reverse;
+    color: var(--neon-cyan);
+    z-index: -1;
+}
+
+.glitch::after {
+    animation: glitch-2 0.5s infinite linear alternate-reverse;
+    color: var(--hot-pink);
+    z-index: -2;
+}
+
+@keyframes glitch-skew {
+    0% { transform: skew(0deg); }
+    20% { transform: skew(0deg); }
+    21% { transform: skew(0.5deg); }
+    25% { transform: skew(0deg); }
+    100% { transform: skew(0deg); }
+}
+
+@keyframes glitch-1 {
+    0% { clip-path: inset(0 0 0 0); transform: translate(0); }
+    20% { clip-path: inset(0 0 0 0); transform: translate(0); }
+    21% { clip-path: inset(0 0 50% 0); transform: translate(-2px); }
+    25% { clip-path: inset(0 0 0 0); transform: translate(0); }
+    100% { clip-path: inset(0 0 0 0); transform: translate(0); }
+}
+
+@keyframes glitch-2 {
+    0% { clip-path: inset(0 0 0 0); transform: translate(0); }
+    20% { clip-path: inset(0 0 0 0); transform: translate(0); }
+    21% { clip-path: inset(50% 0 0 0); transform: translate(2px); }
+    25% { clip-path: inset(0 0 0 0); transform: translate(0); }
+    100% { clip-path: inset(0 0 0 0); transform: translate(0); }
+}
+
+/* Grid Background */
+.retro-grid {
+    background-image: 
+        linear-gradient(rgba(255, 0, 255, 0.1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 0, 255, 0.1) 1px, transparent 1px);
+    background-size: 50px 50px;
+    animation: grid-move 10s linear infinite;
+}
+
+@keyframes grid-move {
+    0% { background-position: 0 0; }
+    100% { background-position: 50px 50px; }
+}
+
+/* Animated Gradient Border */
+.gradient-border {
+    position: relative;
+    background: var(--ui-bg);
+    padding: 20px;
+}
+
+.gradient-border::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(45deg, 
+        var(--neon-pink), 
+        var(--neon-cyan), 
+        var(--neon-yellow), 
+        var(--hot-pink), 
+        var(--electric-blue),
+        var(--neon-pink)
+    );
+    background-size: 400%;
+    z-index: -1;
+    animation: gradient-rotate 10s linear infinite;
+}
+
+@keyframes gradient-rotate {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 400% 50%; }
+}
+
+/* Retro Loading Animation */
+.retro-loader {
+    width: 100px;
+    height: 100px;
+    border: 3px solid var(--neon-pink);
+    border-radius: 50%;
+    position: relative;
+    animation: loader-rotate 2s linear infinite;
+}
+
+.retro-loader::before {
+    content: '';
+    position: absolute;
+    top: -3px;
+    left: -3px;
+    right: -3px;
+    bottom: -3px;
+    border: 3px solid transparent;
+    border-top-color: var(--neon-cyan);
+    border-radius: 50%;
+    animation: loader-rotate 1s linear infinite reverse;
+}
+
+@keyframes loader-rotate {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}

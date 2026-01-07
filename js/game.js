@@ -26,6 +26,7 @@ class Game {
         this.effectsSystem = new EffectsSystem();
         this.shop = new Shop();
         this.soundSystem = new SoundSystem();
+        this.progression = new ProgressionSystem();
         
         // Initialize spatial grid in physics
         this.physics.initSpatialGrid(this.canvas.width, this.canvas.height);
@@ -64,27 +65,44 @@ class Game {
         const gameScreen = document.getElementById('game-screen');
         if (!gameScreen || gameScreen.classList.contains('hidden')) return;
         
-        const rect = container.getBoundingClientRect();
-        const maxWidth = Math.min(rect.width, window.innerWidth);
-        const maxHeight = Math.min(rect.height, window.innerHeight - 150); // Account for UI
+        // Get viewport dimensions
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
         
-        // Calculate scale to fit while maintaining aspect ratio
-        const targetRatio = CONSTANTS.CANVAS_WIDTH / CONSTANTS.CANVAS_HEIGHT;
-        let width = maxWidth;
-        let height = width / targetRatio;
+        // Account for HUD and controls
+        const hudHeight = 60;
+        const controlsHeight = 60;
+        const availableHeight = viewportHeight - hudHeight - controlsHeight;
         
-        if (height > maxHeight) {
-            height = maxHeight;
+        // Calculate scale to fit while maintaining 16:9 aspect ratio
+        const targetRatio = 16 / 9;
+        let width, height;
+        
+        // Try to fit by width first
+        width = viewportWidth;
+        height = width / targetRatio;
+        
+        // If height exceeds available space, fit by height instead
+        if (height > availableHeight) {
+            height = availableHeight;
             width = height * targetRatio;
         }
         
-        // Set actual canvas resolution
+        // Apply some padding for better mobile experience
+        const padding = 20;
+        width = Math.min(width - padding * 2, viewportWidth - padding * 2);
+        height = width / targetRatio;
+        
+        // Set actual canvas resolution (internal rendering resolution)
         this.canvas.width = CONSTANTS.CANVAS_WIDTH;
         this.canvas.height = CONSTANTS.CANVAS_HEIGHT;
         
-        // Set CSS size for scaling
+        // Set CSS size for scaling (displayed size)
         this.canvas.style.width = `${width}px`;
         this.canvas.style.height = `${height}px`;
+        this.canvas.style.maxWidth = '100%';
+        this.canvas.style.margin = '0 auto';
+        this.canvas.style.display = 'block';
         
         // Store scale factor for touch coordinates
         this.scaleX = CONSTANTS.CANVAS_WIDTH / width;
@@ -337,7 +355,7 @@ class Game {
         
         if (humanIndex >= 0) {
             // Open shop for human player
-            this.shop.openShop(this.tanks[humanIndex]);
+            this.shop.openShop(this.tanks[humanIndex], this.progression);
         } else {
             // All AI game, skip shop
             this.startCombatPhase();
@@ -518,6 +536,14 @@ class Game {
     endGame() {
         this.gameState = CONSTANTS.GAME_STATES.GAME_OVER;
         
+        // Update progression stats
+        this.progression.data.statistics.gamesPlayed++;
+        const humanWinner = this.tanks.filter(t => !t.isAI).sort((a, b) => b.kills - a.kills)[0];
+        if (humanWinner && humanWinner.kills > 0) {
+            this.progression.data.statistics.gamesWon++;
+        }
+        this.progression.saveProgress();
+        
         // Calculate final stats
         const stats = this.tanks.map(tank => ({
             playerName: tank.playerName,
@@ -583,6 +609,8 @@ class Game {
             );
         }
         
+        // Store reference to game in projectile manager for progression tracking
+        this.projectileManager.game = this;
         this.projectileManager.update(deltaTime, this.physics, this.terrain, this.tanks, this.effectsSystem, this.soundSystem);
         
         // Update effects and mark their areas dirty

@@ -1,8 +1,8 @@
 // Game Constants
 const CONSTANTS = {
-    // Canvas settings
-    CANVAS_WIDTH: 1024,
-    CANVAS_HEIGHT: 600,
+    // Canvas settings - 16:9 mobile landscape standard
+    CANVAS_WIDTH: 1280,
+    CANVAS_HEIGHT: 720,
     
     // Physics
     GRAVITY_DEFAULT: 9.8,

@@ -16,7 +16,8 @@ class ProjectileManager {
             shotData.angle,
             shotData.power,
             shotData.owner,
-            shotData.tracer
+            shotData.tracer,
+            this.game
         );
         
         if (projectile) {

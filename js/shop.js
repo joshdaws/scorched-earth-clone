@@ -16,14 +16,41 @@ class Shop {
         }
     }
     
-    openShop(player) {
+    openShop(player, progression = null) {
         this.currentPlayer = player;
         this.pendingPurchases = [];
+        this.progression = progression;
         this.updateShopDisplay();
         
         // Show shop screen
         document.getElementById('game-screen').classList.add('hidden');
         document.getElementById('shop-screen').classList.remove('hidden');
+        
+        // Show shop keeper one-liner if progression exists
+        if (this.progression) {
+            const oneLiner = this.progression.getRandomOneLiner('shop');
+            if (oneLiner) {
+                // Create temporary message at top of shop
+                const message = document.createElement('div');
+                message.className = 'shop-keeper-message';
+                message.textContent = `"${oneLiner}"`;
+                message.style.cssText = `
+                    position: absolute;
+                    top: 60px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background: rgba(0, 0, 0, 0.8);
+                    color: #ff00ff;
+                    padding: 10px 20px;
+                    border-radius: 10px;
+                    font-style: italic;
+                    z-index: 1000;
+                    animation: fadeInOut 3s ease-in-out;
+                `;
+                document.getElementById('shop-screen').appendChild(message);
+                setTimeout(() => message.remove(), 3000);
+            }
+        }
     }
     
     updateShopDisplay() {
@@ -54,22 +81,49 @@ class Shop {
             const owned = this.getOwnedQuantity(key, type);
             const pending = this.getPendingQuantity(key, type);
             
+            // Check if weapon is locked
+            let isLocked = false;
+            let requiredLevel = 0;
+            if (type === 'weapon' && this.progression && !this.currentPlayer.isAI) {
+                isLocked = !this.progression.isWeaponUnlocked(key);
+                if (isLocked) {
+                    // Find required level
+                    const lockedWeapons = this.progression.getLockedWeapons();
+                    const lockedWeapon = lockedWeapons.find(w => w.id === key);
+                    if (lockedWeapon) {
+                        requiredLevel = lockedWeapon.requiredLevel;
+                    }
+                }
+            }
+            
             const itemElement = document.createElement('div');
             itemElement.className = 'shop-item';
             if (pending > 0) {
                 itemElement.classList.add('selected');
             }
+            if (isLocked) {
+                itemElement.classList.add('locked');
+            }
             
             itemElement.innerHTML = `
                 <h4>${item.name}</h4>
-                <div class="price">$${currentPrice}</div>
+                ${isLocked 
+                    ? `<div class="locked-info">🔒 Level ${requiredLevel}</div>`
+                    : `<div class="price">$${currentPrice}</div>`
+                }
                 ${owned > 0 ? `<div class="owned">Owned: ${owned === -1 ? '∞' : owned}</div>` : ''}
                 ${pending > 0 ? `<div class="pending">In Cart: ${pending}</div>` : ''}
                 ${item.quantity && item.quantity > 1 ? `<div class="quantity">Qty: ${item.quantity}</div>` : ''}
             `;
             
-            // Add click handler
-            itemElement.addEventListener('click', () => this.toggleItem(key, type, currentPrice, item));
+            // Add click handler only if not locked
+            if (!isLocked) {
+                itemElement.addEventListener('click', () => this.toggleItem(key, type, currentPrice, item));
+            } else {
+                itemElement.style.opacity = '0.5';
+                itemElement.style.cursor = 'not-allowed';
+                itemElement.title = `Unlocks at level ${requiredLevel}`;
+            }
             
             grid.appendChild(itemElement);
         }

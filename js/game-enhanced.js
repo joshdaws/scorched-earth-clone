@@ -44,22 +44,38 @@ class GameEnhanced {
             console.log('Game enhancements initialized successfully');
             
         } catch (error) {
-            // Don't log WebGL errors as they're expected on some devices
-            if (!error.message.includes('WebGL')) {
+            // Only log errors if they're not related to WebGL/PIXI availability
+            if (!error.message.includes('WebGL') && !error.message.includes('PIXI')) {
                 console.error('Failed to initialize enhancements:', error);
             }
-            console.log('Using standard game mode (enhancements not available on this device)');
+            console.log('Using standard game mode');
         }
     }
     
     // Determine if we should use PIXI renderer
     shouldUsePixiRenderer() {
-        // Check WebGL support and performance
+        // PIXI.js v7+ requires WebGL, so we'll only use it on devices with WebGL support
+        // The standard Canvas2D renderer is excellent, so this is just for extra effects
+        
+        // Check WebGL support
         const canvas = document.createElement('canvas');
         const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
         
         if (!gl) {
             console.log('WebGL not supported, using standard renderer');
+            return false;
+        }
+        
+        // Also check if WebGL context can actually be created (some devices lie about support)
+        try {
+            const testCanvas = document.createElement('canvas');
+            const testContext = testCanvas.getContext('webgl', { failIfMajorPerformanceCaveat: true });
+            if (!testContext) {
+                console.log('WebGL performance too low, using standard renderer');
+                return false;
+            }
+        } catch (e) {
+            console.log('WebGL test failed, using standard renderer');
             return false;
         }
         
@@ -75,18 +91,24 @@ class GameEnhanced {
     
     // Initialize PIXI renderer
     async initializePixiRenderer() {
-        const canvas = this.game.renderer.canvas;
-        
-        // Create PIXI renderer
-        this.pixiRenderer = new PIXIRenderer(canvas, {
-            antialias: true,
-            resolution: window.devicePixelRatio || 1
-        });
-        
-        // Override game's render methods
-        this.overrideRenderMethods();
-        
-        console.log('PIXI renderer initialized');
+        try {
+            const canvas = this.game.renderer.canvas;
+            
+            // Create PIXI renderer
+            this.pixiRenderer = new PIXIRenderer(canvas, {
+                antialias: true,
+                resolution: window.devicePixelRatio || 1
+            });
+            
+            // Override game's render methods
+            this.overrideRenderMethods();
+            
+            console.log('PIXI renderer initialized');
+        } catch (error) {
+            // Silently fail - this is expected on non-WebGL devices
+            console.log('PIXI renderer not available on this device - using standard renderer');
+            this.pixiRenderer = null;
+        }
     }
     
     // Override rendering methods to use PIXI
