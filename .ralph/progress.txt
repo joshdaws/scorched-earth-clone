@@ -64,3 +64,9 @@
 **Files:** js/game.js, js/main.js
 **Commit:** d1f8373
 ---
+## scorched-earth-7ku.8 - Add Canvas Resize Handling for Responsive Design
+**Status:** Completed
+**Changes:** Implemented comprehensive canvas resize handling with 3:2 aspect ratio preservation, devicePixelRatio support for high-DPI displays, 100ms debounced resize handler, mobile orientation change support, and coordinate conversion utilities.
+**Files:** js/renderer.js, style.css
+**Commit:** (pending)
+---

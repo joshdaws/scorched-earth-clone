@@ -50,10 +50,9 @@ body {
     scrollbar-width: none;
 }
 
-/* Game canvas fills viewport */
+/* Game canvas - dimensions set by JS for responsive scaling */
 #game-canvas {
     display: block;
-    width: 100vw;
-    height: 100vh;
     background-color: var(--bg-dark);
+    /* Width, height, and position set dynamically by renderer.js */
 }
