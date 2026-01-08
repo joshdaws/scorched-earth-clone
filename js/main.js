@@ -43,7 +43,7 @@ async function init() {
     console.log('Initializing...');
 
     // Initialize renderer (gets canvas by ID internally)
-    const ctx = Renderer.init('game-canvas');
+    const ctx = Renderer.init('game');
     if (!ctx) {
         console.error('Failed to initialize renderer');
         return;

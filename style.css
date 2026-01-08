@@ -51,7 +51,7 @@ body {
 }
 
 /* Game canvas - dimensions set by JS for responsive scaling */
-#game-canvas {
+#game {
     display: block;
     background-color: var(--bg-dark);
     /* Width, height, and position set dynamically by renderer.js */

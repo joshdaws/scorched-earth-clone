@@ -20,10 +20,10 @@ const RESIZE_DEBOUNCE_MS = 100;
 
 /**
  * Initialize the renderer by getting canvas element by ID
- * @param {string} [canvasId='game-canvas'] - The canvas element ID
+ * @param {string} [canvasId='game'] - The canvas element ID
  * @returns {CanvasRenderingContext2D|null} The 2D context if successful, null otherwise
  */
-export function init(canvasId = 'game-canvas') {
+export function init(canvasId = 'game') {
     // Get canvas element by ID
     canvas = document.getElementById(canvasId);
 
