@@ -76,6 +76,87 @@ function getHandlers(state) {
 }
 
 // =============================================================================
+// VALID STATE TRANSITIONS
+// =============================================================================
+
+/**
+ * Map of valid state transitions.
+ * Each key is a state, and its value is an array of states it can transition to.
+ * This prevents invalid state transitions (e.g., going from VICTORY directly to SHOP).
+ */
+const validTransitions = {
+    [GAME_STATES.MENU]: [
+        GAME_STATES.PLAYING,
+        GAME_STATES.AIMING  // Can also start directly into aiming
+    ],
+    [GAME_STATES.PLAYING]: [
+        GAME_STATES.AIMING,
+        GAME_STATES.PAUSED,
+        GAME_STATES.VICTORY,
+        GAME_STATES.DEFEAT,
+        GAME_STATES.GAME_OVER,
+        GAME_STATES.MENU  // Can return to menu
+    ],
+    [GAME_STATES.AIMING]: [
+        GAME_STATES.FIRING,
+        GAME_STATES.PAUSED,
+        GAME_STATES.PLAYING,
+        GAME_STATES.MENU  // Can return to menu
+    ],
+    [GAME_STATES.FIRING]: [
+        GAME_STATES.AIMING,     // Next player's turn
+        GAME_STATES.PLAYING,    // Back to playing state
+        GAME_STATES.ROUND_END,  // Round finished
+        GAME_STATES.VICTORY,
+        GAME_STATES.DEFEAT,
+        GAME_STATES.PAUSED,
+        GAME_STATES.MENU  // Can return to menu
+    ],
+    [GAME_STATES.PAUSED]: [
+        GAME_STATES.PLAYING,
+        GAME_STATES.AIMING,
+        GAME_STATES.FIRING,
+        GAME_STATES.MENU  // Can exit to menu from pause
+    ],
+    [GAME_STATES.ROUND_END]: [
+        GAME_STATES.SHOP,
+        GAME_STATES.VICTORY,
+        GAME_STATES.DEFEAT,
+        GAME_STATES.PLAYING,  // Next round starts
+        GAME_STATES.AIMING,
+        GAME_STATES.MENU
+    ],
+    [GAME_STATES.SHOP]: [
+        GAME_STATES.PLAYING,
+        GAME_STATES.AIMING,
+        GAME_STATES.MENU
+    ],
+    [GAME_STATES.VICTORY]: [
+        GAME_STATES.MENU,
+        GAME_STATES.SHOP,       // Could allow shop after victory
+        GAME_STATES.GAME_OVER
+    ],
+    [GAME_STATES.DEFEAT]: [
+        GAME_STATES.MENU,
+        GAME_STATES.GAME_OVER
+    ],
+    [GAME_STATES.GAME_OVER]: [
+        GAME_STATES.MENU
+    ]
+};
+
+/**
+ * Check if a state transition is valid.
+ * @param {string} fromState - Current state
+ * @param {string} toState - Target state
+ * @returns {boolean} True if transition is allowed
+ */
+function isValidTransition(fromState, toState) {
+    const allowed = validTransitions[fromState];
+    return allowed && allowed.includes(toState);
+}
+
+// =============================================================================
 // STATE MACHINE
 // =============================================================================
 
@@ -98,12 +179,13 @@ export function getState() {
 
 /**
  * Set the game state with transition hooks.
- * Calls onExit for the old state and onEnter for the new state.
+ * Validates that the transition is allowed, then calls onExit for the old state
+ * and onEnter for the new state.
  * @param {string} newState - The new state to set
  * @returns {boolean} True if state change succeeded
  */
 export function setState(newState) {
-    // Validate state
+    // Validate state is a valid state value
     if (!Object.values(GAME_STATES).includes(newState)) {
         console.error(`Invalid game state: ${newState}`);
         return false;
@@ -112,6 +194,16 @@ export function setState(newState) {
     // No change needed
     if (newState === currentState) {
         return true;
+    }
+
+    // Validate state transition is allowed
+    if (!isValidTransition(currentState, newState)) {
+        console.error(`Invalid state transition: ${currentState} → ${newState}`);
+        if (debugMode) {
+            const allowed = validTransitions[currentState] || [];
+            console.log(`Allowed transitions from ${currentState}: ${allowed.join(', ')}`);
+        }
+        return false;
     }
 
     const oldState = currentState;

@@ -129,7 +129,8 @@ function handleMouseDown(e) {
     pointer.isDown = true;
     updatePointerFromMouse();
 
-    mouseDownCallbacks.forEach(cb => cb(mouse.x, mouse.y, e.button));
+    // Pass design space coordinates to callbacks (same as pointer.x/y)
+    mouseDownCallbacks.forEach(cb => cb(pointer.x, pointer.y, e.button));
 }
 
 function handleMouseUp(e) {
