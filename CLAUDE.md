@@ -1,98 +1,133 @@
-# CLAUDE.md
+# Scorched Earth: Synthwave Edition
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+A modern reimagining of the classic 1991 DOS artillery game, rebuilt with synthwave aesthetics and modern web technologies.
 
-## Commands
+## Project Vision
 
-### Development
+**Gameplay:** Turn-based artillery combat. Two tanks on destructible terrain. Adjust power and angle, fire projectiles, watch physics play out. Terrain explodes, dirt falls, reshape the battlefield. Earn money, buy better weapons. Simple to learn, satisfying to master.
+
+**Aesthetic:** Full 80s synthwave. Neon colors, grid lines, sunset gradients, CRT glow effects. Think Outrun, Hotline Miami, Far Cry Blood Dragon. The Dr Disrespect gaming aesthetic.
+
+**Audio:** Synthwave soundtrack. Pulsing basslines, arpeggiated synths, dramatic hits for explosions.
+
+**Platform:** Web-first (HTML5 Canvas/WebGL), designed for eventual iOS mobile port.
+
+## Game Features
+
+### Core Mechanics
+
+- Turn-based combat between player tank and AI opponent
+- Power (0-100%) and angle (0-180°) aiming controls
+- Projectile trajectory visualization
+- Realistic physics (gravity, wind effects)
+- Destructible terrain with falling dirt physics
+
+### Weapons
+
+- **Basic Shot** - Unlimited ammo, moderate damage
+- **MIRV** - Splits into multiple warheads mid-flight
+- **Roller** - Rolls along terrain until it hits something
+- **Digger** - Burrows through terrain
+- **Nuke** - Massive explosion radius
+- **Mini Nuke** - Smaller but still devastating
+- And more to be defined in spec...
+
+### Progression
+
+- Earn money from damage dealt and wins
+- Shop between rounds to buy weapons
+- AI opponents with varying difficulty
+
+## Development Workflow
+
+### Task Management
+
+This project uses **Beads** for issue tracking and **Ralph** for autonomous development loops.
+
 ```bash
-# Install dependencies
-npm install
+# See what's ready to work on
+bd ready
 
-# Start development server (port 8080)
-npm start
+# Claim an issue before starting
+bd update <issue-id> --claim
 
-# Take screenshots for visual testing
-npm run screenshot:menu    # Capture main menu
-npm run screenshot:game    # Capture gameplay
-npm run screenshot         # Capture menu (default)
+# Close when done
+bd close <issue-id>
+
+# Run autonomous loop
+./ralph.sh --all
 ```
 
-### Git Operations
-```bash
-# The game is hosted on GitHub Pages at:
-# https://joshdaws.github.io/scorched-earth-clone/
+### Key Files
+
+- `ralph.sh` - Autonomous development loop script
+- `.ralph/PROMPT.md` - Loop prompt template
+- `.ralph/AGENT.md` - Project-specific agent instructions
+- `docs/research/` - Research documentation
+- `docs/specs/` - Game specifications
+
+## Tech Stack
+
+To be finalized in `scorched-earth-7ku`, but likely:
+
+- **Rendering:** Canvas 2D or PixiJS (2D WebGL)
+- **Physics:** Custom ballistics + terrain collision (general physics engines are overkill)
+- **Audio:** Web Audio API
+- **Build:** Minimal or none (vanilla JS ES modules)
+- **Mobile:** Capacitor wrapper for iOS App Store
+
+### Mobile-First Considerations
+
+- Abstract input layer (mouse + touch) from day one
+- Responsive canvas sizing
+- Test in mobile Safari early and often
+- Design UI for thumb zones
+
+## Code Style
+
+- Vanilla JavaScript (ES6+ modules)
+- Clear separation: rendering, physics, game logic, UI
+- Document complex physics/math with comments explaining WHY
+- No placeholder implementations - full working code only
+
+## Directory Structure
+
+```
+index.html              # Entry point
+style.css               # Styling (synthwave theme)
+js/
+  main.js               # Initialization
+  game.js               # Game loop and state
+  tank.js               # Tank entity
+  terrain.js            # Terrain generation/destruction
+  projectile.js         # Projectile physics
+  weapons.js            # Weapon definitions
+  physics.js            # Physics calculations
+  ai.js                 # AI opponent logic
+  renderer.js           # Canvas/WebGL rendering
+  ui.js                 # UI elements
+  effects.js            # Visual effects (explosions, particles)
+  sound.js              # Audio system
+  shop.js               # Weapon shop
+  constants.js          # Game constants
+docs/
+  research/             # Research on original game
+  specs/                # Game specifications
+  architecture/         # Technical decisions
+assets/
+  images/               # Sprites, backgrounds
+  audio/                # Sound effects, music
 ```
 
-## Architecture
+## Current Status
 
-### Core Game Loop
-The game uses a Manager/System pattern with these key components:
-- `Game` class orchestrates the main loop: `animate() → update() → render()`
-- `UIManager` handles all DOM interactions and screen transitions
-- Turn-based state machine: MENU → GAME_SETUP → PLAYING (with SHOP phases) → GAME_OVER
+**Phase:** Initial Setup
 
-### Module Interaction Flow
-```
-Tank.fire() → ProjectileManager.fireWeapon() → WeaponSystem.createProjectile()
-    ↓
-Physics updates projectile trajectory each frame
-    ↓
-On collision → WeaponSystem.explodeProjectile() → Effects + Terrain deformation
-    ↓
-Terrain.applyTerrainCollapse() → Cascading physics for floating terrain
-```
+**Active Issues:**
 
-### Key Architectural Patterns
+1. `scorched-earth-7mz` - Research original Scorched Earth game
+2. `scorched-earth-33s` - Write game specification (blocked)
+3. `scorched-earth-28e` - Break spec into epics/issues (blocked)
+4. `scorched-earth-7ku` - Set up tech stack (blocked)
 
-**Double Canvas Rendering**: Terrain pre-rendered to off-screen canvas, composited with dynamic elements on main canvas.
-
-**Physics System**: Centralized physics calculations with configurable boundary behaviors (wrap/bounce/absorb). Projectiles query physics for updates rather than owning physics logic.
-
-**AI Architecture**: AIControllers analyze game state and use `Physics.calculateOptimalShot()` for targeting. Accuracy varies by AI type (SHOOTER: 60%, CYBORG: 85%, KILLER: 95%).
-
-**Menu Animation**: Self-contained animation system in `menu-background.js` with procedural synthwave graphics (sun, grid, mountains) running independently via requestAnimationFrame.
-
-### Sound System
-Uses Web Audio API with procedural sound generation. Must be initialized after user interaction due to browser policies. Volume control integrated into HUD.
-
-### Visual Style
-Synthwave aesthetic throughout:
-- Gradient backgrounds: #0a0015 → #1a0033 → #ff0066 → #ffcc00
-- Neon colors: #ff00ff (pink), #00ffff (cyan), #ffff00 (yellow)
-- Glow effects via shadowBlur on all interactive elements
-- Tank colors are vibrant neons with drop shadows
-
-## Performance Optimizations
-
-### Spatial Grid
-The game uses a spatial grid (`SpatialGrid`) for efficient collision detection. Instead of checking every tank against every projectile, only nearby objects are tested. The grid automatically updates when tanks move.
-
-### WebGL Renderer
-The game attempts to use WebGL for hardware-accelerated rendering. Falls back to Canvas2D if WebGL is unavailable. The renderer abstraction (`Renderer`) handles both modes transparently.
-
-### Dirty Rectangle System
-The `DirtyRectManager` tracks which parts of the screen need redrawing. Only changed regions are redrawn each frame, significantly improving performance on large displays.
-
-To enable debug visualization:
-```javascript
-game.toggleDebug(); // Shows spatial grid and dirty rectangles
-```
-
-## Development Notes
-
-### Adding New Weapons
-1. Add weapon definition to `CONSTANTS.WEAPONS` in `constants.js`
-2. Implement special behavior in `WeaponSystem.updateProjectile()` if needed
-3. Add to shop items in `CONSTANTS.SHOP_ITEMS`
-
-### Modifying Terrain Generation
-Terrain uses midpoint displacement algorithm in `Terrain.generate()`. Smoothing passes and height constraints can be adjusted.
-
-### Performance Considerations
-- Spatial grid divides screen into 50x50 pixel cells
-- WebGL renderer caches textures for repeated elements
-- Dirty rectangles merge if too many small updates occur
-- Particle effects limited to prevent slowdown
-- Trail arrays capped at 100 points
-- Stars and terrain cached after first render
+Run `bd ready` to see what's available to work on.

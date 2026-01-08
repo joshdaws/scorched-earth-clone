@@ -1,35 +1,23 @@
-# Dependencies
-node_modules/
-
-# Screenshots
-screenshots/
-
-# OS files
+# OS
 .DS_Store
 Thumbs.db
 
-# Editor files
+# Editor
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# Dependencies
+node_modules/
 
-# Environment variables
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# Build outputs
+# Build output
 dist/
 build/
 
-# Temporary files
-*.tmp
-*.temp
+# Ralph temp files
+.ralph/output.tmp
+.ralph/generated_prompt.md
+
+# Logs
+*.log
