@@ -64,14 +64,29 @@ Implement the solution following project standards (see AGENT.md).
 
 **DO NOT close an issue until you have visually verified it works in the browser.**
 
-### STEP 5: Verify Acceptance Criteria
+### STEP 5: Verify and Check Off EACH Acceptance Criterion (MANDATORY)
 
-Before closing ANY issue:
+**You MUST verify and check off EACH criterion before closing. This is NOT optional.**
 
-1. Re-read the acceptance criteria from `bd show <issue-id>`
-2. Verify EACH criterion is met - not just "mostly done"
-3. If ANY criterion is not met, keep working
-4. Only proceed to close when ALL criteria pass
+1. Run `bd show <issue-id>` to see the acceptance criteria
+2. Go through EACH criterion one by one:
+   - Did you actually do this? Verify it.
+   - If YES: Mark it `[x]`
+   - If NO: Go back and do it. Do not proceed.
+3. Update the issue with ALL criteria checked:
+
+```bash
+bd update <issue-id> --acceptance "## Acceptance Criteria
+
+- [x] First criterion - VERIFIED: <how you verified it>
+- [x] Second criterion - VERIFIED: <how you verified it>
+- [x] Third criterion - VERIFIED: <how you verified it>
+..."
+```
+
+**CRITICAL: If ANY criterion shows `[ ]` (unchecked), you are NOT DONE. Go back and complete it.**
+
+**CRITICAL: You must actually RUN the `bd update --acceptance` command to check things off. Do not just say you did it.**
 
 ### STEP 6: Create New Issues for Discoveries
 
@@ -81,38 +96,33 @@ When you discover a bug or new task, create it in beads:
 bd create --title "..." --type bug --priority P2{{PARENT_FLAG}}
 ```
 
-### STEP 7: Update Issue with Results
+### STEP 7: Add Implementation Notes
 
-Before closing, update the issue with what was done:
+After ALL acceptance criteria are checked off, add notes:
 
-1. **Review acceptance criteria** from `bd show <issue-id>`
-2. **Update acceptance criteria** - check off completed items:
+```bash
+bd update <issue-id> --notes "## Implementation Summary
 
-   ```bash
-   bd update <issue-id> --acceptance "## Acceptance Criteria
+<Describe what was done, key decisions made, any issues encountered>
 
-   - [x] First item that was completed
-   - [x] Second item that was completed
-   - [ ] Any items NOT completed (explain why in notes)
-   ..."
-   ```
+### Files Modified
+- path/to/file1.js - description
+- path/to/file2.js - description
 
-3. **Add notes** describing what was implemented:
+### Verification
+- <How each acceptance criterion was verified>"
+```
 
-   ```bash
-   bd update <issue-id> --notes "## Implementation Summary
+### STEP 8: Final Check Before Close
 
-   <Describe what was done, key decisions made, any issues encountered>
+Before running `bd close`:
 
-   ### Files Modified
-   - path/to/file1.js - description
-   - path/to/file2.js - description
+1. Run `bd show <issue-id>` one more time
+2. Confirm ALL acceptance criteria show `[x]`
+3. If ANY show `[ ]`, STOP and go complete them
+4. Only proceed if everything is checked
 
-   ### Testing Done
-   - <what was tested and verified>"
-   ```
-
-### STEP 8: Complete and Close
+### STEP 9: Complete and Close
 
 When the task is complete and tests pass:
 
@@ -136,9 +146,9 @@ When the task is complete and tests pass:
 
 1. **ONE ISSUE PER ITERATION.** Complete one issue, commit, then STOP.
 
-2. **ACCEPTANCE CRITERIA ARE LAW.** Do not close an issue until EVERY acceptance criterion is met and verified. Re-read them before closing.
+2. **CHECK OFF EVERY ACCEPTANCE CRITERION.** Before closing ANY issue, you MUST run `bd update --acceptance` to mark each criterion as `[x]`. If you don't run this command, you haven't done it. Verify the checkboxes are updated by running `bd show` again.
 
-3. **CHROME EXTENSION VALIDATION REQUIRED.** You must visually verify changes work in the browser using the Chrome extension. Take screenshots. Check console for errors.
+3. **CHROME EXTENSION VALIDATION FOR CODE.** For implementation tasks, visually verify changes work in the browser. Skip for research/spec/planning tasks where there's no code to test.
 
 4. When authoring code, capture WHY in comments for complex logic.
 
