@@ -110,14 +110,59 @@ js/
   sound.js              # Audio system
   shop.js               # Weapon shop
   constants.js          # Game constants
+  assets.js             # Asset loader and manifest
 docs/
   research/             # Research on original game
   specs/                # Game specifications
   architecture/         # Technical decisions
 assets/
-  images/               # Sprites, backgrounds
-  audio/                # Sound effects, music
+  manifest.json         # Asset manifest (paths, dimensions, animations)
+  images/
+    tanks/              # Tank sprites (tank-player.png, tank-enemy.png)
+    weapons/            # Weapon/projectile sprites
+    terrain/            # Terrain textures
+    effects/            # Explosion sprites, particles
+    ui/                 # UI elements, buttons, icons
+    backgrounds/        # Sky gradients, parallax layers
+  audio/
+    music/              # Background tracks
+    sfx/                # Sound effects
 ```
+
+## Asset Architecture (Swappable Graphics)
+
+**All visual elements use sprites that can be swapped without code changes.**
+
+### Asset Manifest (`assets/manifest.json`)
+```json
+{
+  "tanks": {
+    "player": { "path": "images/tanks/tank-player.png", "width": 64, "height": 32 },
+    "enemy": { "path": "images/tanks/tank-enemy.png", "width": 64, "height": 32 }
+  },
+  "projectiles": {
+    "basic": { "path": "images/weapons/shot-basic.png", "width": 8, "height": 8 },
+    "mirv": { "path": "images/weapons/shot-mirv.png", "width": 12, "height": 12 }
+  },
+  "effects": {
+    "explosion-small": { "path": "images/effects/explosion-small.png", "frames": 8 },
+    "explosion-large": { "path": "images/effects/explosion-large.png", "frames": 12 }
+  }
+}
+```
+
+### Placeholder Strategy
+Ralph will create simple geometric placeholders (colored rectangles/circles) that render correctly. When custom art is ready (via NanoBanana), just:
+1. Drop new images in `assets/images/`
+2. Update dimensions in `manifest.json` if needed
+3. Refresh - new graphics appear
+
+### Naming Conventions
+- `tank-{type}.png` - Tank sprites
+- `shot-{weapon}.png` - Projectile sprites
+- `explosion-{size}.png` - Explosion spritesheets
+- `bg-{layer}.png` - Background layers
+- `ui-{element}.png` - UI elements
 
 ## Current Status
 
