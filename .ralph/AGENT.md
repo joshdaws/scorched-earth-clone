@@ -32,16 +32,38 @@ python3 -m http.server 8000
 npx serve .
 ```
 
-## Testing with Browser Extension
+## Testing with Chrome Extension (MANDATORY)
 
-For visual verification, use Chrome browser extension:
+**ALL changes must be verified using the Chrome browser extension before closing issues.**
 
+### Start the Server
+```bash
+python3 -m http.server 8000
 ```
-1. Open the game in browser
-2. Navigate: mcp__claude-in-chrome__navigate to localhost:8000 or file path
-3. Screenshot: mcp__claude-in-chrome__computer action=screenshot
-4. Check console: mcp__claude-in-chrome__read_console_messages
+
+### Test Workflow
 ```
+1. Navigate to game:
+   mcp__claude-in-chrome__navigate url="http://localhost:8000" tabId=<tab>
+
+2. Take screenshot to verify visuals:
+   mcp__claude-in-chrome__computer action=screenshot tabId=<tab>
+
+3. Check for JavaScript errors:
+   mcp__claude-in-chrome__read_console_messages tabId=<tab>
+
+4. Test interactions (click, input):
+   mcp__claude-in-chrome__computer action=left_click coordinate=[x,y] tabId=<tab>
+
+5. Read page state if needed:
+   mcp__claude-in-chrome__read_page tabId=<tab>
+```
+
+### Before Closing Any Issue
+- Screenshot shows the feature working
+- Console has no errors related to your changes
+- All acceptance criteria verified visually
+- If something doesn't work, FIX IT before closing
 
 ## File Structure
 

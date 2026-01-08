@@ -44,22 +44,34 @@ Before making changes, search the codebase to verify the item needs work (don't 
 
 Implement the solution following project standards (see AGENT.md).
 
-### STEP 4: Validate
+### STEP 4: Validate with Chrome Extension (REQUIRED)
 
-After implementing, run validation:
+**You MUST use the Chrome browser extension to validate ALL changes:**
 
-- Open `index.html` in browser to test the game
-- Check browser console for JavaScript errors
-- Verify the game runs without crashes
+```
+1. Start local server: python3 -m http.server 8000
+2. Navigate: mcp__claude-in-chrome__navigate to http://localhost:8000
+3. Take screenshot: mcp__claude-in-chrome__computer action=screenshot
+4. Check console: mcp__claude-in-chrome__read_console_messages
+5. Test interactions if applicable
+```
 
-### STEP 5: For Visual/UI Work
+**Validation checklist:**
+- [ ] Game loads without console errors
+- [ ] Visual elements render correctly
+- [ ] Any new functionality works as expected
+- [ ] Take screenshots as evidence
 
-Use the Chrome browser extension to test:
+**DO NOT close an issue until you have visually verified it works in the browser.**
 
-- Open `index.html` via file:// or local server
-- Take screenshots of the game in action
-- Verify visual changes look correct
-- Check console for errors
+### STEP 5: Verify Acceptance Criteria
+
+Before closing ANY issue:
+
+1. Re-read the acceptance criteria from `bd show <issue-id>`
+2. Verify EACH criterion is met - not just "mostly done"
+3. If ANY criterion is not met, keep working
+4. Only proceed to close when ALL criteria pass
 
 ### STEP 6: Create New Issues for Discoveries
 
@@ -124,17 +136,21 @@ When the task is complete and tests pass:
 
 1. **ONE ISSUE PER ITERATION.** Complete one issue, commit, then STOP.
 
-2. When authoring code, capture WHY in comments for complex logic.
+2. **ACCEPTANCE CRITERIA ARE LAW.** Do not close an issue until EVERY acceptance criterion is met and verified. Re-read them before closing.
 
-3. Single sources of truth - check existing patterns first.
+3. **CHROME EXTENSION VALIDATION REQUIRED.** You must visually verify changes work in the browser using the Chrome extension. Take screenshots. Check console for errors.
 
-4. If unrelated tests fail, resolve them as part of your change.
+4. When authoring code, capture WHY in comments for complex logic.
 
-5. FULL IMPLEMENTATIONS ONLY. No placeholders or stubs.
+5. Single sources of truth - check existing patterns first.
 
-6. Before creating new files, search to ensure they don't already exist.
+6. If unrelated tests fail, resolve them as part of your change.
 
-7. Beads is the ONLY source of truth for task status:
+7. FULL IMPLEMENTATIONS ONLY. No placeholders or stubs.
+
+8. Before creating new files, search to ensure they don't already exist.
+
+9. Beads is the ONLY source of truth for task status:
    - Starting work: `bd update <issue-id> --claim`
    - Completing work: `bd close <issue-id>`
    - Finding bugs: `bd create --title "..." --type bug{{PARENT_FLAG}}`
