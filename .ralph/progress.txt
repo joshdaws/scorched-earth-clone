@@ -32,5 +32,11 @@
 **Status:** Completed
 **Changes:** Updated style.css with complete synthwave color palette as CSS custom properties (--bg-dark, --neon-pink, --neon-cyan, --neon-purple, --neon-yellow, --neon-orange) and base page styling including dark background, hidden scrollbars, system sans-serif font, and full viewport canvas.
 **Files:** style.css
-**Commit:** (pending)
+**Commit:** 01d3758
+---
+## scorched-earth-7ku.3 - Create JavaScript Module Structure
+**Status:** Completed
+**Changes:** Created JS module structure with constants.js (game settings), game.js (loop/state), renderer.js (canvas), input.js (keyboard/mouse/touch), and updated main.js as entry point
+**Files:** js/constants.js, js/game.js, js/renderer.js, js/input.js, js/main.js
+**Commit:** fb250c8
 ---
