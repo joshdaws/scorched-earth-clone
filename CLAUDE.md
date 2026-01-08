@@ -68,20 +68,21 @@ bd close <issue-id>
 
 ## Tech Stack
 
-To be finalized in `scorched-earth-7ku`, but likely:
+Finalized and implemented. See `docs/architecture/tech-stack.md` for detailed rationale.
 
-- **Rendering:** Canvas 2D or PixiJS (2D WebGL)
+- **Rendering:** Canvas 2D (not PixiJS/WebGL - simpler, better for terrain pixel manipulation)
 - **Physics:** Custom ballistics + terrain collision (general physics engines are overkill)
-- **Audio:** Web Audio API
-- **Build:** Minimal or none (vanilla JS ES modules)
-- **Mobile:** Capacitor wrapper for iOS App Store
+- **Audio:** Web Audio API with separate music/SFX channels
+- **Build:** None (vanilla ES6 modules, no bundler needed)
+- **Mobile:** Capacitor wrapper for iOS App Store (future)
 
-### Mobile-First Considerations
+### Mobile-First Design (Implemented)
 
-- Abstract input layer (mouse + touch) from day one
-- Responsive canvas sizing
-- Test in mobile Safari early and often
-- Design UI for thumb zones
+- Unified pointer API abstracts mouse and touch input (`js/input.js`)
+- Canvas scales responsively to any viewport while maintaining 3:2 aspect ratio
+- High-DPI support via devicePixelRatio scaling
+- Touch events handled with proper passive flags
+- Design coordinates (1200x800) independent of actual resolution
 
 ## Code Style
 
@@ -166,9 +167,15 @@ Ralph will create simple geometric placeholders (colored rectangles/circles) tha
 
 ## Current Status
 
-**Phase:** Implementation Ready
+**Phase:** Core Implementation
 
-All planning complete. Tech stack setup must be completed before any implementation work begins.
+Tech stack setup complete (`scorched-earth-7ku`). All foundation systems are working:
+- Canvas rendering with responsive scaling
+- Game state machine with transition hooks
+- Input abstraction (mouse + touch + keyboard)
+- Asset loader with manifest support
+- Audio system with music/SFX channels
+- Debug mode with FPS counter
 
 ### Epic Breakdown
 
