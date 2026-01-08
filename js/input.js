@@ -6,10 +6,15 @@
  * All coordinates are converted to canvas design space (1200x800).
  */
 
-import { CANVAS } from './constants.js';
+import { CANVAS, GAME_KEYS } from './constants.js';
 
-// Input state
+// Input state - tracks currently held keys
 const keys = {};
+
+// Tracks keys that were pressed this frame (for single-fire events)
+// These get cleared at the end of each frame by clearFrameState()
+const keysPressed = {};
+
 const mouse = {
     x: 0,
     y: 0,
@@ -72,11 +77,26 @@ export function init(canvas) {
 
 // Keyboard handlers
 function handleKeyDown(e) {
+    // Prevent default browser behavior for game keys (e.g., arrow key scrolling)
+    if (GAME_KEYS.has(e.code)) {
+        e.preventDefault();
+    }
+
+    // Only set wasPressed if this is a fresh press (not a key repeat)
+    if (!keys[e.code]) {
+        keysPressed[e.code] = true;
+    }
+
     keys[e.code] = true;
     keyDownCallbacks.forEach(cb => cb(e.code, e));
 }
 
 function handleKeyUp(e) {
+    // Prevent default for game keys on release too
+    if (GAME_KEYS.has(e.code)) {
+        e.preventDefault();
+    }
+
     keys[e.code] = false;
     keyUpCallbacks.forEach(cb => cb(e.code, e));
 }
@@ -206,13 +226,54 @@ function updatePointerFromTouch() {
     pointer.y = design.y;
 }
 
+// =============================================================================
+// KEYBOARD API
+// =============================================================================
+
 /**
- * Check if a key is currently pressed
+ * Check if a key is currently held down.
+ * This returns true every frame while the key is pressed.
+ * @param {string} keyCode - The key code to check (e.g., 'ArrowUp', 'Space')
+ * @returns {boolean} True if key is currently down
+ */
+export function isKeyDown(keyCode) {
+    return keys[keyCode] === true;
+}
+
+/**
+ * Check if a key is currently pressed (alias for isKeyDown).
  * @param {string} keyCode - The key code to check
  * @returns {boolean} True if key is pressed
+ * @deprecated Use isKeyDown for clarity
  */
 export function isKeyPressed(keyCode) {
-    return keys[keyCode] === true;
+    return isKeyDown(keyCode);
+}
+
+/**
+ * Check if a key was pressed this frame (single-fire event).
+ * This returns true only on the frame the key was first pressed,
+ * not on subsequent frames while the key is held.
+ * Use this for actions that should only trigger once per key press.
+ * @param {string} keyCode - The key code to check
+ * @returns {boolean} True if key was pressed this frame
+ */
+export function wasKeyPressed(keyCode) {
+    return keysPressed[keyCode] === true;
+}
+
+/**
+ * Clear the frame state for input.
+ * This should be called at the end of each game loop frame to reset
+ * single-fire key presses. Keys that are held down will still report
+ * as down via isKeyDown(), but wasKeyPressed() will return false
+ * until the key is released and pressed again.
+ */
+export function clearFrameState() {
+    // Clear all keys that were marked as pressed this frame
+    for (const key in keysPressed) {
+        delete keysPressed[key];
+    }
 }
 
 /**

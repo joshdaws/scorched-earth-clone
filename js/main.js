@@ -46,6 +46,10 @@ function init() {
  */
 function update(deltaTime) {
     // Game update logic will go here
+
+    // Clear single-fire input state at end of frame
+    // This must be done after all game logic that checks wasKeyPressed()
+    Input.clearFrameState();
 }
 
 /**

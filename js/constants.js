@@ -186,3 +186,44 @@ export const UI = {
     FONT_SIZE_TITLE: 48,
     FONT_FAMILY: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
 };
+
+// =============================================================================
+// KEY CODES
+// =============================================================================
+
+/**
+ * Keyboard key code constants.
+ * Using KeyboardEvent.code values for consistent behavior across layouts.
+ */
+export const KEYS = {
+    // Arrow keys
+    ARROW_UP: 'ArrowUp',
+    ARROW_DOWN: 'ArrowDown',
+    ARROW_LEFT: 'ArrowLeft',
+    ARROW_RIGHT: 'ArrowRight',
+
+    // Action keys
+    SPACE: 'Space',
+    ENTER: 'Enter',
+    TAB: 'Tab',
+    ESCAPE: 'Escape',
+
+    // Letter keys (for potential future use)
+    W: 'KeyW',
+    A: 'KeyA',
+    S: 'KeyS',
+    D: 'KeyD'
+};
+
+/**
+ * Set of key codes that should have default browser behavior prevented.
+ * These keys would otherwise cause scrolling or focus changes.
+ */
+export const GAME_KEYS = new Set([
+    KEYS.ARROW_UP,
+    KEYS.ARROW_DOWN,
+    KEYS.ARROW_LEFT,
+    KEYS.ARROW_RIGHT,
+    KEYS.SPACE,
+    KEYS.TAB
+]);
