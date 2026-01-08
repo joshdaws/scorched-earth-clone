@@ -70,3 +70,9 @@
 **Files:** js/renderer.js, style.css
 **Commit:** (pending)
 ---
+## scorched-earth-7ku.9 - Create Input Abstraction Layer
+**Status:** Completed
+**Changes:** Enhanced input.js with unified pointer abstraction that normalizes mouse/touch input. Added isPointerDown(), getPointerPosition(), and coordinate scaling to canvas design space (1200x800).
+**Files:** js/input.js
+**Commit:** d102004
+---
