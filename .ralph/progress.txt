@@ -100,3 +100,9 @@
 **Files:** js/sound.js (modified), assets/audio/music/test-loop.wav (new)
 **Commit:** (pending)
 ---
+## scorched-earth-7ku.14 - Create Basic Game State Machine
+**Status:** Completed
+**Changes:** Enhanced game.js with registerStateHandlers(), onEnter/onExit hooks, state-specific update/render, and debug logging. Added VICTORY/DEFEAT to GAME_STATES in constants.js.
+**Files:** js/game.js (modified), js/constants.js (modified)
+**Commit:** (pending)
+---

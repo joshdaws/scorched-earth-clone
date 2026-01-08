@@ -86,6 +86,8 @@ export const GAME_STATES = {
     PAUSED: 'paused',
     SHOP: 'shop',
     ROUND_END: 'round_end',
+    VICTORY: 'victory',
+    DEFEAT: 'defeat',
     GAME_OVER: 'game_over'
 };
 
