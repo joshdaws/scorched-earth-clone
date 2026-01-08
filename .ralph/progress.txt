@@ -14,5 +14,11 @@
 **Status:** Completed
 **Changes:** Created 10 new epics with 60+ implementation issues, proper dependency chains, and acceptance criteria for each
 **Files:** CLAUDE.md (updated Current Status section), .beads/issues.jsonl (many new issues)
+**Commit:** 90086cd
+---
+## scorched-earth-4b4 - Break Tech Stack Epic into Issues
+**Status:** Completed
+**Changes:** Created 16 issues under scorched-earth-7ku covering project setup, rendering, input, audio, and game loop
+**Files:** .beads/issues.jsonl (16 new issues)
 **Commit:** pending
 ---
