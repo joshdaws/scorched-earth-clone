@@ -58,3 +58,9 @@
 **Files:** js/renderer.js, js/main.js
 **Commit:** 2161e22
 ---
+## scorched-earth-7ku.7 - Implement Basic Render Loop with requestAnimationFrame
+**Status:** Completed
+**Changes:** Enhanced game.js with FPS tracking and debug mode. Added startLoop/stopLoop functions using requestAnimationFrame with deltaTime calculation. FPS is logged every second in debug mode.
+**Files:** js/game.js, js/main.js
+**Commit:** d1f8373
+---

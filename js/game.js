@@ -10,6 +10,11 @@ let gameState = GAME_STATES.MENU;
 let lastFrameTime = 0;
 let isRunning = false;
 
+// FPS tracking for debug mode
+let frameCount = 0;
+let lastFpsUpdate = 0;
+let debugMode = false;
+
 /**
  * Initialize the game state
  */
@@ -42,12 +47,15 @@ export function setState(newState) {
 
 /**
  * Start the game loop
- * @param {Function} updateFn - Update function called each frame
- * @param {Function} renderFn - Render function called each frame
+ * @param {Function} updateFn - Update function called each frame with deltaTime
+ * @param {Function} renderFn - Render function called each frame with ctx
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D rendering context
  */
-export function startLoop(updateFn, renderFn) {
+export function startLoop(updateFn, renderFn, ctx) {
     isRunning = true;
     lastFrameTime = performance.now();
+    lastFpsUpdate = performance.now();
+    frameCount = 0;
 
     function loop(currentTime) {
         if (!isRunning) return;
@@ -55,11 +63,21 @@ export function startLoop(updateFn, renderFn) {
         const deltaTime = currentTime - lastFrameTime;
         lastFrameTime = currentTime;
 
+        // FPS logging in debug mode
+        if (debugMode) {
+            frameCount++;
+            if (currentTime - lastFpsUpdate >= 1000) {
+                console.log(`FPS: ${frameCount}`);
+                frameCount = 0;
+                lastFpsUpdate = currentTime;
+            }
+        }
+
         // Update game logic
         if (updateFn) updateFn(deltaTime);
 
-        // Render frame
-        if (renderFn) renderFn();
+        // Render frame with context
+        if (renderFn) renderFn(ctx);
 
         requestAnimationFrame(loop);
     }
@@ -82,4 +100,22 @@ export function stopLoop() {
  */
 export function isLoopRunning() {
     return isRunning;
+}
+
+/**
+ * Enable or disable debug mode
+ * When enabled, FPS is logged to console every second
+ * @param {boolean} enabled - Whether to enable debug mode
+ */
+export function setDebugMode(enabled) {
+    debugMode = enabled;
+    console.log(`Debug mode ${enabled ? 'enabled' : 'disabled'}`);
+}
+
+/**
+ * Check if debug mode is enabled
+ * @returns {boolean} True if debug mode is enabled
+ */
+export function isDebugMode() {
+    return debugMode;
 }

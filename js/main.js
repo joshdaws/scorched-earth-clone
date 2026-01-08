@@ -31,10 +31,13 @@ function init() {
     // Initialize game state
     Game.init();
 
+    // Enable debug mode to verify FPS logging
+    Game.setDebugMode(true);
+
     console.log('Scorched Earth initialized');
 
-    // Start the game loop
-    Game.startLoop(update, render);
+    // Start the game loop with update, render, and context
+    Game.startLoop(update, render, ctx);
 }
 
 /**
@@ -47,8 +50,9 @@ function update(deltaTime) {
 
 /**
  * Render frame
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D rendering context
  */
-function render() {
+function render(ctx) {
     // Clear canvas
     Renderer.clear();
 
