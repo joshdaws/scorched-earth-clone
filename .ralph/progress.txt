@@ -8,5 +8,11 @@
 **Status:** Completed
 **Changes:** Created comprehensive game specification document covering all gameplay mechanics, physics, weapons, terrain, economy, AI, visual design, audio, and asset architecture
 **Files:** docs/specs/game-spec.md (1200+ lines)
+**Commit:** 4a7c9c4
+---
+## scorched-earth-28e - Break Game Spec into Epics and Issues
+**Status:** Completed
+**Changes:** Created 10 new epics with 60+ implementation issues, proper dependency chains, and acceptance criteria for each
+**Files:** CLAUDE.md (updated Current Status section), .beads/issues.jsonl (many new issues)
 **Commit:** pending
 ---

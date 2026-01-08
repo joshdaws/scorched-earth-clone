@@ -166,13 +166,43 @@ Ralph will create simple geometric placeholders (colored rectangles/circles) tha
 
 ## Current Status
 
-**Phase:** Initial Setup
+**Phase:** Implementation Ready
 
-**Active Issues:**
+All planning complete. Tech stack setup must be completed before any implementation work begins.
 
-1. `scorched-earth-7mz` - Research original Scorched Earth game
-2. `scorched-earth-33s` - Write game specification (blocked)
-3. `scorched-earth-28e` - Break spec into epics/issues (blocked)
-4. `scorched-earth-7ku` - Set up tech stack (blocked)
+### Epic Breakdown
+
+| Epic | ID | Issues | Priority | Description |
+|------|-----|--------|----------|-------------|
+| **Tech Stack Setup** | `scorched-earth-7ku` | TBD | P1 | Project scaffolding, HTML/JS structure |
+| **Core Game Engine** | `scorched-earth-5zm` | 6 | P1 | Canvas, game loop, state machine, input, assets |
+| **Terrain System** | `scorched-earth-v3c` | 6 | P1 | Heightmap, generation, rendering, destruction |
+| **Tank & Projectile** | `scorched-earth-wu8` | 8 | P1 | Tank entity, physics, collision, damage, wind |
+| **Weapons System** | `scorched-earth-8qc` | 9 | P1 | All 11 weapons with unique behaviors |
+| **AI Opponents** | `scorched-earth-7hv` | 5 | P1 | Easy/Medium/Hard AI, turn execution |
+| **UI and Menus** | `scorched-earth-x47` | 6 | P1 | HUD, menus, aiming controls, screens |
+| **Economy & Shop** | `scorched-earth-wzf` | 5 | P1 | Money, shop UI, inventory, rounds |
+| **Visual Effects** | `scorched-earth-qff` | 5 | P2 | Particles, shake, flash, backgrounds |
+| **Audio System** | `scorched-earth-cu2` | 5 | P2 | SFX, music, volume controls |
+| **Mobile Support** | `scorched-earth-pxn` | 5 | P2 | Touch controls, scaling, iOS |
+
+**Total:** 10 epics, 60+ issues
+
+### Implementation Order
+
+1. **Tech Stack Setup** (scorched-earth-7ku) - FIRST, blocks everything
+2. **Core Game Engine** → **Terrain System** → **Tank & Projectile** (parallel work possible)
+3. **Weapons System** (depends on projectile physics)
+4. **UI and Menus** + **Economy & Shop** (can work in parallel)
+5. **AI Opponents** (needs weapons and damage)
+6. **Visual Effects** + **Audio System** (polish phase)
+7. **Mobile Support** (final phase)
+
+### Key Dependencies
+
+- ALL implementation issues are blocked by `scorched-earth-7ku` (tech stack)
+- Weapons depend on projectile physics being complete
+- AI depends on weapons and damage calculation
+- Shop depends on weapon registry and economy
 
 Run `bd ready` to see what's available to work on.
