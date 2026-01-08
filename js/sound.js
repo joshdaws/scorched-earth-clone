@@ -28,6 +28,18 @@ let initialized = false;
 /** @type {Map<string, AudioBuffer>} Cache of loaded audio buffers */
 const soundCache = new Map();
 
+/** @type {Map<string, AudioBuffer>} Cache of loaded music buffers */
+const musicCache = new Map();
+
+/** @type {AudioBufferSourceNode|null} Currently playing music source */
+let currentMusicSource = null;
+
+/** @type {GainNode|null} Gain node for current music (for fading) */
+let currentMusicGainNode = null;
+
+/** @type {string|null} ID of currently playing music track */
+let currentMusicId = null;
+
 // =============================================================================
 // AUDIO CONFIGURATION
 // =============================================================================
@@ -317,4 +329,255 @@ export function unloadSound(id) {
  */
 export function clearSoundCache() {
     soundCache.clear();
+}
+
+// =============================================================================
+// MUSIC API
+// =============================================================================
+
+/** Default fade duration in seconds */
+const DEFAULT_FADE_DURATION = 1.0;
+
+/**
+ * Load a music track from a file path and cache it for playback.
+ * @param {string} id - Unique identifier for the music track
+ * @param {string} path - Path to the audio file
+ * @returns {Promise<boolean>} True if loading succeeded
+ */
+export async function loadMusic(id, path) {
+    // Check if already cached
+    if (musicCache.has(id)) {
+        return true;
+    }
+
+    // Audio context must be initialized
+    if (!audioContext) {
+        console.warn(`Cannot load music '${id}': Audio not initialized`);
+        return false;
+    }
+
+    try {
+        const response = await fetch(path);
+
+        if (!response.ok) {
+            console.warn(`Failed to load music '${id}': ${response.status} ${response.statusText}`);
+            return false;
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+        musicCache.set(id, audioBuffer);
+        console.log(`Music loaded: ${id}`);
+        return true;
+    } catch (error) {
+        console.warn(`Failed to load music '${id}':`, error.message);
+        return false;
+    }
+}
+
+/**
+ * Play a music track. Only one track plays at a time.
+ * If another track is playing, it will be stopped first.
+ * @param {string} id - Identifier of the music track to play
+ * @param {boolean} [loop=true] - Whether to loop the track
+ * @param {number} [fadeIn=0] - Fade in duration in seconds (0 for instant)
+ * @returns {boolean} True if playback started successfully
+ */
+export function playMusic(id, loop = true, fadeIn = 0) {
+    // Audio must be initialized
+    if (!audioContext || !musicGain) {
+        console.warn(`Cannot play music '${id}': Audio not initialized`);
+        return false;
+    }
+
+    // Music must be loaded
+    const buffer = musicCache.get(id);
+    if (!buffer) {
+        console.warn(`Cannot play music '${id}': Music not loaded`);
+        return false;
+    }
+
+    // Stop current music if playing
+    if (currentMusicSource) {
+        stopMusicImmediate();
+    }
+
+    try {
+        // Create source node
+        const source = audioContext.createBufferSource();
+        source.buffer = buffer;
+        source.loop = loop;
+
+        // Create per-track gain node for fading
+        const gainNode = audioContext.createGain();
+
+        // Set initial volume (0 if fading in, 1 otherwise)
+        gainNode.gain.value = fadeIn > 0 ? 0 : 1;
+
+        // Connect: source → per-track gain → music gain → master → destination
+        source.connect(gainNode);
+        gainNode.connect(musicGain);
+
+        // Apply fade in if requested
+        if (fadeIn > 0) {
+            gainNode.gain.linearRampToValueAtTime(1, audioContext.currentTime + fadeIn);
+        }
+
+        // Store references
+        currentMusicSource = source;
+        currentMusicGainNode = gainNode;
+        currentMusicId = id;
+
+        // Clean up when track ends (if not looping)
+        source.onended = () => {
+            if (currentMusicSource === source) {
+                currentMusicSource = null;
+                currentMusicGainNode = null;
+                currentMusicId = null;
+            }
+        };
+
+        source.start(0);
+        console.log(`Music playing: ${id}`);
+        return true;
+    } catch (error) {
+        console.error(`Error playing music '${id}':`, error);
+        return false;
+    }
+}
+
+/**
+ * Stop the currently playing music immediately.
+ */
+function stopMusicImmediate() {
+    if (currentMusicSource) {
+        try {
+            currentMusicSource.stop();
+        } catch (e) {
+            // Ignore errors if already stopped
+        }
+        currentMusicSource = null;
+        currentMusicGainNode = null;
+        currentMusicId = null;
+    }
+}
+
+/**
+ * Stop the currently playing music.
+ * @param {number} [fadeOut=0] - Fade out duration in seconds (0 for instant)
+ */
+export function stopMusic(fadeOut = 0) {
+    if (!currentMusicSource || !currentMusicGainNode || !audioContext) {
+        return;
+    }
+
+    if (fadeOut > 0) {
+        // Fade out then stop
+        const source = currentMusicSource;
+        const gainNode = currentMusicGainNode;
+
+        gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + fadeOut);
+
+        // Stop after fade completes
+        setTimeout(() => {
+            if (currentMusicSource === source) {
+                stopMusicImmediate();
+            }
+        }, fadeOut * 1000);
+    } else {
+        stopMusicImmediate();
+    }
+}
+
+/**
+ * Crossfade from current music to a new track.
+ * @param {string} id - Identifier of the music track to fade to
+ * @param {boolean} [loop=true] - Whether to loop the new track
+ * @param {number} [duration=1] - Crossfade duration in seconds
+ * @returns {boolean} True if crossfade started successfully
+ */
+export function crossfadeMusic(id, loop = true, duration = DEFAULT_FADE_DURATION) {
+    // If nothing is playing, just play with fade in
+    if (!currentMusicSource) {
+        return playMusic(id, loop, duration);
+    }
+
+    // Same track - do nothing
+    if (currentMusicId === id) {
+        return true;
+    }
+
+    // Music must be loaded
+    const buffer = musicCache.get(id);
+    if (!buffer) {
+        console.warn(`Cannot crossfade to music '${id}': Music not loaded`);
+        return false;
+    }
+
+    // Fade out current
+    if (currentMusicGainNode && audioContext) {
+        const oldSource = currentMusicSource;
+        const oldGain = currentMusicGainNode;
+
+        oldGain.gain.linearRampToValueAtTime(0, audioContext.currentTime + duration);
+
+        // Stop old track after fade
+        setTimeout(() => {
+            try {
+                oldSource.stop();
+            } catch (e) {
+                // Ignore
+            }
+        }, duration * 1000);
+    }
+
+    // Clear current references before playing new track
+    currentMusicSource = null;
+    currentMusicGainNode = null;
+    currentMusicId = null;
+
+    // Play new track with fade in
+    return playMusic(id, loop, duration);
+}
+
+/**
+ * Check if a music track is loaded and ready to play.
+ * @param {string} id - Music identifier to check
+ * @returns {boolean} True if music is loaded
+ */
+export function isMusicLoaded(id) {
+    return musicCache.has(id);
+}
+
+/**
+ * Get the ID of the currently playing music track.
+ * @returns {string|null} The current track ID, or null if nothing is playing
+ */
+export function getCurrentMusicId() {
+    return currentMusicId;
+}
+
+/**
+ * Check if music is currently playing.
+ * @returns {boolean} True if music is playing
+ */
+export function isMusicPlaying() {
+    return currentMusicSource !== null;
+}
+
+/**
+ * Unload a music track from the cache.
+ * @param {string} id - Music identifier to unload
+ */
+export function unloadMusic(id) {
+    musicCache.delete(id);
+}
+
+/**
+ * Clear all loaded music from the cache.
+ */
+export function clearMusicCache() {
+    stopMusic();
+    musicCache.clear();
 }
