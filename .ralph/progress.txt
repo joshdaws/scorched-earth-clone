@@ -44,5 +44,11 @@
 **Status:** Completed
 **Changes:** Created complete asset directory structure with manifest.json containing definitions for tanks, projectiles, effects, UI elements, backgrounds, and audio assets. Added .gitkeep files to all empty directories.
 **Files:** assets/manifest.json, assets/images/{tanks,weapons,effects,ui,backgrounds}/.gitkeep, assets/audio/{music,sfx}/.gitkeep
-**Commit:** (pending)
+**Commit:** 6a8c4b2
+---
+## scorched-earth-7ku.5 - Implement Constants Module with Game Settings
+**Status:** Completed
+**Changes:** Populated js/constants.js with all game constants from spec including physics (GRAVITY 0.15, MAX_VELOCITY 20, WIND_RANGE 10), canvas dimensions (1200x800), tank settings (64x32, 100 health), game settings (1000 starting money), full synthwave color palette matching CSS variables, timing, terrain, projectile, and UI constants.
+**Files:** js/constants.js
+**Commit:** pending
 ---
