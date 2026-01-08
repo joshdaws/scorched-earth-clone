@@ -7,6 +7,7 @@ import * as Game from './game.js';
 import * as Renderer from './renderer.js';
 import * as Input from './input.js';
 import * as Sound from './sound.js';
+import * as Assets from './assets.js';
 import { COLORS } from './constants.js';
 
 /**
@@ -36,7 +37,7 @@ function setupAudioInit(canvas) {
 /**
  * Initialize all game modules
  */
-function init() {
+async function init() {
     console.log('Scorched Earth: Synthwave Edition');
     console.log('Initializing...');
 
@@ -56,6 +57,17 @@ function init() {
     // Set up audio initialization on first user interaction
     // Web Audio API requires user gesture to start
     setupAudioInit(canvas);
+
+    // Load assets before starting the game
+    try {
+        await Assets.loadManifest();
+        await Assets.loadAllAssets((loaded, total) => {
+            console.log(`Loading assets: ${loaded}/${total}`);
+        });
+    } catch (error) {
+        console.error('Failed to load assets:', error);
+        // Continue anyway - game can run with missing assets
+    }
 
     // Initialize game state
     Game.init();

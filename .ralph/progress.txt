@@ -106,3 +106,9 @@
 **Files:** js/game.js (modified), js/constants.js (modified)
 **Commit:** (pending)
 ---
+## scorched-earth-7ku.16 - Create Asset Loader Module
+**Status:** Completed
+**Changes:** Implemented complete asset loader module with manifest loading, image caching, progress callbacks, and graceful error handling. Integrated into main.js initialization.
+**Files:** js/assets.js (created), js/main.js (modified)
+**Commit:** 6e89fd8
+---
