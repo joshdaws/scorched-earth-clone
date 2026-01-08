@@ -68,7 +68,7 @@
 **Status:** Completed
 **Changes:** Implemented comprehensive canvas resize handling with 3:2 aspect ratio preservation, devicePixelRatio support for high-DPI displays, 100ms debounced resize handler, mobile orientation change support, and coordinate conversion utilities.
 **Files:** js/renderer.js, style.css
-**Commit:** (pending)
+**Commit:** 0a20cd8
 ---
 ## scorched-earth-7ku.9 - Create Input Abstraction Layer
 **Status:** Completed
@@ -86,29 +86,35 @@
 **Status:** Completed
 **Changes:** Created js/sound.js with Web Audio API initialization, master/music/sfx gain nodes, and volume control API. Updated main.js to initialize audio on first user interaction.
 **Files:** js/sound.js (new), js/main.js (modified)
-**Commit:** (pending)
+**Commit:** 0a20cd8
 ---
 ## scorched-earth-7ku.12 - Implement Sound Effect Player
 **Status:** Completed
 **Changes:** Added loadSound/playSound functions to sound.js with caching and overlapping playback support. Created test-beep.wav placeholder sound.
 **Files:** js/sound.js (modified), assets/audio/sfx/test-beep.wav (new)
-**Commit:** (pending)
+**Commit:** 0a20cd8
 ---
 ## scorched-earth-7ku.13 - Implement Music Player with Loop Support
 **Status:** Completed
 **Changes:** Added loadMusic/playMusic/stopMusic/crossfadeMusic functions to sound.js. Only one track plays at a time. Created test-loop.wav placeholder music.
 **Files:** js/sound.js (modified), assets/audio/music/test-loop.wav (new)
-**Commit:** (pending)
+**Commit:** 0a20cd8
 ---
 ## scorched-earth-7ku.14 - Create Basic Game State Machine
 **Status:** Completed
 **Changes:** Enhanced game.js with registerStateHandlers(), onEnter/onExit hooks, state-specific update/render, and debug logging. Added VICTORY/DEFEAT to GAME_STATES in constants.js.
 **Files:** js/game.js (modified), js/constants.js (modified)
-**Commit:** (pending)
+**Commit:** 0a20cd8
 ---
 ## scorched-earth-7ku.16 - Create Asset Loader Module
 **Status:** Completed
 **Changes:** Implemented complete asset loader module with manifest loading, image caching, progress callbacks, and graceful error handling. Integrated into main.js initialization.
 **Files:** js/assets.js (created), js/main.js (modified)
 **Commit:** 6e89fd8
+---
+## scorched-earth-7ku.15 - Add Debug Mode with FPS Counter
+**Status:** Completed
+**Changes:** Added complete debug module with rolling average FPS counter, ms per frame display, conditional debug logging, and 'D' key toggle
+**Files:** js/constants.js (DEBUG config), js/debug.js (new), js/main.js (integration)
+**Commit:** 0a20cd8
 ---

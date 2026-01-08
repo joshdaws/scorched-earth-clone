@@ -229,3 +229,24 @@ export const GAME_KEYS = new Set([
     KEYS.SPACE,
     KEYS.TAB
 ]);
+
+// =============================================================================
+// DEBUG CONSTANTS
+// =============================================================================
+
+/**
+ * Debug mode configuration.
+ * When enabled, displays FPS counter and enables debug logging.
+ */
+export const DEBUG = {
+    /** Enable debug mode by default during development */
+    ENABLED: true,
+    /** Number of frames to average for FPS calculation */
+    FPS_SAMPLE_SIZE: 60,
+    /** Position of FPS counter on canvas */
+    FPS_POSITION: { x: 10, y: 20 },
+    /** Font size for debug text */
+    FONT_SIZE: 14,
+    /** Key code to toggle debug mode */
+    TOGGLE_KEY: 'KeyD'
+};

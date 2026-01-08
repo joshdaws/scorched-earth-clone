@@ -8,7 +8,8 @@ import * as Renderer from './renderer.js';
 import * as Input from './input.js';
 import * as Sound from './sound.js';
 import * as Assets from './assets.js';
-import { COLORS } from './constants.js';
+import * as Debug from './debug.js';
+import { COLORS, DEBUG } from './constants.js';
 
 /**
  * Set up audio initialization on first user interaction.
@@ -72,8 +73,15 @@ async function init() {
     // Initialize game state
     Game.init();
 
-    // Enable debug mode to verify FPS logging
-    Game.setDebugMode(true);
+    // Initialize debug module
+    Debug.init();
+
+    // Register 'D' key to toggle debug mode
+    Input.onKeyDown((keyCode) => {
+        if (keyCode === DEBUG.TOGGLE_KEY) {
+            Debug.toggle();
+        }
+    });
 
     console.log('Scorched Earth initialized');
 
@@ -86,6 +94,9 @@ async function init() {
  * @param {number} deltaTime - Time since last frame in ms
  */
 function update(deltaTime) {
+    // Update debug FPS tracking
+    Debug.updateFps(performance.now());
+
     // Game update logic will go here
 
     // Clear single-fire input state at end of frame
@@ -102,6 +113,9 @@ function render(ctx) {
     Renderer.clear();
 
     // Render game elements will go here
+
+    // Render debug overlay last (on top of everything)
+    Debug.render(ctx);
 }
 
 // Initialize when DOM is ready
