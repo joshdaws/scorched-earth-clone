@@ -1,0 +1,138 @@
+{
+  "tanks": {
+    "player": {
+      "path": "images/tanks/tank-player.png",
+      "width": 64,
+      "height": 32
+    },
+    "enemy": {
+      "path": "images/tanks/tank-enemy.png",
+      "width": 64,
+      "height": 32
+    }
+  },
+  "projectiles": {
+    "basic": {
+      "path": "images/weapons/shot-basic.png",
+      "width": 8,
+      "height": 8
+    },
+    "mirv": {
+      "path": "images/weapons/shot-mirv.png",
+      "width": 12,
+      "height": 12
+    },
+    "roller": {
+      "path": "images/weapons/shot-roller.png",
+      "width": 10,
+      "height": 10
+    },
+    "digger": {
+      "path": "images/weapons/shot-digger.png",
+      "width": 8,
+      "height": 8
+    },
+    "nuke": {
+      "path": "images/weapons/shot-nuke.png",
+      "width": 16,
+      "height": 16
+    },
+    "miniNuke": {
+      "path": "images/weapons/shot-mini-nuke.png",
+      "width": 12,
+      "height": 12
+    }
+  },
+  "effects": {
+    "explosion-small": {
+      "path": "images/effects/explosion-small.png",
+      "width": 32,
+      "height": 32,
+      "frames": 8
+    },
+    "explosion-medium": {
+      "path": "images/effects/explosion-medium.png",
+      "width": 64,
+      "height": 64,
+      "frames": 10
+    },
+    "explosion-large": {
+      "path": "images/effects/explosion-large.png",
+      "width": 128,
+      "height": 128,
+      "frames": 12
+    },
+    "dirt-particle": {
+      "path": "images/effects/dirt-particle.png",
+      "width": 4,
+      "height": 4
+    }
+  },
+  "ui": {
+    "button": {
+      "path": "images/ui/ui-button.png",
+      "width": 120,
+      "height": 40
+    },
+    "power-bar": {
+      "path": "images/ui/ui-power-bar.png",
+      "width": 200,
+      "height": 20
+    },
+    "angle-indicator": {
+      "path": "images/ui/ui-angle-indicator.png",
+      "width": 60,
+      "height": 60
+    }
+  },
+  "backgrounds": {
+    "sky": {
+      "path": "images/backgrounds/bg-sky.png",
+      "width": 1920,
+      "height": 1080
+    },
+    "mountains": {
+      "path": "images/backgrounds/bg-mountains.png",
+      "width": 1920,
+      "height": 400
+    },
+    "grid": {
+      "path": "images/backgrounds/bg-grid.png",
+      "width": 1920,
+      "height": 1080
+    }
+  },
+  "audio": {
+    "music": {
+      "main-theme": {
+        "path": "audio/music/main-theme.mp3"
+      },
+      "battle": {
+        "path": "audio/music/battle.mp3"
+      },
+      "shop": {
+        "path": "audio/music/shop.mp3"
+      }
+    },
+    "sfx": {
+      "shot-fire": {
+        "path": "audio/sfx/shot-fire.wav"
+      },
+      "explosion-small": {
+        "path": "audio/sfx/explosion-small.wav"
+      },
+      "explosion-large": {
+        "path": "audio/sfx/explosion-large.wav"
+      },
+      "menu-select": {
+        "path": "audio/sfx/menu-select.wav"
+      },
+      "purchase": {
+        "path": "audio/sfx/purchase.wav"
+      },
+      "tank-hit": {
+        "path": "audio/sfx/tank-hit.wav"
+      }
+    }
+  }
+}
