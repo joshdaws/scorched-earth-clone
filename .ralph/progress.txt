@@ -50,5 +50,11 @@
 **Status:** Completed
 **Changes:** Populated js/constants.js with all game constants from spec including physics (GRAVITY 0.15, MAX_VELOCITY 20, WIND_RANGE 10), canvas dimensions (1200x800), tank settings (64x32, 100 health), game settings (1000 starting money), full synthwave color palette matching CSS variables, timing, terrain, projectile, and UI constants.
 **Files:** js/constants.js
-**Commit:** pending
+**Commit:** 4b00dcf
+---
+## scorched-earth-7ku.6 - Initialize Canvas 2D Context in Renderer
+**Status:** Completed
+**Changes:** Refactored renderer.js init() to get canvas by ID internally, return context, and render test rectangle. Updated main.js to use new signature.
+**Files:** js/renderer.js, js/main.js
+**Commit:** 2161e22
 ---

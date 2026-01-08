@@ -15,19 +15,15 @@ function init() {
     console.log('Scorched Earth: Synthwave Edition');
     console.log('Initializing...');
 
-    // Get canvas element
-    const canvas = document.getElementById('game-canvas');
-
-    if (!canvas) {
-        console.error('Canvas element not found!');
-        return;
-    }
-
-    // Initialize renderer
-    if (!Renderer.init(canvas)) {
+    // Initialize renderer (gets canvas by ID internally)
+    const ctx = Renderer.init('game-canvas');
+    if (!ctx) {
         console.error('Failed to initialize renderer');
         return;
     }
+
+    // Get canvas for input initialization
+    const canvas = Renderer.getCanvas();
 
     // Initialize input with canvas
     Input.init(canvas);
