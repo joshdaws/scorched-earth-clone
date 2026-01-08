@@ -25,6 +25,9 @@ let sfxGain = null;
 /** @type {boolean} */
 let initialized = false;
 
+/** @type {Map<string, AudioBuffer>} Cache of loaded audio buffers */
+const soundCache = new Map();
+
 // =============================================================================
 // AUDIO CONFIGURATION
 // =============================================================================
@@ -206,4 +209,112 @@ export async function suspend() {
     if (audioContext && audioContext.state === 'running') {
         await audioContext.suspend();
     }
+}
+
+// =============================================================================
+// SOUND EFFECTS API
+// =============================================================================
+
+/**
+ * Load a sound effect from a file path and cache it for playback.
+ * @param {string} id - Unique identifier for the sound
+ * @param {string} path - Path to the audio file
+ * @returns {Promise<boolean>} True if loading succeeded
+ */
+export async function loadSound(id, path) {
+    // Check if already cached
+    if (soundCache.has(id)) {
+        return true;
+    }
+
+    // Audio context must be initialized
+    if (!audioContext) {
+        console.warn(`Cannot load sound '${id}': Audio not initialized`);
+        return false;
+    }
+
+    try {
+        const response = await fetch(path);
+
+        if (!response.ok) {
+            console.warn(`Failed to load sound '${id}': ${response.status} ${response.statusText}`);
+            return false;
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+        soundCache.set(id, audioBuffer);
+        console.log(`Sound loaded: ${id}`);
+        return true;
+    } catch (error) {
+        console.warn(`Failed to load sound '${id}':`, error.message);
+        return false;
+    }
+}
+
+/**
+ * Play a loaded sound effect.
+ * Multiple calls will play overlapping instances of the same sound.
+ * @param {string} id - Identifier of the sound to play
+ * @param {number} [volume=1] - Volume multiplier (0-1), applied on top of SFX gain
+ * @returns {AudioBufferSourceNode|null} The source node, or null if playback failed
+ */
+export function playSound(id, volume = 1) {
+    // Audio must be initialized
+    if (!audioContext || !sfxGain) {
+        console.warn(`Cannot play sound '${id}': Audio not initialized`);
+        return null;
+    }
+
+    // Sound must be loaded
+    const buffer = soundCache.get(id);
+    if (!buffer) {
+        console.warn(`Cannot play sound '${id}': Sound not loaded`);
+        return null;
+    }
+
+    try {
+        // Create a new source node for each playback (allows overlapping)
+        const source = audioContext.createBufferSource();
+        source.buffer = buffer;
+
+        // Create a gain node for per-sound volume control
+        const gainNode = audioContext.createGain();
+        gainNode.gain.value = Math.max(0, Math.min(1, volume));
+
+        // Connect: source → per-sound gain → SFX gain → master → destination
+        source.connect(gainNode);
+        gainNode.connect(sfxGain);
+
+        source.start(0);
+        return source;
+    } catch (error) {
+        console.error(`Error playing sound '${id}':`, error);
+        return null;
+    }
+}
+
+/**
+ * Check if a sound is loaded and ready to play.
+ * @param {string} id - Sound identifier to check
+ * @returns {boolean} True if sound is loaded
+ */
+export function isSoundLoaded(id) {
+    return soundCache.has(id);
+}
+
+/**
+ * Unload a sound from the cache.
+ * @param {string} id - Sound identifier to unload
+ */
+export function unloadSound(id) {
+    soundCache.delete(id);
+}
+
+/**
+ * Clear all loaded sounds from the cache.
+ */
+export function clearSoundCache() {
+    soundCache.clear();
 }
