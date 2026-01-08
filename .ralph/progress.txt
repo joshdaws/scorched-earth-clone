@@ -1,0 +1,6 @@
+## scorched-earth-7mz - Research Original Scorched Earth Game
+**Status:** Completed
+**Changes:** Comprehensive research document on original 1991 DOS game covering weapons, physics, terrain, economy, AI, controls, and mobile adaptation considerations
+**Files:** docs/research/scorched-earth-original.md (609 lines)
+**Commit:** c404dd7
+---
