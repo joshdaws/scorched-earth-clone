@@ -6,7 +6,32 @@
 import * as Game from './game.js';
 import * as Renderer from './renderer.js';
 import * as Input from './input.js';
+import * as Sound from './sound.js';
 import { COLORS } from './constants.js';
+
+/**
+ * Set up audio initialization on first user interaction.
+ * Web Audio API requires a user gesture (click/touch) to start.
+ * @param {HTMLCanvasElement} canvas - Canvas to listen for interactions
+ */
+function setupAudioInit(canvas) {
+    const initAudio = () => {
+        if (!Sound.isInitialized()) {
+            Sound.init();
+        }
+        // Remove listeners after first successful init
+        if (Sound.isInitialized()) {
+            canvas.removeEventListener('click', initAudio);
+            canvas.removeEventListener('touchstart', initAudio);
+            document.removeEventListener('keydown', initAudio);
+        }
+    };
+
+    // Listen for any user interaction to initialize audio
+    canvas.addEventListener('click', initAudio);
+    canvas.addEventListener('touchstart', initAudio);
+    document.addEventListener('keydown', initAudio);
+}
 
 /**
  * Initialize all game modules
@@ -27,6 +52,10 @@ function init() {
 
     // Initialize input with canvas
     Input.init(canvas);
+
+    // Set up audio initialization on first user interaction
+    // Web Audio API requires user gesture to start
+    setupAudioInit(canvas);
 
     // Initialize game state
     Game.init();
