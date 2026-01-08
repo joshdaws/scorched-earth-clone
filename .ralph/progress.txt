@@ -126,3 +126,15 @@
 - CLAUDE.md (updated Tech Stack and Current Status sections)
 **Commit:** 9fb1499
 ---
+## scorched-earth-5zm.1 - Create HTML5 Canvas and Responsive Sizing
+**Status:** Completed
+**Changes:** Renamed canvas element ID from 'game-canvas' to 'game' to match acceptance criteria. The responsive canvas system was already fully implemented with all required features (aspect ratio maintenance, devicePixelRatio handling, resize handler, design resolution 1200x800, synthwave background).
+**Files:** index.html, style.css, js/renderer.js, js/main.js
+**Commit:** 45083d0
+---
+## scorched-earth-5zm.2 - Implement Game Loop with Fixed Timestep
+**Status:** Completed
+**Changes:** Implemented fixed timestep game loop pattern with accumulator-based physics updates, pause/resume functionality, and spiral of death prevention
+**Files:** js/game.js
+**Commit:** de25bff08b7760b8e944a2ff4040438a9db7643d
+---

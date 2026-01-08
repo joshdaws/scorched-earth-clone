@@ -21,6 +21,18 @@ let lastFrameTime = 0;
 /** @type {boolean} Whether the game loop is running */
 let isRunning = false;
 
+/** @type {boolean} Whether the game loop is paused (can be resumed) */
+let isPaused = false;
+
+/** @type {number} Accumulated time for fixed timestep physics */
+let accumulator = 0;
+
+/** @type {number} Fixed timestep duration in ms (for physics updates) */
+const FIXED_TIMESTEP = TIMING.FRAME_DURATION;
+
+/** @type {number} Maximum accumulated time to prevent spiral of death */
+const MAX_ACCUMULATED_TIME = TIMING.FRAME_DURATION * 5;
+
 // FPS tracking for debug mode
 let frameCount = 0;
 let lastFpsUpdate = 0;
@@ -141,22 +153,49 @@ export function isState(state) {
 // =============================================================================
 
 /**
- * Start the game loop
- * @param {Function} updateFn - Update function called each frame with deltaTime
+ * Start the game loop.
+ * Uses a fixed timestep for physics updates to ensure consistent behavior
+ * regardless of frame rate. Rendering happens every frame with interpolation
+ * potential via the alpha value.
+ *
+ * Fixed timestep pattern:
+ * - Accumulate actual elapsed time
+ * - Run physics updates in fixed-size chunks (16.67ms at 60fps)
+ * - Render after all physics updates are done
+ * - This prevents physics jitter from variable frame times
+ *
+ * @param {Function} updateFn - Update function called with fixed deltaTime for physics
  * @param {Function} renderFn - Render function called each frame with ctx
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D rendering context
  */
 export function startLoop(updateFn, renderFn, ctx) {
     isRunning = true;
+    isPaused = false;
     lastFrameTime = performance.now();
     lastFpsUpdate = performance.now();
     frameCount = 0;
+    accumulator = 0;
 
     function loop(currentTime) {
         if (!isRunning) return;
 
-        const deltaTime = currentTime - lastFrameTime;
+        // Skip updates while paused but keep the loop alive
+        if (isPaused) {
+            // Reset lastFrameTime to prevent time accumulation during pause
+            lastFrameTime = currentTime;
+            requestAnimationFrame(loop);
+            return;
+        }
+
+        // Calculate real elapsed time since last frame
+        let deltaTime = currentTime - lastFrameTime;
         lastFrameTime = currentTime;
+
+        // Clamp delta time to prevent spiral of death
+        // (when updates take longer than a frame, causing more updates, etc.)
+        if (deltaTime > MAX_ACCUMULATED_TIME) {
+            deltaTime = MAX_ACCUMULATED_TIME;
+        }
 
         // FPS logging in debug mode
         if (debugMode) {
@@ -168,15 +207,27 @@ export function startLoop(updateFn, renderFn, ctx) {
             }
         }
 
-        // Update game logic
-        // First call state-specific update, then global update
-        const handlers = getHandlers(currentState);
-        if (handlers.update) {
-            handlers.update(deltaTime);
+        // Accumulate time for fixed timestep physics
+        accumulator += deltaTime;
+
+        // Run physics updates at fixed intervals
+        // Multiple updates may run per frame if we're behind
+        while (accumulator >= FIXED_TIMESTEP) {
+            // Update game logic with fixed timestep
+            const handlers = getHandlers(currentState);
+            if (handlers.update) {
+                handlers.update(FIXED_TIMESTEP);
+            }
+            if (updateFn) {
+                updateFn(FIXED_TIMESTEP);
+            }
+
+            accumulator -= FIXED_TIMESTEP;
         }
-        if (updateFn) {
-            updateFn(deltaTime);
-        }
+
+        // Calculate interpolation alpha for smooth rendering (0-1)
+        // Can be passed to render functions for smoother animation
+        // const alpha = accumulator / FIXED_TIMESTEP;
 
         // Render frame
         // First call global render (clears screen, draws background)
@@ -184,6 +235,7 @@ export function startLoop(updateFn, renderFn, ctx) {
         if (renderFn) {
             renderFn(ctx);
         }
+        const handlers = getHandlers(currentState);
         if (handlers.render) {
             handlers.render(ctx);
         }
@@ -196,19 +248,60 @@ export function startLoop(updateFn, renderFn, ctx) {
 }
 
 /**
- * Stop the game loop
+ * Stop the game loop completely.
+ * Use this when exiting the game or resetting.
  */
 export function stopLoop() {
     isRunning = false;
+    isPaused = false;
+    accumulator = 0;
     console.log('Game loop stopped');
 }
 
 /**
- * Check if game loop is running
- * @returns {boolean} True if loop is running
+ * Pause the game loop.
+ * Updates and physics stop, but the loop continues running
+ * so it can be resumed without restarting.
+ */
+export function pauseLoop() {
+    if (!isRunning) return;
+    isPaused = true;
+    console.log('Game loop paused');
+}
+
+/**
+ * Resume the game loop from a paused state.
+ */
+export function resumeLoop() {
+    if (!isRunning) return;
+    isPaused = false;
+    // Reset frame time to prevent huge delta after unpause
+    lastFrameTime = performance.now();
+    console.log('Game loop resumed');
+}
+
+/**
+ * Check if game loop is running (not stopped)
+ * @returns {boolean} True if loop is running (may be paused)
  */
 export function isLoopRunning() {
     return isRunning;
+}
+
+/**
+ * Check if game loop is currently paused
+ * @returns {boolean} True if loop is paused
+ */
+export function isLoopPaused() {
+    return isPaused;
+}
+
+/**
+ * Get the fixed timestep value used for physics updates
+ * @returns {number} Fixed timestep in milliseconds
+ */
+export function getFixedTimestep() {
+    return FIXED_TIMESTEP;
 }
 
 // =============================================================================
