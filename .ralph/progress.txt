@@ -4,3 +4,9 @@
 **Files:** docs/research/scorched-earth-original.md (609 lines)
 **Commit:** c404dd7
 ---
+## scorched-earth-33s - Write Game Specification for Synthwave Scorched Earth
+**Status:** Completed
+**Changes:** Created comprehensive game specification document covering all gameplay mechanics, physics, weapons, terrain, economy, AI, visual design, audio, and asset architecture
+**Files:** docs/specs/game-spec.md (1200+ lines)
+**Commit:** pending
+---
