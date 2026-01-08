@@ -20,5 +20,11 @@
 **Status:** Completed
 **Changes:** Created 16 issues under scorched-earth-7ku covering project setup, rendering, input, audio, and game loop
 **Files:** .beads/issues.jsonl (16 new issues)
+**Commit:** 425382e
+---
+## scorched-earth-7ku.1 - Create index.html with Canvas and Basic Structure
+**Status:** Completed
+**Changes:** Created index.html, style.css (placeholder), and js/main.js (placeholder) - first actual game code
+**Files:** index.html, style.css, js/main.js
 **Commit:** pending
 ---
