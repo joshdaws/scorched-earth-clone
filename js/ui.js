@@ -78,6 +78,22 @@ const HUD = {
         MIN_HEIGHT: 50,               // Minimum height (auto-expands with content)
         PADDING: 16,
         BORDER_RADIUS: 12
+    },
+    // Weapon bar at bottom-center - horizontal selection bar
+    // Positioned to the left of the fire button
+    WEAPON_BAR: {
+        // Fire button is at X=1070 (center), width 180, so left edge is at 980
+        // Add 20px gap between weapon bar and fire button
+        RIGHT_EDGE: CANVAS.DESIGN_WIDTH - 130 - 90 - 20,  // 960 (left of fire button)
+        Y: CANVAS.DESIGN_HEIGHT - 75,                      // Aligned with fire button
+        HEIGHT: 70,                                         // Same height as fire button
+        WIDTH: 580,                                         // Wide enough for 6 slots + arrows
+        ARROW_WIDTH: 40,                                   // Navigation arrow width
+        SLOT_SIZE: 72,                                     // Individual weapon slot size
+        SLOT_GAP: 8,                                       // Gap between slots
+        PADDING: 10,
+        BORDER_RADIUS: 12,
+        VISIBLE_SLOTS: 6                                   // Number of visible weapon slots
     }
 };
 
@@ -102,6 +118,28 @@ let currentTurn = null;
  * @type {number}
  */
 let animationTime = 0;
+
+// =============================================================================
+// WEAPON BAR STATE
+// =============================================================================
+
+/**
+ * Current scroll offset for weapon bar (index of first visible weapon).
+ * @type {number}
+ */
+let weaponBarScrollIndex = 0;
+
+/**
+ * Whether left arrow is being pressed (touch feedback).
+ * @type {boolean}
+ */
+let weaponBarLeftPressed = false;
+
+/**
+ * Whether right arrow is being pressed (touch feedback).
+ * @type {boolean}
+ */
+let weaponBarRightPressed = false;
 
 // =============================================================================
 // TURN INDICATOR TRANSITION STATE
@@ -750,6 +788,378 @@ export function setWeaponPanelPressed(pressed) {
 }
 
 // =============================================================================
+// WEAPON BAR (Bottom-center weapon selection)
+// =============================================================================
+
+/**
+ * Render the weapon bar container at bottom-center of the screen.
+ * Shows navigation arrows and weapon slot placeholders.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {import('./tank.js').Tank} playerTank - Player tank (for current weapon)
+ * @param {number} [totalWeapons=11] - Total number of weapons available
+ */
+export function renderWeaponBar(ctx, playerTank, totalWeapons = 11) {
+    if (!ctx) return;
+
+    const bar = HUD.WEAPON_BAR;
+    const drawX = bar.RIGHT_EDGE - bar.WIDTH;
+    const drawY = bar.Y - bar.HEIGHT / 2;
+
+    ctx.save();
+
+    // ==========================================================================
+    // MAIN CONTAINER BACKGROUND
+    // ==========================================================================
+
+    // Dark translucent background
+    ctx.fillStyle = 'rgba(10, 10, 26, 0.85)';
+    ctx.beginPath();
+    ctx.roundRect(drawX, drawY, bar.WIDTH, bar.HEIGHT, bar.BORDER_RADIUS);
+    ctx.fill();
+
+    // Cyan glowing border (synthwave aesthetic)
+    ctx.strokeStyle = COLORS.NEON_CYAN;
+    ctx.lineWidth = 2;
+    ctx.shadowColor = COLORS.NEON_CYAN;
+    ctx.shadowBlur = 8;
+    ctx.stroke();
+
+    // Subtle inner glow effect
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = `${COLORS.NEON_CYAN}40`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(drawX + 2, drawY + 2, bar.WIDTH - 4, bar.HEIGHT - 4, bar.BORDER_RADIUS - 2);
+    ctx.stroke();
+
+    ctx.restore();
+
+    // ==========================================================================
+    // LEFT NAVIGATION ARROW
+    // ==========================================================================
+    const leftArrowX = drawX + bar.PADDING;
+    const leftArrowY = drawY + bar.PADDING;
+    const arrowHeight = bar.HEIGHT - bar.PADDING * 2;
+    const canScrollLeft = weaponBarScrollIndex > 0;
+
+    renderWeaponBarArrow(ctx, leftArrowX, leftArrowY, bar.ARROW_WIDTH, arrowHeight,
+        'left', canScrollLeft, weaponBarLeftPressed);
+
+    // ==========================================================================
+    // RIGHT NAVIGATION ARROW
+    // ==========================================================================
+    const rightArrowX = drawX + bar.WIDTH - bar.PADDING - bar.ARROW_WIDTH;
+    const canScrollRight = weaponBarScrollIndex + bar.VISIBLE_SLOTS < totalWeapons;
+
+    renderWeaponBarArrow(ctx, rightArrowX, leftArrowY, bar.ARROW_WIDTH, arrowHeight,
+        'right', canScrollRight, weaponBarRightPressed);
+
+    // ==========================================================================
+    // WEAPON SLOT PLACEHOLDERS
+    // ==========================================================================
+    const slotsStartX = leftArrowX + bar.ARROW_WIDTH + bar.SLOT_GAP;
+    const slotsWidth = rightArrowX - slotsStartX - bar.SLOT_GAP;
+    const slotSize = (slotsWidth - (bar.VISIBLE_SLOTS - 1) * bar.SLOT_GAP) / bar.VISIBLE_SLOTS;
+    const slotY = drawY + (bar.HEIGHT - slotSize) / 2;
+
+    // Get current weapon for highlighting
+    const currentWeaponId = playerTank ? playerTank.currentWeapon : 'basic';
+
+    for (let i = 0; i < bar.VISIBLE_SLOTS; i++) {
+        const weaponIndex = weaponBarScrollIndex + i;
+        if (weaponIndex >= totalWeapons) break;
+
+        const slotX = slotsStartX + i * (slotSize + bar.SLOT_GAP);
+        const isSelected = i === 0; // Placeholder: first visible is selected for now
+
+        renderWeaponSlot(ctx, slotX, slotY, slotSize, isSelected, weaponIndex);
+    }
+}
+
+/**
+ * Render a navigation arrow for the weapon bar.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {number} x - X position
+ * @param {number} y - Y position
+ * @param {number} width - Arrow button width
+ * @param {number} height - Arrow button height
+ * @param {'left' | 'right'} direction - Arrow direction
+ * @param {boolean} enabled - Whether the arrow is enabled (can scroll)
+ * @param {boolean} pressed - Whether the arrow is being pressed
+ */
+function renderWeaponBarArrow(ctx, x, y, width, height, direction, enabled, pressed) {
+    ctx.save();
+
+    const color = enabled ? COLORS.NEON_CYAN : COLORS.TEXT_MUTED;
+    const pressOffset = pressed && enabled ? 2 : 0;
+
+    // Arrow button background
+    ctx.fillStyle = pressed && enabled ? 'rgba(5, 217, 232, 0.2)' : 'rgba(30, 30, 60, 0.6)';
+    ctx.beginPath();
+    ctx.roundRect(x, y + pressOffset, width, height - pressOffset * 2, 6);
+    ctx.fill();
+
+    // Arrow button border
+    ctx.strokeStyle = color;
+    ctx.lineWidth = pressed && enabled ? 2 : 1;
+    if (enabled) {
+        ctx.shadowColor = color;
+        ctx.shadowBlur = pressed ? 10 : 4;
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Arrow symbol
+    ctx.fillStyle = color;
+    ctx.font = `bold ${UI.FONT_SIZE_LARGE}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const arrowSymbol = direction === 'left' ? '<' : '>';
+    ctx.fillText(arrowSymbol, x + width / 2, y + height / 2 + pressOffset);
+
+    ctx.restore();
+}
+
+/**
+ * Render a weapon slot placeholder in the weapon bar.
+ * Will eventually show weapon icon and ammo count.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {number} x - X position
+ * @param {number} y - Y position
+ * @param {number} size - Slot size (width and height are equal)
+ * @param {boolean} isSelected - Whether this slot is currently selected
+ * @param {number} index - Weapon index (for placeholder differentiation)
+ */
+function renderWeaponSlot(ctx, x, y, size, isSelected, index) {
+    ctx.save();
+
+    const borderColor = isSelected ? COLORS.NEON_CYAN : 'rgba(100, 100, 140, 0.6)';
+
+    // Slot background
+    ctx.fillStyle = isSelected ? 'rgba(5, 217, 232, 0.15)' : 'rgba(20, 20, 40, 0.8)';
+    ctx.beginPath();
+    ctx.roundRect(x, y, size, size, 6);
+    ctx.fill();
+
+    // Slot border with glow for selected
+    ctx.strokeStyle = borderColor;
+    ctx.lineWidth = isSelected ? 2 : 1;
+    if (isSelected) {
+        ctx.shadowColor = COLORS.NEON_CYAN;
+        ctx.shadowBlur = 10;
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Placeholder icon (simple shape to indicate weapon slot)
+    const iconSize = size * 0.5;
+    const iconX = x + (size - iconSize) / 2;
+    const iconY = y + (size - iconSize) / 2 - 4; // Offset up for ammo text
+
+    ctx.fillStyle = isSelected ? COLORS.NEON_CYAN : 'rgba(100, 100, 140, 0.8)';
+
+    // Draw different placeholder shapes based on index for visual variety
+    ctx.beginPath();
+    switch (index % 6) {
+        case 0: // Circle (basic shot)
+            ctx.arc(iconX + iconSize / 2, iconY + iconSize / 2, iconSize / 3, 0, Math.PI * 2);
+            break;
+        case 1: // Triangle (missile)
+            ctx.moveTo(iconX + iconSize / 2, iconY);
+            ctx.lineTo(iconX + iconSize, iconY + iconSize);
+            ctx.lineTo(iconX, iconY + iconSize);
+            ctx.closePath();
+            break;
+        case 2: // Star (MIRV)
+            drawStar(ctx, iconX + iconSize / 2, iconY + iconSize / 2, 5, iconSize / 2.5, iconSize / 5);
+            break;
+        case 3: // Square with X (nuke)
+            ctx.rect(iconX + iconSize * 0.15, iconY + iconSize * 0.15, iconSize * 0.7, iconSize * 0.7);
+            break;
+        case 4: // Diamond (roller)
+            ctx.moveTo(iconX + iconSize / 2, iconY);
+            ctx.lineTo(iconX + iconSize, iconY + iconSize / 2);
+            ctx.lineTo(iconX + iconSize / 2, iconY + iconSize);
+            ctx.lineTo(iconX, iconY + iconSize / 2);
+            ctx.closePath();
+            break;
+        case 5: // Down arrow (digger)
+            ctx.moveTo(iconX + iconSize / 2, iconY + iconSize);
+            ctx.lineTo(iconX + iconSize, iconY);
+            ctx.lineTo(iconX + iconSize * 0.65, iconY);
+            ctx.lineTo(iconX + iconSize * 0.65, iconY - iconSize * 0.3);
+            ctx.lineTo(iconX + iconSize * 0.35, iconY - iconSize * 0.3);
+            ctx.lineTo(iconX + iconSize * 0.35, iconY);
+            ctx.lineTo(iconX, iconY);
+            ctx.closePath();
+            break;
+    }
+    ctx.fill();
+
+    // Placeholder ammo count
+    ctx.fillStyle = isSelected ? COLORS.NEON_YELLOW : COLORS.TEXT_MUTED;
+    ctx.font = `bold ${UI.FONT_SIZE_SMALL - 2}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(`x${index === 0 ? '∞' : (10 - index)}`, x + size / 2, y + size - 2);
+
+    ctx.restore();
+}
+
+/**
+ * Draw a star shape.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} cx - Center X
+ * @param {number} cy - Center Y
+ * @param {number} spikes - Number of spikes
+ * @param {number} outerRadius - Outer radius
+ * @param {number} innerRadius - Inner radius
+ */
+function drawStar(ctx, cx, cy, spikes, outerRadius, innerRadius) {
+    let rot = (Math.PI / 2) * 3;
+    const step = Math.PI / spikes;
+
+    ctx.moveTo(cx, cy - outerRadius);
+    for (let i = 0; i < spikes; i++) {
+        ctx.lineTo(cx + Math.cos(rot) * outerRadius, cy + Math.sin(rot) * outerRadius);
+        rot += step;
+        ctx.lineTo(cx + Math.cos(rot) * innerRadius, cy + Math.sin(rot) * innerRadius);
+        rot += step;
+    }
+    ctx.lineTo(cx, cy - outerRadius);
+    ctx.closePath();
+}
+
+/**
+ * Check if a point is inside the weapon bar left arrow.
+ * @param {number} x - X coordinate in design space
+ * @param {number} y - Y coordinate in design space
+ * @returns {boolean} True if inside left arrow
+ */
+export function isInsideWeaponBarLeftArrow(x, y) {
+    const bar = HUD.WEAPON_BAR;
+    const drawX = bar.RIGHT_EDGE - bar.WIDTH;
+    const drawY = bar.Y - bar.HEIGHT / 2;
+    const arrowX = drawX + bar.PADDING;
+    const arrowY = drawY + bar.PADDING;
+    const arrowHeight = bar.HEIGHT - bar.PADDING * 2;
+
+    return (
+        x >= arrowX &&
+        x <= arrowX + bar.ARROW_WIDTH &&
+        y >= arrowY &&
+        y <= arrowY + arrowHeight
+    );
+}
+
+/**
+ * Check if a point is inside the weapon bar right arrow.
+ * @param {number} x - X coordinate in design space
+ * @param {number} y - Y coordinate in design space
+ * @returns {boolean} True if inside right arrow
+ */
+export function isInsideWeaponBarRightArrow(x, y) {
+    const bar = HUD.WEAPON_BAR;
+    const drawX = bar.RIGHT_EDGE - bar.WIDTH;
+    const drawY = bar.Y - bar.HEIGHT / 2;
+    const arrowX = drawX + bar.WIDTH - bar.PADDING - bar.ARROW_WIDTH;
+    const arrowY = drawY + bar.PADDING;
+    const arrowHeight = bar.HEIGHT - bar.PADDING * 2;
+
+    return (
+        x >= arrowX &&
+        x <= arrowX + bar.ARROW_WIDTH &&
+        y >= arrowY &&
+        y <= arrowY + arrowHeight
+    );
+}
+
+/**
+ * Check if a point is inside the weapon bar container.
+ * @param {number} x - X coordinate in design space
+ * @param {number} y - Y coordinate in design space
+ * @returns {boolean} True if inside weapon bar
+ */
+export function isInsideWeaponBar(x, y) {
+    const bar = HUD.WEAPON_BAR;
+    const drawX = bar.RIGHT_EDGE - bar.WIDTH;
+    const drawY = bar.Y - bar.HEIGHT / 2;
+
+    return (
+        x >= drawX &&
+        x <= drawX + bar.WIDTH &&
+        y >= drawY &&
+        y <= drawY + bar.HEIGHT
+    );
+}
+
+/**
+ * Scroll the weapon bar left (show previous weapons).
+ * @returns {boolean} True if scroll occurred
+ */
+export function scrollWeaponBarLeft() {
+    if (weaponBarScrollIndex > 0) {
+        weaponBarScrollIndex--;
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Scroll the weapon bar right (show next weapons).
+ * @param {number} [totalWeapons=11] - Total number of weapons
+ * @returns {boolean} True if scroll occurred
+ */
+export function scrollWeaponBarRight(totalWeapons = 11) {
+    const bar = HUD.WEAPON_BAR;
+    if (weaponBarScrollIndex + bar.VISIBLE_SLOTS < totalWeapons) {
+        weaponBarScrollIndex++;
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Set the left arrow pressed state for touch feedback.
+ * @param {boolean} pressed - Whether the arrow is pressed
+ */
+export function setWeaponBarLeftPressed(pressed) {
+    weaponBarLeftPressed = pressed;
+}
+
+/**
+ * Set the right arrow pressed state for touch feedback.
+ * @param {boolean} pressed - Whether the arrow is pressed
+ */
+export function setWeaponBarRightPressed(pressed) {
+    weaponBarRightPressed = pressed;
+}
+
+/**
+ * Get the current weapon bar scroll index.
+ * @returns {number} Current scroll index
+ */
+export function getWeaponBarScrollIndex() {
+    return weaponBarScrollIndex;
+}
+
+/**
+ * Reset the weapon bar scroll to the beginning.
+ */
+export function resetWeaponBarScroll() {
+    weaponBarScrollIndex = 0;
+}
+
+/**
+ * Get the weapon bar layout for external positioning.
+ * @returns {Object} Weapon bar layout constants
+ */
+export function getWeaponBarLayout() {
+    return { ...HUD.WEAPON_BAR };
+}
+
+// =============================================================================
 // MONEY DISPLAY
 // =============================================================================
 
@@ -1003,6 +1413,9 @@ export function renderHUD(ctx, state) {
 
     renderWindIndicator(ctx);
     renderWeaponPanel(ctx, playerTank);
+
+    // Render new weapon bar at bottom-center (left of fire button)
+    renderWeaponBar(ctx, playerTank);
 }
 
 // =============================================================================
