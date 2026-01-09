@@ -2724,9 +2724,10 @@ function setupPlayingState() {
             Music.playForState(GAME_STATES.PLAYING);
 
             // Determine if this is a new game or continuation
-            const isNewGame = fromState === GAME_STATES.MENU;
+            // New game comes from MENU or DIFFICULTY_SELECT (since difficulty selection is part of new game flow)
+            const isNewGame = fromState === GAME_STATES.MENU || fromState === GAME_STATES.DIFFICULTY_SELECT;
 
-            // Initialize money system if this is a new game from menu
+            // Initialize money system if this is a new game
             if (isNewGame) {
                 Money.init();
             }
@@ -2757,25 +2758,14 @@ function setupPlayingState() {
             playerTank = tanks.player;
             enemyTank = tanks.enemy;
 
-            // Restore or initialize player inventory
+            // Restore player inventory from previous round (if continuing)
+            // For new games, tank starts with default inventory (basic-shot only)
             if (savedPlayerInventory) {
-                // Continuing from previous round - restore inventory
                 playerTank.inventory = savedPlayerInventory;
                 console.log('[Main] Restored player inventory from previous round');
-            } else {
-                // New game from menu - give starting ammo for testing weapons
-                // In the final game, these will be purchased from the shop
-                playerTank.addAmmo('missile', 5);
-                playerTank.addAmmo('big-shot', 3);
-                playerTank.addAmmo('mirv', 3); // MIRV for testing splitting mechanic
-                playerTank.addAmmo('deaths-head', 2); // Death's Head for testing 9-warhead split
-                playerTank.addAmmo('roller', 3); // Roller for testing rolling mechanic
-                playerTank.addAmmo('heavy-roller', 2); // Heavy Roller for testing
-                playerTank.addAmmo('digger', 3); // Digger for testing tunneling mechanic
-                playerTank.addAmmo('heavy-digger', 2); // Heavy Digger for testing
-                playerTank.addAmmo('mini-nuke', 2); // Mini Nuke for testing nuclear effects
-                playerTank.addAmmo('nuke', 1); // Nuke for testing big nuclear effects
             }
+            // Note: New games start with only basic-shot (default tank inventory)
+            // Additional weapons must be purchased from the shop
 
             // Set up AI for this round with player-selected difficulty
             // If player selected a difficulty, use that; otherwise fall back to round-based progression
