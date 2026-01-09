@@ -140,7 +140,20 @@ When the task is complete and tests pass:
    ```
 3. Run `git add -A`
 4. Run `git commit` referencing the issue ID
-5. **STOP HERE** - The loop will restart for the next issue.
+
+### STEP 10: Check if Parent Epic is Complete
+
+After closing an issue that has a parent epic:
+
+1. Check if issue had a parent: look at the output of `bd show <issue-id>` for "Parent:"
+2. If it has a parent epic, check the epic: `bd show <parent-epic-id>`
+3. Look at its children - are ALL of them closed?
+4. If ALL children are closed, close the epic too: `bd close <parent-epic-id>`
+5. If some children are still open, leave the epic open
+
+**Epics should be closed when all their child issues are complete.**
+
+6. **STOP HERE** - The loop will restart for the next issue.
 
 ## Critical Rules
 
