@@ -384,3 +384,75 @@ export function calculateTrajectory(startX, startY, angle, power, wind = 0, maxS
 
     return points;
 }
+
+// =============================================================================
+// TANK COLLISION DETECTION
+// =============================================================================
+
+/**
+ * Distance threshold for direct hit flag.
+ * If projectile center is within this distance of tank center, it's a direct hit.
+ * @type {number}
+ */
+const DIRECT_HIT_DISTANCE = 5;
+
+/**
+ * Check if a point collides with any tank in the provided array.
+ *
+ * Collision is detected using rectangular hitboxes (64x32 pixels centered on tank position).
+ * Direct hits are flagged when the projectile center is within 5 pixels of the tank center.
+ *
+ * Important edge cases handled:
+ * - Destroyed tanks are skipped (no collision with dead tanks)
+ * - When tanks overlap, returns the first hit tank in array order
+ * - Returns null if no collision detected
+ *
+ * @param {number} x - X coordinate of projectile position
+ * @param {number} y - Y coordinate of projectile position
+ * @param {import('./tank.js').Tank[]} tanks - Array of tanks to check collision against
+ * @returns {{tank: import('./tank.js').Tank, directHit: boolean}|null} Hit info or null if no collision
+ */
+export function checkTankCollision(x, y, tanks) {
+    if (!tanks || tanks.length === 0) {
+        return null;
+    }
+
+    // Check each tank in order (handles overlapping tanks by returning first hit)
+    for (const tank of tanks) {
+        // Skip destroyed tanks - no collision with dead tanks
+        if (tank.isDestroyed()) {
+            continue;
+        }
+
+        // Get tank's bounding box for rectangular hitbox collision
+        const bounds = tank.getBounds();
+
+        // Check if point is within rectangular hitbox
+        // bounds.x is left edge, bounds.y is top edge
+        const withinX = x >= bounds.x && x <= bounds.x + bounds.width;
+        const withinY = y >= bounds.y && y <= bounds.y + bounds.height;
+
+        if (withinX && withinY) {
+            // Calculate if this is a direct hit (within 5px of tank center)
+            const center = tank.getCenter();
+            const dx = x - center.x;
+            const dy = y - center.y;
+            const distanceToCenter = Math.sqrt(dx * dx + dy * dy);
+            const directHit = distanceToCenter <= DIRECT_HIT_DISTANCE;
+
+            if (directHit) {
+                console.log(`Direct hit on ${tank.team} tank! Distance to center: ${distanceToCenter.toFixed(1)}px`);
+            } else {
+                console.log(`Hit ${tank.team} tank at (${x.toFixed(1)}, ${y.toFixed(1)})`);
+            }
+
+            return {
+                tank: tank,
+                directHit: directHit
+            };
+        }
+    }
+
+    // No collision with any tank
+    return null;
+}

@@ -14,7 +14,7 @@ import * as Turn from './turn.js';
 import { COLORS, DEBUG, CANVAS, UI, GAME_STATES, TURN_PHASES, PHYSICS, TANK, PROJECTILE } from './constants.js';
 import { generateTerrain } from './terrain.js';
 import { placeTanksOnTerrain, updateTankTerrainPosition } from './tank.js';
-import { Projectile, createProjectileFromTank } from './projectile.js';
+import { Projectile, createProjectileFromTank, checkTankCollision } from './projectile.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -232,9 +232,49 @@ function updateProjectile() {
         return;
     }
 
+    const pos = activeProjectile.getPosition();
+
+    // Check for tank collision first (before terrain)
+    // This ensures projectiles hitting tanks don't also destroy terrain
+    const tanks = [playerTank, enemyTank].filter(t => t !== null);
+    const tankHit = checkTankCollision(pos.x, pos.y, tanks);
+
+    if (tankHit) {
+        const { tank, directHit } = tankHit;
+
+        // Apply damage to the hit tank
+        // Direct hits deal bonus damage (50% more)
+        // Using a default damage for now - will be weapon-dependent later
+        const baseDamage = PROJECTILE.DEFAULT_DAMAGE;
+        const damage = directHit ? Math.floor(baseDamage * 1.5) : baseDamage;
+        tank.takeDamage(damage);
+
+        console.log(`Tank hit! ${tank.team} took ${damage} damage${directHit ? ' (DIRECT HIT!)' : ''}, health: ${tank.health}`);
+
+        // Destroy terrain at impact point with smaller blast radius for tank hits
+        const blastRadius = 30;
+        if (currentTerrain) {
+            destroyTerrainAt(pos.x, pos.y, blastRadius);
+
+            // Update tank positions to match new terrain height
+            if (playerTank && currentTerrain) {
+                updateTankTerrainPosition(playerTank, currentTerrain);
+            }
+            if (enemyTank && currentTerrain) {
+                updateTankTerrainPosition(enemyTank, currentTerrain);
+            }
+        }
+
+        // Deactivate projectile and clean up
+        activeProjectile.deactivate();
+        activeProjectile.clearTrail();
+        activeProjectile = null;
+        Turn.projectileResolved();
+        return;
+    }
+
     // Check for terrain collision
     if (currentTerrain) {
-        const pos = activeProjectile.getPosition();
         const collision = currentTerrain.checkTerrainCollision(pos.x, pos.y);
 
         // collision is null if projectile is outside horizontal bounds
