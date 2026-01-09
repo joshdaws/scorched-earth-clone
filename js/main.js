@@ -6,11 +6,12 @@
 import * as Game from './game.js';
 import * as Renderer from './renderer.js';
 import * as Input from './input.js';
+import { INPUT_EVENTS } from './input.js';
 import * as Sound from './sound.js';
 import * as Assets from './assets.js';
 import * as Debug from './debug.js';
 import * as Turn from './turn.js';
-import { COLORS, DEBUG, CANVAS, UI, GAME_STATES, TURN_PHASES } from './constants.js';
+import { COLORS, DEBUG, CANVAS, UI, GAME_STATES, TURN_PHASES, PHYSICS } from './constants.js';
 
 // =============================================================================
 // MENU STATE
@@ -183,6 +184,51 @@ function updatePlaying(deltaTime) {
 let aiAimStartTime = null;
 let projectileFlightStartTime = null;
 
+// =============================================================================
+// PLAYER AIMING STATE
+// =============================================================================
+
+/**
+ * Current player aiming values
+ */
+const playerAim = {
+    angle: 45,  // degrees (0-180, where 90 is straight up)
+    power: 50   // percentage (0-100)
+};
+
+/**
+ * Handle angle change input event
+ * @param {number} delta - Change in angle (degrees)
+ */
+function handleAngleChange(delta) {
+    playerAim.angle = Math.max(PHYSICS.MIN_ANGLE, Math.min(PHYSICS.MAX_ANGLE, playerAim.angle + delta));
+}
+
+/**
+ * Handle power change input event
+ * @param {number} delta - Change in power (percentage points)
+ */
+function handlePowerChange(delta) {
+    playerAim.power = Math.max(PHYSICS.MIN_POWER, Math.min(PHYSICS.MAX_POWER, playerAim.power + delta));
+}
+
+/**
+ * Handle fire input event
+ */
+function handleFire() {
+    if (Turn.canPlayerFire()) {
+        Turn.playerFire();
+    }
+}
+
+/**
+ * Handle weapon select input event
+ */
+function handleSelectWeapon() {
+    // TODO: Implement weapon cycling when weapon system is ready
+    console.log('Weapon select pressed (not yet implemented)');
+}
+
 /**
  * Render the playing screen
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
@@ -204,16 +250,24 @@ function renderPlaying(ctx) {
     // Draw current phase info
     ctx.fillStyle = COLORS.TEXT_MUTED;
     ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
-    ctx.fillText(`Current Phase: ${phase}`, CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2);
+    ctx.fillText(`Current Phase: ${phase}`, CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 - 40);
+
+    // Draw aiming values
+    ctx.fillStyle = COLORS.NEON_CYAN;
+    ctx.font = `${UI.FONT_SIZE_LARGE}px ${UI.FONT_FAMILY}`;
+    ctx.fillText(`ANGLE: ${playerAim.angle.toFixed(1)}°`, CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2);
+    ctx.fillStyle = COLORS.NEON_PINK;
+    ctx.fillText(`POWER: ${playerAim.power.toFixed(1)}%`, CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 35);
 
     // Draw controls help based on current phase
     if (Turn.canPlayerAim()) {
-        ctx.fillStyle = COLORS.NEON_CYAN;
+        ctx.fillStyle = COLORS.TEXT_LIGHT;
         ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
-        ctx.fillText('Press SPACE to fire!', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 40);
+        ctx.fillText('Press SPACE to fire!', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 90);
         ctx.fillStyle = COLORS.TEXT_MUTED;
         ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
-        ctx.fillText('(Arrow keys will control angle/power when implemented)', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 70);
+        ctx.fillText('← → Arrow keys: Adjust angle | ↑ ↓ Arrow keys: Adjust power', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 120);
+        ctx.fillText('TAB: Select weapon', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 145);
     }
 }
 
@@ -221,6 +275,22 @@ function renderPlaying(ctx) {
  * Setup playing state handlers
  */
 function setupPlayingState() {
+    // Register game input event handlers
+    Input.onGameInput(INPUT_EVENTS.ANGLE_CHANGE, handleAngleChange);
+    Input.onGameInput(INPUT_EVENTS.POWER_CHANGE, handlePowerChange);
+    Input.onGameInput(INPUT_EVENTS.FIRE, handleFire);
+    Input.onGameInput(INPUT_EVENTS.SELECT_WEAPON, handleSelectWeapon);
+
+    // Register phase change callback to enable/disable input
+    Turn.onPhaseChange((newPhase, oldPhase) => {
+        // Enable input only during player's aiming phase
+        if (newPhase === TURN_PHASES.PLAYER_AIM) {
+            Input.enableGameInput();
+        } else {
+            Input.disableGameInput();
+        }
+    });
+
     Game.registerStateHandlers(GAME_STATES.PLAYING, {
         onEnter: (fromState) => {
             console.log('Entered PLAYING state - Game started!');
@@ -231,21 +301,19 @@ function setupPlayingState() {
             // Reset timing state
             aiAimStartTime = null;
             projectileFlightStartTime = null;
+            // Reset player aim
+            playerAim.angle = 45;
+            playerAim.power = 50;
+            // Enable game input for player's turn
+            Input.enableGameInput();
         },
         onExit: (toState) => {
             console.log('Exiting PLAYING state');
+            // Disable game input when leaving playing state
+            Input.disableGameInput();
         },
         update: updatePlaying,
         render: renderPlaying
-    });
-
-    // Handle space key to fire during player's turn
-    Input.onKeyDown((keyCode) => {
-        if (Game.getState() === GAME_STATES.PLAYING) {
-            if (keyCode === 'Space' && Turn.canPlayerFire()) {
-                Turn.playerFire();
-            }
-        }
     });
 }
 
@@ -340,7 +408,11 @@ function update(deltaTime) {
     // Update debug FPS tracking
     Debug.updateFps(performance.now());
 
-    // Game update logic will go here
+    // Update continuous input (held keys generate events over time)
+    Input.updateContinuousInput(deltaTime);
+
+    // Process all queued game input events
+    Input.processInputQueue();
 
     // Clear single-fire input state at end of frame
     // This must be done after all game logic that checks wasKeyPressed()
