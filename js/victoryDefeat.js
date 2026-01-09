@@ -8,6 +8,7 @@
 
 import { CANVAS, COLORS, UI, GAME_STATES } from './constants.js';
 import * as Game from './game.js';
+import { playClickSound } from './sound.js';
 
 // =============================================================================
 // SCREEN STATE
@@ -210,6 +211,7 @@ export function handleClick(x, y) {
 
     // Check continue button
     if (isInsideButton(x, y, buttons.continue)) {
+        playClickSound();
         console.log('[VictoryDefeat] Continue to Shop clicked');
         if (onContinueCallback) {
             onContinueCallback();
@@ -223,6 +225,7 @@ export function handleClick(x, y) {
 
     // Check quit button
     if (isInsideButton(x, y, buttons.quit)) {
+        playClickSound();
         console.log('[VictoryDefeat] Quit to Menu clicked');
         if (onQuitCallback) {
             onQuitCallback();

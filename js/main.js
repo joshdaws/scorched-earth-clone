@@ -356,9 +356,13 @@ function handleMenuClick(pos) {
     if (menuTransition.active) return;  // Don't allow clicks during transition
 
     if (isInsideButton(pos.x, pos.y, menuButtons.start)) {
+        // Play click sound
+        Sound.playClickSound();
         // Start fade-out transition, then go to PLAYING state
         startMenuTransition(GAME_STATES.PLAYING);
     } else if (isInsideButton(pos.x, pos.y, menuButtons.options) && menuButtons.options.enabled) {
+        // Play click sound
+        Sound.playClickSound();
         // Options - would go to options menu (not implemented for V1)
         console.log('Options clicked (not implemented)');
     }
@@ -766,6 +770,10 @@ function fireProjectile(tank) {
     tank.currentWeapon = postFireWeapon; // Restore to post-fire weapon (may be basic-shot)
 
     activeProjectiles = [projectile]; // Clear and set new projectile
+
+    // Play fire sound
+    Sound.playFireSound();
+
     console.log(`Projectile fired from ${tank.team} at angle ${tank.angle}°, power ${tank.power}% (${weapon ? weapon.name : firedWeaponId}, ammo: ${ammoDisplay})`);
     return true;
 }
@@ -880,10 +888,19 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
         }
 
         // Play nuclear explosion sound
-        playNuclearExplosionSound(blastRadius);
+        Sound.playNuclearExplosionSound(blastRadius);
     } else {
         // Standard explosion sound for non-nuclear weapons
-        playExplosionSound(blastRadius);
+        Sound.playExplosionSound(blastRadius);
+    }
+
+    // Play hit or miss sound based on whether a tank was hit
+    if (directHitTank) {
+        // Tank was directly hit - play metallic hit sound
+        Sound.playHitSound();
+    } else {
+        // Terrain hit only - play dull thud miss sound
+        Sound.playMissSound();
     }
 }
 
@@ -1804,125 +1821,6 @@ function renderActiveProjectile(ctx) {
         // Render projectile on top
         renderProjectile(ctx, projectile);
     }
-}
-
-// =============================================================================
-// AUDIO EFFECTS
-// =============================================================================
-
-/**
- * Play a standard explosion sound using Web Audio synthesis.
- * Creates a short noise burst with filtering for an explosion effect.
- *
- * @param {number} blastRadius - Explosion radius (affects sound character)
- */
-function playExplosionSound(blastRadius) {
-    if (!Sound.isInitialized()) return;
-
-    const ctx = Sound.getContext();
-    const sfxGain = Sound.getSfxGain();
-    if (!ctx || !sfxGain) return;
-
-    // Create noise buffer for explosion
-    const duration = 0.3;
-    const sampleRate = ctx.sampleRate;
-    const bufferSize = Math.floor(duration * sampleRate);
-    const buffer = ctx.createBuffer(1, bufferSize, sampleRate);
-    const data = buffer.getChannelData(0);
-
-    // Fill with noise that decays
-    for (let i = 0; i < bufferSize; i++) {
-        const decay = 1 - (i / bufferSize);
-        data[i] = (Math.random() * 2 - 1) * decay * decay;
-    }
-
-    // Create source and filter
-    const source = ctx.createBufferSource();
-    source.buffer = buffer;
-
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.value = 500 + (blastRadius * 5); // Larger = deeper
-
-    const gainNode = ctx.createGain();
-    gainNode.gain.value = 0.4;
-
-    source.connect(filter);
-    filter.connect(gainNode);
-    gainNode.connect(sfxGain);
-
-    source.start();
-}
-
-/**
- * Play a nuclear explosion sound using Web Audio synthesis.
- * Creates a dramatic, bass-heavy rumbling explosion with longer decay.
- *
- * @param {number} blastRadius - Explosion radius (affects sound intensity)
- */
-function playNuclearExplosionSound(blastRadius) {
-    if (!Sound.isInitialized()) return;
-
-    const ctx = Sound.getContext();
-    const sfxGain = Sound.getSfxGain();
-    if (!ctx || !sfxGain) return;
-
-    // Longer duration for nuclear explosion
-    const duration = 1.2;
-    const sampleRate = ctx.sampleRate;
-    const bufferSize = Math.floor(duration * sampleRate);
-    const buffer = ctx.createBuffer(1, bufferSize, sampleRate);
-    const data = buffer.getChannelData(0);
-
-    // Fill with layered noise: initial crack + rumbling decay
-    for (let i = 0; i < bufferSize; i++) {
-        const t = i / bufferSize;
-
-        // Initial sharp crack (first 10%)
-        let sample = 0;
-        if (t < 0.1) {
-            const crackEnvelope = 1 - (t / 0.1);
-            sample = (Math.random() * 2 - 1) * crackEnvelope * crackEnvelope;
-        }
-
-        // Deep rumble (throughout)
-        const rumbleEnvelope = Math.pow(1 - t, 1.5);
-        const rumble = (Math.random() * 2 - 1) * rumbleEnvelope * 0.8;
-
-        // Low frequency modulation for "womp" effect
-        const lfoFreq = 8 + t * 20;
-        const lfo = Math.sin(t * Math.PI * 2 * lfoFreq) * 0.3;
-
-        sample += rumble * (1 + lfo * rumbleEnvelope);
-        data[i] = sample;
-    }
-
-    // Create source
-    const source = ctx.createBufferSource();
-    source.buffer = buffer;
-
-    // Very low pass filter for bass-heavy sound
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.value = 200 + (blastRadius * 2);
-    filter.Q.value = 2;
-
-    // Additional sub-bass boost
-    const bassBoost = ctx.createBiquadFilter();
-    bassBoost.type = 'lowshelf';
-    bassBoost.frequency.value = 100;
-    bassBoost.gain.value = 10;
-
-    const gainNode = ctx.createGain();
-    // Louder for nuclear
-    gainNode.gain.value = 0.7;
-
-    source.connect(filter);
-    filter.connect(bassBoost);
-    bassBoost.connect(gainNode);
-    gainNode.connect(sfxGain);
-
-    source.start();
 }
 
 // =============================================================================

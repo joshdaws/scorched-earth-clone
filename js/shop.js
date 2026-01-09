@@ -11,7 +11,7 @@ import { CANVAS, COLORS, UI, GAME_STATES, DEBUG } from './constants.js';
 import { WeaponRegistry, WEAPON_TYPES } from './weapons.js';
 import * as Money from './money.js';
 import * as Game from './game.js';
-import { playPurchaseSound, playErrorSound } from './sound.js';
+import { playPurchaseSound, playErrorSound, playClickSound } from './sound.js';
 
 // =============================================================================
 // SHOP STATE
@@ -303,6 +303,7 @@ export function handleClick(x, y) {
 
     // Check done button
     if (isInsideButton(x, y, doneButton)) {
+        playClickSound();
         console.log('[Shop] Done clicked');
         if (onDoneCallback) {
             onDoneCallback();

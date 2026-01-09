@@ -681,3 +681,496 @@ export function playErrorSound(volume = 0.3) {
         console.error('Error playing error sound:', error);
     }
 }
+
+/**
+ * Play a synthesized UI click sound.
+ * Creates a short, satisfying click for button interactions.
+ * @param {number} [volume=0.25] - Volume multiplier (0-1)
+ */
+export function playClickSound(volume = 0.25) {
+    if (!audioContext || !sfxGain) {
+        return; // Silently fail - UI clicks shouldn't warn
+    }
+
+    try {
+        const now = audioContext.currentTime;
+
+        // Short, snappy click using a filtered noise burst + quick sine
+        const osc = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        // High-pitched sine for clean click
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1200, now);
+        osc.frequency.exponentialRampToValueAtTime(800, now + 0.03);
+
+        // Very quick envelope for snappy feel
+        gainNode.gain.setValueAtTime(0, now);
+        gainNode.gain.linearRampToValueAtTime(volume * 0.6, now + 0.005);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+
+        osc.connect(gainNode);
+        gainNode.connect(sfxGain);
+
+        osc.start(now);
+        osc.stop(now + 0.05);
+    } catch (error) {
+        // Silently fail for UI sounds
+    }
+}
+
+// =============================================================================
+// PROCEDURAL GAME SOUNDS
+// =============================================================================
+
+/**
+ * Track recent sounds to prevent excessive overlap.
+ * Maps sound type to last play timestamp.
+ * @type {Map<string, number>}
+ */
+const recentSounds = new Map();
+
+/**
+ * Minimum time between same sounds in ms.
+ * Prevents audio clipping from rapid-fire sounds.
+ */
+const SOUND_COOLDOWN = {
+    fire: 100,
+    explosion: 50,
+    hit: 100,
+    miss: 100
+};
+
+/**
+ * Check if a sound can be played (respects cooldown).
+ * @param {string} soundType - Type of sound
+ * @returns {boolean} True if sound can be played
+ */
+function canPlaySound(soundType) {
+    const lastPlayed = recentSounds.get(soundType);
+    const cooldown = SOUND_COOLDOWN[soundType] || 50;
+
+    if (lastPlayed && (performance.now() - lastPlayed) < cooldown) {
+        return false;
+    }
+
+    recentSounds.set(soundType, performance.now());
+    return true;
+}
+
+/**
+ * Play a synthesized projectile fire sound.
+ * Creates a punchy "thoom" sound for cannon firing.
+ * @param {number} [volume=0.5] - Volume multiplier (0-1)
+ */
+export function playFireSound(volume = 0.5) {
+    if (!audioContext || !sfxGain) {
+        console.warn('Cannot play fire sound: Audio not initialized');
+        return;
+    }
+
+    if (!canPlaySound('fire')) {
+        return;
+    }
+
+    try {
+        const now = audioContext.currentTime;
+
+        // Low frequency "thump" oscillator
+        const osc1 = audioContext.createOscillator();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(150, now);
+        osc1.frequency.exponentialRampToValueAtTime(60, now + 0.15);
+
+        // Mid frequency "punch" oscillator
+        const osc2 = audioContext.createOscillator();
+        osc2.type = 'triangle';
+        osc2.frequency.setValueAtTime(300, now);
+        osc2.frequency.exponentialRampToValueAtTime(100, now + 0.1);
+
+        // Noise burst for "whoosh" effect
+        const noiseBuffer = createNoiseBuffer(0.15);
+        const noiseSource = audioContext.createBufferSource();
+        noiseSource.buffer = noiseBuffer;
+
+        // Filters
+        const lowFilter = audioContext.createBiquadFilter();
+        lowFilter.type = 'lowpass';
+        lowFilter.frequency.value = 400;
+
+        const noiseFilter = audioContext.createBiquadFilter();
+        noiseFilter.type = 'highpass';
+        noiseFilter.frequency.value = 2000;
+
+        // Gain nodes for mixing
+        const osc1Gain = audioContext.createGain();
+        const osc2Gain = audioContext.createGain();
+        const noiseGain = audioContext.createGain();
+        const masterGainNode = audioContext.createGain();
+
+        // Envelopes
+        osc1Gain.gain.setValueAtTime(0, now);
+        osc1Gain.gain.linearRampToValueAtTime(volume * 0.8, now + 0.01);
+        osc1Gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+
+        osc2Gain.gain.setValueAtTime(0, now);
+        osc2Gain.gain.linearRampToValueAtTime(volume * 0.4, now + 0.005);
+        osc2Gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+
+        noiseGain.gain.setValueAtTime(volume * 0.15, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+
+        masterGainNode.gain.value = 1;
+
+        // Connect everything
+        osc1.connect(lowFilter);
+        lowFilter.connect(osc1Gain);
+        osc2.connect(osc2Gain);
+        noiseSource.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
+
+        osc1Gain.connect(masterGainNode);
+        osc2Gain.connect(masterGainNode);
+        noiseGain.connect(masterGainNode);
+        masterGainNode.connect(sfxGain);
+
+        // Play
+        osc1.start(now);
+        osc2.start(now);
+        noiseSource.start(now);
+        osc1.stop(now + 0.25);
+        osc2.stop(now + 0.15);
+        noiseSource.stop(now + 0.15);
+    } catch (error) {
+        console.error('Error playing fire sound:', error);
+    }
+}
+
+/**
+ * Play a synthesized tank hit sound.
+ * Creates a metallic impact sound when tank takes damage.
+ * @param {number} [volume=0.45] - Volume multiplier (0-1)
+ */
+export function playHitSound(volume = 0.45) {
+    if (!audioContext || !sfxGain) {
+        console.warn('Cannot play hit sound: Audio not initialized');
+        return;
+    }
+
+    if (!canPlaySound('hit')) {
+        return;
+    }
+
+    try {
+        const now = audioContext.currentTime;
+
+        // Metallic ring oscillator (inharmonic frequencies for metal sound)
+        const osc1 = audioContext.createOscillator();
+        osc1.type = 'triangle';
+        osc1.frequency.setValueAtTime(800, now);
+        osc1.frequency.exponentialRampToValueAtTime(400, now + 0.08);
+
+        const osc2 = audioContext.createOscillator();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(1200, now);
+        osc2.frequency.exponentialRampToValueAtTime(600, now + 0.12);
+
+        // Clang overtone
+        const osc3 = audioContext.createOscillator();
+        osc3.type = 'sine';
+        osc3.frequency.setValueAtTime(2400, now);
+        osc3.frequency.exponentialRampToValueAtTime(1500, now + 0.05);
+
+        // Impact thump
+        const osc4 = audioContext.createOscillator();
+        osc4.type = 'sine';
+        osc4.frequency.setValueAtTime(100, now);
+        osc4.frequency.exponentialRampToValueAtTime(40, now + 0.1);
+
+        // Gain nodes
+        const gain1 = audioContext.createGain();
+        const gain2 = audioContext.createGain();
+        const gain3 = audioContext.createGain();
+        const gain4 = audioContext.createGain();
+        const masterGainNode = audioContext.createGain();
+
+        // Envelopes - quick attack, medium decay for metallic ring
+        gain1.gain.setValueAtTime(0, now);
+        gain1.gain.linearRampToValueAtTime(volume * 0.5, now + 0.005);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+        gain2.gain.setValueAtTime(0, now);
+        gain2.gain.linearRampToValueAtTime(volume * 0.3, now + 0.005);
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+        gain3.gain.setValueAtTime(0, now);
+        gain3.gain.linearRampToValueAtTime(volume * 0.15, now + 0.003);
+        gain3.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+        gain4.gain.setValueAtTime(0, now);
+        gain4.gain.linearRampToValueAtTime(volume * 0.6, now + 0.01);
+        gain4.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+        masterGainNode.gain.value = 1;
+
+        // Connect
+        osc1.connect(gain1);
+        osc2.connect(gain2);
+        osc3.connect(gain3);
+        osc4.connect(gain4);
+        gain1.connect(masterGainNode);
+        gain2.connect(masterGainNode);
+        gain3.connect(masterGainNode);
+        gain4.connect(masterGainNode);
+        masterGainNode.connect(sfxGain);
+
+        // Play
+        osc1.start(now);
+        osc2.start(now);
+        osc3.start(now);
+        osc4.start(now);
+        osc1.stop(now + 0.2);
+        osc2.stop(now + 0.2);
+        osc3.stop(now + 0.1);
+        osc4.stop(now + 0.15);
+    } catch (error) {
+        console.error('Error playing hit sound:', error);
+    }
+}
+
+/**
+ * Play a synthesized terrain miss sound.
+ * Creates a dull thud for projectiles hitting dirt (no tank hit).
+ * @param {number} [volume=0.3] - Volume multiplier (0-1)
+ */
+export function playMissSound(volume = 0.3) {
+    if (!audioContext || !sfxGain) {
+        console.warn('Cannot play miss sound: Audio not initialized');
+        return;
+    }
+
+    if (!canPlaySound('miss')) {
+        return;
+    }
+
+    try {
+        const now = audioContext.currentTime;
+
+        // Low thud oscillator
+        const osc = audioContext.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(80, now);
+        osc.frequency.exponentialRampToValueAtTime(40, now + 0.15);
+
+        // Soft noise for dirt scatter
+        const noiseBuffer = createNoiseBuffer(0.2);
+        const noiseSource = audioContext.createBufferSource();
+        noiseSource.buffer = noiseBuffer;
+
+        // Low pass filter for muffled sound
+        const filter = audioContext.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 300;
+
+        const noiseFilter = audioContext.createBiquadFilter();
+        noiseFilter.type = 'lowpass';
+        noiseFilter.frequency.value = 600;
+
+        // Gains
+        const oscGain = audioContext.createGain();
+        const noiseGain = audioContext.createGain();
+        const masterGainNode = audioContext.createGain();
+
+        // Envelopes - soft attack for dull impact
+        oscGain.gain.setValueAtTime(0, now);
+        oscGain.gain.linearRampToValueAtTime(volume * 0.7, now + 0.02);
+        oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+
+        noiseGain.gain.setValueAtTime(volume * 0.2, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+        masterGainNode.gain.value = 1;
+
+        // Connect
+        osc.connect(filter);
+        filter.connect(oscGain);
+        noiseSource.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
+        oscGain.connect(masterGainNode);
+        noiseGain.connect(masterGainNode);
+        masterGainNode.connect(sfxGain);
+
+        // Play
+        osc.start(now);
+        noiseSource.start(now);
+        osc.stop(now + 0.25);
+        noiseSource.stop(now + 0.2);
+    } catch (error) {
+        console.error('Error playing miss sound:', error);
+    }
+}
+
+/**
+ * Play a synthesized explosion sound with variable size.
+ * Creates an explosion sound appropriate for the blast radius.
+ * Small explosions are crisp, large explosions are bass-heavy.
+ * @param {number} blastRadius - Explosion radius (affects sound character)
+ * @param {number} [volume=0.5] - Volume multiplier (0-1)
+ */
+export function playExplosionSound(blastRadius, volume = 0.5) {
+    if (!audioContext || !sfxGain) {
+        console.warn('Cannot play explosion sound: Audio not initialized');
+        return;
+    }
+
+    if (!canPlaySound('explosion')) {
+        return;
+    }
+
+    try {
+        const now = audioContext.currentTime;
+
+        // Scale duration and characteristics based on blast radius
+        // Small (20-40): short, crisp
+        // Medium (40-70): moderate rumble
+        // Large (70+): extended bass rumble
+        const radiusNorm = Math.min(blastRadius / 100, 1);
+        const duration = 0.2 + radiusNorm * 0.4;
+        const baseFreq = 200 - radiusNorm * 120; // Larger = lower
+
+        // Create noise buffer for explosion
+        const sampleRate = audioContext.sampleRate;
+        const bufferSize = Math.floor(duration * sampleRate);
+        const buffer = audioContext.createBuffer(1, bufferSize, sampleRate);
+        const data = buffer.getChannelData(0);
+
+        // Fill with noise that decays (steeper decay for small explosions)
+        const decayPower = 1.5 + (1 - radiusNorm) * 0.5;
+        for (let i = 0; i < bufferSize; i++) {
+            const decay = Math.pow(1 - (i / bufferSize), decayPower);
+            data[i] = (Math.random() * 2 - 1) * decay;
+        }
+
+        // Create source and filters
+        const source = audioContext.createBufferSource();
+        source.buffer = buffer;
+
+        const filter = audioContext.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = baseFreq + blastRadius * 4;
+
+        // Add bass for larger explosions
+        const bassBoost = audioContext.createBiquadFilter();
+        bassBoost.type = 'lowshelf';
+        bassBoost.frequency.value = 120;
+        bassBoost.gain.value = radiusNorm * 8;
+
+        const gainNode = audioContext.createGain();
+        gainNode.gain.value = volume * (0.4 + radiusNorm * 0.3);
+
+        // Connect
+        source.connect(filter);
+        filter.connect(bassBoost);
+        bassBoost.connect(gainNode);
+        gainNode.connect(sfxGain);
+
+        source.start(now);
+    } catch (error) {
+        console.error('Error playing explosion sound:', error);
+    }
+}
+
+/**
+ * Play a synthesized nuclear explosion sound.
+ * Creates a dramatic, bass-heavy rumbling explosion with longer decay.
+ * @param {number} blastRadius - Explosion radius (affects sound intensity)
+ * @param {number} [volume=0.7] - Volume multiplier (0-1)
+ */
+export function playNuclearExplosionSound(blastRadius, volume = 0.7) {
+    if (!audioContext || !sfxGain) {
+        console.warn('Cannot play nuclear explosion sound: Audio not initialized');
+        return;
+    }
+
+    // Nuclear explosions bypass cooldown - they're dramatic enough to stand alone
+
+    try {
+        const now = audioContext.currentTime;
+
+        // Longer duration for nuclear explosion
+        const duration = 1.2;
+        const sampleRate = audioContext.sampleRate;
+        const bufferSize = Math.floor(duration * sampleRate);
+        const buffer = audioContext.createBuffer(1, bufferSize, sampleRate);
+        const data = buffer.getChannelData(0);
+
+        // Fill with layered noise: initial crack + rumbling decay
+        for (let i = 0; i < bufferSize; i++) {
+            const t = i / bufferSize;
+
+            // Initial sharp crack (first 10%)
+            let sample = 0;
+            if (t < 0.1) {
+                const crackEnvelope = 1 - (t / 0.1);
+                sample = (Math.random() * 2 - 1) * crackEnvelope * crackEnvelope;
+            }
+
+            // Deep rumble (throughout)
+            const rumbleEnvelope = Math.pow(1 - t, 1.5);
+            const rumble = (Math.random() * 2 - 1) * rumbleEnvelope * 0.8;
+
+            // Low frequency modulation for "womp" effect
+            const lfoFreq = 8 + t * 20;
+            const lfo = Math.sin(t * Math.PI * 2 * lfoFreq) * 0.3;
+
+            sample += rumble * (1 + lfo * rumbleEnvelope);
+            data[i] = sample;
+        }
+
+        // Create source
+        const source = audioContext.createBufferSource();
+        source.buffer = buffer;
+
+        // Very low pass filter for bass-heavy sound
+        const filter = audioContext.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 200 + (blastRadius * 2);
+        filter.Q.value = 2;
+
+        // Additional sub-bass boost
+        const bassBoost = audioContext.createBiquadFilter();
+        bassBoost.type = 'lowshelf';
+        bassBoost.frequency.value = 100;
+        bassBoost.gain.value = 10;
+
+        const gainNode = audioContext.createGain();
+        gainNode.gain.value = volume;
+
+        source.connect(filter);
+        filter.connect(bassBoost);
+        bassBoost.connect(gainNode);
+        gainNode.connect(sfxGain);
+
+        source.start(now);
+    } catch (error) {
+        console.error('Error playing nuclear explosion sound:', error);
+    }
+}
+
+/**
+ * Create a short noise buffer for use in sound effects.
+ * @param {number} duration - Duration in seconds
+ * @returns {AudioBuffer} Noise buffer
+ */
+function createNoiseBuffer(duration) {
+    const sampleRate = audioContext.sampleRate;
+    const bufferSize = Math.floor(duration * sampleRate);
+    const buffer = audioContext.createBuffer(1, bufferSize, sampleRate);
+    const data = buffer.getChannelData(0);
+
+    for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+    }
+
+    return buffer;
+}
