@@ -46,6 +46,18 @@ npx serve .
 - Web Audio API for sound
 - No frameworks, no build tools
 
+## How This Was Built
+
+This entire game was built autonomously using an AI agent loop. A "Ralph Wiggum" style workflow runs Claude Code in a loop, one issue at a time, with [Beads](https://github.com/beads-ai/beads) tracking the work queue.
+
+**[Read the full writeup →](docs/workflow/ralph-wiggum-beads.md)**
+
+The process:
+1. Created 4 seed issues (research, spec, tech stack, breakdown)
+2. Those expanded into 60+ implementation issues
+3. Ran the loop overnight
+4. Woke up to a working game
+
 ## License
 
 MIT
