@@ -1470,6 +1470,69 @@ export function playNuclearExplosionSound(blastRadius, volume = 0.7) {
 }
 
 /**
+ * Play a synthesized landing thud sound.
+ * Creates a deep impact sound for tanks landing after falling.
+ * @param {number} [volume=0.4] - Volume multiplier (0-1), scales with fall intensity
+ */
+export function playLandingSound(volume = 0.4) {
+    if (!audioContext || !sfxGain) {
+        console.warn('Cannot play landing sound: Audio not initialized');
+        return;
+    }
+
+    try {
+        const now = audioContext.currentTime;
+
+        // Short, punchy impact sound
+        const duration = 0.25;
+        const sampleRate = audioContext.sampleRate;
+        const bufferSize = Math.floor(duration * sampleRate);
+        const buffer = audioContext.createBuffer(1, bufferSize, sampleRate);
+        const data = buffer.getChannelData(0);
+
+        // Create a short thud: initial impact + quick decay
+        for (let i = 0; i < bufferSize; i++) {
+            const t = i / bufferSize;
+
+            // Quick attack, exponential decay
+            const envelope = Math.pow(1 - t, 3);
+
+            // Filtered noise for dirt/impact texture
+            const noise = Math.random() * 2 - 1;
+
+            // Low frequency thump (simulates ground impact)
+            const thumpFreq = 60 + t * 40; // 60Hz -> 100Hz slight pitch rise
+            const thump = Math.sin(t * Math.PI * 2 * thumpFreq) * 0.8;
+
+            // Combine noise and thump with envelope
+            const sample = (noise * 0.3 + thump * 0.7) * envelope;
+            data[i] = sample;
+        }
+
+        // Create source
+        const source = audioContext.createBufferSource();
+        source.buffer = buffer;
+
+        // Low pass filter for bass-heavy thud
+        const filter = audioContext.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 200;
+        filter.Q.value = 1;
+
+        const gainNode = audioContext.createGain();
+        gainNode.gain.value = Math.max(0, Math.min(1, volume));
+
+        source.connect(filter);
+        filter.connect(gainNode);
+        gainNode.connect(sfxGain);
+
+        source.start(now);
+    } catch (error) {
+        console.error('Error playing landing sound:', error);
+    }
+}
+
+/**
  * Create a short noise buffer for use in sound effects.
  * @param {number} duration - Duration in seconds
  * @returns {AudioBuffer} Noise buffer

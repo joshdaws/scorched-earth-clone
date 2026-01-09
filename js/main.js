@@ -13,7 +13,7 @@ import * as Debug from './debug.js';
 import * as Turn from './turn.js';
 import { COLORS, DEBUG, CANVAS, UI, GAME_STATES, TURN_PHASES, PHYSICS, TANK, PROJECTILE, GAME } from './constants.js';
 import { generateTerrain } from './terrain.js';
-import { placeTanksOnTerrain, updateTankTerrainPosition } from './tank.js';
+import { placeTanksOnTerrain, updateTankTerrainPosition, calculateFallDamage, areAnyTanksFalling } from './tank.js';
 import { Projectile, createProjectileFromTank, checkTankCollision, createSplitProjectiles } from './projectile.js';
 import { applyExplosionDamage, applyExplosionToAllTanks, DAMAGE } from './damage.js';
 import * as Wind from './wind.js';
@@ -1582,6 +1582,85 @@ function checkRoundEnd() {
 
     // No one destroyed - continue to next turn
     Turn.projectileResolved();
+}
+
+// =============================================================================
+// TANK FALLING SYSTEM
+// =============================================================================
+
+/**
+ * Update all falling tanks each frame.
+ * Handles gravity-based falling animation and applies fall damage on landing.
+ * Called from the main update loop.
+ */
+function updateFallingTanks() {
+    const tanks = [playerTank, enemyTank].filter(t => t !== null);
+    let anyTankLanded = false;
+
+    for (const tank of tanks) {
+        if (!tank.isFalling) continue;
+
+        // Update falling physics
+        const result = tank.updateFalling();
+
+        if (result.landed) {
+            // Tank just landed - apply fall damage and feedback
+            handleTankLanding(tank, result.fallDistance);
+            anyTankLanded = true;
+        }
+    }
+
+    // If a tank landed and might have been destroyed by fall damage,
+    // check if the round has ended (but only if we're in PROJECTILE_FLIGHT phase
+    // since that's when explosions and terrain destruction happen)
+    if (anyTankLanded && Game.getState() === GAME_STATES.AIMING) {
+        // Check if any tank was destroyed by fall damage
+        const playerDestroyed = playerTank && playerTank.health <= 0;
+        const enemyDestroyed = enemyTank && enemyTank.health <= 0;
+
+        if (playerDestroyed || enemyDestroyed) {
+            checkRoundEnd();
+        }
+    }
+}
+
+/**
+ * Handle a tank landing after a fall.
+ * Applies fall damage, screen shake, and audio feedback.
+ * @param {import('./tank.js').Tank} tank - The tank that landed
+ * @param {number} fallDistance - Distance fallen in pixels
+ */
+function handleTankLanding(tank, fallDistance) {
+    // Calculate fall damage
+    const damage = calculateFallDamage(fallDistance);
+
+    if (damage > 0) {
+        // Apply damage
+        tank.takeDamage(damage);
+        console.log(`Tank (${tank.team}) took ${damage} fall damage from ${fallDistance.toFixed(0)}px fall`);
+
+        // Screen shake proportional to fall damage
+        // Scale shake intensity based on damage (0-60 damage maps to small-large shake)
+        const shakeIntensity = Math.min(1, damage / 60) * TANK.FALL.LANDING_SHAKE_INTENSITY;
+        if (shakeIntensity > 0.1) {
+            // Use a custom screen shake function or reuse explosion shake
+            const shakeRadius = 10 + (damage / 60) * 40; // 10-50px equivalent blast radius for shake
+            screenShakeForBlastRadius(shakeRadius);
+        }
+
+        // Play landing thud sound (louder for harder landings)
+        const volume = 0.3 + (damage / 60) * 0.7; // 0.3-1.0 volume based on damage
+        Sound.playLandingSound(volume);
+
+        // Check if tank was destroyed by fall damage
+        if (tank.health <= 0) {
+            console.log(`Tank (${tank.team}) destroyed by fall damage!`);
+            // The next checkRoundEnd call will handle victory/defeat
+        }
+    } else {
+        // Soft landing - quiet thud
+        Sound.playLandingSound(0.2);
+    }
 }
 
 /**
@@ -3255,6 +3334,11 @@ async function init() {
     // This creates a merged object with both Debug module and DebugTools functions
     window.Debug = { ...Debug, ...DebugTools };
 
+    // Expose game objects for testing/debugging
+    window.getPlayerTank = () => playerTank;
+    window.getEnemyTank = () => enemyTank;
+    window.getTerrain = () => currentTerrain;
+
     // Start the game loop with update, render, and context
     Game.startLoop(update, render, ctx);
 }
@@ -3281,6 +3365,9 @@ function update(deltaTime) {
 
     // Update particle system
     updateParticles(deltaTime);
+
+    // Update falling tanks
+    updateFallingTanks();
 
     // Update background animation (star twinkle)
     updateBackground(deltaTime);

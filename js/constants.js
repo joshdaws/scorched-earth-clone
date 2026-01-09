@@ -58,7 +58,27 @@ export const TANK = {
     TURRET_LENGTH: 20,
     TURRET_WIDTH: 4,   // Barrel width
     START_HEALTH: 100,
-    MAX_HEALTH: 100
+    MAX_HEALTH: 100,
+
+    // Fall damage settings
+    FALL: {
+        /** Gravity acceleration in pixels per frame squared (matches projectile physics) */
+        GRAVITY: 0.15,
+        /** Maximum fall velocity in pixels per frame */
+        MAX_VELOCITY: 12,
+        /** Minimum fall distance (pixels) before damage is applied */
+        DAMAGE_THRESHOLD: 20,
+        /** Fall distance (pixels) that causes instant death */
+        LETHAL_DISTANCE: 150,
+        /** Minimum damage at threshold distance */
+        MIN_DAMAGE: 5,
+        /** Maximum damage just below lethal distance */
+        MAX_DAMAGE: 60,
+        /** Screen shake intensity for heavy landings */
+        LANDING_SHAKE_INTENSITY: 0.5,
+        /** Screen shake duration for heavy landings (ms) */
+        LANDING_SHAKE_DURATION: 200
+    }
 };
 
 // =============================================================================

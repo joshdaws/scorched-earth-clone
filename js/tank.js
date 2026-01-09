@@ -96,6 +96,31 @@ export class Tank {
             'basic-shot': Infinity
         };
 
+        // Falling state properties
+        /**
+         * Whether the tank is currently falling.
+         * @type {boolean}
+         */
+        this.isFalling = false;
+
+        /**
+         * Current vertical velocity during fall (pixels per frame).
+         * @type {number}
+         */
+        this.fallVelocity = 0;
+
+        /**
+         * Y position where the fall started (for calculating fall distance).
+         * @type {number}
+         */
+        this.fallStartY = 0;
+
+        /**
+         * Target Y position where the tank will land (terrain surface).
+         * @type {number}
+         */
+        this.targetY = 0;
+
         console.log(`Tank created: team=${team}, position=(${x}, ${y}), health=${this.health}`);
     }
 
@@ -318,6 +343,77 @@ export class Tank {
      */
     setTerrainPosition(terrainY) {
         this.y = terrainY;
+    }
+
+    // =========================================================================
+    // FALLING METHODS
+    // =========================================================================
+
+    /**
+     * Start a falling animation from current position to target terrain position.
+     * @param {number} targetTerrainY - The canvas Y coordinate where the tank will land
+     */
+    startFalling(targetTerrainY) {
+        // Only start falling if there's actually a gap to fall
+        if (targetTerrainY <= this.y) {
+            // Tank is already at or below terrain level, no fall needed
+            this.y = targetTerrainY;
+            return;
+        }
+
+        this.isFalling = true;
+        this.fallVelocity = 0;
+        this.fallStartY = this.y;
+        this.targetY = targetTerrainY;
+
+        console.log(`Tank (${this.team}) started falling from Y=${this.y.toFixed(0)} to Y=${targetTerrainY.toFixed(0)}`);
+    }
+
+    /**
+     * Update the falling animation for one frame.
+     * Applies gravity and moves tank downward until it reaches the target.
+     * @returns {{landed: boolean, fallDistance: number}} Result of the update
+     *   - landed: true if the tank just landed this frame
+     *   - fallDistance: total distance fallen (only meaningful when landed is true)
+     */
+    updateFalling() {
+        if (!this.isFalling) {
+            return { landed: false, fallDistance: 0 };
+        }
+
+        // Apply gravity to velocity
+        this.fallVelocity += TANK.FALL.GRAVITY;
+
+        // Cap velocity at maximum
+        if (this.fallVelocity > TANK.FALL.MAX_VELOCITY) {
+            this.fallVelocity = TANK.FALL.MAX_VELOCITY;
+        }
+
+        // Move tank downward
+        this.y += this.fallVelocity;
+
+        // Check if tank has landed
+        if (this.y >= this.targetY) {
+            // Land the tank
+            const fallDistance = this.targetY - this.fallStartY;
+            this.y = this.targetY;
+            this.isFalling = false;
+            this.fallVelocity = 0;
+
+            console.log(`Tank (${this.team}) landed after falling ${fallDistance.toFixed(0)} pixels`);
+
+            return { landed: true, fallDistance };
+        }
+
+        return { landed: false, fallDistance: 0 };
+    }
+
+    /**
+     * Check if the tank is currently in a falling state.
+     * @returns {boolean} True if the tank is falling
+     */
+    checkIsFalling() {
+        return this.isFalling;
     }
 
     /**
@@ -569,13 +665,79 @@ export function placeTanksOnTerrain(terrain) {
 
 /**
  * Update a tank's position to match the current terrain height.
+ * If there's a gap between the tank and terrain, starts a falling animation
+ * instead of teleporting the tank.
+ *
  * Call this when terrain changes (e.g., after an explosion) to ensure
  * tanks don't float or sink into the ground.
  *
  * @param {Tank} tank - The tank to update
  * @param {import('./terrain.js').Terrain} terrain - The terrain instance
+ * @returns {boolean} True if the tank started falling, false if already on terrain
  */
 export function updateTankTerrainPosition(tank, terrain) {
     const terrainHeight = terrain.getHeight(tank.x);
-    tank.y = terrainHeightToCanvasY(terrainHeight);
+    const targetY = terrainHeightToCanvasY(terrainHeight);
+
+    // If tank is already falling, don't restart the fall
+    if (tank.isFalling) {
+        // Update the target Y in case terrain changed during fall
+        tank.targetY = targetY;
+        return true;
+    }
+
+    // Check if there's a gap (tank is above terrain)
+    const gap = targetY - tank.y;
+
+    if (gap > 1) {
+        // Start falling animation
+        tank.startFalling(targetY);
+        return true;
+    } else {
+        // No gap or tank is below terrain - just set position directly
+        tank.y = targetY;
+        return false;
+    }
+}
+
+/**
+ * Calculate fall damage based on fall distance.
+ * Uses a linear scale between threshold and lethal distances.
+ *
+ * Damage formula:
+ * - Falls < DAMAGE_THRESHOLD pixels: 0 damage
+ * - Falls >= LETHAL_DISTANCE pixels: 100 damage (instant kill)
+ * - Falls in between: linear interpolation from MIN_DAMAGE to MAX_DAMAGE
+ *
+ * @param {number} fallDistance - Distance fallen in pixels
+ * @returns {number} Damage amount to apply (0-100)
+ */
+export function calculateFallDamage(fallDistance) {
+    const { DAMAGE_THRESHOLD, LETHAL_DISTANCE, MIN_DAMAGE, MAX_DAMAGE } = TANK.FALL;
+
+    // No damage for small falls
+    if (fallDistance < DAMAGE_THRESHOLD) {
+        return 0;
+    }
+
+    // Instant death for catastrophic falls
+    if (fallDistance >= LETHAL_DISTANCE) {
+        return 100;
+    }
+
+    // Linear interpolation between threshold and lethal distance
+    // Maps [DAMAGE_THRESHOLD, LETHAL_DISTANCE) -> [MIN_DAMAGE, MAX_DAMAGE]
+    const normalized = (fallDistance - DAMAGE_THRESHOLD) / (LETHAL_DISTANCE - DAMAGE_THRESHOLD);
+    const damage = MIN_DAMAGE + normalized * (MAX_DAMAGE - MIN_DAMAGE);
+
+    return Math.floor(damage);
+}
+
+/**
+ * Check if any tanks are currently falling.
+ * @param {Tank[]} tanks - Array of tanks to check
+ * @returns {boolean} True if at least one tank is falling
+ */
+export function areAnyTanksFalling(tanks) {
+    return tanks.some(tank => tank && tank.isFalling);
 }
