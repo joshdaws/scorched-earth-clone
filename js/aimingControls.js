@@ -35,12 +35,12 @@ const CONTROLS = {
         KNOB_HEIGHT: 48,    // Touch-friendly: exceeds 44px minimum
         TOUCH_ZONE_PADDING: 24  // Extra padding for touch targets
     },
-    // Fire button at bottom center - touch-optimized for easy thumb access
+    // Fire button at bottom right - touch-optimized for right thumb access
     FIRE_BUTTON: {
-        X: CANVAS.DESIGN_WIDTH / 2,
-        Y: CANVAS.DESIGN_HEIGHT - 110,  // Slightly higher for thumb reach
-        WIDTH: 200,         // Extra wide for easy tapping
-        HEIGHT: 80,         // Touch-friendly: well over 44px minimum
+        X: CANVAS.DESIGN_WIDTH - 130,   // Right side with margin from edge
+        Y: CANVAS.DESIGN_HEIGHT - 80,   // Bottom with margin for thumb reach
+        WIDTH: 180,         // Wide for easy tapping, minimum 44pt
+        HEIGHT: 70,         // Touch-friendly: well over 44px minimum
         BORDER_RADIUS: 14
     },
     // Angle arc around tank turret
@@ -362,12 +362,6 @@ function renderFireButton(ctx, canFire) {
         ctx.shadowBlur = isPressed ? 15 : 8 * pulse;
     }
     ctx.fillText('FIRE!', btn.X, btn.Y + offsetY);
-
-    // Keyboard hint - smaller and subtle
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = COLORS.TEXT_MUTED;
-    ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
-    ctx.fillText('[SPACE]', btn.X, btn.Y + btn.HEIGHT / 2 - 8 + offsetY);
 
     ctx.restore();
 }
