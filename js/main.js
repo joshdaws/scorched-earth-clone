@@ -200,9 +200,24 @@ let projectileFlightStartTime = null;
 // =============================================================================
 
 /**
- * Render the terrain as a filled polygon.
+ * Terrain fill color - dark purple per spec
+ */
+const TERRAIN_FILL_COLOR = '#1a0a2e';
+
+/**
+ * Terrain edge stroke color - neon pink per spec
+ */
+const TERRAIN_EDGE_COLOR = '#ff2a6d';
+
+/**
+ * Render the terrain as a filled polygon with synthwave styling.
  * Terrain heights are stored as distance from bottom, so we need to flip Y
  * since canvas Y=0 is at the top.
+ *
+ * Rendering approach (efficient - no per-pixel operations):
+ * 1. Build a single path for the terrain polygon
+ * 2. Fill with solid dark purple color
+ * 3. Draw neon pink edge with glow effect using shadow blur
  *
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  */
@@ -212,13 +227,7 @@ function renderTerrain(ctx) {
     const terrain = currentTerrain;
     const width = terrain.getWidth();
 
-    // Create gradient for terrain (synthwave ground look)
-    const gradient = ctx.createLinearGradient(0, CANVAS.DESIGN_HEIGHT, 0, CANVAS.DESIGN_HEIGHT * 0.3);
-    gradient.addColorStop(0, COLORS.TERRAIN);  // Bottom: darker purple
-    gradient.addColorStop(0.5, '#3d2b5e');     // Middle: medium purple
-    gradient.addColorStop(1, '#4a3068');       // Top: lighter purple
-
-    ctx.fillStyle = gradient;
+    // Build terrain path once and reuse for fill and stroke
     ctx.beginPath();
 
     // Start at bottom-left corner
@@ -236,11 +245,22 @@ function renderTerrain(ctx) {
     ctx.lineTo(width - 1, CANVAS.DESIGN_HEIGHT);
     ctx.closePath();
 
-    // Fill the terrain
+    // Fill terrain with solid dark purple
+    ctx.fillStyle = TERRAIN_FILL_COLOR;
     ctx.fill();
 
-    // Draw terrain outline for synthwave glow effect
-    ctx.strokeStyle = COLORS.NEON_PURPLE;
+    // Draw terrain edge with neon glow effect
+    // Use shadow blur for the glow effect - more performant than gradient
+    ctx.save();
+
+    // Create glow effect using shadow
+    ctx.shadowColor = TERRAIN_EDGE_COLOR;
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+
+    // Draw neon pink edge stroke
+    ctx.strokeStyle = TERRAIN_EDGE_COLOR;
     ctx.lineWidth = 2;
     ctx.beginPath();
     for (let x = 0; x < width; x++) {
@@ -253,6 +273,8 @@ function renderTerrain(ctx) {
         }
     }
     ctx.stroke();
+
+    ctx.restore();
 }
 
 // =============================================================================

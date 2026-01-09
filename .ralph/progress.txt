@@ -174,3 +174,9 @@
 **Files:** js/terrain.js (added generateTerrain, createSeededRandom), js/main.js (added terrain state, renderTerrain, generation on game start)
 **Commit:** 8f3e45d
 ---
+## scorched-earth-v3c.3 - Implement Terrain Rendering
+**Status:** Completed
+**Changes:** Updated renderTerrain function with synthwave styling - solid dark purple fill (#1a0a2e), neon pink edge stroke (#ff2a6d) with 2px width, and glow effect using shadowBlur
+**Files:** js/main.js (renderTerrain function, lines 198-278)
+**Commit:** f64a2e5
+---
