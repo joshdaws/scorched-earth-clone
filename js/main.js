@@ -662,10 +662,18 @@ function updatePlaying(deltaTime) {
             AI.startTurn(enemyTank, playerTank, Wind.getWind(), currentTerrain);
         }
 
+        // Animate turret and power during thinking phase
+        const animatedAim = AI.getAnimatedAim();
+        if (animatedAim && enemyTank) {
+            // Apply animated values for visual feedback
+            enemyTank.angle = animatedAim.angle;
+            enemyTank.power = animatedAim.power;
+        }
+
         // Update AI turn and check if ready to fire
         const aiResult = AI.updateTurn();
         if (aiResult && aiResult.ready && enemyTank) {
-            // Apply AI's calculated aim to the enemy tank
+            // Apply AI's final calculated aim to the enemy tank
             enemyTank.angle = aiResult.angle;
             enemyTank.power = aiResult.power;
             enemyTank.setWeapon(aiResult.weapon);

@@ -272,7 +272,7 @@ export function getTurnIndicatorText() {
         case TURN_PHASES.PROJECTILE_FLIGHT:
             return currentShooter === 'player' ? 'PROJECTILE IN FLIGHT' : 'INCOMING!';
         case TURN_PHASES.AI_AIM:
-            return 'ENEMY AIMING...';
+            return 'AI THINKING...';
         case TURN_PHASES.AI_FIRE:
             return 'ENEMY FIRING!';
         default:

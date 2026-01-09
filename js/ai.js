@@ -971,7 +971,9 @@ export function getThinkingDelay() {
  *   startTime: number,
  *   thinkingDelay: number,
  *   calculatedAim: {angle: number, power: number}|null,
- *   selectedWeapon: string|null
+ *   selectedWeapon: string|null,
+ *   initialAngle: number,
+ *   initialPower: number
  * }}
  */
 const aiTurnState = {
@@ -979,7 +981,10 @@ const aiTurnState = {
     startTime: 0,
     thinkingDelay: 0,
     calculatedAim: null,
-    selectedWeapon: null
+    selectedWeapon: null,
+    // Animation state - stores starting position for interpolation
+    initialAngle: 0,
+    initialPower: 0
 };
 
 /**
@@ -995,6 +1000,11 @@ export function startTurn(aiTank, playerTank, windValue = 0, terrain = null) {
     aiTurnState.active = true;
     aiTurnState.startTime = performance.now();
     aiTurnState.thinkingDelay = getThinkingDelay();
+
+    // Capture initial position for animation
+    aiTurnState.initialAngle = aiTank.angle;
+    aiTurnState.initialPower = aiTank.power;
+
     // Hard AI uses terrain for iterative solver; Easy/Medium don't need it
     aiTurnState.calculatedAim = calculateAim(aiTank, playerTank, windValue, terrain);
     // Hard AI uses player position and terrain for strategic weapon selection
@@ -1002,6 +1012,8 @@ export function startTurn(aiTank, playerTank, windValue = 0, terrain = null) {
 
     if (debugMode) {
         console.log('[AI] Turn started - thinking...');
+        console.log(`[AI] Animating from angle=${aiTurnState.initialAngle.toFixed(1)}° power=${aiTurnState.initialPower.toFixed(0)}%`);
+        console.log(`[AI] Target aim: angle=${aiTurnState.calculatedAim.angle.toFixed(1)}° power=${aiTurnState.calculatedAim.power.toFixed(0)}%`);
     }
 }
 
@@ -1051,10 +1063,47 @@ export function cancelTurn() {
     aiTurnState.active = false;
     aiTurnState.calculatedAim = null;
     aiTurnState.selectedWeapon = null;
+    aiTurnState.initialAngle = 0;
+    aiTurnState.initialPower = 0;
 
     if (debugMode) {
         console.log('[AI] Turn cancelled');
     }
+}
+
+/**
+ * Get the current animated aim values during AI thinking.
+ * Uses easeInOutQuad for smooth animation.
+ *
+ * @returns {{angle: number, power: number, progress: number}|null}
+ *          Current animated values, or null if not animating
+ */
+export function getAnimatedAim() {
+    if (!aiTurnState.active || !aiTurnState.calculatedAim) {
+        return null;
+    }
+
+    const elapsed = performance.now() - aiTurnState.startTime;
+    // Use 80% of thinking delay for animation, keep 20% at final position before firing
+    const animationDuration = aiTurnState.thinkingDelay * 0.8;
+    const progress = Math.min(1, elapsed / animationDuration);
+
+    // Ease in-out quad for smooth animation
+    const eased = progress < 0.5
+        ? 2 * progress * progress
+        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+    // Interpolate from initial to target
+    const angle = aiTurnState.initialAngle +
+        (aiTurnState.calculatedAim.angle - aiTurnState.initialAngle) * eased;
+    const power = aiTurnState.initialPower +
+        (aiTurnState.calculatedAim.power - aiTurnState.initialPower) * eased;
+
+    return {
+        angle,
+        power,
+        progress: elapsed / aiTurnState.thinkingDelay
+    };
 }
 
 /**
