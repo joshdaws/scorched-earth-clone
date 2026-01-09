@@ -278,3 +278,9 @@
 **Files:** js/projectile.js, js/main.js
 **Commit:** 63203bd
 ---
+## scorched-earth-8qc.7 - Implement Digger Weapons
+**Status:** Completed
+**Changes:** Implemented Digger and Heavy Digger weapons with terrain tunneling mechanics. When these weapons hit terrain, they enter "digging mode" and continue along their trajectory, destroying terrain as they go. They can emerge from the other side of terrain and resume normal flight, or explode after traveling their maximum tunnel distance.
+**Files:** js/projectile.js, js/main.js
+**Commit:** 9d57b84
+---

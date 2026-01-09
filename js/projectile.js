@@ -175,6 +175,45 @@ export class Projectile {
          */
         this.rollRotation = 0;
 
+        // =============================================================================
+        // DIGGING STATE (for Digger-type weapons)
+        // =============================================================================
+
+        /**
+         * Whether this projectile is currently in digging mode.
+         * Digger weapons enter digging mode on first terrain contact instead of exploding.
+         * @type {boolean}
+         */
+        this.isDigging = false;
+
+        /**
+         * Distance traveled while digging (in pixels).
+         * Tracks how far the digger has tunneled through terrain.
+         * @type {number}
+         */
+        this.digDistance = 0;
+
+        /**
+         * Direction vector for digging (normalized).
+         * Set when digger enters terrain, maintains the trajectory.
+         * @type {{x: number, y: number}}
+         */
+        this.digDirection = { x: 0, y: 0 };
+
+        /**
+         * Speed while digging (pixels per frame).
+         * Slightly reduced from impact speed for realism.
+         * @type {number}
+         */
+        this.digSpeed = 0;
+
+        /**
+         * Entry point where digger entered terrain.
+         * Used for visual effects and tunnel creation.
+         * @type {{x: number, y: number}|null}
+         */
+        this.digEntryPoint = null;
+
         // Calculate initial velocity from power and angle
         this._calculateInitialVelocity(angle, power);
 
@@ -579,6 +618,173 @@ export class Projectile {
      */
     getRollRotation() {
         return this.rollRotation;
+    }
+
+    // =============================================================================
+    // DIGGING WEAPON SUPPORT
+    // =============================================================================
+
+    /**
+     * Check if this projectile should enter digging mode on terrain contact.
+     * Only digging-type weapons enter digging mode.
+     *
+     * @returns {boolean} True if weapon is a digging type and not already digging
+     */
+    shouldDig() {
+        if (this.isDigging) return false;
+
+        const weapon = WeaponRegistry.getWeapon(this.weaponId);
+        if (!weapon || weapon.type !== WEAPON_TYPES.DIGGING) return false;
+
+        return true;
+    }
+
+    /**
+     * Start digging mode for this projectile.
+     * Sets the digging direction based on current velocity and records entry point.
+     *
+     * @param {number} entryX - The X position where digger enters terrain
+     * @param {number} entryY - The Y position where digger enters terrain (canvas coords)
+     */
+    startDigging(entryX, entryY) {
+        this.isDigging = true;
+        this.digDistance = 0;
+
+        // Record entry point for visual effects
+        this.digEntryPoint = { x: entryX, y: entryY };
+
+        // Calculate normalized direction vector from current velocity
+        const speed = this.getSpeed();
+        if (speed > 0.01) {
+            this.digDirection = {
+                x: this.vx / speed,
+                y: this.vy / speed
+            };
+        } else {
+            // If speed is negligible, default to straight down
+            this.digDirection = { x: 0, y: 1 };
+        }
+
+        // Set digging speed (slightly slower than impact speed, but minimum 3 px/frame)
+        this.digSpeed = Math.max(speed * 0.7, 3);
+
+        console.log(`Digger started digging at (${entryX.toFixed(1)}, ${entryY.toFixed(1)}), direction=(${this.digDirection.x.toFixed(2)}, ${this.digDirection.y.toFixed(2)}), speed=${this.digSpeed.toFixed(2)}`);
+    }
+
+    /**
+     * Update the digger's position while tunneling through terrain.
+     * Creates a tunnel along the path and checks for emergence or distance limit.
+     *
+     * @param {import('./terrain.js').Terrain} terrain - The terrain to dig through
+     * @param {import('./tank.js').Tank[]} tanks - Array of tanks to check for collision
+     * @returns {{explode: boolean, reason: string, hitTank?: import('./tank.js').Tank}|null} Explosion trigger info or null to continue digging
+     */
+    updateDigging(terrain, tanks) {
+        if (!this.isDigging) return null;
+
+        const weapon = WeaponRegistry.getWeapon(this.weaponId);
+        const maxTunnelDistance = weapon?.tunnelDistance || 100;
+        const tunnelRadius = weapon?.tunnelRadius || 10;
+
+        // Move in digging direction
+        const prevX = this.x;
+        const prevY = this.y;
+
+        this.x += this.digDirection.x * this.digSpeed;
+        this.y += this.digDirection.y * this.digSpeed;
+
+        // Update distance traveled
+        const stepDistance = Math.sqrt(
+            Math.pow(this.x - prevX, 2) +
+            Math.pow(this.y - prevY, 2)
+        );
+        this.digDistance += stepDistance;
+
+        // Destroy terrain along the tunnel path
+        // Use smaller destruction at current position to create smooth tunnel
+        terrain.destroyTerrain(this.x, this.y, tunnelRadius);
+
+        // Check for tank collision while underground
+        for (const tank of tanks) {
+            if (tank.isDestroyed()) continue;
+
+            const bounds = tank.getBounds();
+            if (this.x >= bounds.x && this.x <= bounds.x + bounds.width &&
+                this.y >= bounds.y && this.y <= bounds.y + bounds.height) {
+                console.log(`Digger hit ${tank.team} tank while digging!`);
+                return { explode: true, reason: 'tank', hitTank: tank };
+            }
+        }
+
+        // Check if we've reached max tunnel distance
+        if (this.digDistance >= maxTunnelDistance) {
+            console.log(`Digger reached max distance (${maxTunnelDistance}px)`);
+            return { explode: true, reason: 'distance' };
+        }
+
+        // Check if we've emerged from terrain (exited the other side)
+        const flooredX = Math.floor(this.x);
+        if (flooredX >= 0 && flooredX < terrain.getWidth()) {
+            const terrainHeight = terrain.getHeight(flooredX);
+            const terrainSurfaceY = CANVAS.DESIGN_HEIGHT - terrainHeight;
+
+            // We've emerged if we're above the terrain surface
+            // Add a small buffer to prevent immediate re-triggering
+            if (this.y < terrainSurfaceY - 2) {
+                console.log(`Digger emerged from terrain at (${this.x.toFixed(1)}, ${this.y.toFixed(1)})`);
+
+                // Exit digging mode and resume normal flight
+                this.isDigging = false;
+
+                // Restore velocity for continued flight
+                this.vx = this.digDirection.x * this.digSpeed;
+                this.vy = this.digDirection.y * this.digSpeed;
+
+                return null; // Don't explode, continue flying
+            }
+        }
+
+        // Check for out of bounds (left/right)
+        if (this.x < 0 || this.x >= terrain.getWidth()) {
+            return { explode: true, reason: 'wall' };
+        }
+
+        // Check for out of bounds (bottom)
+        if (this.y >= CANVAS.DESIGN_HEIGHT) {
+            return { explode: true, reason: 'bottom' };
+        }
+
+        // Add trail position while digging (for visual effect)
+        this.trail.push({ x: this.x, y: this.y });
+        while (this.trail.length > this.maxTrailLength) {
+            this.trail.shift();
+        }
+
+        return null; // Continue digging
+    }
+
+    /**
+     * Check if the digger is currently underground.
+     * @returns {boolean} True if projectile is in digging mode
+     */
+    isUnderground() {
+        return this.isDigging;
+    }
+
+    /**
+     * Get the dig entry point for visual effects.
+     * @returns {{x: number, y: number}|null} Entry point or null if not digging
+     */
+    getDigEntryPoint() {
+        return this.digEntryPoint;
+    }
+
+    /**
+     * Get the current dig distance traveled.
+     * @returns {number} Distance in pixels
+     */
+    getDigDistance() {
+        return this.digDistance;
     }
 }
 

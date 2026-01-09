@@ -288,12 +288,13 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
 }
 
 /**
- * Update all active projectiles - physics, collisions, splitting, and rolling.
+ * Update all active projectiles - physics, collisions, splitting, rolling, and digging.
  * Called each frame during projectile flight.
  *
  * Handles different weapon types:
  * - MIRV/Splitting: Split into multiple warheads at apex
  * - Rolling: Enter rolling mode on terrain contact, follow terrain contour
+ * - Digging: Tunnel through terrain, explode on tank or after distance
  * - Standard: Explode on terrain or tank contact
  */
 function updateProjectile() {
@@ -308,6 +309,30 @@ function updateProjectile() {
         if (!projectile.isActive()) {
             toRemove.push(projectile);
             continue;
+        }
+
+        // Handle digging projectiles
+        if (projectile.isDigging) {
+            // Update digging physics
+            const digResult = projectile.updateDigging(currentTerrain, tanks);
+
+            if (digResult && digResult.explode) {
+                console.log(`Digger exploded: ${digResult.reason} at (${projectile.x.toFixed(1)}, ${projectile.y.toFixed(1)})`);
+                const hitTank = digResult.hitTank || null;
+                handleProjectileExplosion(projectile, projectile.getPosition(), hitTank);
+                projectile.deactivate();
+                projectile.clearTrail();
+                toRemove.push(projectile);
+                continue;
+            }
+
+            // If digger emerged from terrain, continue with normal physics next frame
+            if (!projectile.isDigging) {
+                // Digger emerged - will continue with normal flight physics
+                console.log('Digger emerged and resuming flight');
+            }
+
+            continue; // Skip normal physics for digging projectiles
         }
 
         // Handle rolling projectiles differently
@@ -411,6 +436,13 @@ function updateProjectile() {
                 if (projectile.shouldRoll()) {
                     console.log(`Roller hit terrain at (${collision.x}, ${collision.y.toFixed(1)}) - starting roll!`);
                     projectile.startRolling(collision.y);
+                    continue; // Continue to next frame, don't explode yet
+                }
+
+                // Check if this is a digging weapon that should enter digging mode
+                if (projectile.shouldDig()) {
+                    console.log(`Digger hit terrain at (${collision.x}, ${collision.y.toFixed(1)}) - starting dig!`);
+                    projectile.startDigging(pos.x, collision.y);
                     continue; // Continue to next frame, don't explode yet
                 }
 
@@ -874,6 +906,36 @@ function renderProjectile(ctx, projectile) {
         ctx.stroke();
 
         ctx.restore();
+    } else if (projectile.isDigging) {
+        // Digging projectiles show a drill-like visual with pulsing effect
+        // Darker, more muted appearance to indicate underground
+        const digProgress = (projectile.getDigDistance() % 20) / 20; // Cycle every 20px
+        const pulseAlpha = 0.5 + 0.5 * Math.sin(digProgress * Math.PI * 2);
+
+        // Draw drill tip (triangle pointing in dig direction)
+        ctx.save();
+        ctx.translate(x, y);
+
+        // Rotate to face dig direction
+        const digAngle = Math.atan2(projectile.digDirection.y, projectile.digDirection.x);
+        ctx.rotate(digAngle);
+
+        // Draw drill bit shape
+        ctx.beginPath();
+        ctx.moveTo(radius * 1.5, 0); // Tip
+        ctx.lineTo(-radius * 0.5, -radius * 0.8);
+        ctx.lineTo(-radius * 0.5, radius * 0.8);
+        ctx.closePath();
+        ctx.fillStyle = `rgba(255, 140, 0, ${pulseAlpha})`; // Orange with pulse
+        ctx.fill();
+
+        // Draw core (dimmer)
+        ctx.beginPath();
+        ctx.arc(0, 0, radius * 0.6, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 200, 100, ${0.3 + pulseAlpha * 0.3})`;
+        ctx.fill();
+
+        ctx.restore();
     } else {
         // Draw bright inner core for extra glow effect (non-rolling projectiles)
         ctx.beginPath();
@@ -1210,6 +1272,8 @@ function setupPlayingState() {
             playerTank.addAmmo('deaths-head', 2); // Death's Head for testing 9-warhead split
             playerTank.addAmmo('roller', 3); // Roller for testing rolling mechanic
             playerTank.addAmmo('heavy-roller', 2); // Heavy Roller for testing
+            playerTank.addAmmo('digger', 3); // Digger for testing tunneling mechanic
+            playerTank.addAmmo('heavy-digger', 2); // Heavy Digger for testing
 
             // Generate random wind for this round
             // Wind value -10 to +10: negative = left, positive = right
