@@ -7,10 +7,11 @@
  * current ammo, and purchase buttons. Uses synthwave styling.
  */
 
-import { CANVAS, COLORS, UI, GAME_STATES } from './constants.js';
+import { CANVAS, COLORS, UI, GAME_STATES, DEBUG } from './constants.js';
 import { WeaponRegistry, WEAPON_TYPES } from './weapons.js';
 import * as Money from './money.js';
 import * as Game from './game.js';
+import { playPurchaseSound, playErrorSound } from './sound.js';
 
 // =============================================================================
 // SHOP STATE
@@ -190,19 +191,27 @@ export function onDone(callback) {
  */
 export function purchaseWeapon(weaponId) {
     if (!playerTankRef) {
-        console.log('[Shop] No player tank reference');
+        if (DEBUG.ENABLED) {
+            console.log('[Shop] No player tank reference');
+        }
         return false;
     }
 
     const weapon = WeaponRegistry.getWeapon(weaponId);
     if (!weapon) {
-        console.log(`[Shop] Unknown weapon: ${weaponId}`);
+        if (DEBUG.ENABLED) {
+            console.log(`[Shop] Unknown weapon: ${weaponId}`);
+        }
         return false;
     }
 
     // Check if player can afford it
     if (!Money.canAfford(weapon.cost)) {
-        console.log(`[Shop] Cannot afford ${weapon.name} ($${weapon.cost})`);
+        if (DEBUG.ENABLED) {
+            console.log(`[Shop] Cannot afford ${weapon.name} ($${weapon.cost})`);
+        }
+        // Play error sound for insufficient funds
+        playErrorSound();
         purchaseFeedback = {
             active: true,
             weaponId: weaponId,
@@ -218,7 +227,15 @@ export function purchaseWeapon(weaponId) {
     // Add ammo to player's inventory
     playerTankRef.addAmmo(weaponId, weapon.ammo);
 
-    console.log(`[Shop] Purchased ${weapon.name} for $${weapon.cost} (${weapon.ammo} ammo)`);
+    // Play purchase sound effect
+    playPurchaseSound();
+
+    if (DEBUG.ENABLED) {
+        const newBalance = Money.getMoney();
+        const newAmmo = playerTankRef.getAmmo(weaponId);
+        console.log(`[Shop] Purchased ${weapon.name} for $${weapon.cost} (+${weapon.ammo} ammo)`);
+        console.log(`[Shop] New balance: $${newBalance.toLocaleString()}, ${weapon.name} ammo: ${newAmmo}`);
+    }
 
     // Show success feedback
     purchaseFeedback = {

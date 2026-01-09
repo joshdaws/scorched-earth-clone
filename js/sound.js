@@ -581,3 +581,103 @@ export function clearMusicCache() {
     stopMusic();
     musicCache.clear();
 }
+
+// =============================================================================
+// PROCEDURAL UI SOUNDS
+// =============================================================================
+
+/**
+ * Play a synthesized purchase/confirm sound.
+ * Creates a short ascending tone with a synthwave character.
+ * @param {number} [volume=0.4] - Volume multiplier (0-1)
+ */
+export function playPurchaseSound(volume = 0.4) {
+    if (!audioContext || !sfxGain) {
+        console.warn('Cannot play purchase sound: Audio not initialized');
+        return;
+    }
+
+    try {
+        const now = audioContext.currentTime;
+
+        // Create two oscillators for a richer sound (synthwave character)
+        const osc1 = audioContext.createOscillator();
+        const osc2 = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        // Primary oscillator - sawtooth for that synthwave edge
+        osc1.type = 'sawtooth';
+        osc1.frequency.setValueAtTime(440, now);
+        osc1.frequency.exponentialRampToValueAtTime(880, now + 0.1);
+
+        // Secondary oscillator - square wave one octave higher for brightness
+        osc2.type = 'square';
+        osc2.frequency.setValueAtTime(880, now);
+        osc2.frequency.exponentialRampToValueAtTime(1760, now + 0.1);
+
+        // Connect oscillators with relative volumes
+        const osc1Gain = audioContext.createGain();
+        const osc2Gain = audioContext.createGain();
+        osc1Gain.gain.value = 0.7;
+        osc2Gain.gain.value = 0.3;
+
+        osc1.connect(osc1Gain);
+        osc2.connect(osc2Gain);
+        osc1Gain.connect(gainNode);
+        osc2Gain.connect(gainNode);
+
+        // Envelope: quick attack, short decay
+        gainNode.gain.setValueAtTime(0, now);
+        gainNode.gain.linearRampToValueAtTime(volume * 0.5, now + 0.02);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+        // Connect to SFX channel
+        gainNode.connect(sfxGain);
+
+        // Play
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + 0.15);
+        osc2.stop(now + 0.15);
+    } catch (error) {
+        console.error('Error playing purchase sound:', error);
+    }
+}
+
+/**
+ * Play a synthesized error/reject sound.
+ * Creates a short descending tone indicating failure.
+ * @param {number} [volume=0.3] - Volume multiplier (0-1)
+ */
+export function playErrorSound(volume = 0.3) {
+    if (!audioContext || !sfxGain) {
+        console.warn('Cannot play error sound: Audio not initialized');
+        return;
+    }
+
+    try {
+        const now = audioContext.currentTime;
+
+        // Single oscillator for error - descending tone
+        const osc = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        // Square wave for harsh error sound
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(300, now);
+        osc.frequency.exponentialRampToValueAtTime(150, now + 0.15);
+
+        // Envelope
+        gainNode.gain.setValueAtTime(0, now);
+        gainNode.gain.linearRampToValueAtTime(volume * 0.4, now + 0.02);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+
+        osc.connect(gainNode);
+        gainNode.connect(sfxGain);
+
+        osc.start(now);
+        osc.stop(now + 0.2);
+    } catch (error) {
+        console.error('Error playing error sound:', error);
+    }
+}

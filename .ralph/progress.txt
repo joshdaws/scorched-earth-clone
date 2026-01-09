@@ -4,3 +4,15 @@
 **Files:** js/ui.js, js/main.js
 **Commit:** 245d30f
 ---
+## scorched-earth-wzf.2 - Create Shop UI
+**Status:** Completed
+**Changes:** Implemented Shop UI component with synthwave styling, weapon purchase functionality, and game state integration
+**Files:** js/shop.js (new), js/main.js (modified), js/game.js (modified)
+**Commit:** efbef52
+---
+## scorched-earth-wzf.3 - Implement Weapon Purchasing
+**Status:** Completed
+**Changes:** Added purchase sound effects and enhanced debug logging for weapon purchasing. The core purchasing logic (money deduction, inventory updates) was already implemented in shop.js. Added playPurchaseSound() and playErrorSound() procedural audio functions to sound.js, integrated them with the shop, and added proper DEBUG flag checks for console logging.
+**Files:** js/sound.js, js/shop.js
+**Commit:** (pending)
+---
