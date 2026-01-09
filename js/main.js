@@ -2295,12 +2295,23 @@ function setupPlayingState() {
         onEnter: (fromState) => {
             console.log('Entered PLAYING state - Game started!');
 
+            // Determine if this is a new game or continuation
+            const isNewGame = fromState === GAME_STATES.MENU;
+
             // Initialize money system if this is a new game from menu
-            if (fromState === GAME_STATES.MENU) {
+            if (isNewGame) {
                 Money.init();
             }
             // Start round earnings tracking for all round starts
             Money.startRound();
+
+            // Save player inventory before creating new tanks (for round continuation)
+            // Inventory persists across rounds when transitioning from SHOP or DEFEAT
+            let savedPlayerInventory = null;
+            if (!isNewGame && playerTank) {
+                savedPlayerInventory = { ...playerTank.inventory };
+                console.log('[Main] Preserving player inventory for new round:', savedPlayerInventory);
+            }
 
             // Generate new terrain for this game
             // Uses midpoint displacement algorithm for natural-looking hills and valleys
@@ -2317,18 +2328,25 @@ function setupPlayingState() {
             playerTank = tanks.player;
             enemyTank = tanks.enemy;
 
-            // Give player starting ammo for testing weapons
-            // In the final game, these will be purchased from the shop
-            playerTank.addAmmo('missile', 5);
-            playerTank.addAmmo('big-shot', 3);
-            playerTank.addAmmo('mirv', 3); // MIRV for testing splitting mechanic
-            playerTank.addAmmo('deaths-head', 2); // Death's Head for testing 9-warhead split
-            playerTank.addAmmo('roller', 3); // Roller for testing rolling mechanic
-            playerTank.addAmmo('heavy-roller', 2); // Heavy Roller for testing
-            playerTank.addAmmo('digger', 3); // Digger for testing tunneling mechanic
-            playerTank.addAmmo('heavy-digger', 2); // Heavy Digger for testing
-            playerTank.addAmmo('mini-nuke', 2); // Mini Nuke for testing nuclear effects
-            playerTank.addAmmo('nuke', 1); // Nuke for testing big nuclear effects
+            // Restore or initialize player inventory
+            if (savedPlayerInventory) {
+                // Continuing from previous round - restore inventory
+                playerTank.inventory = savedPlayerInventory;
+                console.log('[Main] Restored player inventory from previous round');
+            } else {
+                // New game from menu - give starting ammo for testing weapons
+                // In the final game, these will be purchased from the shop
+                playerTank.addAmmo('missile', 5);
+                playerTank.addAmmo('big-shot', 3);
+                playerTank.addAmmo('mirv', 3); // MIRV for testing splitting mechanic
+                playerTank.addAmmo('deaths-head', 2); // Death's Head for testing 9-warhead split
+                playerTank.addAmmo('roller', 3); // Roller for testing rolling mechanic
+                playerTank.addAmmo('heavy-roller', 2); // Heavy Roller for testing
+                playerTank.addAmmo('digger', 3); // Digger for testing tunneling mechanic
+                playerTank.addAmmo('heavy-digger', 2); // Heavy Digger for testing
+                playerTank.addAmmo('mini-nuke', 2); // Mini Nuke for testing nuclear effects
+                playerTank.addAmmo('nuke', 1); // Nuke for testing big nuclear effects
+            }
 
             // Set up AI for this round with appropriate difficulty and weapons
             // Rounds 1-2: Easy, Rounds 3-4: Medium, Rounds 5+: Hard

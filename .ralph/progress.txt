@@ -14,5 +14,11 @@
 **Status:** Completed
 **Changes:** Added purchase sound effects and enhanced debug logging for weapon purchasing. The core purchasing logic (money deduction, inventory updates) was already implemented in shop.js. Added playPurchaseSound() and playErrorSound() procedural audio functions to sound.js, integrated them with the shop, and added proper DEBUG flag checks for console logging.
 **Files:** js/sound.js, js/shop.js
-**Commit:** (pending)
+**Commit:** ac54aa4
+---
+## scorched-earth-wzf.4 - Implement Player Inventory
+**Status:** Completed
+**Changes:** Fixed inventory persistence across rounds. The player inventory system was already implemented but inventory was being lost when new tanks were created between rounds. Added save/restore logic in main.js PLAYING state handler.
+**Files:** js/main.js
+**Commit:** 4ad46f9
 ---
