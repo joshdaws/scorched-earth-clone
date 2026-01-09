@@ -167,85 +167,6 @@ function renderPauseButton(ctx) {
     ctx.restore();
 }
 
-/**
- * Render the round and AI difficulty indicator.
- * Displayed below the wind indicator at the top-left.
- * Shows round number, AI difficulty, and money multiplier.
- * @param {CanvasRenderingContext2D} ctx - Canvas rendering context
- */
-function renderRoundIndicator(ctx) {
-    const difficulty = AI.getDifficulty();
-    const difficultyName = AI.getDifficultyName(difficulty);
-    const multiplier = Money.getMultiplier();
-
-    // Position below wind indicator
-    const x = 20;
-    const y = 65; // Below wind indicator
-
-    ctx.save();
-
-    // Background pill
-    const pillWidth = 160;
-    const pillHeight = 24;
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-    ctx.beginPath();
-    ctx.roundRect(x, y, pillWidth, pillHeight, 8);
-    ctx.fill();
-
-    // Round text
-    ctx.font = `bold ${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
-    ctx.fillStyle = COLORS.NEON_CYAN;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`ROUND ${currentRound}`, x + 10, y + pillHeight / 2);
-
-    // Difficulty text with color based on level
-    let difficultyColor;
-    switch (difficulty) {
-        case 'easy':
-            difficultyColor = '#00ff88'; // Green
-            break;
-        case 'medium':
-            difficultyColor = '#ffff00'; // Yellow
-            break;
-        case 'hard':
-            difficultyColor = '#ff4444'; // Red
-            break;
-        default:
-            difficultyColor = COLORS.TEXT_MUTED;
-    }
-
-    ctx.fillStyle = difficultyColor;
-    ctx.textAlign = 'right';
-    ctx.fillText(difficultyName.toUpperCase(), x + pillWidth - 10, y + pillHeight / 2);
-
-    ctx.restore();
-
-    // Render money multiplier indicator below when above 1.0x
-    if (multiplier > 1.0) {
-        const bonusY = y + pillHeight + 5;
-        const bonusPillWidth = 90;
-        const bonusPillHeight = 20;
-
-        ctx.save();
-
-        // Background pill for bonus
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-        ctx.beginPath();
-        ctx.roundRect(x, bonusY, bonusPillWidth, bonusPillHeight, 6);
-        ctx.fill();
-
-        // Bonus text in gold/yellow color
-        ctx.font = `bold ${UI.FONT_SIZE_SMALL - 2}px ${UI.FONT_FAMILY}`;
-        ctx.fillStyle = '#ffd700'; // Gold color for money bonus
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(`${multiplier}x BONUS`, x + bonusPillWidth / 2, bonusY + bonusPillHeight / 2);
-
-        ctx.restore();
-    }
-}
-
 // =============================================================================
 // MENU STATE
 // =============================================================================
@@ -2584,9 +2505,6 @@ function renderPlaying(ctx) {
         difficulty: AI.getDifficultyName(AI.getDifficulty())
     });
 
-    // Render round and difficulty indicator (still uses existing function)
-    renderRoundIndicator(ctx);
-
     // Render pause button
     renderPauseButton(ctx);
 
@@ -2611,18 +2529,6 @@ function renderPlaying(ctx) {
         isPlayerTurn,
         terrain: currentTerrain
     });
-
-    // Draw keyboard hints at bottom of screen during player's turn (compact version)
-    // Skip if touch aiming is actively being used (less distracting)
-    if (isPlayerTurn && !TouchAiming.isActive()) {
-        ctx.save();
-        ctx.fillStyle = COLORS.TEXT_MUTED;
-        ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
-        ctx.fillText('← → Angle  |  ↑ ↓ Power  |  TAB Weapon  |  SPACE Fire  |  Drag tank to aim', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT - 20);
-        ctx.restore();
-    }
 
     // Restore context if screen shake was applied
     if (shakeOffset.x !== 0 || shakeOffset.y !== 0) {
@@ -2666,12 +2572,6 @@ function handlePlayingPointerDown(pos) {
             AimingControls.isInsideAngleArc(pos.x, pos.y, playerTank)) {
             return;
         }
-    }
-
-    // Check if click is on weapon panel (only during player aim phase)
-    if (Turn.canPlayerAim() && HUD.isInsideWeaponPanel(pos.x, pos.y)) {
-        handleSelectWeapon();
-        return;
     }
 
     // Check if click is on weapon bar (only during player aim phase)

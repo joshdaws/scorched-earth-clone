@@ -39,14 +39,6 @@ const HUD = {
         BORDER_RADIUS: 10
     },
 
-    // Weapon panel on right side - touch-friendly for tap to cycle
-    WEAPON_PANEL: {
-        X: CANVAS.DESIGN_WIDTH - 20,
-        Y: 100,
-        WIDTH: 190,         // Slightly wider for touch
-        HEIGHT: 75,         // Touch-friendly height
-        PADDING: 12
-    },
     // Money display at bottom right
     MONEY_PANEL: {
         X: CANVAS.DESIGN_WIDTH - 20,
@@ -983,93 +975,6 @@ export function renderWindIndicator(ctx) {
 }
 
 // =============================================================================
-// WEAPON & AMMO DISPLAY
-// =============================================================================
-
-/** @type {boolean} Whether the weapon panel is currently pressed (for touch feedback) */
-let weaponPanelPressed = false;
-
-/**
- * Render the weapon panel showing current weapon and ammo.
- * Panel is tappable to cycle weapons on touch devices.
- * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
- * @param {import('./tank.js').Tank} playerTank - Player tank
- */
-export function renderWeaponPanel(ctx, playerTank) {
-    if (!ctx || !playerTank) return;
-
-    const weapon = WeaponRegistry.getWeapon(playerTank.currentWeapon);
-    if (!weapon) return;
-
-    const panel = HUD.WEAPON_PANEL;
-    const ammo = playerTank.getAmmo(playerTank.currentWeapon);
-    const ammoDisplay = ammo === Infinity ? '∞' : ammo.toString();
-
-    // Determine border color based on weapon type
-    let borderColor = COLORS.NEON_CYAN;
-    if (weapon.type === 'nuclear') {
-        borderColor = COLORS.NEON_ORANGE;
-    } else if (weapon.type === 'splitting') {
-        borderColor = COLORS.NEON_PURPLE;
-    } else if (weapon.type === 'rolling' || weapon.type === 'digging') {
-        borderColor = COLORS.NEON_YELLOW;
-    }
-
-    // Pressed offset for touch feedback
-    const pressOffset = weaponPanelPressed ? 2 : 0;
-
-    // Draw panel background (right-aligned) with touch feedback
-    const panelX = drawPanel(ctx, panel.X, panel.Y + pressOffset, panel.WIDTH, panel.HEIGHT, borderColor, true, weaponPanelPressed);
-
-    ctx.save();
-
-    // Weapon name
-    ctx.fillStyle = COLORS.TEXT_LIGHT;
-    ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText(weapon.name, panelX + panel.PADDING, panel.Y + 12 + pressOffset);
-
-    // Ammo count
-    ctx.fillStyle = ammo === Infinity ? COLORS.TEXT_MUTED : COLORS.NEON_YELLOW;
-    ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
-    ctx.fillText(`Ammo: ${ammoDisplay}`, panelX + panel.PADDING, panel.Y + 38 + pressOffset);
-
-    // Weapon switch hint - touch-friendly text
-    ctx.fillStyle = COLORS.TEXT_MUTED;
-    ctx.font = `${UI.FONT_SIZE_SMALL - 1}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'right';
-    ctx.fillText('TAP TO SWITCH', panel.X - panel.PADDING, panel.Y + 58 + pressOffset);
-
-    ctx.restore();
-}
-
-/**
- * Check if a point is inside the weapon panel.
- * @param {number} x - X coordinate in design space
- * @param {number} y - Y coordinate in design space
- * @returns {boolean} True if inside weapon panel
- */
-export function isInsideWeaponPanel(x, y) {
-    const panel = HUD.WEAPON_PANEL;
-    const panelX = panel.X - panel.WIDTH;
-    return (
-        x >= panelX &&
-        x <= panel.X &&
-        y >= panel.Y &&
-        y <= panel.Y + panel.HEIGHT
-    );
-}
-
-/**
- * Set weapon panel pressed state for touch feedback.
- * @param {boolean} pressed - Whether the panel is pressed
- */
-export function setWeaponPanelPressed(pressed) {
-    weaponPanelPressed = pressed;
-}
-
-// =============================================================================
 // WEAPON BAR (Bottom-center weapon selection)
 // =============================================================================
 
@@ -1947,9 +1852,7 @@ export function renderHUD(ctx, state) {
     // The legacy renderTurnIndicatorPhase and renderWindIndicator are kept for backwards compatibility
     // but no longer called from renderHUD
 
-    renderWeaponPanel(ctx, playerTank);
-
-    // Render new weapon bar at bottom-center (left of fire button)
+    // Render weapon bar at bottom-center (left of fire button)
     renderWeaponBar(ctx, playerTank);
 }
 
