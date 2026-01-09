@@ -68,6 +68,38 @@ let isMuted = false;
 let preMuteVolume = DEFAULT_MASTER_VOLUME;
 
 // =============================================================================
+// VOLUME DUCKING STATE
+// =============================================================================
+
+/**
+ * Ducking configuration - lowers music volume during explosions for impact
+ */
+const DUCK_CONFIG = {
+    /** Target volume when ducked (30% of normal) */
+    DUCKED_LEVEL: 0.3,
+    /** Time to fade down to ducked level (100ms) */
+    DUCK_FADE_IN: 0.1,
+    /** Time to wait before starting fade back up (500ms for normal explosions) */
+    DUCK_HOLD_DURATION: 0.5,
+    /** Time to wait before starting fade back up for nuclear explosions (1000ms) */
+    DUCK_HOLD_DURATION_NUCLEAR: 1.0,
+    /** Time to fade back up to normal level (300ms for smooth transition) */
+    DUCK_FADE_OUT: 0.3
+};
+
+/** @type {boolean} Whether music is currently ducked */
+let isDucked = false;
+
+/** @type {number|null} Scheduled time for duck to end */
+let duckEndTime = null;
+
+/** @type {number|null} Timeout ID for unduck operation */
+let duckTimeoutId = null;
+
+/** @type {number} Music volume before ducking (to restore after) */
+let preDuckMusicVolume = 1.0;
+
+// =============================================================================
 // PUBLIC API
 // =============================================================================
 
@@ -745,6 +777,118 @@ export function clearMusicCache() {
 }
 
 // =============================================================================
+// VOLUME DUCKING API
+// =============================================================================
+
+/**
+ * Duck the music volume for explosion impact.
+ * Uses Web Audio API's linearRampToValueAtTime for smooth transitions.
+ * This affects the music channel gain, leaving SFX untouched.
+ * Works with both playMusic() and procedural music systems.
+ */
+function duckMusic() {
+    if (!audioContext || !musicGain) {
+        return;
+    }
+
+    const now = audioContext.currentTime;
+
+    // Store the current music volume so we can restore it
+    preDuckMusicVolume = musicGain.gain.value;
+
+    // Cancel any scheduled gain changes to prevent conflicts
+    musicGain.gain.cancelScheduledValues(now);
+
+    // Ramp down to ducked level (as a fraction of current volume)
+    const targetVolume = preDuckMusicVolume * DUCK_CONFIG.DUCKED_LEVEL;
+    musicGain.gain.setValueAtTime(preDuckMusicVolume, now);
+    musicGain.gain.linearRampToValueAtTime(
+        targetVolume,
+        now + DUCK_CONFIG.DUCK_FADE_IN
+    );
+
+    isDucked = true;
+}
+
+/**
+ * Restore music volume after ducking.
+ * Uses Web Audio API's linearRampToValueAtTime for smooth transitions.
+ */
+function unduckMusic() {
+    if (!audioContext || !musicGain) {
+        isDucked = false;
+        duckEndTime = null;
+        return;
+    }
+
+    const now = audioContext.currentTime;
+
+    // Cancel any scheduled gain changes
+    musicGain.gain.cancelScheduledValues(now);
+
+    // Ramp back up to the pre-duck volume
+    const currentGain = musicGain.gain.value;
+    musicGain.gain.setValueAtTime(currentGain, now);
+    musicGain.gain.linearRampToValueAtTime(
+        preDuckMusicVolume,
+        now + DUCK_CONFIG.DUCK_FADE_OUT
+    );
+
+    isDucked = false;
+    duckEndTime = null;
+}
+
+/**
+ * Trigger volume ducking for an explosion.
+ * If already ducked, extends the duck duration (multiple explosions compound).
+ * @param {boolean} [isNuclear=false] - Whether this is a nuclear explosion (longer hold)
+ */
+export function triggerDuck(isNuclear = false) {
+    if (!audioContext || !musicGain) {
+        return; // Audio not initialized, nothing to duck
+    }
+
+    const holdDuration = isNuclear
+        ? DUCK_CONFIG.DUCK_HOLD_DURATION_NUCLEAR
+        : DUCK_CONFIG.DUCK_HOLD_DURATION;
+
+    // Calculate when we should unduck
+    const now = performance.now();
+    const fadeInMs = DUCK_CONFIG.DUCK_FADE_IN * 1000;
+    const holdMs = holdDuration * 1000;
+    const newEndTime = now + fadeInMs + holdMs;
+
+    // If not currently ducked, start ducking
+    if (!isDucked) {
+        duckMusic();
+    }
+
+    // If this explosion would end later than currently scheduled, extend the duck
+    if (duckEndTime === null || newEndTime > duckEndTime) {
+        duckEndTime = newEndTime;
+
+        // Clear any existing unduck timeout
+        if (duckTimeoutId !== null) {
+            clearTimeout(duckTimeoutId);
+        }
+
+        // Schedule the unduck
+        duckTimeoutId = setTimeout(() => {
+            unduckMusic();
+            duckTimeoutId = null;
+        }, fadeInMs + holdMs);
+    }
+}
+
+/**
+ * Check if music is currently ducked.
+ * @returns {boolean} True if music is ducked
+ */
+export function isMusicDucked() {
+    return isDucked;
+}
+
+// =============================================================================
 // PROCEDURAL UI SOUNDS
 // =============================================================================
 
@@ -1237,6 +1381,9 @@ export function playExplosionSound(blastRadius, volume = 0.5) {
         gainNode.connect(sfxGain);
 
         source.start(now);
+
+        // Trigger volume ducking for music (non-nuclear)
+        triggerDuck(false);
     } catch (error) {
         console.error('Error playing explosion sound:', error);
     }
@@ -1314,6 +1461,9 @@ export function playNuclearExplosionSound(blastRadius, volume = 0.7) {
         gainNode.connect(sfxGain);
 
         source.start(now);
+
+        // Trigger volume ducking for music (nuclear = longer hold)
+        triggerDuck(true);
     } catch (error) {
         console.error('Error playing nuclear explosion sound:', error);
     }
