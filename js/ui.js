@@ -80,7 +80,7 @@ const HUD = {
         Y: CANVAS.DESIGN_HEIGHT - 75,                      // Aligned with fire button
         HEIGHT: 70,                                         // Same height as fire button
         WIDTH: 580,                                         // Wide enough for 6 slots + arrows
-        ARROW_WIDTH: 40,                                   // Navigation arrow width
+        ARROW_WIDTH: 44,                                   // Navigation arrow width (44pt touch minimum)
         SLOT_SIZE: 72,                                     // Individual weapon slot size
         SLOT_GAP: 8,                                       // Gap between slots
         PADDING: 10,
