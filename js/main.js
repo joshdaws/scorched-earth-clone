@@ -11,8 +11,9 @@ import * as Sound from './sound.js';
 import * as Assets from './assets.js';
 import * as Debug from './debug.js';
 import * as Turn from './turn.js';
-import { COLORS, DEBUG, CANVAS, UI, GAME_STATES, TURN_PHASES, PHYSICS } from './constants.js';
+import { COLORS, DEBUG, CANVAS, UI, GAME_STATES, TURN_PHASES, PHYSICS, TANK } from './constants.js';
 import { generateTerrain } from './terrain.js';
+import { placeTanksOnTerrain, updateTankTerrainPosition } from './tank.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -23,6 +24,22 @@ import { generateTerrain } from './terrain.js';
  * @type {import('./terrain.js').Terrain|null}
  */
 let currentTerrain = null;
+
+// =============================================================================
+// TANK STATE
+// =============================================================================
+
+/**
+ * Player tank instance
+ * @type {import('./tank.js').Tank|null}
+ */
+let playerTank = null;
+
+/**
+ * Enemy tank instance
+ * @type {import('./tank.js').Tank|null}
+ */
+let enemyTank = null;
 
 // =============================================================================
 // MENU STATE
@@ -278,6 +295,89 @@ function renderTerrain(ctx) {
 }
 
 // =============================================================================
+// TANK RENDERING
+// =============================================================================
+
+/**
+ * Render a single tank.
+ * Draws a simple geometric placeholder that matches the tank sprite dimensions.
+ * The tank consists of:
+ * - A rectangular body (dark fill with neon outline)
+ * - A circular turret base
+ * - A turret barrel pointing at the current angle
+ *
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {import('./tank.js').Tank} tank - The tank to render
+ */
+function renderTank(ctx, tank) {
+    if (!tank) return;
+
+    const { x, y, team, angle } = tank;
+
+    // Choose colors based on team
+    const bodyColor = team === 'player' ? '#0a1a2a' : '#2a0a1a';
+    const outlineColor = team === 'player' ? COLORS.NEON_CYAN : COLORS.NEON_PINK;
+
+    ctx.save();
+
+    // Tank body is centered horizontally at x, bottom at y
+    const bodyX = x - TANK.WIDTH / 2;
+    const bodyY = y - TANK.HEIGHT;
+
+    // Draw tank body with glow
+    ctx.shadowColor = outlineColor;
+    ctx.shadowBlur = 8;
+
+    // Body fill
+    ctx.fillStyle = bodyColor;
+    ctx.fillRect(bodyX, bodyY, TANK.WIDTH, TANK.HEIGHT);
+
+    // Body outline
+    ctx.strokeStyle = outlineColor;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(bodyX, bodyY, TANK.WIDTH, TANK.HEIGHT);
+
+    // Turret pivot point (center-top of tank body)
+    const turretPivotX = x;
+    const turretPivotY = y - TANK.HEIGHT;
+
+    // Draw turret base (small circle at pivot point)
+    const turretBaseRadius = 8;
+    ctx.beginPath();
+    ctx.arc(turretPivotX, turretPivotY, turretBaseRadius, 0, Math.PI * 2);
+    ctx.fillStyle = bodyColor;
+    ctx.fill();
+    ctx.strokeStyle = outlineColor;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Draw turret barrel
+    // Convert angle to radians (0° = right, 90° = up, 180° = left)
+    const radians = (angle * Math.PI) / 180;
+    const barrelEndX = turretPivotX + Math.cos(radians) * TANK.TURRET_LENGTH;
+    const barrelEndY = turretPivotY - Math.sin(radians) * TANK.TURRET_LENGTH; // Negative because canvas Y is inverted
+
+    ctx.beginPath();
+    ctx.moveTo(turretPivotX, turretPivotY);
+    ctx.lineTo(barrelEndX, barrelEndY);
+    ctx.strokeStyle = outlineColor;
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    ctx.restore();
+}
+
+/**
+ * Render all tanks in the game.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ */
+function renderTanks(ctx) {
+    renderTank(ctx, playerTank);
+    renderTank(ctx, enemyTank);
+}
+
+// =============================================================================
 // TERRAIN DESTRUCTION API
 // =============================================================================
 
@@ -359,6 +459,9 @@ function renderPlaying(ctx) {
     // Render terrain first (background)
     renderTerrain(ctx);
 
+    // Render tanks on terrain
+    renderTanks(ctx);
+
     // Render turn indicator at top of screen
     Turn.renderTurnIndicator(ctx);
 
@@ -412,6 +515,15 @@ function handlePlayingClick(pos) {
 
     if (destroyed) {
         console.log(`Crater created at (${pos.x.toFixed(0)}, ${pos.y.toFixed(0)}) with radius ${testBlastRadius}`);
+
+        // Update tank positions to match new terrain height
+        // This ensures tanks don't float after terrain is destroyed
+        if (playerTank && currentTerrain) {
+            updateTankTerrainPosition(playerTank, currentTerrain);
+        }
+        if (enemyTank && currentTerrain) {
+            updateTankTerrainPosition(enemyTank, currentTerrain);
+        }
     }
 }
 
@@ -456,6 +568,13 @@ function setupPlayingState() {
                 minHeightPercent: 0.2,  // Terrain starts at 20% of canvas height minimum
                 maxHeightPercent: 0.7   // Terrain peaks at 70% of canvas height maximum
             });
+
+            // Place tanks on the generated terrain
+            // Player on left third (15-25%), Enemy on right third (75-85%)
+            // Tank positions are recalculated each new round with new terrain
+            const tanks = placeTanksOnTerrain(currentTerrain);
+            playerTank = tanks.player;
+            enemyTank = tanks.enemy;
 
             // Initialize the turn system when entering playing state
             Turn.init();

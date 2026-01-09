@@ -6,7 +6,7 @@
  * Each tank has position, health, aiming controls (angle/power), and a weapon reference.
  */
 
-import { TANK, PHYSICS } from './constants.js';
+import { TANK, PHYSICS, CANVAS } from './constants.js';
 
 /**
  * Team identifiers for tanks.
@@ -376,4 +376,204 @@ export function createPlayerTank(x, y) {
  */
 export function createEnemyTank(x, y) {
     return new Tank({ x, y, team: TEAMS.ENEMY });
+}
+
+// =============================================================================
+// TANK PLACEMENT ON TERRAIN
+// =============================================================================
+
+/**
+ * Tank placement configuration constants.
+ */
+const PLACEMENT = {
+    /** Player tank spawns between 15-25% of screen width */
+    PLAYER_X_MIN_PERCENT: 0.15,
+    PLAYER_X_MAX_PERCENT: 0.25,
+    /** Enemy tank spawns between 75-85% of screen width */
+    ENEMY_X_MIN_PERCENT: 0.75,
+    ENEMY_X_MAX_PERCENT: 0.85,
+    /** Minimum distance between tanks in pixels */
+    MIN_TANK_DISTANCE: 300,
+    /**
+     * Maximum depth of valley tanks will spawn in.
+     * If terrain height is this much lower than surrounding average, find another spot.
+     * Value is in pixels.
+     */
+    MAX_VALLEY_DEPTH: 100,
+    /** How far to sample for valley detection (each direction from spawn point) */
+    VALLEY_SAMPLE_RADIUS: 80,
+    /** Maximum attempts to find a suitable spawn position */
+    MAX_PLACEMENT_ATTEMPTS: 20
+};
+
+/**
+ * Calculate the average terrain height over a range centered at x.
+ * Used for valley detection.
+ *
+ * @param {import('./terrain.js').Terrain} terrain - The terrain instance
+ * @param {number} x - Center x coordinate
+ * @param {number} radius - Radius to sample on each side
+ * @returns {number} Average terrain height in the sampled range
+ */
+function getAverageTerrainHeight(terrain, x, radius) {
+    let sum = 0;
+    let count = 0;
+
+    const startX = Math.max(0, Math.floor(x - radius));
+    const endX = Math.min(terrain.getWidth() - 1, Math.ceil(x + radius));
+
+    for (let xi = startX; xi <= endX; xi++) {
+        sum += terrain.getHeight(xi);
+        count++;
+    }
+
+    return count > 0 ? sum / count : terrain.getHeight(x);
+}
+
+/**
+ * Check if a position is in a valley (too deep compared to surrounding terrain).
+ *
+ * @param {import('./terrain.js').Terrain} terrain - The terrain instance
+ * @param {number} x - X coordinate to check
+ * @returns {boolean} True if the position is in a valley that's too deep
+ */
+function isInDeepValley(terrain, x) {
+    const heightAtX = terrain.getHeight(x);
+    const averageHeight = getAverageTerrainHeight(terrain, x, PLACEMENT.VALLEY_SAMPLE_RADIUS);
+
+    // If the terrain at x is significantly lower than the average, it's a deep valley
+    return (averageHeight - heightAtX) > PLACEMENT.MAX_VALLEY_DEPTH;
+}
+
+/**
+ * Find the best X position for a tank within a range, avoiding deep valleys.
+ * The "best" position is the one with the highest terrain height within the range
+ * that isn't in a deep valley.
+ *
+ * @param {import('./terrain.js').Terrain} terrain - The terrain instance
+ * @param {number} minX - Minimum X position (inclusive)
+ * @param {number} maxX - Maximum X position (inclusive)
+ * @returns {number} The best X position for tank placement
+ */
+function findBestXInRange(terrain, minX, maxX) {
+    let bestX = Math.floor((minX + maxX) / 2); // Default to center if nothing better found
+    let bestHeight = -Infinity;
+    let anyValidFound = false;
+
+    // Sample positions across the range
+    const step = Math.max(1, Math.floor((maxX - minX) / 20)); // Check up to 20 positions
+
+    for (let x = minX; x <= maxX; x += step) {
+        const xi = Math.floor(x);
+        const height = terrain.getHeight(xi);
+
+        // Skip positions in deep valleys
+        if (isInDeepValley(terrain, xi)) {
+            continue;
+        }
+
+        anyValidFound = true;
+
+        // Prefer higher terrain (less likely to be obscured)
+        if (height > bestHeight) {
+            bestHeight = height;
+            bestX = xi;
+        }
+    }
+
+    // If no valid position found (all in valleys), just use center of range
+    if (!anyValidFound) {
+        bestX = Math.floor((minX + maxX) / 2);
+        console.warn(`All positions in range ${minX}-${maxX} are in deep valleys, using center`);
+    }
+
+    return bestX;
+}
+
+/**
+ * Convert terrain height to canvas Y coordinate.
+ * Terrain heights are stored as distance from bottom, but canvas Y=0 is at top.
+ *
+ * @param {number} terrainHeight - Height from bottom of canvas
+ * @returns {number} Canvas Y coordinate (Y=0 at top)
+ */
+function terrainHeightToCanvasY(terrainHeight) {
+    return CANVAS.DESIGN_HEIGHT - terrainHeight;
+}
+
+/**
+ * Place a tank on the terrain at a given X position.
+ * Sets the tank's Y position so it sits on the terrain surface.
+ *
+ * @param {Tank} tank - The tank to place
+ * @param {import('./terrain.js').Terrain} terrain - The terrain instance
+ * @param {number} x - X position for the tank
+ */
+function placeTankAtX(tank, terrain, x) {
+    tank.x = x;
+    // Tank Y is the canvas Y of the bottom of the tank (where it touches ground)
+    const terrainHeight = terrain.getHeight(x);
+    tank.y = terrainHeightToCanvasY(terrainHeight);
+}
+
+/**
+ * Place player and enemy tanks on terrain at appropriate positions.
+ * - Player tank: left third of screen (15-25% x position)
+ * - Enemy tank: right third of screen (75-85% x position)
+ * - Both tanks sit on top of terrain
+ * - Avoids spawning in deep valleys
+ * - Enforces minimum distance between tanks
+ *
+ * This function should be called at the start of each round with the new terrain.
+ *
+ * @param {import('./terrain.js').Terrain} terrain - The terrain instance
+ * @returns {{player: Tank, enemy: Tank}} Object containing the placed player and enemy tanks
+ */
+export function placeTanksOnTerrain(terrain) {
+    const width = terrain.getWidth();
+
+    // Calculate player X range (15-25% of screen width)
+    const playerMinX = Math.floor(width * PLACEMENT.PLAYER_X_MIN_PERCENT);
+    const playerMaxX = Math.floor(width * PLACEMENT.PLAYER_X_MAX_PERCENT);
+
+    // Calculate enemy X range (75-85% of screen width)
+    const enemyMinX = Math.floor(width * PLACEMENT.ENEMY_X_MIN_PERCENT);
+    const enemyMaxX = Math.floor(width * PLACEMENT.ENEMY_X_MAX_PERCENT);
+
+    // Find best positions for each tank
+    const playerX = findBestXInRange(terrain, playerMinX, playerMaxX);
+    const enemyX = findBestXInRange(terrain, enemyMinX, enemyMaxX);
+
+    // Calculate canvas Y positions from terrain heights
+    const playerTerrainHeight = terrain.getHeight(playerX);
+    const enemyTerrainHeight = terrain.getHeight(enemyX);
+    const playerY = terrainHeightToCanvasY(playerTerrainHeight);
+    const enemyY = terrainHeightToCanvasY(enemyTerrainHeight);
+
+    // Create tanks at the calculated positions
+    const playerTank = createPlayerTank(playerX, playerY);
+    const enemyTank = createEnemyTank(enemyX, enemyY);
+
+    // Verify minimum distance (should always pass given the X ranges)
+    const distance = Math.abs(enemyX - playerX);
+    if (distance < PLACEMENT.MIN_TANK_DISTANCE) {
+        console.warn(`Tank distance ${distance}px is less than minimum ${PLACEMENT.MIN_TANK_DISTANCE}px`);
+    }
+
+    console.log(`Tanks placed: Player at (${playerX}, ${playerY.toFixed(0)}), Enemy at (${enemyX}, ${enemyY.toFixed(0)}), distance=${distance}px`);
+
+    return { player: playerTank, enemy: enemyTank };
+}
+
+/**
+ * Update a tank's position to match the current terrain height.
+ * Call this when terrain changes (e.g., after an explosion) to ensure
+ * tanks don't float or sink into the ground.
+ *
+ * @param {Tank} tank - The tank to update
+ * @param {import('./terrain.js').Terrain} terrain - The terrain instance
+ */
+export function updateTankTerrainPosition(tank, terrain) {
+    const terrainHeight = terrain.getHeight(tank.x);
+    tank.y = terrainHeightToCanvasY(terrainHeight);
 }
