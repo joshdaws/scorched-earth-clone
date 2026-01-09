@@ -271,3 +271,10 @@
 **Files:** js/weapons.js (weapon definition), js/main.js (color rendering, test ammo)
 **Commit:** pending
 ---
+**Commit:** 4c6c330
+## scorched-earth-8qc.6 - Implement Roller Weapons
+**Status:** Completed
+**Changes:** Implemented Roller and Heavy Roller weapons with terrain-following rolling physics. Rollers land on terrain and roll along the surface, accelerating downhill and decelerating uphill. Explosion triggers: tank contact, wall contact, valley bottom, and 3-second timeout. Added rotating visual effect for rolling projectiles.
+**Files:** js/projectile.js, js/main.js
+**Commit:** 63203bd
+---

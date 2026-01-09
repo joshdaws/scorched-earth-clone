@@ -288,14 +288,13 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
 }
 
 /**
- * Update all active projectiles - physics, collisions, and splitting.
+ * Update all active projectiles - physics, collisions, splitting, and rolling.
  * Called each frame during projectile flight.
  *
- * Handles MIRV-type weapons by:
- * 1. Detecting apex (when vy goes from negative to positive)
- * 2. Spawning child projectiles at apex
- * 3. Destroying parent projectile
- * 4. Tracking all projectiles until they all resolve
+ * Handles different weapon types:
+ * - MIRV/Splitting: Split into multiple warheads at apex
+ * - Rolling: Enter rolling mode on terrain contact, follow terrain contour
+ * - Standard: Explode on terrain or tank contact
  */
 function updateProjectile() {
     if (activeProjectiles.length === 0) return;
@@ -311,7 +310,49 @@ function updateProjectile() {
             continue;
         }
 
-        // Update projectile physics with current wind force
+        // Handle rolling projectiles differently
+        if (projectile.isRolling) {
+            // Check for tank collision while rolling
+            const pos = projectile.getPosition();
+            const tankHit = checkTankCollision(pos.x, pos.y, tanks);
+            if (tankHit) {
+                const { tank } = tankHit;
+                console.log(`Roller hit ${tank.team} tank!`);
+                handleProjectileExplosion(projectile, pos, tank);
+                projectile.deactivate();
+                projectile.clearTrail();
+                toRemove.push(projectile);
+                continue;
+            }
+
+            // Update rolling physics
+            const rollResult = projectile.updateRolling(currentTerrain);
+            if (rollResult && rollResult.explode) {
+                console.log(`Roller exploded: ${rollResult.reason} at (${projectile.x.toFixed(1)}, ${projectile.y.toFixed(1)})`);
+                handleProjectileExplosion(projectile, projectile.getPosition(), null);
+                projectile.deactivate();
+                projectile.clearTrail();
+                toRemove.push(projectile);
+                continue;
+            }
+
+            // Check for tank collision again after moving
+            const newPos = projectile.getPosition();
+            const tankHitAfterMove = checkTankCollision(newPos.x, newPos.y, tanks);
+            if (tankHitAfterMove) {
+                const { tank } = tankHitAfterMove;
+                console.log(`Roller hit ${tank.team} tank after moving!`);
+                handleProjectileExplosion(projectile, newPos, tank);
+                projectile.deactivate();
+                projectile.clearTrail();
+                toRemove.push(projectile);
+                continue;
+            }
+
+            continue; // Skip normal physics for rolling projectiles
+        }
+
+        // Update projectile physics with current wind force (for non-rolling projectiles)
         projectile.update(Wind.getWindForce());
 
         // Check if projectile went out of bounds
@@ -366,6 +407,14 @@ function updateProjectile() {
             const collision = currentTerrain.checkTerrainCollision(pos.x, pos.y);
 
             if (collision && collision.hit) {
+                // Check if this is a rolling weapon that should enter rolling mode
+                if (projectile.shouldRoll()) {
+                    console.log(`Roller hit terrain at (${collision.x}, ${collision.y.toFixed(1)}) - starting roll!`);
+                    projectile.startRolling(collision.y);
+                    continue; // Continue to next frame, don't explode yet
+                }
+
+                // Standard weapon - explode on terrain contact
                 console.log(`Projectile hit terrain at (${collision.x}, ${collision.y.toFixed(1)})`);
                 handleProjectileExplosion(projectile, pos, null);
 
@@ -765,9 +814,10 @@ function renderProjectileTrail(ctx, projectile) {
 }
 
 /**
- * Render the projectile as a glowing circle.
+ * Render the projectile as a glowing circle or rotating roller.
  * Per spec: 8px diameter circle with glow effect.
  * Uses weapon-specific projectile colors for distinct visual appearance.
+ * Rolling projectiles show a rotating visual effect.
  *
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  * @param {import('./projectile.js').Projectile} projectile - The projectile to render
@@ -804,11 +854,33 @@ function renderProjectile(ctx, projectile) {
     ctx.fillStyle = projectileColor;
     ctx.fill();
 
-    // Draw bright inner core for extra glow effect
-    ctx.beginPath();
-    ctx.arc(x, y, radius * 0.5, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffffff';  // White hot center
-    ctx.fill();
+    // For rolling projectiles, show rotation visual instead of static core
+    if (projectile.isRolling) {
+        // Draw rotating line pattern to show rolling motion
+        const rotation = projectile.getRollRotation();
+
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(rotation);
+
+        // Draw a cross pattern inside the circle to show rotation
+        ctx.beginPath();
+        ctx.moveTo(-radius * 0.7, 0);
+        ctx.lineTo(radius * 0.7, 0);
+        ctx.moveTo(0, -radius * 0.7);
+        ctx.lineTo(0, radius * 0.7);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.restore();
+    } else {
+        // Draw bright inner core for extra glow effect (non-rolling projectiles)
+        ctx.beginPath();
+        ctx.arc(x, y, radius * 0.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';  // White hot center
+        ctx.fill();
+    }
 
     ctx.restore();
 }
@@ -1136,6 +1208,8 @@ function setupPlayingState() {
             playerTank.addAmmo('big-shot', 3);
             playerTank.addAmmo('mirv', 3); // MIRV for testing splitting mechanic
             playerTank.addAmmo('deaths-head', 2); // Death's Head for testing 9-warhead split
+            playerTank.addAmmo('roller', 3); // Roller for testing rolling mechanic
+            playerTank.addAmmo('heavy-roller', 2); // Heavy Roller for testing
 
             // Generate random wind for this round
             // Wind value -10 to +10: negative = left, positive = right

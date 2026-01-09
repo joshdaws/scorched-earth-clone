@@ -136,6 +136,45 @@ export class Projectile {
          */
         this.isChild = options.isChild || false;
 
+        // =============================================================================
+        // ROLLING STATE (for Roller-type weapons)
+        // =============================================================================
+
+        /**
+         * Whether this projectile is currently in rolling mode.
+         * Roller weapons enter rolling mode on first terrain contact instead of exploding.
+         * @type {boolean}
+         */
+        this.isRolling = false;
+
+        /**
+         * Timestamp when rolling started (for timeout check).
+         * @type {number}
+         */
+        this.rollStartTime = 0;
+
+        /**
+         * Rolling velocity (horizontal speed while rolling).
+         * Positive = rolling right, negative = rolling left.
+         * Speed is affected by terrain slope.
+         * @type {number}
+         */
+        this.rollVelocity = 0;
+
+        /**
+         * Rolling direction: 1 for right, -1 for left.
+         * Determined by horizontal velocity when roller hits terrain.
+         * @type {number}
+         */
+        this.rollDirection = 1;
+
+        /**
+         * Rotation angle for visual effect (radians).
+         * Accumulates as the roller moves along terrain.
+         * @type {number}
+         */
+        this.rollRotation = 0;
+
         // Calculate initial velocity from power and angle
         this._calculateInitialVelocity(angle, power);
 
@@ -383,6 +422,163 @@ export class Projectile {
      */
     markSplit() {
         this.hasSplit = true;
+    }
+
+    // =============================================================================
+    // ROLLING WEAPON SUPPORT
+    // =============================================================================
+
+    /**
+     * Check if this projectile should enter rolling mode on terrain contact.
+     * Only rolling-type weapons enter rolling mode.
+     *
+     * @returns {boolean} True if weapon is a rolling type and not already rolling
+     */
+    shouldRoll() {
+        if (this.isRolling) return false;
+
+        const weapon = WeaponRegistry.getWeapon(this.weaponId);
+        if (!weapon || weapon.type !== WEAPON_TYPES.ROLLING) return false;
+
+        return true;
+    }
+
+    /**
+     * Start rolling mode for this projectile.
+     * Sets initial roll direction based on current horizontal velocity.
+     *
+     * @param {number} terrainY - The Y position of the terrain surface (canvas coords)
+     */
+    startRolling(terrainY) {
+        this.isRolling = true;
+        this.rollStartTime = performance.now();
+
+        // Set roll direction based on horizontal velocity at impact
+        // If vx is very small, default to rolling right
+        this.rollDirection = this.vx >= 0 ? 1 : -1;
+
+        // Initial roll velocity is based on horizontal speed at impact
+        // Minimum velocity to ensure roller moves
+        const minRollSpeed = 2;
+        this.rollVelocity = Math.max(Math.abs(this.vx) * 0.5, minRollSpeed) * this.rollDirection;
+
+        // Snap to terrain surface
+        this.y = terrainY;
+
+        // Clear vertical velocity (now following terrain)
+        this.vy = 0;
+
+        console.log(`Roller started rolling at (${this.x.toFixed(1)}, ${this.y.toFixed(1)}), direction=${this.rollDirection > 0 ? 'right' : 'left'}, velocity=${this.rollVelocity.toFixed(2)}`);
+    }
+
+    /**
+     * Update the roller's position following terrain contour.
+     * The roller moves horizontally and snaps to terrain height.
+     * Speed is affected by terrain slope (faster downhill, slower uphill).
+     *
+     * @param {import('./terrain.js').Terrain} terrain - The terrain to roll on
+     * @returns {{explode: boolean, reason: string}|null} Explosion trigger info or null to continue rolling
+     */
+    updateRolling(terrain) {
+        if (!this.isRolling) return null;
+
+        const weapon = WeaponRegistry.getWeapon(this.weaponId);
+        const rollTimeout = weapon?.rollTimeout || 3000;
+
+        // Check timeout
+        const rollDuration = performance.now() - this.rollStartTime;
+        if (rollDuration >= rollTimeout) {
+            return { explode: true, reason: 'timeout' };
+        }
+
+        // Get current terrain height at position
+        const currentTerrainHeight = terrain.getHeight(Math.floor(this.x));
+        const currentSurfaceY = CANVAS.DESIGN_HEIGHT - currentTerrainHeight;
+
+        // Calculate slope at current position
+        // Look ahead in roll direction to find slope
+        const lookAhead = 3; // pixels ahead to check
+        const nextX = Math.floor(this.x + this.rollDirection * lookAhead);
+
+        // Check for wall (left/right boundary)
+        if (nextX < 0 || nextX >= terrain.getWidth()) {
+            return { explode: true, reason: 'wall' };
+        }
+
+        const nextTerrainHeight = terrain.getHeight(nextX);
+        const nextSurfaceY = CANVAS.DESIGN_HEIGHT - nextTerrainHeight;
+
+        // Calculate slope angle (positive = going downhill, negative = going uphill)
+        // In canvas coords: lower Y = higher on screen
+        const heightDiff = currentSurfaceY - nextSurfaceY; // Positive if terrain goes up (roller goes uphill)
+        const slopeAngle = Math.atan2(-heightDiff, lookAhead); // Negative heightDiff for correct direction
+
+        // Base roll speed affected by slope
+        // Gravity effect: rolling downhill speeds up, uphill slows down
+        const gravityEffect = 0.15; // How much slope affects speed
+        const slopeAcceleration = Math.sin(slopeAngle) * gravityEffect;
+
+        // Update roll velocity with slope effect
+        this.rollVelocity += slopeAcceleration * this.rollDirection;
+
+        // Clamp roll speed
+        const maxRollSpeed = 8;
+        const minRollSpeed = 0.5;
+        const absVelocity = Math.abs(this.rollVelocity);
+
+        if (absVelocity > maxRollSpeed) {
+            this.rollVelocity = maxRollSpeed * this.rollDirection;
+        }
+
+        // Check for valley bottom (speed too low to climb)
+        // If we're trying to go uphill but can't make it, we've hit a valley
+        if (absVelocity < minRollSpeed && heightDiff > 0.5) {
+            return { explode: true, reason: 'valley' };
+        }
+
+        // Update horizontal position
+        this.x += this.rollVelocity;
+
+        // Snap to terrain surface at new position
+        const newX = Math.floor(this.x);
+        if (newX >= 0 && newX < terrain.getWidth()) {
+            const newTerrainHeight = terrain.getHeight(newX);
+            this.y = CANVAS.DESIGN_HEIGHT - newTerrainHeight;
+        }
+
+        // Update rotation for visual effect
+        // Rotation based on distance traveled (assuming 4px radius)
+        const rollerRadius = 4;
+        this.rollRotation += this.rollVelocity / rollerRadius;
+
+        // Add trail position while rolling
+        this.trail.push({ x: this.x, y: this.y });
+        while (this.trail.length > this.maxTrailLength) {
+            this.trail.shift();
+        }
+
+        return null; // Continue rolling
+    }
+
+    /**
+     * Check if the roller has timed out.
+     * @returns {boolean} True if roll timeout has been exceeded
+     */
+    hasRollTimeout() {
+        if (!this.isRolling) return false;
+
+        const weapon = WeaponRegistry.getWeapon(this.weaponId);
+        const rollTimeout = weapon?.rollTimeout || 3000;
+
+        return (performance.now() - this.rollStartTime) >= rollTimeout;
+    }
+
+    /**
+     * Get the current rotation angle for rendering.
+     * @returns {number} Rotation angle in radians
+     */
+    getRollRotation() {
+        return this.rollRotation;
     }
 }
 
