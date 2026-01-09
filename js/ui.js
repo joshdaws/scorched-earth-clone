@@ -7,7 +7,7 @@
  * accents on dark panels.
  */
 
-import { CANVAS, COLORS, UI, TANK } from './constants.js';
+import { CANVAS, COLORS, UI, TANK, TURN_PHASES } from './constants.js';
 import { WeaponRegistry } from './weapons.js';
 import * as Wind from './wind.js';
 
@@ -82,6 +82,40 @@ let currentTurn = null;
  * @type {number}
  */
 let animationTime = 0;
+
+// =============================================================================
+// TURN INDICATOR TRANSITION STATE
+// =============================================================================
+
+/**
+ * Previous turn phase for transition animations.
+ * @type {string | null}
+ */
+let previousPhase = null;
+
+/**
+ * Current transition progress (0-1, 1 = fully transitioned).
+ * @type {number}
+ */
+let transitionProgress = 1;
+
+/**
+ * Transition duration in seconds.
+ * @type {number}
+ */
+const TRANSITION_DURATION = 0.3;
+
+/**
+ * Previous text being faded out during transition.
+ * @type {string}
+ */
+let previousText = '';
+
+/**
+ * Previous color being faded out during transition.
+ * @type {string}
+ */
+let previousColor = '';
 
 // =============================================================================
 // HELPER FUNCTIONS
@@ -402,63 +436,168 @@ export function renderMoneyPanel(ctx, money) {
 // =============================================================================
 
 /**
- * Render the turn indicator showing whose turn it is.
- * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
- * @param {'player' | 'enemy'} turn - Current turn
- * @param {boolean} [isFiring=false] - Whether a projectile is in flight
+ * Get indicator text and color for a given turn phase.
+ * @param {string} phase - Turn phase from TURN_PHASES
+ * @param {string} shooter - Who fired ('player' or 'ai') for projectile flight
+ * @returns {{text: string, color: string}} Text and color for indicator
  */
-export function renderTurnIndicator(ctx, turn, isFiring = false) {
-    if (!ctx) return;
+function getIndicatorContent(phase, shooter = 'player') {
+    switch (phase) {
+        case TURN_PHASES.PLAYER_AIM:
+            return { text: 'YOUR TURN', color: COLORS.NEON_CYAN };
+        case TURN_PHASES.PLAYER_FIRE:
+            return { text: 'FIRING...', color: COLORS.NEON_CYAN };
+        case TURN_PHASES.AI_AIM:
+            return { text: 'AI THINKING...', color: COLORS.NEON_PINK };
+        case TURN_PHASES.AI_FIRE:
+            return { text: 'ENEMY FIRING!', color: COLORS.NEON_PINK };
+        case TURN_PHASES.PROJECTILE_FLIGHT:
+            // Different text based on who fired
+            if (shooter === 'player') {
+                return { text: 'PROJECTILE IN FLIGHT', color: COLORS.NEON_ORANGE };
+            } else {
+                return { text: 'INCOMING!', color: COLORS.NEON_ORANGE };
+            }
+        default:
+            return { text: '', color: COLORS.TEXT_MUTED };
+    }
+}
+
+/**
+ * Render the turn indicator showing current game phase.
+ * Shows 'YOUR TURN' during player phase, 'AI THINKING...' during AI phase,
+ * and 'PROJECTILE IN FLIGHT' during resolution. Uses smooth transitions.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {string} phase - Current turn phase from TURN_PHASES
+ * @param {string} [shooter='player'] - Who fired ('player' or 'ai') for flight phase
+ */
+export function renderTurnIndicatorPhase(ctx, phase, shooter = 'player') {
+    if (!ctx || !phase) return;
 
     const indicator = HUD.TURN_INDICATOR;
-    animationTime += 0.05;
+    const { text, color } = getIndicatorContent(phase, shooter);
 
-    // Determine text and color based on turn state
-    let text, color;
-    if (isFiring) {
-        text = 'FIRING...';
-        color = COLORS.NEON_ORANGE;
-    } else if (turn === 'player') {
-        text = 'YOUR TURN';
-        color = COLORS.NEON_CYAN;
-    } else if (turn === 'enemy') {
-        text = 'ENEMY TURN';
-        color = COLORS.NEON_PINK;
-    } else {
-        return; // Don't render if no turn
+    if (!text) return;
+
+    // Handle phase transitions
+    if (phase !== previousPhase) {
+        // Starting a new transition
+        if (previousPhase) {
+            const prevContent = getIndicatorContent(previousPhase, shooter);
+            previousText = prevContent.text;
+            previousColor = prevContent.color;
+        }
+        transitionProgress = 0;
+        previousPhase = phase;
+    }
+
+    // Update transition progress (assumes ~16ms per frame)
+    if (transitionProgress < 1) {
+        transitionProgress = Math.min(1, transitionProgress + (1 / 60) / TRANSITION_DURATION);
     }
 
     ctx.save();
 
     // Pulsing effect for current turn
-    const pulse = Math.sin(animationTime) * 0.15 + 0.85;
+    const pulse = Math.sin(animationTime * 4) * 0.15 + 0.85;
 
-    // Background pill
-    const pillWidth = indicator.WIDTH;
+    // Background pill - wider to fit longer text
+    const maxTextWidth = 220;
+    const pillWidth = Math.max(indicator.WIDTH, maxTextWidth);
     const pillHeight = indicator.HEIGHT;
     const pillX = indicator.X - pillWidth / 2;
 
+    // Draw background
     ctx.fillStyle = 'rgba(10, 10, 26, 0.85)';
     ctx.beginPath();
     ctx.roundRect(pillX, indicator.Y, pillWidth, pillHeight, pillHeight / 2);
     ctx.fill();
 
-    // Glowing border
-    ctx.strokeStyle = color;
+    // Interpolate border color during transition
+    const borderColor = transitionProgress < 1 && previousColor ?
+        lerpColor(previousColor, color, transitionProgress) : color;
+
+    // Glowing border with pulse
+    ctx.strokeStyle = borderColor;
     ctx.lineWidth = 2;
-    ctx.shadowColor = color;
+    ctx.shadowColor = borderColor;
     ctx.shadowBlur = 8 * pulse;
     ctx.stroke();
 
-    // Text
-    ctx.fillStyle = color;
+    // Text rendering with fade transition
     ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.globalAlpha = pulse;
-    ctx.fillText(text, indicator.X, indicator.Y + pillHeight / 2);
+
+    const textY = indicator.Y + pillHeight / 2;
+
+    // During transition, fade out old text and fade in new text
+    if (transitionProgress < 1 && previousText) {
+        // Fade out previous text
+        ctx.fillStyle = previousColor;
+        ctx.globalAlpha = (1 - transitionProgress) * pulse;
+        ctx.fillText(previousText, indicator.X, textY);
+    }
+
+    // Current text with fade in (or full visibility if no transition)
+    ctx.fillStyle = color;
+    ctx.globalAlpha = (transitionProgress < 1 ? transitionProgress : 1) * pulse;
+    ctx.fillText(text, indicator.X, textY);
 
     ctx.restore();
+}
+
+/**
+ * Legacy render function for backwards compatibility.
+ * Converts turn/isFiring to phase-based rendering.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {'player' | 'enemy'} turn - Current turn
+ * @param {boolean} [isFiring=false] - Whether a projectile is in flight
+ */
+export function renderTurnIndicator(ctx, turn, isFiring = false) {
+    // Convert to phase-based call
+    let phase;
+    let shooter = 'player';
+
+    if (isFiring) {
+        phase = TURN_PHASES.PROJECTILE_FLIGHT;
+        shooter = turn === 'enemy' ? 'ai' : 'player';
+    } else if (turn === 'player') {
+        phase = TURN_PHASES.PLAYER_AIM;
+    } else if (turn === 'enemy') {
+        phase = TURN_PHASES.AI_AIM;
+    } else {
+        // No turn specified - try to show projectile in flight
+        phase = TURN_PHASES.PROJECTILE_FLIGHT;
+    }
+
+    renderTurnIndicatorPhase(ctx, phase, shooter);
+}
+
+/**
+ * Linear interpolate between two hex colors.
+ * @param {string} color1 - Start color (hex)
+ * @param {string} color2 - End color (hex)
+ * @param {number} t - Progress (0-1)
+ * @returns {string} Interpolated hex color
+ */
+function lerpColor(color1, color2, t) {
+    const hex1 = color1.replace('#', '');
+    const hex2 = color2.replace('#', '');
+
+    const r1 = parseInt(hex1.slice(0, 2), 16);
+    const g1 = parseInt(hex1.slice(2, 4), 16);
+    const b1 = parseInt(hex1.slice(4, 6), 16);
+
+    const r2 = parseInt(hex2.slice(0, 2), 16);
+    const g2 = parseInt(hex2.slice(2, 4), 16);
+    const b2 = parseInt(hex2.slice(4, 6), 16);
+
+    const r = Math.round(r1 + (r2 - r1) * t);
+    const g = Math.round(g1 + (g2 - g1) * t);
+    const b = Math.round(b1 + (b2 - b1) * t);
+
+    return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 }
 
 // =============================================================================
@@ -472,9 +611,11 @@ export function renderTurnIndicator(ctx, turn, isFiring = false) {
  * @param {import('./tank.js').Tank} state.playerTank - Player tank
  * @param {import('./tank.js').Tank} state.enemyTank - Enemy tank
  * @param {number} state.money - Current player money
- * @param {'player' | 'enemy'} state.turn - Current turn
- * @param {boolean} state.isFiring - Whether a projectile is in flight
+ * @param {'player' | 'enemy'} state.turn - Current turn (legacy)
+ * @param {boolean} state.isFiring - Whether a projectile is in flight (legacy)
  * @param {boolean} [state.isPlayerTurn=true] - Whether it's the player's aiming turn
+ * @param {string} [state.phase] - Turn phase from TURN_PHASES (preferred)
+ * @param {string} [state.shooter='player'] - Who fired ('player' or 'ai')
  */
 export function renderHUD(ctx, state) {
     if (!ctx || !state) return;
@@ -485,12 +626,21 @@ export function renderHUD(ctx, state) {
         money = 0,
         turn = 'player',
         isFiring = false,
-        isPlayerTurn = true
+        isPlayerTurn = true,
+        phase = null,
+        shooter = 'player'
     } = state;
 
     // Render all HUD elements
     renderHealthBars(ctx, playerTank, enemyTank);
-    renderTurnIndicator(ctx, turn, isFiring);
+
+    // Use phase-based indicator if phase is provided, otherwise fall back to legacy
+    if (phase) {
+        renderTurnIndicatorPhase(ctx, phase, shooter);
+    } else {
+        renderTurnIndicator(ctx, turn, isFiring);
+    }
+
     renderWindIndicator(ctx);
     renderAimingPanel(ctx, playerTank, isPlayerTurn);
     renderWeaponPanel(ctx, playerTank);

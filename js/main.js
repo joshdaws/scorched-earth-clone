@@ -2066,21 +2066,17 @@ function renderPlaying(ctx) {
     // Determine turn state for HUD
     const phase = Turn.getPhase();
     const isPlayerTurn = Turn.canPlayerAim();
-    const isFiring = phase === TURN_PHASES.PROJECTILE_FLIGHT ||
-                     phase === TURN_PHASES.PLAYER_FIRE ||
-                     phase === TURN_PHASES.AI_FIRE;
-    const currentTurnTeam = isPlayerTurn ? 'player' :
-                            (phase === TURN_PHASES.AI_AIM || phase === TURN_PHASES.AI_FIRE) ? 'enemy' :
-                            (isFiring ? null : 'player');
+    const shooter = Turn.getCurrentShooter();
 
     // Render the complete HUD using the new ui.js module
+    // Pass the phase directly for the enhanced turn indicator
     HUD.renderHUD(ctx, {
         playerTank,
         enemyTank,
         money: playerMoney,
-        turn: isFiring ? (activeProjectiles.length > 0 ? null : currentTurnTeam) : currentTurnTeam,
-        isFiring,
-        isPlayerTurn
+        isPlayerTurn,
+        phase,
+        shooter
     });
 
     // Render round and difficulty indicator (still uses existing function)
