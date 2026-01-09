@@ -271,17 +271,91 @@ function drawGameStatePanel(ctx, contentHeight = 0) {
 }
 
 /**
- * Render the game state panel container.
- * Currently renders as an empty styled container.
- * Future children: turn indicator, round/difficulty, wind.
+ * Render the game state panel container with turn indicator.
+ * Contains: turn indicator (large, glowing text).
+ * Future children: round/difficulty, wind.
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {string} [turnPhase='player_aim'] - Current turn phase
+ * @param {string} [shooter='player'] - Who fired ('player' or 'ai')
  */
-export function renderGameStatePanel(ctx) {
+export function renderGameStatePanel(ctx, turnPhase = null, shooter = 'player') {
     if (!ctx) return;
 
-    // For now, just draw the empty panel container
-    // Content will be added in subsequent issues
-    drawGameStatePanel(ctx);
+    // Draw the panel container and get bounds for content placement
+    const bounds = drawGameStatePanel(ctx);
+
+    // Render turn indicator inside the panel
+    renderTurnIndicatorInPanel(ctx, bounds, turnPhase, shooter);
+}
+
+/**
+ * Render the turn indicator inside the game state panel.
+ * Shows "YOUR TURN" or "ENEMY TURN" with appropriate glow effects.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {Object} bounds - Panel bounds from drawGameStatePanel
+ * @param {string} turnPhase - Current turn phase
+ * @param {string} shooter - Who fired ('player' or 'ai')
+ */
+function renderTurnIndicatorInPanel(ctx, bounds, turnPhase, shooter) {
+    // Determine text and color based on turn phase
+    let text = '';
+    let glowColor = COLORS.NEON_CYAN;
+
+    // Map phases to display text and colors
+    if (turnPhase === TURN_PHASES.PLAYER_AIM || turnPhase === TURN_PHASES.PLAYER_FIRE) {
+        text = 'YOUR TURN';
+        glowColor = COLORS.NEON_CYAN;
+    } else if (turnPhase === TURN_PHASES.AI_AIM || turnPhase === TURN_PHASES.AI_FIRE) {
+        text = 'ENEMY TURN';
+        glowColor = COLORS.NEON_PINK;
+    } else if (turnPhase === TURN_PHASES.PROJECTILE_FLIGHT) {
+        // During projectile flight, show based on who fired
+        if (shooter === 'player') {
+            text = 'YOUR TURN';
+            glowColor = COLORS.NEON_CYAN;
+        } else {
+            text = 'ENEMY TURN';
+            glowColor = COLORS.NEON_PINK;
+        }
+    } else {
+        // Default to player turn if no phase specified
+        text = 'YOUR TURN';
+        glowColor = COLORS.NEON_CYAN;
+    }
+
+    if (!text) return;
+
+    ctx.save();
+
+    // Calculate center position in panel
+    const centerX = bounds.x + bounds.width / 2;
+    const centerY = bounds.y + bounds.height / 2;
+
+    // Pulsing glow effect
+    const pulse = Math.sin(animationTime * 3) * 0.2 + 0.8;
+
+    // Large, prominent font
+    ctx.font = `bold 24px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // Multi-layer glow effect for synthwave aesthetic
+    // Outer glow (larger, more diffuse)
+    ctx.shadowColor = glowColor;
+    ctx.shadowBlur = 20 * pulse;
+    ctx.fillStyle = glowColor;
+    ctx.fillText(text, centerX, centerY);
+
+    // Middle glow layer
+    ctx.shadowBlur = 10 * pulse;
+    ctx.fillText(text, centerX, centerY);
+
+    // Inner bright text
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(text, centerX, centerY);
+
+    ctx.restore();
 }
 
 /**
@@ -1394,8 +1468,27 @@ export function renderHUD(ctx, state) {
         shooter = 'player'
     } = state;
 
-    // Render game state panel first (container at top-center)
-    renderGameStatePanel(ctx);
+    // Determine the effective phase for rendering
+    // If phase is provided, use it; otherwise convert from legacy turn/isFiring
+    let effectivePhase = phase;
+    let effectiveShooter = shooter;
+
+    if (!effectivePhase) {
+        // Convert legacy turn/isFiring to phase
+        if (isFiring) {
+            effectivePhase = TURN_PHASES.PROJECTILE_FLIGHT;
+            effectiveShooter = turn === 'enemy' ? 'ai' : 'player';
+        } else if (turn === 'player') {
+            effectivePhase = TURN_PHASES.PLAYER_AIM;
+        } else if (turn === 'enemy') {
+            effectivePhase = TURN_PHASES.AI_AIM;
+        } else {
+            effectivePhase = TURN_PHASES.PLAYER_AIM;
+        }
+    }
+
+    // Render game state panel with turn indicator inside
+    renderGameStatePanel(ctx, effectivePhase, effectiveShooter);
 
     // Render consolidated player info panel (top-left)
     // Contains: health, currency, angle/power placeholder
@@ -1404,12 +1497,9 @@ export function renderHUD(ctx, state) {
     // Render enemy health bar separately (top-right)
     renderEnemyHealthBar(ctx, enemyTank);
 
-    // Use phase-based indicator if phase is provided, otherwise fall back to legacy
-    if (phase) {
-        renderTurnIndicatorPhase(ctx, phase, shooter);
-    } else {
-        renderTurnIndicator(ctx, turn, isFiring);
-    }
+    // Note: Turn indicator is now rendered inside renderGameStatePanel
+    // The legacy renderTurnIndicatorPhase is kept for backwards compatibility
+    // but no longer called from renderHUD
 
     renderWindIndicator(ctx);
     renderWeaponPanel(ctx, playerTank);
