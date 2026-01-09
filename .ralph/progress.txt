@@ -148,5 +148,17 @@
 **Status:** Completed
 **Changes:** Implemented turn-based combat system with 5 phases (PLAYER_AIM, PLAYER_FIRE, PROJECTILE_FLIGHT, AI_AIM, AI_FIRE), turn indicator UI, phase transition validation, and debug logging
 **Files:** js/turn.js (created), js/constants.js (modified), js/main.js (modified)
-**Commit:** pending
+**Commit:** 5d362ca
+---
+## scorched-earth-5zm.5 - Create Input Abstraction Layer
+**Status:** Completed
+**Changes:** Implemented high-level game input abstraction with event types (ANGLE_CHANGE, POWER_CHANGE, FIRE, SELECT_WEAPON), input queue system processed once per frame, keyboard bindings (arrow keys, space, tab), mouse/touch slider support, and phase-based input enabling/disabling
+**Files:** js/input.js, js/main.js
+**Commit:** 65cfa0f
+---
+## scorched-earth-5zm.6 - Implement Asset Loader
+**Status:** Completed
+**Changes:** Enhanced asset loader with graceful error handling, placeholder image generation for missing assets, progress percentage tracking, and improved console output
+**Files:** js/assets.js, js/main.js
+**Commit:** 5d362ca
 ---

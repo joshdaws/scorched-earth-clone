@@ -19,29 +19,42 @@ const imageCache = new Map();
 /** @type {boolean} Whether all assets have been loaded */
 let loaded = false;
 
+/** @type {number} Current loading progress (0-100) */
+let loadingProgress = 0;
+
+/** @type {number} Total assets to load */
+let totalAssets = 0;
+
+/** @type {number} Assets loaded so far */
+let loadedAssets = 0;
+
 // =============================================================================
 // MANIFEST LOADING
 // =============================================================================
 
 /**
  * Load and parse the asset manifest.
+ * Falls back to an empty manifest if loading fails.
  * @param {string} [path='assets/manifest.json'] - Path to manifest file
- * @returns {Promise<Object>} The parsed manifest
+ * @returns {Promise<Object>} The parsed manifest or empty object
  */
 export async function loadManifest(path = 'assets/manifest.json') {
     try {
         const response = await fetch(path);
 
         if (!response.ok) {
-            throw new Error(`Failed to load manifest: ${response.status} ${response.statusText}`);
+            console.warn(`Asset manifest not found (${response.status}), using empty manifest`);
+            manifest = {};
+            return manifest;
         }
 
         manifest = await response.json();
         console.log('Asset manifest loaded');
         return manifest;
     } catch (error) {
-        console.error('Failed to load asset manifest:', error);
-        throw error;
+        console.warn('Failed to load asset manifest, using empty manifest:', error.message);
+        manifest = {};
+        return manifest;
     }
 }
 
@@ -51,6 +64,81 @@ export async function loadManifest(path = 'assets/manifest.json') {
  */
 export function getManifest() {
     return manifest;
+}
+
+// =============================================================================
+// PLACEHOLDER GENERATION
+// =============================================================================
+
+/**
+ * Color palette for placeholder images based on asset category.
+ * Colors are synthwave-themed for visual consistency.
+ */
+const PLACEHOLDER_COLORS = {
+    tanks: '#ff00ff',      // Magenta
+    projectiles: '#00ffff', // Cyan
+    effects: '#ff6600',     // Orange
+    ui: '#00ff88',          // Green
+    backgrounds: '#6600ff', // Purple
+    default: '#ff0088'      // Pink
+};
+
+/**
+ * Generate a placeholder image for a missing asset.
+ * Creates a colored rectangle with the asset key text.
+ * @param {string} key - Asset key (e.g., 'tanks.player')
+ * @param {Object} meta - Asset metadata (width, height, etc.)
+ * @returns {HTMLImageElement} Generated placeholder image
+ */
+function createPlaceholder(key, meta) {
+    const width = meta?.width || 64;
+    const height = meta?.height || 64;
+
+    // Create an offscreen canvas for the placeholder
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+
+    // Determine color based on asset category
+    const category = key.split('.')[0];
+    const color = PLACEHOLDER_COLORS[category] || PLACEHOLDER_COLORS.default;
+
+    // Fill background with color
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, width, height);
+
+    // Add a border
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, width - 2, height - 2);
+
+    // Add diagonal lines to indicate placeholder
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(width, height);
+    ctx.moveTo(width, 0);
+    ctx.lineTo(0, height);
+    ctx.stroke();
+
+    // Add text label (shortened key)
+    const label = key.split('.').pop() || '?';
+    const fontSize = Math.min(12, Math.floor(width / 4));
+    ctx.fillStyle = '#000000';
+    ctx.font = `bold ${fontSize}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label.substring(0, 8), width / 2, height / 2);
+
+    // Convert canvas to image
+    const img = new Image();
+    img.src = canvas.toDataURL('image/png');
+    img.width = width;
+    img.height = height;
+
+    return img;
 }
 
 // =============================================================================
@@ -111,47 +199,66 @@ function extractImageEntries(obj, prefix = '') {
 
 /**
  * Load all images from the manifest.
- * @param {Function} [onProgress] - Progress callback (loaded, total)
- * @returns {Promise<number>} Number of images loaded successfully
+ * Missing assets are replaced with generated placeholders.
+ * @param {Function} [onProgress] - Progress callback (loaded, total, percentage)
+ * @returns {Promise<number>} Number of images loaded successfully (not including placeholders)
  */
 export async function loadAllAssets(onProgress) {
     if (!manifest) {
         console.warn('Manifest not loaded. Call loadManifest() first.');
+        loaded = true;
+        loadingProgress = 100;
         return 0;
     }
 
     const entries = extractImageEntries(manifest);
-    const total = entries.length;
-    let loadedCount = 0;
+    totalAssets = entries.length;
+    loadedAssets = 0;
+    loadingProgress = 0;
     let successCount = 0;
+    let placeholderCount = 0;
+
+    if (totalAssets === 0) {
+        console.log('No assets to load');
+        loaded = true;
+        loadingProgress = 100;
+        return 0;
+    }
+
+    console.log(`Loading ${totalAssets} assets...`);
 
     for (const entry of entries) {
         try {
             const img = await loadImage(entry.path);
             imageCache.set(entry.key, img);
             successCount++;
+            console.log(`  ✓ ${entry.key}`);
         } catch (error) {
-            console.warn(`Failed to load asset '${entry.key}': ${error.message}`);
-            // Store null for failed loads so get() can return null
-            imageCache.set(entry.key, null);
+            // Generate placeholder for failed loads
+            const placeholder = createPlaceholder(entry.key, entry.meta);
+            imageCache.set(entry.key, placeholder);
+            placeholderCount++;
+            console.warn(`  ⚠ ${entry.key} (using placeholder)`);
         }
 
-        loadedCount++;
+        loadedAssets++;
+        loadingProgress = Math.round((loadedAssets / totalAssets) * 100);
 
         if (onProgress) {
-            onProgress(loadedCount, total);
+            onProgress(loadedAssets, totalAssets, loadingProgress);
         }
     }
 
     loaded = true;
-    console.log(`Assets loaded: ${successCount}/${total}`);
+    console.log(`Asset loading complete: ${successCount} loaded, ${placeholderCount} placeholders`);
     return successCount;
 }
 
 /**
  * Load a single asset by its manifest key.
+ * Falls back to placeholder if loading fails.
  * @param {string} key - Dot-notation key (e.g., 'tanks.player')
- * @returns {Promise<HTMLImageElement|null>} The loaded image or null
+ * @returns {Promise<HTMLImageElement>} The loaded image or placeholder
  */
 export async function loadAsset(key) {
     // Already cached
@@ -162,7 +269,9 @@ export async function loadAsset(key) {
     // Need manifest to find the path
     if (!manifest) {
         console.warn('Manifest not loaded. Call loadManifest() first.');
-        return null;
+        const placeholder = createPlaceholder(key, null);
+        imageCache.set(key, placeholder);
+        return placeholder;
     }
 
     // Navigate to the entry in manifest
@@ -174,13 +283,17 @@ export async function loadAsset(key) {
             current = current[part];
         } else {
             console.warn(`Asset not found in manifest: ${key}`);
-            return null;
+            const placeholder = createPlaceholder(key, null);
+            imageCache.set(key, placeholder);
+            return placeholder;
         }
     }
 
     if (!current || !current.path) {
         console.warn(`Invalid asset entry: ${key}`);
-        return null;
+        const placeholder = createPlaceholder(key, current);
+        imageCache.set(key, placeholder);
+        return placeholder;
     }
 
     // Load the image
@@ -189,9 +302,10 @@ export async function loadAsset(key) {
         imageCache.set(key, img);
         return img;
     } catch (error) {
-        console.warn(`Failed to load asset '${key}': ${error.message}`);
-        imageCache.set(key, null);
-        return null;
+        console.warn(`Failed to load asset '${key}': ${error.message}, using placeholder`);
+        const placeholder = createPlaceholder(key, current);
+        imageCache.set(key, placeholder);
+        return placeholder;
     }
 }
 
@@ -256,9 +370,33 @@ export function getLoadedCount() {
 }
 
 /**
+ * Get the current loading progress as a percentage.
+ * @returns {number} Progress percentage (0-100)
+ */
+export function getProgress() {
+    return loadingProgress;
+}
+
+/**
+ * Get detailed loading status.
+ * @returns {{loaded: number, total: number, percentage: number, complete: boolean}}
+ */
+export function getLoadingStatus() {
+    return {
+        loaded: loadedAssets,
+        total: totalAssets,
+        percentage: loadingProgress,
+        complete: loaded
+    };
+}
+
+/**
  * Clear the asset cache.
  */
 export function clearCache() {
     imageCache.clear();
     loaded = false;
+    loadingProgress = 0;
+    totalAssets = 0;
+    loadedAssets = 0;
 }

@@ -366,15 +366,11 @@ async function init() {
     setupAudioInit(canvas);
 
     // Load assets before starting the game
-    try {
-        await Assets.loadManifest();
-        await Assets.loadAllAssets((loaded, total) => {
-            console.log(`Loading assets: ${loaded}/${total}`);
-        });
-    } catch (error) {
-        console.error('Failed to load assets:', error);
-        // Continue anyway - game can run with missing assets
-    }
+    // Note: loadManifest gracefully handles missing manifest files
+    await Assets.loadManifest();
+    await Assets.loadAllAssets((loaded, total, percentage) => {
+        console.log(`Loading assets: ${percentage}% (${loaded}/${total})`);
+    });
 
     // Initialize game state
     Game.init();
