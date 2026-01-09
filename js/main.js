@@ -248,88 +248,419 @@ function renderRoundIndicator(ctx) {
 // =============================================================================
 
 /**
- * Button definition for "Start Game" button
+ * Menu animation state for pulsing effects
  */
-const startButton = {
-    x: CANVAS.DESIGN_WIDTH / 2,
-    y: CANVAS.DESIGN_HEIGHT / 2 + 60,
-    width: 250,
-    height: 60,
-    text: 'START GAME'
+let menuAnimationTime = 0;
+
+/**
+ * Menu transition state for fade-in/fade-out effects
+ */
+const menuTransition = {
+    active: false,
+    fadeOut: false,
+    startTime: 0,
+    duration: 500,  // 500ms transition
+    alpha: 1
 };
 
 /**
- * Check if a point is inside the start button
+ * Button definitions for menu
+ */
+const menuButtons = {
+    start: {
+        x: CANVAS.DESIGN_WIDTH / 2,
+        y: CANVAS.DESIGN_HEIGHT / 2 + 60,
+        width: 280,
+        height: 60,
+        text: 'START GAME',
+        color: COLORS.NEON_CYAN,
+        enabled: true
+    },
+    options: {
+        x: CANVAS.DESIGN_WIDTH / 2,
+        y: CANVAS.DESIGN_HEIGHT / 2 + 140,
+        width: 280,
+        height: 60,
+        text: 'OPTIONS',
+        color: COLORS.NEON_PURPLE,
+        enabled: false  // Disabled for V1
+    }
+};
+
+/**
+ * Check if a point is inside a menu button
+ * @param {number} x - X coordinate
+ * @param {number} y - Y coordinate
+ * @param {Object} button - Button definition
+ * @returns {boolean} True if point is inside button
+ */
+function isInsideButton(x, y, button) {
+    const halfWidth = button.width / 2;
+    const halfHeight = button.height / 2;
+    return (
+        x >= button.x - halfWidth &&
+        x <= button.x + halfWidth &&
+        y >= button.y - halfHeight &&
+        y <= button.y + halfHeight
+    );
+}
+
+/**
+ * Check if a point is inside the start button (backwards compatibility)
  * @param {number} x - X coordinate
  * @param {number} y - Y coordinate
  * @returns {boolean} True if point is inside button
  */
 function isInsideStartButton(x, y) {
-    const halfWidth = startButton.width / 2;
-    const halfHeight = startButton.height / 2;
-    return (
-        x >= startButton.x - halfWidth &&
-        x <= startButton.x + halfWidth &&
-        y >= startButton.y - halfHeight &&
-        y <= startButton.y + halfHeight
-    );
+    return isInsideButton(x, y, menuButtons.start);
 }
 
 /**
- * Handle click on menu - check if Start Game button was clicked
+ * Start menu fade-out transition, then change state
+ * @param {string} targetState - State to transition to
+ */
+function startMenuTransition(targetState) {
+    menuTransition.active = true;
+    menuTransition.fadeOut = true;
+    menuTransition.startTime = performance.now();
+    menuTransition.targetState = targetState;
+}
+
+/**
+ * Handle click on menu - check if buttons were clicked
  * @param {{x: number, y: number}} pos - Click position in design coordinates
  */
 function handleMenuClick(pos) {
     if (Game.getState() !== GAME_STATES.MENU) return;
+    if (menuTransition.active) return;  // Don't allow clicks during transition
 
-    if (isInsideStartButton(pos.x, pos.y)) {
-        // Transition to PLAYING state
-        Game.setState(GAME_STATES.PLAYING);
+    if (isInsideButton(pos.x, pos.y, menuButtons.start)) {
+        // Start fade-out transition, then go to PLAYING state
+        startMenuTransition(GAME_STATES.PLAYING);
+    } else if (isInsideButton(pos.x, pos.y, menuButtons.options) && menuButtons.options.enabled) {
+        // Options - would go to options menu (not implemented for V1)
+        console.log('Options clicked (not implemented)');
     }
 }
 
 /**
- * Render the menu screen
+ * Render the synthwave background for the menu.
+ * Creates a dramatic sunset gradient with grid lines.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ */
+function renderMenuBackground(ctx) {
+    const width = CANVAS.DESIGN_WIDTH;
+    const height = CANVAS.DESIGN_HEIGHT;
+    const horizonY = height * 0.6;  // Horizon line at 60% down
+
+    ctx.save();
+
+    // Sky gradient (top to horizon)
+    const skyGradient = ctx.createLinearGradient(0, 0, 0, horizonY);
+    skyGradient.addColorStop(0, '#0a0a1a');      // Dark blue at top
+    skyGradient.addColorStop(0.4, '#1a0a2e');   // Deep purple
+    skyGradient.addColorStop(0.7, '#2d1b4e');   // Purple
+    skyGradient.addColorStop(0.9, '#ff2a6d');   // Neon pink near horizon
+    skyGradient.addColorStop(1, '#ff6b35');     // Orange at horizon
+    ctx.fillStyle = skyGradient;
+    ctx.fillRect(0, 0, width, horizonY);
+
+    // Sun (semi-circle at horizon with horizontal scan lines for retro effect)
+    const sunX = width / 2;
+    const sunY = horizonY;
+    const sunRadius = 120;
+
+    // Sun gradient
+    const sunGradient = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunRadius);
+    sunGradient.addColorStop(0, '#ffff88');
+    sunGradient.addColorStop(0.3, '#ff8844');
+    sunGradient.addColorStop(0.6, '#ff2a6d');
+    sunGradient.addColorStop(1, 'transparent');
+
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, sunRadius, Math.PI, 0, false);  // Top half of circle
+    ctx.fillStyle = sunGradient;
+    ctx.fill();
+
+    // Sun scan lines (horizontal stripes across the sun for retro effect)
+    ctx.globalCompositeOperation = 'destination-out';
+    for (let y = sunY - sunRadius; y < sunY; y += 8) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.fillRect(sunX - sunRadius, y, sunRadius * 2, 3);
+    }
+    ctx.globalCompositeOperation = 'source-over';
+
+    // Ground (below horizon) - dark with perspective grid
+    const groundGradient = ctx.createLinearGradient(0, horizonY, 0, height);
+    groundGradient.addColorStop(0, '#1a0a2e');
+    groundGradient.addColorStop(1, '#0a0a1a');
+    ctx.fillStyle = groundGradient;
+    ctx.fillRect(0, horizonY, width, height - horizonY);
+
+    // Perspective grid lines
+    ctx.strokeStyle = 'rgba(211, 0, 197, 0.4)';  // Purple grid
+    ctx.lineWidth = 1;
+
+    // Horizontal grid lines (closer together near horizon, further apart below)
+    const numHorizontalLines = 15;
+    for (let i = 0; i <= numHorizontalLines; i++) {
+        // Use exponential spacing for perspective effect
+        const t = i / numHorizontalLines;
+        const y = horizonY + (height - horizonY) * Math.pow(t, 1.5);
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+    }
+
+    // Vertical grid lines (converge at horizon center)
+    const numVerticalLines = 20;
+    const vanishingPointX = width / 2;
+    for (let i = 0; i <= numVerticalLines; i++) {
+        const t = i / numVerticalLines;
+        const bottomX = t * width;
+        ctx.beginPath();
+        ctx.moveTo(vanishingPointX, horizonY);
+        ctx.lineTo(bottomX, height);
+        ctx.stroke();
+    }
+
+    // Add subtle stars in the sky
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+    const starSeed = 12345;  // Fixed seed for consistent star placement
+    for (let i = 0; i < 50; i++) {
+        // Pseudo-random but deterministic star positions
+        const sx = ((starSeed * (i + 1) * 7) % width);
+        const sy = ((starSeed * (i + 1) * 13) % (horizonY * 0.6));
+        const sr = ((i % 3) + 1) * 0.5;
+        ctx.beginPath();
+        ctx.arc(sx, sy, sr, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    ctx.restore();
+}
+
+/**
+ * Render a neon-styled menu button with glow effect
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {Object} button - Button definition
+ * @param {number} pulseIntensity - Glow pulse intensity (0-1)
+ */
+function renderMenuButton(ctx, button, pulseIntensity) {
+    const halfWidth = button.width / 2;
+    const halfHeight = button.height / 2;
+    const btnX = button.x - halfWidth;
+    const btnY = button.y - halfHeight;
+
+    ctx.save();
+
+    // Determine if button is disabled
+    const isDisabled = !button.enabled;
+    const buttonColor = isDisabled ? COLORS.TEXT_MUTED : button.color;
+    const glowIntensity = isDisabled ? 0 : pulseIntensity;
+
+    // Button background with rounded corners
+    ctx.fillStyle = isDisabled ? 'rgba(26, 26, 46, 0.5)' : 'rgba(26, 26, 46, 0.8)';
+    ctx.beginPath();
+    ctx.roundRect(btnX, btnY, button.width, button.height, 8);
+    ctx.fill();
+
+    // Neon glow effect (pulsing)
+    if (!isDisabled) {
+        ctx.shadowColor = buttonColor;
+        ctx.shadowBlur = 15 + glowIntensity * 10;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+    }
+
+    // Button border (neon outline)
+    ctx.strokeStyle = buttonColor;
+    ctx.lineWidth = isDisabled ? 2 : 3;
+    ctx.beginPath();
+    ctx.roundRect(btnX, btnY, button.width, button.height, 8);
+    ctx.stroke();
+
+    // Reset shadow for text
+    ctx.shadowBlur = 0;
+
+    // Button text with glow
+    if (!isDisabled) {
+        ctx.shadowColor = buttonColor;
+        ctx.shadowBlur = 8 + glowIntensity * 5;
+    }
+    ctx.fillStyle = isDisabled ? COLORS.TEXT_MUTED : COLORS.TEXT_LIGHT;
+    ctx.font = `bold ${UI.FONT_SIZE_LARGE}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(button.text, button.x, button.y);
+
+    // Add "(Coming Soon)" for disabled buttons
+    if (isDisabled) {
+        ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+        ctx.fillStyle = COLORS.TEXT_MUTED;
+        ctx.fillText('(Coming Soon)', button.x, button.y + 35);
+    }
+
+    ctx.restore();
+}
+
+/**
+ * Render the menu screen with full synthwave styling.
+ * Features:
+ * - Sunset gradient background with grid
+ * - Neon title with glow effect
+ * - Animated pulsing buttons
+ * - Full-screen overlay
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  */
 function renderMenu(ctx) {
-    // Draw title
-    ctx.fillStyle = COLORS.NEON_CYAN;
-    ctx.font = `bold ${UI.FONT_SIZE_TITLE}px ${UI.FONT_FAMILY}`;
+    // Update animation time
+    menuAnimationTime += 16;  // Approximate 60fps frame time
+
+    // Calculate pulse intensity for glowing effects (0-1, oscillating)
+    const pulseIntensity = (Math.sin(menuAnimationTime * 0.003) + 1) / 2;
+
+    ctx.save();
+
+    // Update transition state
+    if (menuTransition.active) {
+        const elapsed = performance.now() - menuTransition.startTime;
+        const progress = Math.min(elapsed / menuTransition.duration, 1);
+
+        if (menuTransition.fadeOut) {
+            menuTransition.alpha = 1 - progress;
+        } else {
+            menuTransition.alpha = progress;
+        }
+
+        // Apply fade alpha to entire menu
+        ctx.globalAlpha = menuTransition.alpha;
+
+        // Check if transition is complete
+        if (progress >= 1 && menuTransition.fadeOut && menuTransition.targetState) {
+            menuTransition.active = false;
+            menuTransition.alpha = 1;
+            Game.setState(menuTransition.targetState);
+            ctx.restore();
+            return;
+        }
+    }
+
+    // Render synthwave background (visible behind everything)
+    renderMenuBackground(ctx);
+
+    // Semi-transparent overlay for menu content area
+    const overlayGradient = ctx.createLinearGradient(0, 0, 0, CANVAS.DESIGN_HEIGHT);
+    overlayGradient.addColorStop(0, 'rgba(10, 10, 26, 0.7)');
+    overlayGradient.addColorStop(0.5, 'rgba(10, 10, 26, 0.3)');
+    overlayGradient.addColorStop(1, 'rgba(10, 10, 26, 0.7)');
+    ctx.fillStyle = overlayGradient;
+    ctx.fillRect(0, 0, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+
+    // Title with neon glow effect
+    const titleY = CANVAS.DESIGN_HEIGHT / 3 - 20;
+
+    // Title shadow/glow layers
+    ctx.save();
+    ctx.shadowColor = COLORS.NEON_CYAN;
+    ctx.shadowBlur = 30 + pulseIntensity * 20;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+
+    ctx.font = `bold 72px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('SCORCHED EARTH', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 3);
+    ctx.fillStyle = COLORS.NEON_CYAN;
+    ctx.fillText('SCORCHED EARTH', CANVAS.DESIGN_WIDTH / 2, titleY);
 
-    // Draw subtitle
+    // Title outline for extra depth
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1;
+    ctx.strokeText('SCORCHED EARTH', CANVAS.DESIGN_WIDTH / 2, titleY);
+    ctx.restore();
+
+    // Subtitle with different color glow
+    ctx.save();
+    ctx.shadowColor = COLORS.NEON_PINK;
+    ctx.shadowBlur = 15 + pulseIntensity * 10;
+    ctx.font = `bold ${UI.FONT_SIZE_LARGE + 4}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
     ctx.fillStyle = COLORS.NEON_PINK;
-    ctx.font = `${UI.FONT_SIZE_LARGE}px ${UI.FONT_FAMILY}`;
-    ctx.fillText('SYNTHWAVE EDITION', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 3 + 50);
+    ctx.fillText('SYNTHWAVE EDITION', CANVAS.DESIGN_WIDTH / 2, titleY + 55);
+    ctx.restore();
 
-    // Draw start button
-    const halfWidth = startButton.width / 2;
-    const halfHeight = startButton.height / 2;
-    const btnX = startButton.x - halfWidth;
-    const btnY = startButton.y - halfHeight;
+    // Render menu buttons
+    renderMenuButton(ctx, menuButtons.start, pulseIntensity);
+    renderMenuButton(ctx, menuButtons.options, pulseIntensity);
 
-    // Button background
-    ctx.fillStyle = COLORS.BG_MEDIUM;
-    ctx.fillRect(btnX, btnY, startButton.width, startButton.height);
-
-    // Button border (neon glow effect)
-    ctx.strokeStyle = COLORS.NEON_CYAN;
-    ctx.lineWidth = 3;
-    ctx.strokeRect(btnX, btnY, startButton.width, startButton.height);
-
-    // Button text
-    ctx.fillStyle = COLORS.TEXT_LIGHT;
-    ctx.font = `bold ${UI.FONT_SIZE_LARGE}px ${UI.FONT_FAMILY}`;
-    ctx.fillText(startButton.text, startButton.x, startButton.y);
-
-    // Instructions text
+    // Instructions text at bottom
     ctx.fillStyle = COLORS.TEXT_MUTED;
     ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
-    ctx.fillText('Click or tap to start', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT - 100);
-    ctx.fillText('Press D to toggle debug mode', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT - 70);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Click or tap START GAME to begin', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT - 80);
+    ctx.fillText('Press D to toggle debug mode', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT - 55);
+
+    // Decorative line under title
+    ctx.save();
+    ctx.strokeStyle = COLORS.NEON_PURPLE;
+    ctx.shadowColor = COLORS.NEON_PURPLE;
+    ctx.shadowBlur = 10;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    const lineWidth = 200;
+    ctx.moveTo(CANVAS.DESIGN_WIDTH / 2 - lineWidth, titleY + 80);
+    ctx.lineTo(CANVAS.DESIGN_WIDTH / 2 + lineWidth, titleY + 80);
+    ctx.stroke();
+    ctx.restore();
+
+    // Neon frame around the screen
+    ctx.save();
+    ctx.strokeStyle = COLORS.NEON_CYAN;
+    ctx.shadowColor = COLORS.NEON_CYAN;
+    ctx.shadowBlur = 15;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(20, 20, CANVAS.DESIGN_WIDTH - 40, CANVAS.DESIGN_HEIGHT - 40);
+
+    // Corner accents
+    const cornerSize = 30;
+    ctx.strokeStyle = COLORS.NEON_PINK;
+    ctx.shadowColor = COLORS.NEON_PINK;
+    ctx.lineWidth = 4;
+
+    // Top-left corner
+    ctx.beginPath();
+    ctx.moveTo(20, 20 + cornerSize);
+    ctx.lineTo(20, 20);
+    ctx.lineTo(20 + cornerSize, 20);
+    ctx.stroke();
+
+    // Top-right corner
+    ctx.beginPath();
+    ctx.moveTo(CANVAS.DESIGN_WIDTH - 20 - cornerSize, 20);
+    ctx.lineTo(CANVAS.DESIGN_WIDTH - 20, 20);
+    ctx.lineTo(CANVAS.DESIGN_WIDTH - 20, 20 + cornerSize);
+    ctx.stroke();
+
+    // Bottom-left corner
+    ctx.beginPath();
+    ctx.moveTo(20, CANVAS.DESIGN_HEIGHT - 20 - cornerSize);
+    ctx.lineTo(20, CANVAS.DESIGN_HEIGHT - 20);
+    ctx.lineTo(20 + cornerSize, CANVAS.DESIGN_HEIGHT - 20);
+    ctx.stroke();
+
+    // Bottom-right corner
+    ctx.beginPath();
+    ctx.moveTo(CANVAS.DESIGN_WIDTH - 20 - cornerSize, CANVAS.DESIGN_HEIGHT - 20);
+    ctx.lineTo(CANVAS.DESIGN_WIDTH - 20, CANVAS.DESIGN_HEIGHT - 20);
+    ctx.lineTo(CANVAS.DESIGN_WIDTH - 20, CANVAS.DESIGN_HEIGHT - 20 - cornerSize);
+    ctx.stroke();
+
+    ctx.restore();
+
+    ctx.restore();
 }
 
 /**

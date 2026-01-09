@@ -308,3 +308,15 @@
 **Files:** js/turn.js, js/ai.js, js/main.js
 **Commit:** 99761a5
 ---
+## scorched-earth-7hv.5 - Implement AI Difficulty Progression
+**Status:** Completed
+**Changes:** Added AI difficulty progression system with round-based scaling (Easy->Medium->Hard) and weapon purchasing based on difficulty budget
+**Files:** js/ai.js (added progression and purchasing functions), js/main.js (added round tracking and UI indicator)
+**Commit:** 16a4f47
+---
+## scorched-earth-x47.1 - Create Main Menu Screen
+**Status:** Completed
+**Changes:** Implemented full synthwave-styled main menu with sunset gradient background, neon glowing title, animated buttons, disabled Options button, decorative frame with corner accents, and smooth 500ms fade-out transition to gameplay
+**Files:** js/main.js (lines 246-664 - menu state rendering)
+**Commit:** (pending)
+---
