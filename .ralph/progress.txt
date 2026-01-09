@@ -113,3 +113,15 @@
 **Files:** js/pauseMenu.js
 **Commit:** (pending)
 ---
+## scorched-earth-x47.6 - Implement Pause Menu
+**Status:** Completed
+**Changes:** Fixed pause button click causing immediate menu close by adding timestamp-based delay in pauseMenu.js
+**Files:** js/pauseMenu.js
+**Commit:** 57eb819
+---
+## scorched-earth-wzf.6 - Shop: Nuclear weapons category cut off at bottom of panel
+**Status:** Completed
+**Changes:** Fixed shop layout to display all 5 weapon categories by making cards more compact (85px instead of 120px), reducing gaps, and adjusting panel height to 770px. All nuclear weapons (Mini Nuke, Nuke) are now visible and purchasable.
+**Files:** js/shop.js (SHOP_LAYOUT constants, renderWeaponCard function)
+**Commit:** cf131da
+---

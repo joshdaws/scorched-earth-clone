@@ -62,42 +62,42 @@ let purchaseFeedback = null;
  * Centered on screen with weapon cards in a grid layout.
  */
 const SHOP_LAYOUT = {
-    // Main shop panel
+    // Main shop panel - fills most of the screen to fit all 5 weapon categories
     PANEL: {
         X: CANVAS.DESIGN_WIDTH / 2,
         Y: CANVAS.DESIGN_HEIGHT / 2,
         WIDTH: 900,
-        HEIGHT: 650,
-        PADDING: 30
+        HEIGHT: 770,
+        PADDING: 15
     },
-    // Title area
+    // Title area - compact
     TITLE: {
-        Y_OFFSET: -280,  // From panel center
-        FONT_SIZE: 42
+        Y_OFFSET: -355,
+        FONT_SIZE: 32
     },
-    // Balance display
+    // Balance display - compact
     BALANCE: {
-        Y_OFFSET: -220,
-        HEIGHT: 40
+        Y_OFFSET: -310,
+        HEIGHT: 30
     },
-    // Weapon categories
+    // Weapon categories - tighter spacing
     CATEGORY: {
-        Y_START: -160,  // Starting Y offset from panel center
-        HEIGHT: 30,
-        SPACING: 10
+        Y_START: -260,
+        HEIGHT: 20,
+        SPACING: 5
     },
-    // Weapon cards grid
+    // Weapon cards grid - compact to fit all 5 categories
     CARD: {
         WIDTH: 200,
-        HEIGHT: 120,
-        GAP: 15,
+        HEIGHT: 85,   // Compact cards
+        GAP: 8,       // Minimal gap
         COLUMNS: 4
     },
-    // Done button
+    // Done button - positioned after content
     DONE_BUTTON: {
-        Y_OFFSET: 280,  // From panel center
-        WIDTH: 200,
-        HEIGHT: 55
+        Y_OFFSET: 355,
+        WIDTH: 160,
+        HEIGHT: 45
     }
 };
 
@@ -406,7 +406,7 @@ function renderWeaponCard(ctx, weapon, x, y, currentAmmo, canAfford, pulseIntens
     // Card background
     ctx.fillStyle = dimmed ? 'rgba(20, 20, 40, 0.85)' : 'rgba(26, 26, 46, 0.9)';
     ctx.beginPath();
-    ctx.roundRect(x, y, cardWidth, cardHeight, 8);
+    ctx.roundRect(x, y, cardWidth, cardHeight, 5);
     ctx.fill();
 
     // Feedback flash
@@ -421,59 +421,60 @@ function renderWeaponCard(ctx, weapon, x, y, currentAmmo, canAfford, pulseIntens
     ctx.lineWidth = 2;
     if (!dimmed) {
         ctx.shadowColor = borderColor;
-        ctx.shadowBlur = showFeedback && feedbackSuccess ? 20 : 6;
+        ctx.shadowBlur = showFeedback && feedbackSuccess ? 15 : 4;
     }
     ctx.stroke();
 
     ctx.shadowBlur = 0;
 
-    // Weapon name
+    // Weapon name (row 1)
     ctx.fillStyle = dimmed ? COLORS.TEXT_MUTED : COLORS.TEXT_LIGHT;
-    ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+    ctx.font = `bold ${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillText(weapon.name, x + 10, y + 10);
+    ctx.fillText(weapon.name, x + 6, y + 5);
 
-    // Stats row 1: Cost and Ammo per purchase
-    ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+    // Cost on right of name row
+    ctx.textAlign = 'right';
+    ctx.font = `${UI.FONT_SIZE_SMALL - 2}px ${UI.FONT_FAMILY}`;
     ctx.fillStyle = weapon.cost === 0 ? '#00ff88' : (canAfford ? COLORS.NEON_YELLOW : COLORS.NEON_PINK);
     const costText = weapon.cost === 0 ? 'FREE' : `$${weapon.cost.toLocaleString()}`;
-    ctx.fillText(costText, x + 10, y + 35);
+    ctx.fillText(costText, x + cardWidth - 6, y + 5);
 
-    // Ammo per purchase on right side
-    ctx.fillStyle = COLORS.TEXT_MUTED;
-    ctx.textAlign = 'right';
-    const ammoPerPurchase = weapon.ammo === Infinity ? '∞' : `+${weapon.ammo}`;
-    ctx.fillText(`x${ammoPerPurchase}`, x + cardWidth - 10, y + 35);
-
-    // Stats row 2: Damage and Radius
+    // Stats row: DMG, RAD, OWNED (row 2)
+    ctx.font = `${UI.FONT_SIZE_SMALL - 2}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'left';
     ctx.fillStyle = dimmed ? 'rgba(136, 136, 153, 0.5)' : COLORS.TEXT_MUTED;
-    ctx.fillText(`DMG: ${weapon.damage}`, x + 10, y + 55);
-    ctx.fillText(`RAD: ${weapon.blastRadius}`, x + 10, y + 75);
+    ctx.fillText(`D:${weapon.damage} R:${weapon.blastRadius}`, x + 6, y + 24);
 
-    // Current ammo owned
+    // Ammo owned
     ctx.textAlign = 'right';
     ctx.fillStyle = currentAmmo > 0 || currentAmmo === Infinity ? '#00ff88' : COLORS.TEXT_MUTED;
     const ownedAmmo = currentAmmo === Infinity ? '∞' : currentAmmo;
-    ctx.fillText(`OWNED: ${ownedAmmo}`, x + cardWidth - 10, y + 55);
+    ctx.fillText(`x${ownedAmmo}`, x + cardWidth - 6, y + 24);
 
-    // Buy indicator (if purchasable)
+    // Ammo per purchase (row 3)
+    ctx.textAlign = 'left';
+    ctx.fillStyle = COLORS.TEXT_MUTED;
+    const ammoPerPurchase = weapon.ammo === Infinity ? '∞/buy' : `+${weapon.ammo}/buy`;
+    ctx.fillText(ammoPerPurchase, x + 6, y + 42);
+
+    // Buy indicator (row 4, bottom of card)
     if (weapon.cost > 0 && canAfford) {
         ctx.fillStyle = borderColor;
-        ctx.font = `bold ${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
-        ctx.textAlign = 'center';
-        ctx.fillText('CLICK TO BUY', x + cardWidth / 2, y + cardHeight - 12);
-    } else if (weapon.cost === 0) {
-        ctx.fillStyle = COLORS.TEXT_MUTED;
-        ctx.font = `${UI.FONT_SIZE_SMALL - 2}px ${UI.FONT_FAMILY}`;
-        ctx.textAlign = 'center';
-        ctx.fillText('DEFAULT WEAPON', x + cardWidth / 2, y + cardHeight - 12);
-    } else if (weapon.cost > 0 && !canAfford) {
-        ctx.fillStyle = COLORS.NEON_PINK;
         ctx.font = `bold ${UI.FONT_SIZE_SMALL - 2}px ${UI.FONT_FAMILY}`;
         ctx.textAlign = 'center';
-        ctx.fillText('INSUFFICIENT FUNDS', x + cardWidth / 2, y + cardHeight - 12);
+        ctx.fillText('BUY', x + cardWidth / 2, y + cardHeight - 12);
+    } else if (weapon.cost === 0) {
+        ctx.fillStyle = COLORS.TEXT_MUTED;
+        ctx.font = `${UI.FONT_SIZE_SMALL - 3}px ${UI.FONT_FAMILY}`;
+        ctx.textAlign = 'center';
+        ctx.fillText('DEFAULT', x + cardWidth / 2, y + cardHeight - 12);
+    } else if (weapon.cost > 0 && !canAfford) {
+        ctx.fillStyle = COLORS.NEON_PINK;
+        ctx.font = `bold ${UI.FONT_SIZE_SMALL - 3}px ${UI.FONT_FAMILY}`;
+        ctx.textAlign = 'center';
+        ctx.fillText('NO FUNDS', x + cardWidth / 2, y + cardHeight - 12);
     }
 
     ctx.restore();
