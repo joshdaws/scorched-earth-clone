@@ -31,3 +31,4 @@ ios/App/*.xcworkspace
 *.xcuserstate
 xcuserdata/
 .playwright-mcp/
+.vercel
