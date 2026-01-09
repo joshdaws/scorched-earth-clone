@@ -63,3 +63,9 @@
 **Files:** js/effects.js, js/main.js
 **Commit:** 20436c9
 ---
+## scorched-earth-qff.3 - Implement Screen Flash Effect
+**Status:** Completed
+**Changes:** Implemented reusable screenFlash(color, duration) API in effects.js with smooth alpha fade, integrated with nuclear weapon explosions in main.js
+**Files:** js/effects.js, js/main.js
+**Commit:** (pending)
+---

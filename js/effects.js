@@ -589,3 +589,149 @@ export function isScreenShaking() {
 export function clearScreenShake() {
     screenShakeState = null;
 }
+
+// =============================================================================
+// SCREEN FLASH SYSTEM
+// =============================================================================
+
+/**
+ * Screen flash configuration.
+ */
+export const SCREEN_FLASH_CONFIG = {
+    /** Default flash duration in milliseconds */
+    DEFAULT_DURATION: 300,
+    /** Minimum flash duration in milliseconds */
+    MIN_DURATION: 200,
+    /** Maximum flash duration in milliseconds */
+    MAX_DURATION: 400,
+    /** Default flash color (white for nuclear explosions) */
+    DEFAULT_COLOR: { r: 255, g: 255, b: 255 }
+};
+
+/**
+ * Screen flash effect state.
+ * Tracks active flash with color, duration, and timing.
+ * @type {{active: boolean, color: {r: number, g: number, b: number}, startTime: number, duration: number}|null}
+ */
+let screenFlashState = null;
+
+/**
+ * Trigger a screen flash effect.
+ * Flash starts at full opacity and fades to transparent.
+ * New flashes replace existing flashes (no stacking).
+ *
+ * @param {string|{r: number, g: number, b: number}} color - Flash color as CSS string or RGB object
+ * @param {number} duration - Flash duration in milliseconds (200-400ms recommended)
+ */
+export function screenFlash(color, duration) {
+    // Parse color if provided as string (e.g., 'white', '#ffffff', 'rgb(255,255,255)')
+    let parsedColor;
+    if (typeof color === 'string') {
+        // Handle common color names
+        if (color === 'white') {
+            parsedColor = { r: 255, g: 255, b: 255 };
+        } else if (color === 'red') {
+            parsedColor = { r: 255, g: 0, b: 0 };
+        } else if (color === 'yellow') {
+            parsedColor = { r: 255, g: 255, b: 0 };
+        } else {
+            // Default to white for unknown colors
+            parsedColor = SCREEN_FLASH_CONFIG.DEFAULT_COLOR;
+        }
+    } else if (color && typeof color === 'object') {
+        parsedColor = {
+            r: color.r ?? 255,
+            g: color.g ?? 255,
+            b: color.b ?? 255
+        };
+    } else {
+        parsedColor = SCREEN_FLASH_CONFIG.DEFAULT_COLOR;
+    }
+
+    // Clamp duration to valid range
+    const clampedDuration = Math.max(
+        SCREEN_FLASH_CONFIG.MIN_DURATION,
+        Math.min(SCREEN_FLASH_CONFIG.MAX_DURATION, duration ?? SCREEN_FLASH_CONFIG.DEFAULT_DURATION)
+    );
+
+    screenFlashState = {
+        active: true,
+        color: parsedColor,
+        startTime: performance.now(),
+        duration: clampedDuration
+    };
+
+    console.log(`Screen flash: color=rgb(${parsedColor.r},${parsedColor.g},${parsedColor.b}), duration=${clampedDuration}ms`);
+}
+
+/**
+ * Get the current screen flash info for rendering.
+ * Returns color and alpha value to render as overlay.
+ * Alpha decays smoothly from 0.9 to 0 over the flash duration.
+ *
+ * @returns {{color: {r: number, g: number, b: number}, alpha: number}|null} Flash info or null if no flash
+ */
+export function getScreenFlashInfo() {
+    if (!screenFlashState || !screenFlashState.active) {
+        return null;
+    }
+
+    const elapsed = performance.now() - screenFlashState.startTime;
+    if (elapsed > screenFlashState.duration) {
+        // Flash complete - reset state
+        screenFlashState = null;
+        return null;
+    }
+
+    // Calculate fade progress (0 at start, 1 at end)
+    const progress = elapsed / screenFlashState.duration;
+
+    // Smooth alpha decay using quadratic easing
+    // Starts at 0.9 and fades to 0 (fast initial fade, then slower)
+    const alpha = Math.pow(1 - progress, 2) * 0.9;
+
+    return {
+        color: screenFlashState.color,
+        alpha: alpha
+    };
+}
+
+/**
+ * Render the screen flash effect to the canvas.
+ * Covers the entire canvas with a colored overlay that fades out.
+ *
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D rendering context
+ * @param {number} width - Canvas width
+ * @param {number} height - Canvas height
+ */
+export function renderScreenFlash(ctx, width, height) {
+    const flashInfo = getScreenFlashInfo();
+    if (!flashInfo) return;
+
+    ctx.save();
+    ctx.fillStyle = `rgba(${flashInfo.color.r}, ${flashInfo.color.g}, ${flashInfo.color.b}, ${flashInfo.alpha})`;
+    ctx.fillRect(0, 0, width, height);
+    ctx.restore();
+}
+
+/**
+ * Check if a screen flash is currently active.
+ *
+ * @returns {boolean} True if flash is in progress
+ */
+export function isScreenFlashing() {
+    if (!screenFlashState || !screenFlashState.active) {
+        return false;
+    }
+
+    const elapsed = performance.now() - screenFlashState.startTime;
+    return elapsed <= screenFlashState.duration;
+}
+
+/**
+ * Clear any active screen flash effect.
+ * Use when resetting game state.
+ */
+export function clearScreenFlash() {
+    screenFlashState = null;
+}

@@ -24,7 +24,7 @@ import * as AimingControls from './aimingControls.js';
 import * as VictoryDefeat from './victoryDefeat.js';
 import * as Money from './money.js';
 import * as Shop from './shop.js';
-import { spawnExplosionParticles, updateParticles, renderParticles, clearParticles, getParticleCount, screenShakeForBlastRadius, getScreenShakeOffset, clearScreenShake } from './effects.js';
+import { spawnExplosionParticles, updateParticles, renderParticles, clearParticles, getParticleCount, screenShakeForBlastRadius, getScreenShakeOffset, clearScreenShake, screenFlash, renderScreenFlash, clearScreenFlash } from './effects.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -87,14 +87,8 @@ let splitEffect = null;
 // NUCLEAR WEAPON EFFECT STATE
 // =============================================================================
 
-// Screen shake is now handled by effects.js - see screenShakeForBlastRadius() and getScreenShakeOffset()
-
-/**
- * Screen flash effect state for nuclear explosions.
- * Creates a bright white flash that fades out.
- * @type {{active: boolean, startTime: number, duration: number}|null}
- */
-let screenFlashEffect = null;
+// Screen shake and screen flash are now handled by effects.js
+// See screenShakeForBlastRadius(), getScreenShakeOffset(), screenFlash(), renderScreenFlash()
 
 /**
  * Explosion effect state for visual feedback on projectile impact.
@@ -880,13 +874,9 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
     if (isNuclear) {
         console.log(`Nuclear explosion at (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}) - ${weapon.name}`);
 
-        // Screen flash effect (white flash)
+        // Screen flash effect (white flash) - triggers for nuclear weapons only
         if (weapon.screenFlash) {
-            screenFlashEffect = {
-                active: true,
-                startTime: performance.now(),
-                duration: 300 // 300ms flash
-            };
+            screenFlash('white', 300);
         }
 
         // Play nuclear explosion sound
@@ -1784,31 +1774,7 @@ function renderExplosionEffect(ctx) {
     ctx.restore();
 }
 
-/**
- * Render the screen flash effect (white flash for nuclear explosions).
- * Covers the entire screen with a fading white overlay.
- *
- * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
- */
-function renderScreenFlash(ctx) {
-    if (!screenFlashEffect || !screenFlashEffect.active) return;
-
-    const elapsed = performance.now() - screenFlashEffect.startTime;
-    if (elapsed > screenFlashEffect.duration) {
-        screenFlashEffect = null;
-        return;
-    }
-
-    const progress = elapsed / screenFlashEffect.duration;
-    // Fast fade: high opacity at start, quickly fading
-    const alpha = Math.pow(1 - progress, 2) * 0.9;
-
-    ctx.save();
-    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
-    ctx.fillRect(0, 0, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
-    ctx.restore();
-}
-
+// renderScreenFlash() is now imported from effects.js
 // getScreenShakeOffset() is now imported from effects.js
 
 /**
@@ -2189,7 +2155,7 @@ function renderPlaying(ctx) {
     }
 
     // Render screen flash on top of everything (not affected by shake)
-    renderScreenFlash(ctx);
+    renderScreenFlash(ctx, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
 }
 
 /**
@@ -2379,7 +2345,7 @@ function setupPlayingState() {
             splitEffect = null;
             // Reset visual effect states
             clearScreenShake();
-            screenFlashEffect = null;
+            clearScreenFlash();
             explosionEffect = null;
             // Clear explosion particles
             clearParticles();
