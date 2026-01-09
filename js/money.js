@@ -28,6 +28,19 @@ export const MONEY = {
     DEFEAT_CONSOLATION: 100
 };
 
+/**
+ * Round-based money multipliers.
+ * Higher rounds award more money to encourage progression.
+ * - Rounds 1-2: 1.0x (standard rewards)
+ * - Rounds 3-4: 1.2x (20% bonus)
+ * - Rounds 5+: 1.5x (50% bonus)
+ */
+const ROUND_MULTIPLIERS = {
+    EARLY: 1.0,    // Rounds 1-2
+    MEDIUM: 1.2,   // Rounds 3-4
+    LATE: 1.5      // Rounds 5+
+};
+
 // =============================================================================
 // MODULE STATE
 // =============================================================================
@@ -50,6 +63,19 @@ let roundEarnings = 0;
  */
 let roundDamage = 0;
 
+/**
+ * Current round's money multiplier.
+ * Updated when startRound() is called with a round number.
+ * @type {number}
+ */
+let currentMultiplier = ROUND_MULTIPLIERS.EARLY;
+
+/**
+ * Current round number (for display and tracking).
+ * @type {number}
+ */
+let currentRoundNumber = 1;
+
 // =============================================================================
 // DEBUG LOGGING
 // =============================================================================
@@ -68,6 +94,45 @@ function logMoneyChange(reason, amount, newTotal) {
 }
 
 // =============================================================================
+// ROUND MULTIPLIER
+// =============================================================================
+
+/**
+ * Get the money multiplier for a given round number.
+ * - Rounds 1-2: 1.0x (standard rewards)
+ * - Rounds 3-4: 1.2x (20% bonus)
+ * - Rounds 5+: 1.5x (50% bonus)
+ *
+ * @param {number} roundNumber - Current round (1-based)
+ * @returns {number} Money multiplier for the round
+ */
+export function getMultiplierForRound(roundNumber) {
+    if (roundNumber <= 2) {
+        return ROUND_MULTIPLIERS.EARLY;
+    } else if (roundNumber <= 4) {
+        return ROUND_MULTIPLIERS.MEDIUM;
+    } else {
+        return ROUND_MULTIPLIERS.LATE;
+    }
+}
+
+/**
+ * Get the current round's money multiplier.
+ * @returns {number} Current multiplier
+ */
+export function getMultiplier() {
+    return currentMultiplier;
+}
+
+/**
+ * Get the current round number.
+ * @returns {number} Current round (1-based)
+ */
+export function getRoundNumber() {
+    return currentRoundNumber;
+}
+
+// =============================================================================
 // MONEY OPERATIONS
 // =============================================================================
 
@@ -78,6 +143,8 @@ export function init() {
     currentMoney = MONEY.STARTING_AMOUNT;
     roundEarnings = 0;
     roundDamage = 0;
+    currentMultiplier = ROUND_MULTIPLIERS.EARLY;
+    currentRoundNumber = 1;
 
     if (DEBUG.ENABLED) {
         console.log(`[Money] Initialized with $${MONEY.STARTING_AMOUNT.toLocaleString()}`);
@@ -86,14 +153,17 @@ export function init() {
 
 /**
  * Reset round tracking at the start of a new round.
- * Does not reset the player's total money.
+ * Updates the money multiplier based on round number.
+ * @param {number} [roundNumber=1] - Current round number (1-based)
  */
-export function startRound() {
+export function startRound(roundNumber = 1) {
     roundEarnings = 0;
     roundDamage = 0;
+    currentRoundNumber = roundNumber;
+    currentMultiplier = getMultiplierForRound(roundNumber);
 
     if (DEBUG.ENABLED) {
-        console.log(`[Money] New round started. Current balance: $${currentMoney.toLocaleString()}`);
+        console.log(`[Money] Round ${roundNumber} started. Multiplier: ${currentMultiplier}x | Balance: $${currentMoney.toLocaleString()}`);
     }
 }
 
@@ -184,48 +254,54 @@ export function canAfford(amount) {
 
 /**
  * Award money for landing a hit on an enemy tank.
- * Formula: $100 + (damage × 2)
+ * Formula: ($100 + (damage × 2)) × round multiplier
  * @param {number} damage - Damage dealt to the enemy
  * @returns {number} Amount awarded
  */
 export function awardHitReward(damage) {
-    const reward = MONEY.HIT_BASE_REWARD + Math.floor(damage * MONEY.DAMAGE_MULTIPLIER);
+    const baseReward = MONEY.HIT_BASE_REWARD + Math.floor(damage * MONEY.DAMAGE_MULTIPLIER);
+    const reward = Math.floor(baseReward * currentMultiplier);
 
     currentMoney += reward;
     roundEarnings += reward;
     roundDamage += damage;
 
-    logMoneyChange(`Hit reward (${damage} damage)`, reward, currentMoney);
+    const multiplierInfo = currentMultiplier > 1 ? ` (${currentMultiplier}x)` : '';
+    logMoneyChange(`Hit reward (${damage} damage)${multiplierInfo}`, reward, currentMoney);
 
     return reward;
 }
 
 /**
  * Award the victory bonus for winning a round.
+ * Multiplied by round bonus multiplier.
  * @returns {number} Amount awarded
  */
 export function awardVictoryBonus() {
-    const reward = MONEY.VICTORY_BONUS;
+    const reward = Math.floor(MONEY.VICTORY_BONUS * currentMultiplier);
 
     currentMoney += reward;
     roundEarnings += reward;
 
-    logMoneyChange('Victory bonus', reward, currentMoney);
+    const multiplierInfo = currentMultiplier > 1 ? ` (${currentMultiplier}x)` : '';
+    logMoneyChange(`Victory bonus${multiplierInfo}`, reward, currentMoney);
 
     return reward;
 }
 
 /**
  * Award the consolation prize for losing a round.
+ * Multiplied by round bonus multiplier.
  * @returns {number} Amount awarded
  */
 export function awardDefeatConsolation() {
-    const reward = MONEY.DEFEAT_CONSOLATION;
+    const reward = Math.floor(MONEY.DEFEAT_CONSOLATION * currentMultiplier);
 
     currentMoney += reward;
     roundEarnings += reward;
 
-    logMoneyChange('Defeat consolation', reward, currentMoney);
+    const multiplierInfo = currentMultiplier > 1 ? ` (${currentMultiplier}x)` : '';
+    logMoneyChange(`Defeat consolation${multiplierInfo}`, reward, currentMoney);
 
     return reward;
 }
@@ -251,6 +327,8 @@ export function getState() {
     return {
         currentMoney,
         roundEarnings,
-        roundDamage
+        roundDamage,
+        currentRoundNumber,
+        currentMultiplier
     };
 }

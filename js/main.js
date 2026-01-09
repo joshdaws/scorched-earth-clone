@@ -198,11 +198,13 @@ function renderWeaponHUD(ctx) {
 /**
  * Render the round and AI difficulty indicator.
  * Displayed below the wind indicator at the top-left.
+ * Shows round number, AI difficulty, and money multiplier.
  * @param {CanvasRenderingContext2D} ctx - Canvas rendering context
  */
 function renderRoundIndicator(ctx) {
     const difficulty = AI.getDifficulty();
     const difficultyName = AI.getDifficultyName(difficulty);
+    const multiplier = Money.getMultiplier();
 
     // Position below wind indicator
     const x = 20;
@@ -246,6 +248,30 @@ function renderRoundIndicator(ctx) {
     ctx.fillText(difficultyName.toUpperCase(), x + pillWidth - 10, y + pillHeight / 2);
 
     ctx.restore();
+
+    // Render money multiplier indicator below when above 1.0x
+    if (multiplier > 1.0) {
+        const bonusY = y + pillHeight + 5;
+        const bonusPillWidth = 90;
+        const bonusPillHeight = 20;
+
+        ctx.save();
+
+        // Background pill for bonus
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.beginPath();
+        ctx.roundRect(x, bonusY, bonusPillWidth, bonusPillHeight, 6);
+        ctx.fill();
+
+        // Bonus text in gold/yellow color
+        ctx.font = `bold ${UI.FONT_SIZE_SMALL - 2}px ${UI.FONT_FAMILY}`;
+        ctx.fillStyle = '#ffd700'; // Gold color for money bonus
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`${multiplier}x BONUS`, x + bonusPillWidth / 2, bonusY + bonusPillHeight / 2);
+
+        ctx.restore();
+    }
 }
 
 // =============================================================================
@@ -2302,8 +2328,9 @@ function setupPlayingState() {
             if (isNewGame) {
                 Money.init();
             }
-            // Start round earnings tracking for all round starts
-            Money.startRound();
+            // Start round earnings tracking with round number for multiplier
+            // Rounds 1-2: 1.0x, Rounds 3-4: 1.2x, Rounds 5+: 1.5x
+            Money.startRound(currentRound);
 
             // Save player inventory before creating new tanks (for round continuation)
             // Inventory persists across rounds when transitioning from SHOP or DEFEAT
@@ -2433,7 +2460,8 @@ function updateVictoryDefeat(deltaTime) {
  */
 function startNextRound() {
     currentRound++;
-    Money.startRound();  // Reset round earnings tracking
+    // Note: Money.startRound(currentRound) is called in PLAYING state's onEnter handler
+    // after the round counter is already incremented
     console.log(`[Main] Starting round ${currentRound}`);
     Game.setState(GAME_STATES.PLAYING);
 }

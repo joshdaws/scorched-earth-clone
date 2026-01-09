@@ -22,3 +22,9 @@
 **Files:** js/main.js
 **Commit:** 4ad46f9
 ---
+## scorched-earth-wzf.5 - Implement Round Progression
+**Status:** Completed
+**Changes:** Implemented round-based money multipliers (1.0x for rounds 1-2, 1.2x for rounds 3-4, 1.5x for rounds 5+). Added getMultiplierForRound() function, updated reward functions to apply multipliers, added money bonus indicator to HUD.
+**Files:** js/money.js (money multiplier system), js/main.js (HUD indicator, Money.startRound() calls)
+**Commit:** 0a072a4
+---
