@@ -58,6 +58,16 @@ const HUD = {
         Y: 20,
         WIDTH: 200,
         HEIGHT: 30
+    },
+    // Game state panel at top-center - container for turn indicator, round, wind
+    // Will eventually replace individual top-center elements
+    GAME_STATE_PANEL: {
+        X: CANVAS.DESIGN_WIDTH / 2,  // Center X
+        Y: 12,                        // Top padding
+        WIDTH: 360,                   // Wide enough for content
+        MIN_HEIGHT: 50,               // Minimum height (auto-expands with content)
+        PADDING: 16,
+        BORDER_RADIUS: 12
     }
 };
 
@@ -160,6 +170,70 @@ function drawPanel(ctx, x, y, width, height, borderColor, rightAligned = false, 
     ctx.restore();
 
     return drawX;
+}
+
+/**
+ * Draw the centered game state panel at the top of the screen.
+ * This is a container panel for turn indicator, round info, and wind.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {number} [contentHeight=0] - Additional height for content (auto-expands)
+ * @returns {{x: number, y: number, width: number, height: number}} Panel bounds for content placement
+ */
+function drawGameStatePanel(ctx, contentHeight = 0) {
+    const panel = HUD.GAME_STATE_PANEL;
+    const height = Math.max(panel.MIN_HEIGHT, panel.MIN_HEIGHT + contentHeight);
+    const drawX = panel.X - panel.WIDTH / 2;  // Center horizontally
+
+    ctx.save();
+
+    // Dark translucent background
+    ctx.fillStyle = 'rgba(10, 10, 26, 0.85)';
+    ctx.beginPath();
+    ctx.roundRect(drawX, panel.Y, panel.WIDTH, height, panel.BORDER_RADIUS);
+    ctx.fill();
+
+    // Cyan glowing border (synthwave aesthetic)
+    ctx.strokeStyle = COLORS.NEON_CYAN;
+    ctx.lineWidth = 2;
+    ctx.shadowColor = COLORS.NEON_CYAN;
+    ctx.shadowBlur = 8;
+    ctx.stroke();
+
+    // Subtle inner glow effect
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = `${COLORS.NEON_CYAN}40`;  // 25% opacity
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(drawX + 2, panel.Y + 2, panel.WIDTH - 4, height - 4, panel.BORDER_RADIUS - 2);
+    ctx.stroke();
+
+    ctx.restore();
+
+    // Return bounds for content placement
+    return {
+        x: drawX,
+        y: panel.Y,
+        width: panel.WIDTH,
+        height: height,
+        innerX: drawX + panel.PADDING,
+        innerY: panel.Y + panel.PADDING,
+        innerWidth: panel.WIDTH - panel.PADDING * 2,
+        innerHeight: height - panel.PADDING * 2
+    };
+}
+
+/**
+ * Render the game state panel container.
+ * Currently renders as an empty styled container.
+ * Future children: turn indicator, round/difficulty, wind.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ */
+export function renderGameStatePanel(ctx) {
+    if (!ctx) return;
+
+    // For now, just draw the empty panel container
+    // Content will be added in subsequent issues
+    drawGameStatePanel(ctx);
 }
 
 /**
@@ -670,6 +744,9 @@ export function renderHUD(ctx, state) {
         phase = null,
         shooter = 'player'
     } = state;
+
+    // Render game state panel first (container at top-center)
+    renderGameStatePanel(ctx);
 
     // Render all HUD elements
     renderHealthBars(ctx, playerTank, enemyTank);
