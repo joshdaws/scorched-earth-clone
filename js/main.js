@@ -17,6 +17,7 @@ import { placeTanksOnTerrain, updateTankTerrainPosition } from './tank.js';
 import { Projectile, createProjectileFromTank, checkTankCollision } from './projectile.js';
 import { applyExplosionDamage, applyExplosionToAllTanks, DAMAGE } from './damage.js';
 import * as Wind from './wind.js';
+import { WeaponRegistry } from './weapons.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -239,9 +240,12 @@ function updateProjectile() {
     if (tankHit) {
         const { tank, directHit } = tankHit;
 
-        // Create explosion data at impact point
-        // Blast radius is smaller for direct tank hits
-        const blastRadius = 30;
+        // Get weapon data from registry for damage and blast radius values
+        const weaponId = activeProjectile.weaponId;
+        const weapon = WeaponRegistry.getWeapon(weaponId);
+
+        // Use weapon blast radius, fallback to 30 if weapon not found
+        const blastRadius = weapon ? weapon.blastRadius : 30;
         const explosion = {
             x: pos.x,
             y: pos.y,
@@ -250,13 +254,13 @@ function updateProjectile() {
 
         // Apply explosion damage to the hit tank using the damage calculation system
         // This uses distance-based falloff with direct hit multiplier
-        const damageResult = applyExplosionDamage(explosion, tank, null /* weapon - will be used later */);
+        const damageResult = applyExplosionDamage(explosion, tank, weapon);
 
         // Also check for splash damage to other tanks
         const allTanks = [playerTank, enemyTank].filter(t => t !== null && t !== tank);
-        applyExplosionToAllTanks(explosion, allTanks, null);
+        applyExplosionToAllTanks(explosion, allTanks, weapon);
 
-        console.log(`Tank hit! ${tank.team} took ${damageResult.actualDamage} damage${damageResult.isDirectHit ? ' (DIRECT HIT!)' : ''}, health: ${tank.health}`);
+        console.log(`Tank hit! ${tank.team} took ${damageResult.actualDamage} damage${damageResult.isDirectHit ? ' (DIRECT HIT!)' : ''}, health: ${tank.health} (weapon: ${weapon ? weapon.name : 'unknown'})`);
         if (currentTerrain) {
             destroyTerrainAt(pos.x, pos.y, blastRadius);
 
@@ -286,9 +290,12 @@ function updateProjectile() {
         if (collision && collision.hit) {
             console.log(`Projectile hit terrain at (${collision.x}, ${collision.y.toFixed(1)})`);
 
-            // Destroy terrain at impact point with blast radius
-            // Using a default radius for now - will be weapon-dependent later
-            const blastRadius = 40;
+            // Get weapon data from registry for blast radius and damage values
+            const weaponId = activeProjectile.weaponId;
+            const weapon = WeaponRegistry.getWeapon(weaponId);
+
+            // Use weapon blast radius, fallback to 40 if weapon not found
+            const blastRadius = weapon ? weapon.blastRadius : 40;
 
             // Create explosion data for damage calculation
             const explosion = {
@@ -299,7 +306,7 @@ function updateProjectile() {
 
             // Apply splash damage to all tanks near the explosion
             const allTanks = [playerTank, enemyTank].filter(t => t !== null);
-            const damageResults = applyExplosionToAllTanks(explosion, allTanks, null);
+            const damageResults = applyExplosionToAllTanks(explosion, allTanks, weapon);
 
             // Log any damage dealt
             for (const result of damageResults) {

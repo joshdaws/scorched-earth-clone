@@ -244,5 +244,11 @@
 **Status:** Completed
 **Changes:** Created complete weapon system with WEAPON_TYPES enum, createWeapon() factory, all 11 weapon definitions matching game spec, and WeaponRegistry with full API (getWeapon, getAllWeapons, getWeaponsByType, etc.)
 **Files:** js/weapons.js (new)
-**Commit:** pending
+**Commit:** ff0cf54
+---
+## scorched-earth-8qc.2 - Implement Basic Shot Weapon
+**Status:** Completed
+**Changes:** Integrated Basic Shot weapon from weapon registry into projectile/damage systems. Fixed weapon ID mismatch (basic -> basic-shot), integrated WeaponRegistry into collision handlers, weapon-specific blast radius (30px) and damage values now used.
+**Files:** js/tank.js, js/main.js
+**Commit:** d7485af
 ---

@@ -80,20 +80,20 @@ export class Tank {
 
         /**
          * Currently selected weapon.
-         * Stores the weapon ID string (e.g., 'basic', 'mirv', 'nuke').
-         * The weapon registry will be implemented in weapons.js.
+         * Stores the weapon ID string (e.g., 'basic-shot', 'mirv', 'nuke').
+         * The weapon registry is implemented in weapons.js.
          * @type {string}
          */
-        this.currentWeapon = 'basic';
+        this.currentWeapon = 'basic-shot';
 
         /**
          * Weapon inventory.
          * Maps weapon IDs to ammo counts.
-         * 'basic' has unlimited ammo (represented as Infinity).
+         * 'basic-shot' has unlimited ammo (represented as Infinity).
          * @type {Object.<string, number>}
          */
         this.inventory = {
-            basic: Infinity
+            'basic-shot': Infinity
         };
 
         console.log(`Tank created: team=${team}, position=(${x}, ${y}), health=${this.health}`);
@@ -257,10 +257,10 @@ export class Tank {
         // Consume ammo
         this.inventory[this.currentWeapon]--;
 
-        // If out of this weapon, switch to basic
+        // If out of this weapon, switch to basic-shot
         if (this.inventory[this.currentWeapon] <= 0) {
-            console.log(`Tank (${this.team}) out of ${this.currentWeapon}, switching to basic`);
-            this.currentWeapon = 'basic';
+            console.log(`Tank (${this.team}) out of ${this.currentWeapon}, switching to basic-shot`);
+            this.currentWeapon = 'basic-shot';
         }
 
         return true;
