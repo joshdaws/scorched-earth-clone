@@ -441,8 +441,8 @@ function handleMenuClick(pos) {
     if (isInsideButton(pos.x, pos.y, menuButtons.start)) {
         // Play click sound
         Sound.playClickSound();
-        // Start fade-out transition, then go to PLAYING state
-        startMenuTransition(GAME_STATES.PLAYING);
+        // Start fade-out transition, then go to DIFFICULTY_SELECT state
+        startMenuTransition(GAME_STATES.DIFFICULTY_SELECT);
     } else if (isInsideButton(pos.x, pos.y, menuButtons.options) && menuButtons.options.enabled) {
         // Play click sound
         Sound.playClickSound();
@@ -932,12 +932,309 @@ function setupMenuState() {
                 return;
             }
 
-            // Space/Enter starts game (only if options not open)
+            // Space/Enter starts game (only if options not open) - go to difficulty selection
             if (!optionsOverlayVisible && (keyCode === 'Space' || keyCode === 'Enter')) {
-                Game.setState(GAME_STATES.PLAYING);
+                Game.setState(GAME_STATES.DIFFICULTY_SELECT);
             }
         }
     });
+}
+
+// =============================================================================
+// DIFFICULTY SELECTION STATE
+// =============================================================================
+
+/**
+ * Selected difficulty level (persists across rounds until new game from menu).
+ * @type {string|null}
+ */
+let selectedDifficulty = null;
+
+/**
+ * Difficulty selection button definitions.
+ * Centered vertically on screen with consistent spacing.
+ */
+const difficultyButtons = {
+    easy: {
+        x: CANVAS.DESIGN_WIDTH / 2,
+        y: CANVAS.DESIGN_HEIGHT / 2 - 70,
+        width: 280,
+        height: 60,
+        text: 'EASY',
+        color: '#00ff88',  // Green
+        difficulty: 'easy',
+        description: 'Relaxed gameplay • AI makes more mistakes'
+    },
+    medium: {
+        x: CANVAS.DESIGN_WIDTH / 2,
+        y: CANVAS.DESIGN_HEIGHT / 2 + 10,
+        width: 280,
+        height: 60,
+        text: 'MEDIUM',
+        color: '#ffff00',  // Yellow
+        difficulty: 'medium',
+        description: 'Balanced challenge • AI compensates for wind'
+    },
+    hard: {
+        x: CANVAS.DESIGN_WIDTH / 2,
+        y: CANVAS.DESIGN_HEIGHT / 2 + 90,
+        width: 280,
+        height: 60,
+        text: 'HARD',
+        color: '#ff4444',  // Red
+        difficulty: 'hard',
+        description: 'Brutal precision • AI rarely misses'
+    }
+};
+
+/**
+ * Back button for difficulty selection screen.
+ */
+const difficultyBackButton = {
+    x: CANVAS.DESIGN_WIDTH / 2,
+    y: CANVAS.DESIGN_HEIGHT - 80,
+    width: 200,
+    height: 50,
+    text: '← BACK',
+    color: COLORS.TEXT_MUTED
+};
+
+/**
+ * Animation time for difficulty selection screen.
+ */
+let difficultyAnimationTime = 0;
+
+/**
+ * Handle click on difficulty selection screen.
+ * @param {{x: number, y: number}} pos - Click position in design coordinates
+ */
+function handleDifficultyClick(pos) {
+    if (Game.getState() !== GAME_STATES.DIFFICULTY_SELECT) return;
+
+    // Check difficulty buttons
+    for (const key of Object.keys(difficultyButtons)) {
+        const button = difficultyButtons[key];
+        if (isInsideButton(pos.x, pos.y, button)) {
+            // Play click sound
+            Sound.playClickSound();
+            // Set the selected difficulty
+            selectedDifficulty = button.difficulty;
+            console.log(`[Main] Player selected difficulty: ${selectedDifficulty}`);
+            // Start the game
+            Game.setState(GAME_STATES.PLAYING);
+            return;
+        }
+    }
+
+    // Check back button
+    if (isInsideButton(pos.x, pos.y, difficultyBackButton)) {
+        Sound.playClickSound();
+        Game.setState(GAME_STATES.MENU);
+    }
+}
+
+/**
+ * Render a difficulty selection button with glow effect.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {Object} button - Button definition
+ * @param {number} pulseIntensity - Glow pulse intensity (0-1)
+ */
+function renderDifficultyButton(ctx, button, pulseIntensity) {
+    const halfWidth = button.width / 2;
+    const halfHeight = button.height / 2;
+    const btnX = button.x - halfWidth;
+    const btnY = button.y - halfHeight;
+
+    ctx.save();
+
+    // Button background with rounded corners
+    ctx.fillStyle = 'rgba(26, 26, 46, 0.8)';
+    ctx.beginPath();
+    ctx.roundRect(btnX, btnY, button.width, button.height, 8);
+    ctx.fill();
+
+    // Neon glow effect (pulsing)
+    ctx.shadowColor = button.color;
+    ctx.shadowBlur = 15 + pulseIntensity * 10;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+
+    // Button border (neon outline)
+    ctx.strokeStyle = button.color;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.roundRect(btnX, btnY, button.width, button.height, 8);
+    ctx.stroke();
+
+    // Reset shadow for text
+    ctx.shadowBlur = 0;
+
+    // Button text with glow
+    ctx.shadowColor = button.color;
+    ctx.shadowBlur = 8 + pulseIntensity * 5;
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.font = `bold ${UI.FONT_SIZE_LARGE}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(button.text, button.x, button.y - 5);
+
+    // Description text below button text
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = COLORS.TEXT_MUTED;
+    ctx.font = `${UI.FONT_SIZE_SMALL - 2}px ${UI.FONT_FAMILY}`;
+    ctx.fillText(button.description, button.x, button.y + 18);
+
+    ctx.restore();
+}
+
+/**
+ * Render the difficulty selection screen.
+ * Uses the same synthwave background as the menu.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ */
+function renderDifficultySelect(ctx) {
+    // Update animation time
+    difficultyAnimationTime += 16;  // Approximate 60fps frame time
+
+    // Calculate pulse intensity for glowing effects (0-1, oscillating)
+    const pulseIntensity = (Math.sin(difficultyAnimationTime * 0.003) + 1) / 2;
+
+    ctx.save();
+
+    // Render synthwave background (same as menu)
+    renderMenuBackground(ctx);
+
+    // Semi-transparent overlay for content area
+    const overlayGradient = ctx.createLinearGradient(0, 0, 0, CANVAS.DESIGN_HEIGHT);
+    overlayGradient.addColorStop(0, 'rgba(10, 10, 26, 0.7)');
+    overlayGradient.addColorStop(0.5, 'rgba(10, 10, 26, 0.3)');
+    overlayGradient.addColorStop(1, 'rgba(10, 10, 26, 0.7)');
+    ctx.fillStyle = overlayGradient;
+    ctx.fillRect(0, 0, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+
+    // Title with neon glow effect
+    const titleY = 120;
+
+    ctx.save();
+    ctx.shadowColor = COLORS.NEON_CYAN;
+    ctx.shadowBlur = 20 + pulseIntensity * 15;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+
+    ctx.font = `bold 48px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = COLORS.NEON_CYAN;
+    ctx.fillText('SELECT DIFFICULTY', CANVAS.DESIGN_WIDTH / 2, titleY);
+    ctx.restore();
+
+    // Subtitle
+    ctx.fillStyle = COLORS.TEXT_MUTED;
+    ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Choose your challenge level', CANVAS.DESIGN_WIDTH / 2, titleY + 45);
+
+    // Render difficulty buttons
+    for (const key of Object.keys(difficultyButtons)) {
+        renderDifficultyButton(ctx, difficultyButtons[key], pulseIntensity);
+    }
+
+    // Render back button (simpler style)
+    const backBtn = difficultyBackButton;
+    const backHalfWidth = backBtn.width / 2;
+    const backHalfHeight = backBtn.height / 2;
+    const backBtnX = backBtn.x - backHalfWidth;
+    const backBtnY = backBtn.y - backHalfHeight;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(26, 26, 46, 0.6)';
+    ctx.beginPath();
+    ctx.roundRect(backBtnX, backBtnY, backBtn.width, backBtn.height, 6);
+    ctx.fill();
+
+    ctx.strokeStyle = COLORS.TEXT_MUTED;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(backBtnX, backBtnY, backBtn.width, backBtn.height, 6);
+    ctx.stroke();
+
+    ctx.fillStyle = COLORS.TEXT_MUTED;
+    ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(backBtn.text, backBtn.x, backBtn.y);
+    ctx.restore();
+
+    // Neon frame around the screen (same as menu)
+    ctx.save();
+    ctx.strokeStyle = COLORS.NEON_CYAN;
+    ctx.shadowColor = COLORS.NEON_CYAN;
+    ctx.shadowBlur = 15;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(20, 20, CANVAS.DESIGN_WIDTH - 40, CANVAS.DESIGN_HEIGHT - 40);
+    ctx.restore();
+
+    ctx.restore();
+
+    // Render CRT effects as final post-processing overlay
+    renderCrtEffects(ctx, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+}
+
+/**
+ * Setup difficulty selection state handlers.
+ */
+function setupDifficultySelectState() {
+    // Register difficulty select state handlers
+    Game.registerStateHandlers(GAME_STATES.DIFFICULTY_SELECT, {
+        onEnter: (fromState) => {
+            console.log('Entered DIFFICULTY_SELECT state');
+            difficultyAnimationTime = 0;
+        },
+        onExit: (toState) => {
+            console.log('Exiting DIFFICULTY_SELECT state');
+        },
+        render: renderDifficultySelect
+    });
+
+    // Register click handler for difficulty selection
+    Input.onMouseDown((x, y, button) => {
+        if (Game.getState() === GAME_STATES.DIFFICULTY_SELECT && button === 0) {
+            handleDifficultyClick({ x, y });
+        }
+    });
+
+    // Register touch handler for difficulty selection
+    Input.onTouchStart((x, y) => {
+        if (Game.getState() === GAME_STATES.DIFFICULTY_SELECT) {
+            handleDifficultyClick({ x, y });
+        }
+    });
+
+    // Handle keyboard - Escape to go back
+    Input.onKeyDown((keyCode) => {
+        if (Game.getState() === GAME_STATES.DIFFICULTY_SELECT) {
+            if (keyCode === 'Escape') {
+                Sound.playClickSound();
+                Game.setState(GAME_STATES.MENU);
+            }
+        }
+    });
+}
+
+/**
+ * Get the player-selected difficulty level.
+ * @returns {string|null} Selected difficulty or null if not selected
+ */
+function getSelectedDifficulty() {
+    return selectedDifficulty;
+}
+
+/**
+ * Reset the selected difficulty (called when returning to menu).
+ */
+function resetSelectedDifficulty() {
+    selectedDifficulty = null;
 }
 
 // =============================================================================
@@ -2480,10 +2777,14 @@ function setupPlayingState() {
                 playerTank.addAmmo('nuke', 1); // Nuke for testing big nuclear effects
             }
 
-            // Set up AI for this round with appropriate difficulty and weapons
-            // Rounds 1-2: Easy, Rounds 3-4: Medium, Rounds 5+: Hard
-            const aiSetup = AI.setupAIForRound(enemyTank, currentRound);
-            console.log(`Round ${currentRound}: AI difficulty is ${aiSetup.difficultyName}`);
+            // Set up AI for this round with player-selected difficulty
+            // If player selected a difficulty, use that; otherwise fall back to round-based progression
+            const difficulty = selectedDifficulty || AI.getAIDifficulty(currentRound);
+            AI.setDifficulty(difficulty);
+            const difficultyName = AI.getDifficultyName(difficulty);
+            // Purchase weapons based on difficulty
+            AI.purchaseWeaponsForAI(enemyTank, difficulty);
+            console.log(`Round ${currentRound}: AI difficulty is ${difficultyName} (player selected: ${selectedDifficulty ? 'yes' : 'no'})`);
 
             // Generate random wind for this round
             // Wind value -10 to +10: negative = left, positive = right
@@ -2584,6 +2885,9 @@ function returnToMenu() {
     enemyTank = null;
     currentTerrain = null;
     activeProjectiles = [];
+
+    // Reset selected difficulty so player must choose again
+    resetSelectedDifficulty();
 
     VictoryDefeat.hide();
     Game.setState(GAME_STATES.MENU);
@@ -2998,6 +3302,7 @@ async function init() {
     // Setup state handlers BEFORE starting the loop
     // These register the update/render functions for each state
     setupMenuState();
+    setupDifficultySelectState();
     setupPlayingState();
     setupPausedState();
     setupVictoryState();

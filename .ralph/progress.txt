@@ -45,3 +45,9 @@
 **Files:** No code changes - QA validation task
 **Commit:** (validation only, no code changes)
 ---
+## scorched-earth-vgy - Missing Difficulty Selection screen
+**Status:** Completed
+**Changes:** Added Difficulty Selection screen with Easy/Medium/Hard options that appears after clicking START GAME. Player-selected difficulty now persists across rounds instead of using round-based progression.
+**Files:** js/constants.js, js/game.js, js/main.js
+**Commit:** a71f366
+---

@@ -83,6 +83,7 @@ export const GAME = {
  */
 export const GAME_STATES = {
     MENU: 'menu',
+    DIFFICULTY_SELECT: 'difficulty_select',
     PLAYING: 'playing',
     AIMING: 'aiming',
     FIRING: 'firing',
