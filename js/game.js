@@ -270,12 +270,34 @@ export function startLoop(updateFn, renderFn, ctx) {
     accumulator = 0;
 
     function loop(currentTime) {
+        // Debug: log every 60 frames to see if loop is running
+        if (!window._loopFrameCount) window._loopFrameCount = 0;
+        window._loopFrameCount++;
+        if (window._loopFrameCount % 60 === 1) {
+            console.log('[GameLoop] Frame', window._loopFrameCount, 'isRunning:', isRunning, 'isPaused:', isPaused);
+        }
+
         if (!isRunning) return;
 
-        // Skip updates while paused but keep the loop alive
+        // Skip updates while paused but keep rendering for pause menu overlay
         if (isPaused) {
             // Reset lastFrameTime to prevent time accumulation during pause
             lastFrameTime = currentTime;
+
+            // Still render the current state (pause menu overlay)
+            if (renderFn) {
+                renderFn(ctx);
+            }
+            const handlers = getHandlers(currentState);
+            // Only log once per pause to avoid flooding console
+            if (!window._pauseLoggedOnce) {
+                window._pauseLoggedOnce = true;
+                console.log('[GameLoop] Paused render ONCE, state:', currentState, 'hasRender:', !!handlers.render);
+            }
+            if (handlers.render) {
+                handlers.render(ctx);
+            }
+
             requestAnimationFrame(loop);
             return;
         }

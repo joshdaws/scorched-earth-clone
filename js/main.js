@@ -27,6 +27,7 @@ import * as Shop from './shop.js';
 import { spawnExplosionParticles, updateParticles, renderParticles, clearParticles, getParticleCount, screenShakeForBlastRadius, getScreenShakeOffset, clearScreenShake, screenFlash, renderScreenFlash, clearScreenFlash, initBackground, updateBackground, renderBackground, clearBackground } from './effects.js';
 import * as Music from './music.js';
 import * as VolumeControls from './volumeControls.js';
+import * as PauseMenu from './pauseMenu.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -114,6 +115,66 @@ const weaponHUD = {
     height: 50,
     padding: 10
 };
+
+/**
+ * Pause button dimensions and position.
+ * Small button in top-right corner for mouse/touch pause.
+ */
+const pauseButton = {
+    x: CANVAS.DESIGN_WIDTH - 50,
+    y: CANVAS.DESIGN_HEIGHT - 50,
+    width: 40,
+    height: 40
+};
+
+/**
+ * Check if a point is inside the pause button.
+ * @param {number} x - X coordinate in design space
+ * @param {number} y - Y coordinate in design space
+ * @returns {boolean} True if point is inside the pause button
+ */
+function isInsidePauseButton(x, y) {
+    return (
+        x >= pauseButton.x &&
+        x <= pauseButton.x + pauseButton.width &&
+        y >= pauseButton.y &&
+        y <= pauseButton.y + pauseButton.height
+    );
+}
+
+/**
+ * Render the pause button.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ */
+function renderPauseButton(ctx) {
+    ctx.save();
+
+    // Button background
+    ctx.fillStyle = 'rgba(10, 10, 26, 0.7)';
+    ctx.beginPath();
+    ctx.roundRect(pauseButton.x, pauseButton.y, pauseButton.width, pauseButton.height, 6);
+    ctx.fill();
+
+    // Button border
+    ctx.strokeStyle = COLORS.NEON_CYAN;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Pause icon (two vertical bars)
+    ctx.fillStyle = COLORS.NEON_CYAN;
+    const barWidth = 6;
+    const barHeight = 18;
+    const gap = 6;
+    const centerX = pauseButton.x + pauseButton.width / 2;
+    const centerY = pauseButton.y + pauseButton.height / 2;
+
+    // Left bar
+    ctx.fillRect(centerX - gap / 2 - barWidth, centerY - barHeight / 2, barWidth, barHeight);
+    // Right bar
+    ctx.fillRect(centerX + gap / 2, centerY - barHeight / 2, barWidth, barHeight);
+
+    ctx.restore();
+}
 
 /**
  * Check if a point is inside the weapon HUD panel.
@@ -320,6 +381,12 @@ const menuButtons = {
  * @type {boolean}
  */
 let optionsOverlayVisible = false;
+
+/**
+ * State we were in before pausing (to return to on resume).
+ * @type {string|null}
+ */
+let prePauseState = null;
 
 /**
  * Check if a point is inside a menu button
@@ -2171,6 +2238,9 @@ function renderPlaying(ctx) {
     // Render round and difficulty indicator (still uses existing function)
     renderRoundIndicator(ctx);
 
+    // Render pause button
+    renderPauseButton(ctx);
+
     // Render aiming controls (power bar, angle arc, fire button, trajectory preview)
     // These are only shown during player's turn
     AimingControls.renderAimingControls(ctx, {
@@ -2208,7 +2278,18 @@ function renderPlaying(ctx) {
  * @param {{x: number, y: number}} pos - Click position in design coordinates
  */
 function handlePlayingPointerDown(pos) {
-    if (Game.getState() !== GAME_STATES.PLAYING) return;
+    const state = Game.getState();
+    const pausableStates = [GAME_STATES.PLAYING, GAME_STATES.AIMING, GAME_STATES.FIRING];
+    if (!pausableStates.includes(state)) return;
+
+    // Check pause button first (always available during gameplay)
+    if (isInsidePauseButton(pos.x, pos.y)) {
+        pauseGame();
+        return;
+    }
+
+    // Only process other interactions in PLAYING state
+    if (state !== GAME_STATES.PLAYING) return;
 
     // Check aiming controls first (power bar, angle arc, fire button)
     if (Turn.canPlayerAim()) {
@@ -2560,6 +2641,201 @@ function setupDefeatState() {
     });
 }
 
+// =============================================================================
+// PAUSED STATE
+// =============================================================================
+
+/**
+ * Handle pause menu action result.
+ * @param {{action: string, data?: any}} result - Action from pause menu
+ */
+function handlePauseMenuAction(result) {
+    if (!result) return;
+
+    switch (result.action) {
+        case 'resume':
+            resumeGame();
+            break;
+        case 'quit':
+            quitToMenu();
+            break;
+        case 'handled':
+            // Action handled internally by pause menu
+            break;
+    }
+}
+
+/**
+ * Open the pause menu and pause the game.
+ */
+function pauseGame() {
+    const currentState = Game.getState();
+
+    // Only allow pausing from gameplay states
+    const pausableStates = [GAME_STATES.PLAYING, GAME_STATES.AIMING, GAME_STATES.FIRING];
+    if (!pausableStates.includes(currentState)) {
+        return;
+    }
+
+    prePauseState = currentState;
+    Game.pauseLoop();
+    PauseMenu.show(currentState);
+    Game.setState(GAME_STATES.PAUSED);
+    Sound.playClickSound();
+    console.log(`Game paused from state: ${currentState}`);
+
+    // Force immediate render of pause menu
+    // The game loop should handle this, but as a fallback we trigger it manually
+    const ctx = Renderer.getContext();
+    if (ctx) {
+        renderPausedState(ctx);
+        console.log('Manually rendered pause menu');
+    }
+}
+
+/**
+ * Resume the game from the pause menu.
+ */
+function resumeGame() {
+    if (Game.getState() !== GAME_STATES.PAUSED) return;
+
+    PauseMenu.hide();
+    Game.resumeLoop();
+
+    // Return to pre-pause state
+    if (prePauseState) {
+        Game.setState(prePauseState);
+        console.log(`Game resumed to state: ${prePauseState}`);
+        prePauseState = null;
+    }
+}
+
+/**
+ * Quit to the main menu from pause.
+ */
+function quitToMenu() {
+    PauseMenu.hide();
+    Game.resumeLoop();
+
+    // Cancel any pending AI turn
+    AI.cancelTurn();
+
+    // Clear projectiles
+    for (const projectile of activeProjectiles) {
+        projectile.clearTrail();
+    }
+    activeProjectiles = [];
+
+    // Clear effects
+    clearScreenShake();
+    clearScreenFlash();
+    clearParticles();
+    clearBackground();
+    explosionEffect = null;
+
+    // Reset round counter for new game
+    currentRound = 1;
+
+    prePauseState = null;
+    Game.setState(GAME_STATES.MENU);
+    console.log('Quit to menu from pause');
+}
+
+/**
+ * Render the paused state overlay.
+ * Shows the game frozen behind the pause menu.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ */
+function renderPausedState(ctx) {
+    // Render the game state that was frozen (behind the overlay)
+    renderPlaying(ctx);
+
+    // Render the pause menu on top
+    PauseMenu.render(ctx);
+}
+
+/**
+ * Set up paused state handlers.
+ */
+function setupPausedState() {
+    // Register click handlers for pause menu
+    Input.onMouseDown((x, y, button) => {
+        if (button === 0 && Game.getState() === GAME_STATES.PAUSED) {
+            const result = PauseMenu.handlePointerDown(x, y);
+            handlePauseMenuAction(result);
+        }
+    });
+
+    Input.onTouchStart((x, y) => {
+        if (Game.getState() === GAME_STATES.PAUSED) {
+            const result = PauseMenu.handlePointerDown(x, y);
+            handlePauseMenuAction(result);
+        }
+    });
+
+    // Handle pointer move for slider dragging
+    Input.onMouseMove((x, y) => {
+        if (Game.getState() === GAME_STATES.PAUSED) {
+            PauseMenu.handlePointerMove(x, y);
+        }
+    });
+
+    Input.onTouchMove((x, y) => {
+        if (Game.getState() === GAME_STATES.PAUSED) {
+            PauseMenu.handlePointerMove(x, y);
+        }
+    });
+
+    // Handle pointer up to end slider dragging
+    Input.onMouseUp((x, y, button) => {
+        if (Game.getState() === GAME_STATES.PAUSED) {
+            PauseMenu.handlePointerUp();
+        }
+    });
+
+    Input.onTouchEnd((x, y) => {
+        if (Game.getState() === GAME_STATES.PAUSED) {
+            PauseMenu.handlePointerUp();
+        }
+    });
+
+    // Register escape key handler for pausing/resuming
+    Input.onKeyDown((keyCode) => {
+        if (keyCode !== 'Escape') return;
+
+        const state = Game.getState();
+
+        // If paused, handle escape via pause menu
+        if (state === GAME_STATES.PAUSED) {
+            const result = PauseMenu.handleEscape();
+            handlePauseMenuAction(result);
+            return;
+        }
+
+        // If in a pausable state, open pause menu
+        const pausableStates = [GAME_STATES.PLAYING, GAME_STATES.AIMING, GAME_STATES.FIRING];
+        if (pausableStates.includes(state)) {
+            pauseGame();
+        }
+    });
+
+    Game.registerStateHandlers(GAME_STATES.PAUSED, {
+        onEnter: (fromState) => {
+            console.log('Entered PAUSED state');
+            // Disable game input while paused
+            Input.disableGameInput();
+        },
+        onExit: (toState) => {
+            console.log('Exiting PAUSED state');
+            // Re-enable game input if returning to player aiming
+            if (toState === GAME_STATES.AIMING) {
+                Input.enableGameInput();
+            }
+        },
+        render: renderPausedState
+    });
+}
+
 /**
  * Set up shop state handlers.
  */
@@ -2682,6 +2958,7 @@ async function init() {
     // These register the update/render functions for each state
     setupMenuState();
     setupPlayingState();
+    setupPausedState();
     setupVictoryState();
     setupDefeatState();
     setupShopState();
