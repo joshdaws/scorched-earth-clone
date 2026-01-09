@@ -56,6 +56,9 @@ const CLICK_OUTSIDE_DELAY = 100;
 /** @type {string|null} Currently pressed button ID for touch feedback */
 let pressedButtonId = null;
 
+/** @type {string|null} Currently hovered button ID for hover states */
+let hoveredButtonId = null;
+
 // =============================================================================
 // BUTTON DEFINITIONS
 // =============================================================================
@@ -226,36 +229,46 @@ export function render(ctx) {
 }
 
 /**
- * Render a single button with touch feedback.
- * Shows pressed state when button is being touched/clicked.
+ * Render a single button with hover and touch feedback.
+ * Shows hover state on mouse over, pressed state when being touched/clicked.
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  * @param {Object} button - Button definition
  */
 function renderButton(ctx, button) {
     const isPressed = pressedButtonId === button.id;
+    const isHovered = hoveredButtonId === button.id;
 
     ctx.save();
 
     // Pressed offset for tactile feedback
     const pressOffset = isPressed ? 2 : 0;
 
-    // Button background - brighter when pressed
-    ctx.fillStyle = isPressed ? 'rgba(30, 30, 60, 0.95)' : 'rgba(10, 10, 26, 0.8)';
+    // Button background - brighter when pressed or hovered
+    let bgColor = 'rgba(10, 10, 26, 0.8)';
+    if (isPressed) {
+        bgColor = 'rgba(30, 30, 60, 0.95)';
+    } else if (isHovered) {
+        bgColor = 'rgba(20, 20, 45, 0.9)';
+    }
+    ctx.fillStyle = bgColor;
     ctx.beginPath();
     ctx.roundRect(button.x, button.y + pressOffset, button.width, button.height, 8);
     ctx.fill();
 
-    // Button border with glow - stronger glow when pressed
+    // Button border with glow - stronger glow when pressed or hovered
     ctx.strokeStyle = button.color;
-    ctx.lineWidth = isPressed ? 3 : 2;
+    ctx.lineWidth = isPressed ? 3 : (isHovered ? 2.5 : 2);
     ctx.shadowColor = button.color;
-    ctx.shadowBlur = isPressed ? 15 : 6;
+    ctx.shadowBlur = isPressed ? 15 : (isHovered ? 10 : 6);
     ctx.stroke();
     ctx.shadowBlur = 0;
 
-    // Inner highlight when pressed
+    // Inner highlight when pressed or hovered
     if (isPressed) {
         ctx.fillStyle = `${button.color}20`;  // 12% opacity highlight
+        ctx.fill();
+    } else if (isHovered) {
+        ctx.fillStyle = `${button.color}10`;  // 6% opacity highlight for hover
         ctx.fill();
     }
 
@@ -503,7 +516,7 @@ export function handlePointerUpWithAction(x, y) {
 }
 
 /**
- * Handle pointer move for slider dragging.
+ * Handle pointer move for slider dragging and hover states.
  * @param {number} x - X coordinate in design space
  * @param {number} y - Y coordinate in design space
  * @returns {boolean} True if handling a drag
@@ -512,7 +525,44 @@ export function handlePointerMove(x, y) {
     if (!isVisible) return false;
 
     if (showingOptions) {
+        // Update back button hover state
+        const centerX = CANVAS.DESIGN_WIDTH / 2;
+        const centerY = CANVAS.DESIGN_HEIGHT / 2;
+        const backButton = {
+            id: 'back',
+            x: centerX - 70,
+            y: centerY + VolumeControls.getPanelDimensions().height / 2 + 30,
+            width: 140,
+            height: 48
+        };
+        hoveredButtonId = isInsideButton(x, y, backButton) ? 'back' : null;
         return VolumeControls.handlePointerMove(x, y);
+    }
+
+    // If showing quit confirmation, track hover on confirm buttons
+    if (showingQuitConfirm && panelPosition) {
+        const confirmY = CANVAS.DESIGN_HEIGHT / 2 - 130;
+        const buttons = getQuitConfirmButtons(panelPosition.x, confirmY);
+        hoveredButtonId = null;
+        for (const button of buttons) {
+            if (isInsideButton(x, y, button)) {
+                hoveredButtonId = button.id;
+                break;
+            }
+        }
+        return false;
+    }
+
+    // Track hover on main buttons
+    if (panelPosition) {
+        const buttons = getButtons(panelPosition.x, panelPosition.y);
+        hoveredButtonId = null;
+        for (const button of buttons) {
+            if (isInsideButton(x, y, button)) {
+                hoveredButtonId = button.id;
+                break;
+            }
+        }
     }
 
     return false;
@@ -588,6 +638,8 @@ export function show(fromState) {
     showingOptions = false;
     showingQuitConfirm = false;
     showTimestamp = performance.now();
+    pressedButtonId = null;
+    hoveredButtonId = null;
     console.log(`Pause menu opened from state: ${fromState}`);
 }
 
@@ -598,6 +650,8 @@ export function hide() {
     isVisible = false;
     showingOptions = false;
     showingQuitConfirm = false;
+    pressedButtonId = null;
+    hoveredButtonId = null;
     VolumeControls.reset();
     console.log('Pause menu closed');
 }

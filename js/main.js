@@ -2819,16 +2819,18 @@ function setupPausedState() {
         }
     });
 
-    // Handle pointer up to end slider dragging
+    // Handle pointer up - triggers button actions when released on same button
     Input.onMouseUp((x, y, button) => {
-        if (Game.getState() === GAME_STATES.PAUSED) {
-            PauseMenu.handlePointerUp();
+        if (button === 0 && Game.getState() === GAME_STATES.PAUSED) {
+            const result = PauseMenu.handlePointerUpWithAction(x, y);
+            handlePauseMenuAction(result);
         }
     });
 
     Input.onTouchEnd((x, y) => {
         if (Game.getState() === GAME_STATES.PAUSED) {
-            PauseMenu.handlePointerUp();
+            const result = PauseMenu.handlePointerUpWithAction(x, y);
+            handlePauseMenuAction(result);
         }
     });
 
