@@ -7,6 +7,7 @@
  */
 
 import { PHYSICS, PROJECTILE, CANVAS } from './constants.js';
+import { WeaponRegistry, WEAPON_TYPES } from './weapons.js';
 
 /**
  * Projectile entity for the game.
@@ -114,6 +115,27 @@ export class Projectile {
          */
         this.maxTrailLength = PROJECTILE.TRAIL_LENGTH;
 
+        /**
+         * Previous vertical velocity for apex detection.
+         * When vy changes from negative (going up) to positive (going down), we've hit apex.
+         * @type {number}
+         */
+        this.prevVy = 0;
+
+        /**
+         * Whether this projectile has already split (for MIRV-type weapons).
+         * Prevents double-splitting.
+         * @type {boolean}
+         */
+        this.hasSplit = false;
+
+        /**
+         * Whether this is a child projectile from a split.
+         * Child projectiles should not split again.
+         * @type {boolean}
+         */
+        this.isChild = options.isChild || false;
+
         // Calculate initial velocity from power and angle
         this._calculateInitialVelocity(angle, power);
 
@@ -153,15 +175,20 @@ export class Projectile {
      * Update projectile position and velocity for one frame.
      *
      * Physics applied each frame:
-     * 1. Store current position in trail for rendering
-     * 2. Wind affects horizontal velocity (constant force)
-     * 3. Gravity affects vertical velocity (constant acceleration)
-     * 4. Position updated based on current velocity
+     * 1. Store previous velocity for apex detection
+     * 2. Store current position in trail for rendering
+     * 3. Wind affects horizontal velocity (constant force)
+     * 4. Gravity affects vertical velocity (constant acceleration)
+     * 5. Position updated based on current velocity
      *
      * @param {number} [wind=0] - Current wind value (positive = right, negative = left)
      */
     update(wind = 0) {
         if (!this.active) return;
+
+        // Store previous vertical velocity for apex detection
+        // Apex occurs when vy transitions from negative (going up) to positive (going down)
+        this.prevVy = this.vy;
 
         // Store current position in trail before moving
         // Trail is used for rendering a fading effect behind the projectile
@@ -319,6 +346,122 @@ export class Projectile {
             launchPower: this.launchPower
         };
     }
+
+    /**
+     * Check if the projectile is at its apex (highest point in trajectory).
+     * Apex is detected when vertical velocity transitions from negative (going up)
+     * to positive or zero (starting to go down).
+     *
+     * @returns {boolean} True if projectile just reached apex
+     */
+    isAtApex() {
+        // Apex: was going up (vy negative), now going down or stationary (vy >= 0)
+        return this.prevVy < 0 && this.vy >= 0;
+    }
+
+    /**
+     * Check if this projectile should split (MIRV-type behavior).
+     * Returns true if:
+     * - Weapon is a splitting type
+     * - Projectile is at apex
+     * - Hasn't already split
+     * - Is not a child projectile
+     *
+     * @returns {boolean} True if projectile should split now
+     */
+    shouldSplit() {
+        if (this.hasSplit || this.isChild) return false;
+
+        const weapon = WeaponRegistry.getWeapon(this.weaponId);
+        if (!weapon || weapon.type !== WEAPON_TYPES.SPLITTING) return false;
+
+        return this.isAtApex();
+    }
+
+    /**
+     * Mark this projectile as having split.
+     */
+    markSplit() {
+        this.hasSplit = true;
+    }
+}
+
+// =============================================================================
+// MIRV / SPLITTING PROJECTILE SUPPORT
+// =============================================================================
+
+/**
+ * Create child projectiles for a splitting weapon (MIRV, Death's Head).
+ * Child projectiles spread in an arc centered on the parent's direction of travel.
+ *
+ * @param {Projectile} parent - The parent projectile that is splitting
+ * @returns {Projectile[]} Array of child projectiles
+ */
+export function createSplitProjectiles(parent) {
+    const weapon = WeaponRegistry.getWeapon(parent.weaponId);
+    if (!weapon) {
+        console.warn(`Cannot split: weapon ${parent.weaponId} not found`);
+        return [];
+    }
+
+    const splitCount = weapon.splitCount || 5;
+    const spreadAngle = weapon.splitAngle || 30; // Total spread in degrees
+
+    const children = [];
+
+    // Calculate the angle between each child projectile
+    // For 5 warheads with 30° spread: -15, -7.5, 0, 7.5, 15 degrees from center
+    const angleStep = splitCount > 1 ? spreadAngle / (splitCount - 1) : 0;
+    const startAngle = -spreadAngle / 2;
+
+    // Get parent's current speed (magnitude of velocity)
+    const parentSpeed = parent.getSpeed();
+
+    // Calculate the current direction of travel (in radians)
+    // Note: atan2(vy, vx) gives the direction the projectile is moving
+    const parentDirection = Math.atan2(parent.vy, parent.vx);
+
+    console.log(`MIRV split at (${parent.x.toFixed(1)}, ${parent.y.toFixed(1)}): spawning ${splitCount} warheads with ${spreadAngle}° spread`);
+
+    for (let i = 0; i < splitCount; i++) {
+        // Calculate offset angle for this child
+        const offsetDegrees = startAngle + (angleStep * i);
+        const offsetRadians = (offsetDegrees * Math.PI) / 180;
+
+        // Child direction = parent direction + offset
+        const childDirection = parentDirection + offsetRadians;
+
+        // Create child projectile at parent's position
+        const child = new Projectile({
+            x: parent.x,
+            y: parent.y,
+            angle: 0, // Not used, we set velocity directly
+            power: 0, // Not used, we set velocity directly
+            weaponId: parent.weaponId,
+            owner: parent.owner,
+            isChild: true
+        });
+
+        // At apex, the parent speed is near zero (only horizontal component remains)
+        // Use a minimum speed based on the parent's original horizontal velocity
+        // to ensure warheads spread out properly
+        const minChildSpeed = Math.abs(parent.vx) * 0.8; // Use horizontal speed at apex
+        const childSpeed = Math.max(minChildSpeed, parentSpeed * 0.8, 5); // At least 5 px/frame
+
+        // Set velocity directly based on calculated direction
+        child.vx = Math.cos(childDirection) * childSpeed;
+        child.vy = Math.sin(childDirection) * childSpeed;
+
+        // Ensure children start moving downward (positive vy in canvas coords)
+        // This makes the visual effect cleaner since split happens at apex
+        if (child.vy < 1) {
+            child.vy = 1; // Minimum downward velocity
+        }
+
+        children.push(child);
+    }
+
+    return children;
 }
 
 /**

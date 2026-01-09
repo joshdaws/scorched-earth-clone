@@ -14,7 +14,7 @@ import * as Turn from './turn.js';
 import { COLORS, DEBUG, CANVAS, UI, GAME_STATES, TURN_PHASES, PHYSICS, TANK, PROJECTILE } from './constants.js';
 import { generateTerrain } from './terrain.js';
 import { placeTanksOnTerrain, updateTankTerrainPosition } from './tank.js';
-import { Projectile, createProjectileFromTank, checkTankCollision } from './projectile.js';
+import { Projectile, createProjectileFromTank, checkTankCollision, createSplitProjectiles } from './projectile.js';
 import { applyExplosionDamage, applyExplosionToAllTanks, DAMAGE } from './damage.js';
 import * as Wind from './wind.js';
 import { WeaponRegistry } from './weapons.js';
@@ -50,10 +50,25 @@ let enemyTank = null;
 // =============================================================================
 
 /**
- * Currently active projectile (only one at a time in this game)
- * @type {import('./projectile.js').Projectile|null}
+ * Array of currently active projectiles.
+ * Usually contains a single projectile, but MIRV weapons create multiple child projectiles.
+ * @type {import('./projectile.js').Projectile[]}
  */
-let activeProjectile = null;
+let activeProjectiles = [];
+
+/**
+ * Legacy accessor for backwards compatibility (used in some render code)
+ * @returns {import('./projectile.js').Projectile|null}
+ */
+function getActiveProjectile() {
+    return activeProjectiles.length > 0 ? activeProjectiles[0] : null;
+}
+
+/**
+ * Split effect state for visual feedback when MIRV splits.
+ * @type {{active: boolean, x: number, y: number, startTime: number, duration: number}|null}
+ */
+let splitEffect = null;
 
 // =============================================================================
 // MENU STATE
@@ -186,7 +201,7 @@ function setupMenuState() {
 
 /**
  * Fire a projectile from the specified tank.
- * Creates a new projectile and sets it as active.
+ * Creates a new projectile and adds it to the active projectiles array.
  * Consumes ammo for the current weapon.
  *
  * @param {import('./tank.js').Tank} tank - The tank firing the projectile
@@ -213,138 +228,169 @@ function fireProjectile(tank) {
     const ammoRemaining = tank.getAmmo(tank.currentWeapon);
     const ammoDisplay = ammoRemaining === Infinity ? '∞' : ammoRemaining;
 
-    // Create projectile from tank's barrel position
-    activeProjectile = createProjectileFromTank(tank);
+    // Create projectile from tank's barrel position and add to array
+    const projectile = createProjectileFromTank(tank);
+    activeProjectiles = [projectile]; // Clear and set new projectile
     console.log(`Projectile fired from ${tank.team} at angle ${tank.angle}°, power ${tank.power}% (${weapon ? weapon.name : tank.currentWeapon}, ammo: ${ammoDisplay})`);
     return true;
 }
 
 /**
- * Update the active projectile physics and check for completion.
- * Called each frame during projectile flight.
+ * Handle a single projectile's explosion (on terrain or tank hit).
+ * Creates crater, applies damage, updates tank positions.
  *
- * Each frame:
- * 1. Update projectile physics (gravity, wind, position)
- * 2. Check for terrain collision
- * 3. If collision: destroy terrain, deactivate projectile, resolve turn
- * 4. If out of bounds: deactivate projectile, resolve turn
+ * @param {import('./projectile.js').Projectile} projectile - The projectile that exploded
+ * @param {{x: number, y: number}} pos - Impact position
+ * @param {import('./tank.js').Tank|null} directHitTank - Tank that was directly hit, or null for terrain hit
  */
-function updateProjectile() {
-    if (!activeProjectile) return;
+function handleProjectileExplosion(projectile, pos, directHitTank) {
+    const weaponId = projectile.weaponId;
+    const weapon = WeaponRegistry.getWeapon(weaponId);
+    const blastRadius = weapon ? weapon.blastRadius : 30;
 
-    // Update projectile physics with current wind force
-    // Wind.getWindForce() converts wind value to velocity change per frame
-    activeProjectile.update(Wind.getWindForce());
+    const explosion = {
+        x: pos.x,
+        y: pos.y,
+        blastRadius: blastRadius
+    };
 
-    // Check if projectile went out of bounds (handled in projectile._checkBounds)
-    if (!activeProjectile.isActive()) {
-        // Clean up trail when projectile is destroyed
-        activeProjectile.clearTrail();
-        activeProjectile = null;
-        Turn.projectileResolved();
-        return;
-    }
-
-    const pos = activeProjectile.getPosition();
-
-    // Check for tank collision first (before terrain)
-    // This ensures projectiles hitting tanks don't also destroy terrain
-    const tanks = [playerTank, enemyTank].filter(t => t !== null);
-    const tankHit = checkTankCollision(pos.x, pos.y, tanks);
-
-    if (tankHit) {
-        const { tank, directHit } = tankHit;
-
-        // Get weapon data from registry for damage and blast radius values
-        const weaponId = activeProjectile.weaponId;
-        const weapon = WeaponRegistry.getWeapon(weaponId);
-
-        // Use weapon blast radius, fallback to 30 if weapon not found
-        const blastRadius = weapon ? weapon.blastRadius : 30;
-        const explosion = {
-            x: pos.x,
-            y: pos.y,
-            blastRadius: blastRadius
-        };
-
-        // Apply explosion damage to the hit tank using the damage calculation system
-        // This uses distance-based falloff with direct hit multiplier
-        const damageResult = applyExplosionDamage(explosion, tank, weapon);
+    if (directHitTank) {
+        // Apply explosion damage to the directly hit tank
+        const damageResult = applyExplosionDamage(explosion, directHitTank, weapon);
 
         // Also check for splash damage to other tanks
-        const allTanks = [playerTank, enemyTank].filter(t => t !== null && t !== tank);
+        const allTanks = [playerTank, enemyTank].filter(t => t !== null && t !== directHitTank);
         applyExplosionToAllTanks(explosion, allTanks, weapon);
 
-        console.log(`Tank hit! ${tank.team} took ${damageResult.actualDamage} damage${damageResult.isDirectHit ? ' (DIRECT HIT!)' : ''}, health: ${tank.health} (weapon: ${weapon ? weapon.name : 'unknown'})`);
-        if (currentTerrain) {
-            destroyTerrainAt(pos.x, pos.y, blastRadius);
+        console.log(`Tank hit! ${directHitTank.team} took ${damageResult.actualDamage} damage${damageResult.isDirectHit ? ' (DIRECT HIT!)' : ''}, health: ${directHitTank.health}`);
+    } else {
+        // Apply splash damage to all tanks near the explosion
+        const allTanks = [playerTank, enemyTank].filter(t => t !== null);
+        const damageResults = applyExplosionToAllTanks(explosion, allTanks, weapon);
 
-            // Update tank positions to match new terrain height
-            if (playerTank && currentTerrain) {
-                updateTankTerrainPosition(playerTank, currentTerrain);
-            }
-            if (enemyTank && currentTerrain) {
-                updateTankTerrainPosition(enemyTank, currentTerrain);
-            }
+        for (const result of damageResults) {
+            console.log(`Splash damage: ${result.tank.team} tank took ${result.actualDamage} damage, health: ${result.tank.health}`);
         }
-
-        // Deactivate projectile and clean up
-        activeProjectile.deactivate();
-        activeProjectile.clearTrail();
-        activeProjectile = null;
-        Turn.projectileResolved();
-        return;
     }
 
-    // Check for terrain collision
+    // Destroy terrain
     if (currentTerrain) {
-        const collision = currentTerrain.checkTerrainCollision(pos.x, pos.y);
+        destroyTerrainAt(pos.x, pos.y, blastRadius);
 
-        // collision is null if projectile is outside horizontal bounds
-        // collision.hit is true if projectile hit terrain
-        if (collision && collision.hit) {
-            console.log(`Projectile hit terrain at (${collision.x}, ${collision.y.toFixed(1)})`);
+        // Update tank positions to match new terrain height
+        if (playerTank && currentTerrain) {
+            updateTankTerrainPosition(playerTank, currentTerrain);
+        }
+        if (enemyTank && currentTerrain) {
+            updateTankTerrainPosition(enemyTank, currentTerrain);
+        }
+    }
+}
 
-            // Get weapon data from registry for blast radius and damage values
-            const weaponId = activeProjectile.weaponId;
-            const weapon = WeaponRegistry.getWeapon(weaponId);
+/**
+ * Update all active projectiles - physics, collisions, and splitting.
+ * Called each frame during projectile flight.
+ *
+ * Handles MIRV-type weapons by:
+ * 1. Detecting apex (when vy goes from negative to positive)
+ * 2. Spawning child projectiles at apex
+ * 3. Destroying parent projectile
+ * 4. Tracking all projectiles until they all resolve
+ */
+function updateProjectile() {
+    if (activeProjectiles.length === 0) return;
 
-            // Use weapon blast radius, fallback to 40 if weapon not found
-            const blastRadius = weapon ? weapon.blastRadius : 40;
+    const tanks = [playerTank, enemyTank].filter(t => t !== null);
+    const newChildren = [];
+    const toRemove = [];
 
-            // Create explosion data for damage calculation
-            const explosion = {
+    // Update each projectile
+    for (const projectile of activeProjectiles) {
+        if (!projectile.isActive()) {
+            toRemove.push(projectile);
+            continue;
+        }
+
+        // Update projectile physics with current wind force
+        projectile.update(Wind.getWindForce());
+
+        // Check if projectile went out of bounds
+        if (!projectile.isActive()) {
+            projectile.clearTrail();
+            toRemove.push(projectile);
+            continue;
+        }
+
+        // Check for MIRV splitting at apex
+        if (projectile.shouldSplit()) {
+            console.log(`Projectile at apex - splitting!`);
+
+            // Create child projectiles
+            const children = createSplitProjectiles(projectile);
+            newChildren.push(...children);
+
+            // Create split effect for visual feedback
+            const pos = projectile.getPosition();
+            splitEffect = {
+                active: true,
                 x: pos.x,
                 y: pos.y,
-                blastRadius: blastRadius
+                startTime: performance.now(),
+                duration: 300 // 300ms flash effect
             };
 
-            // Apply splash damage to all tanks near the explosion
-            const allTanks = [playerTank, enemyTank].filter(t => t !== null);
-            const damageResults = applyExplosionToAllTanks(explosion, allTanks, weapon);
-
-            // Log any damage dealt
-            for (const result of damageResults) {
-                console.log(`Splash damage: ${result.tank.team} tank took ${result.actualDamage} damage, health: ${result.tank.health}`);
-            }
-
-            // Destroy terrain
-            destroyTerrainAt(pos.x, pos.y, blastRadius);
-
-            // Update tank positions to match new terrain height
-            if (playerTank && currentTerrain) {
-                updateTankTerrainPosition(playerTank, currentTerrain);
-            }
-            if (enemyTank && currentTerrain) {
-                updateTankTerrainPosition(enemyTank, currentTerrain);
-            }
-
-            // Deactivate projectile and clean up
-            activeProjectile.deactivate();
-            activeProjectile.clearTrail();
-            activeProjectile = null;
-            Turn.projectileResolved();
+            // Mark parent as split and deactivate
+            projectile.markSplit();
+            projectile.deactivate();
+            projectile.clearTrail();
+            toRemove.push(projectile);
+            continue;
         }
+
+        const pos = projectile.getPosition();
+
+        // Check for tank collision
+        const tankHit = checkTankCollision(pos.x, pos.y, tanks);
+        if (tankHit) {
+            const { tank } = tankHit;
+            handleProjectileExplosion(projectile, pos, tank);
+
+            projectile.deactivate();
+            projectile.clearTrail();
+            toRemove.push(projectile);
+            continue;
+        }
+
+        // Check for terrain collision
+        if (currentTerrain) {
+            const collision = currentTerrain.checkTerrainCollision(pos.x, pos.y);
+
+            if (collision && collision.hit) {
+                console.log(`Projectile hit terrain at (${collision.x}, ${collision.y.toFixed(1)})`);
+                handleProjectileExplosion(projectile, pos, null);
+
+                projectile.deactivate();
+                projectile.clearTrail();
+                toRemove.push(projectile);
+                continue;
+            }
+        }
+    }
+
+    // Remove destroyed projectiles
+    for (const projectile of toRemove) {
+        const index = activeProjectiles.indexOf(projectile);
+        if (index !== -1) {
+            activeProjectiles.splice(index, 1);
+        }
+    }
+
+    // Add new child projectiles
+    activeProjectiles.push(...newChildren);
+
+    // Check if all projectiles are resolved
+    if (activeProjectiles.length === 0) {
+        Turn.projectileResolved();
     }
 }
 
@@ -742,19 +788,72 @@ function renderProjectile(ctx, projectile) {
 }
 
 /**
- * Render the active projectile and its trail.
+ * Render the MIRV split effect (expanding flash/ring).
+ * Creates a visual feedback when MIRV splits into multiple warheads.
+ *
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ */
+function renderSplitEffect(ctx) {
+    if (!splitEffect || !splitEffect.active) return;
+
+    const elapsed = performance.now() - splitEffect.startTime;
+    if (elapsed > splitEffect.duration) {
+        splitEffect = null;
+        return;
+    }
+
+    const progress = elapsed / splitEffect.duration;
+    const { x, y } = splitEffect;
+
+    ctx.save();
+
+    // Expanding ring effect
+    const maxRadius = 50;
+    const radius = maxRadius * progress;
+    const alpha = 1 - progress; // Fade out as it expands
+
+    // Outer glow ring
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(249, 240, 2, ${alpha * 0.8})`; // Yellow
+    ctx.lineWidth = 4 * (1 - progress * 0.5);
+    ctx.shadowColor = '#f9f002';
+    ctx.shadowBlur = 20 * alpha;
+    ctx.stroke();
+
+    // Inner bright flash (fades faster)
+    if (progress < 0.3) {
+        const flashAlpha = 1 - (progress / 0.3);
+        ctx.beginPath();
+        ctx.arc(x, y, 15 * (1 - progress), 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
+        ctx.fill();
+    }
+
+    ctx.restore();
+}
+
+/**
+ * Render all active projectiles and their trails.
  * Trail is rendered first (behind), then the projectile on top.
+ * Also renders the split effect if active.
  *
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  */
 function renderActiveProjectile(ctx) {
-    if (!activeProjectile) return;
+    // Render split effect first (behind projectiles)
+    renderSplitEffect(ctx);
 
-    // Render trail first (behind projectile)
-    renderProjectileTrail(ctx, activeProjectile);
+    // Render each active projectile
+    for (const projectile of activeProjectiles) {
+        if (!projectile.isActive()) continue;
 
-    // Render projectile on top
-    renderProjectile(ctx, activeProjectile);
+        // Render trail first (behind projectile)
+        renderProjectileTrail(ctx, projectile);
+
+        // Render projectile on top
+        renderProjectile(ctx, projectile);
+    }
 }
 
 // =============================================================================
@@ -1005,10 +1104,11 @@ function setupPlayingState() {
             playerTank = tanks.player;
             enemyTank = tanks.enemy;
 
-            // Give player starting ammo for Missile and Big Shot (for testing)
+            // Give player starting ammo for testing weapons
             // In the final game, these will be purchased from the shop
             playerTank.addAmmo('missile', 5);
             playerTank.addAmmo('big-shot', 3);
+            playerTank.addAmmo('mirv', 3); // MIRV for testing splitting mechanic
 
             // Generate random wind for this round
             // Wind value -10 to +10: negative = left, positive = right
@@ -1021,10 +1121,11 @@ function setupPlayingState() {
             // Reset timing state
             aiAimStartTime = null;
             // Reset projectile state
-            if (activeProjectile) {
-                activeProjectile.clearTrail();
-                activeProjectile = null;
+            for (const projectile of activeProjectiles) {
+                projectile.clearTrail();
             }
+            activeProjectiles = [];
+            splitEffect = null;
             // Reset player aim
             playerAim.angle = 45;
             playerAim.power = 50;
