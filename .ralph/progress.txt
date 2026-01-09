@@ -39,3 +39,21 @@
 **Changes:** All 6 child issues complete - heightmap, generation, rendering, destruction, tank placement, and falling dirt physics
 **Commit:** 4aa7ab0
 ---
+## scorched-earth-qff.1 - Implement Explosion Particle System
+**Status:** Completed
+**Changes:** Created particle system with synthwave aesthetics for explosion effects. Particles spawn based on weapon size, transition through white→yellow→pink colors, and fade/shrink over lifetime.
+**Files:** 
+- js/effects.js (created) - Complete particle system module
+- js/main.js (modified) - Integrated particle spawning, updating, rendering
+**Commit:** 14d55f9
+---
+
+## scorched-earth-i27 - Fix applyFallingDirt method not found error in terrain destruction
+**Status:** Closed (Not a code bug - browser caching issue)
+**Investigation:** 
+- Confirmed `applyFallingDirt` method exists at line 337 in terrain.js
+- Confirmed server serves correct file content
+- Root cause: Browser ES module caching served stale terrain.js without the new method
+- Resolution: Hard refresh or cache clear resolves the issue; no code changes needed
+**Files:** No files modified (code was already correct)
+---
