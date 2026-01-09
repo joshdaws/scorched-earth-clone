@@ -18,6 +18,7 @@ import { Projectile, createProjectileFromTank, checkTankCollision, createSplitPr
 import { applyExplosionDamage, applyExplosionToAllTanks, DAMAGE } from './damage.js';
 import * as Wind from './wind.js';
 import { WeaponRegistry, WEAPON_TYPES } from './weapons.js';
+import * as AI from './ai.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -653,25 +654,24 @@ function updateProjectile() {
 function updatePlaying(deltaTime) {
     const phase = Turn.getPhase();
 
-    // Handle AI turn (simple placeholder - AI aims for a short time then fires)
+    // Handle AI turn using the AI module
     if (phase === TURN_PHASES.AI_AIM) {
-        // For now, AI fires after a short delay (simulated with frame count)
-        // In the future, this will involve actual AI calculations
-        if (!aiAimStartTime) {
-            aiAimStartTime = performance.now();
+        // Start AI turn if not already active
+        if (!AI.isTurnActive() && enemyTank && playerTank) {
+            AI.startTurn(enemyTank, playerTank, Wind.getWind());
         }
 
-        // AI "thinks" for 1 second then fires
-        if (performance.now() - aiAimStartTime > 1000) {
-            // Set AI aiming parameters before firing (placeholder)
-            if (enemyTank) {
-                enemyTank.angle = 135; // Aims left-ish toward player
-                enemyTank.power = 50;
-            }
+        // Update AI turn and check if ready to fire
+        const aiResult = AI.updateTurn();
+        if (aiResult && aiResult.ready && enemyTank) {
+            // Apply AI's calculated aim to the enemy tank
+            enemyTank.angle = aiResult.angle;
+            enemyTank.power = aiResult.power;
+            enemyTank.setWeapon(aiResult.weapon);
+
+            // Fire!
             Turn.aiFire();
-            // Fire projectile after turn system transitions
             fireProjectile(enemyTank);
-            aiAimStartTime = null;
         }
     }
 
@@ -680,9 +680,6 @@ function updatePlaying(deltaTime) {
         updateProjectile();
     }
 }
-
-// Timing state for AI turn (will be replaced by actual AI system)
-let aiAimStartTime = null;
 
 // =============================================================================
 // TERRAIN RENDERING
@@ -1818,8 +1815,10 @@ function setupPlayingState() {
             Turn.init();
             // Sync turn debug mode with game debug mode
             Turn.setDebugMode(Debug.isEnabled());
-            // Reset timing state
-            aiAimStartTime = null;
+            // Sync AI debug mode with game debug mode
+            AI.setDebugMode(Debug.isEnabled());
+            // Cancel any pending AI turn
+            AI.cancelTurn();
             // Reset projectile state
             for (const projectile of activeProjectiles) {
                 projectile.clearTrail();
