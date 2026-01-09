@@ -569,19 +569,6 @@ function renderWeaponCard(ctx, weapon, x, y, currentAmmo, canAfford, pulseIntens
     const ownedAmmo = currentAmmo === Infinity ? '∞' : currentAmmo;
     ctx.fillText(`x${ownedAmmo}`, centerX, textY + 38);
 
-    // Row 4: Status indicator at bottom
-    ctx.font = `bold 9px ${UI.FONT_FAMILY}`;
-    if (weapon.cost > 0 && canAfford) {
-        ctx.fillStyle = borderColor;
-        ctx.fillText('BUY', centerX, textY + cardHeight - 14);
-    } else if (weapon.cost === 0) {
-        ctx.fillStyle = COLORS.TEXT_MUTED;
-        ctx.fillText('FREE', centerX, textY + cardHeight - 14);
-    } else if (weapon.cost > 0 && !canAfford) {
-        ctx.fillStyle = COLORS.NEON_PINK;
-        ctx.fillText('$$$', centerX, textY + cardHeight - 14);
-    }
-
     ctx.restore();
 
     // Register hit area
@@ -827,14 +814,6 @@ export function render(ctx) {
     ctx.lineTo(panelLeft + panel.WIDTH - 10, panelTop + panel.HEIGHT - 10 - cornerSize);
     ctx.stroke();
 
-    ctx.restore();
-
-    // Hint text at bottom
-    ctx.save();
-    ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
-    ctx.fillStyle = COLORS.TEXT_MUTED;
-    ctx.textAlign = 'center';
-    ctx.fillText('Click a weapon card to purchase', panel.X, panel.Y + SHOP_LAYOUT.DONE_BUTTON.Y_OFFSET - 30);
     ctx.restore();
 
     ctx.restore();
