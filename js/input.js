@@ -209,7 +209,8 @@ function handleMouseUp(e) {
     }
     updatePointerFromMouse();
 
-    mouseUpCallbacks.forEach(cb => cb(mouse.x, mouse.y, e.button));
+    // Pass design space coordinates to callbacks (same as pointer.x/y)
+    mouseUpCallbacks.forEach(cb => cb(pointer.x, pointer.y, e.button));
 }
 
 function handleMouseMove(e) {
@@ -220,7 +221,8 @@ function handleMouseMove(e) {
         updatePointerFromMouse();
     }
 
-    mouseMoveCallbacks.forEach(cb => cb(mouse.x, mouse.y));
+    // Pass design space coordinates to callbacks (same as pointer.x/y)
+    mouseMoveCallbacks.forEach(cb => cb(pointer.x, pointer.y));
 }
 
 function updateMousePosition(e) {
@@ -250,7 +252,8 @@ function handleTouchStart(e) {
     pointer.isDown = true;
     updatePointerFromTouch();
 
-    touchStartCallbacks.forEach(cb => cb(touch.x, touch.y));
+    // Pass design space coordinates to callbacks (same as pointer.x/y)
+    touchStartCallbacks.forEach(cb => cb(pointer.x, pointer.y));
 }
 
 function handleTouchEnd(e) {
@@ -259,8 +262,10 @@ function handleTouchEnd(e) {
 
     // Update unified pointer state
     pointer.isDown = false;
+    // Note: pointer.x/y retain last known position from touchMove/touchStart
 
-    touchEndCallbacks.forEach(cb => cb(touch.x, touch.y));
+    // Pass design space coordinates to callbacks (same as pointer.x/y)
+    touchEndCallbacks.forEach(cb => cb(pointer.x, pointer.y));
 }
 
 function handleTouchMove(e) {
@@ -270,7 +275,8 @@ function handleTouchMove(e) {
     // Update unified pointer position from touch
     updatePointerFromTouch();
 
-    touchMoveCallbacks.forEach(cb => cb(touch.x, touch.y));
+    // Pass design space coordinates to callbacks (same as pointer.x/y)
+    touchMoveCallbacks.forEach(cb => cb(pointer.x, pointer.y));
 }
 
 function updateTouchPosition(e) {
