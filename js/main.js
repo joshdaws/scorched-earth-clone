@@ -22,6 +22,7 @@ import * as AI from './ai.js';
 import * as HUD from './ui.js';
 import * as AimingControls from './aimingControls.js';
 import * as VictoryDefeat from './victoryDefeat.js';
+import * as Money from './money.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -54,12 +55,6 @@ let enemyTank = null;
  * @type {number}
  */
 let currentRound = 1;
-
-/**
- * Player's current money
- * @type {number}
- */
-let playerMoney = GAME.STARTING_MONEY;
 
 // =============================================================================
 // PROJECTILE STATE
@@ -779,19 +774,45 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
         blastRadius: blastRadius
     };
 
+    // Track who fired this projectile for money awards
+    const isPlayerShot = projectile.owner === 'player';
+
     if (directHitTank) {
         // Apply explosion damage to the directly hit tank
         const damageResult = applyExplosionDamage(explosion, directHitTank, weapon);
 
+        // Award money if player hit the enemy tank
+        if (isPlayerShot && directHitTank.team === 'enemy' && damageResult.actualDamage > 0) {
+            Money.awardHitReward(damageResult.actualDamage);
+        }
+
         // Also check for splash damage to other tanks
         const allTanks = [playerTank, enemyTank].filter(t => t !== null && t !== directHitTank);
-        applyExplosionToAllTanks(explosion, allTanks, weapon);
+        const splashResults = applyExplosionToAllTanks(explosion, allTanks, weapon);
+
+        // Award money for splash damage on enemy if player shot
+        if (isPlayerShot) {
+            for (const result of splashResults) {
+                if (result.tank.team === 'enemy' && result.actualDamage > 0) {
+                    Money.awardHitReward(result.actualDamage);
+                }
+            }
+        }
 
         console.log(`Tank hit! ${directHitTank.team} took ${damageResult.actualDamage} damage${damageResult.isDirectHit ? ' (DIRECT HIT!)' : ''}, health: ${directHitTank.health}`);
     } else {
         // Apply splash damage to all tanks near the explosion
         const allTanks = [playerTank, enemyTank].filter(t => t !== null);
         const damageResults = applyExplosionToAllTanks(explosion, allTanks, weapon);
+
+        // Award money for any damage on enemy if player shot
+        if (isPlayerShot) {
+            for (const result of damageResults) {
+                if (result.tank.team === 'enemy' && result.actualDamage > 0) {
+                    Money.awardHitReward(result.actualDamage);
+                }
+            }
+        }
 
         for (const result of damageResults) {
             console.log(`Splash damage: ${result.tank.team} tank took ${result.actualDamage} damage, health: ${result.tank.health}`);
@@ -1059,15 +1080,15 @@ function checkRoundEnd() {
         // Player wins!
         console.log('[Main] Enemy destroyed - VICTORY!');
 
-        // Calculate round earnings (base + damage bonus)
-        const baseEarnings = 500;
-        const damageBonus = Math.floor((100 - (playerTank?.health || 0)) * 2);  // Bonus for surviving with damage
-        const moneyEarned = baseEarnings + damageBonus;
+        // Award victory bonus (hit rewards already given during combat)
+        Money.awardVictoryBonus();
 
-        playerMoney += moneyEarned;
+        // Get total round earnings for display
+        const roundEarnings = Money.getRoundEarnings();
+        const roundDamage = Money.getRoundDamage();
 
         // Show victory screen after short delay
-        VictoryDefeat.showVictory(moneyEarned, 0, 1200);
+        VictoryDefeat.showVictory(roundEarnings, roundDamage, 1200);
 
         // Transition to victory state
         Game.setState(GAME_STATES.VICTORY);
@@ -1078,12 +1099,15 @@ function checkRoundEnd() {
         // Player loses
         console.log('[Main] Player destroyed - DEFEAT!');
 
-        // Give consolation earnings
-        const moneyEarned = 100;
-        playerMoney += moneyEarned;
+        // Award consolation prize
+        Money.awardDefeatConsolation();
+
+        // Get total round earnings for display
+        const roundEarnings = Money.getRoundEarnings();
+        const roundDamage = Money.getRoundDamage();
 
         // Show defeat screen after short delay
-        VictoryDefeat.showDefeat(moneyEarned, 0, 1200);
+        VictoryDefeat.showDefeat(roundEarnings, roundDamage, 1200);
 
         // Transition to defeat state
         Game.setState(GAME_STATES.DEFEAT);
@@ -2122,7 +2146,7 @@ function renderPlaying(ctx) {
     HUD.renderHUD(ctx, {
         playerTank,
         enemyTank,
-        money: playerMoney,
+        money: Money.getMoney(),
         isPlayerTurn,
         phase,
         shooter
@@ -2270,6 +2294,13 @@ function setupPlayingState() {
         onEnter: (fromState) => {
             console.log('Entered PLAYING state - Game started!');
 
+            // Initialize money system if this is a new game from menu
+            if (fromState === GAME_STATES.MENU) {
+                Money.init();
+            }
+            // Start round earnings tracking for all round starts
+            Money.startRound();
+
             // Generate new terrain for this game
             // Uses midpoint displacement algorithm for natural-looking hills and valleys
             currentTerrain = generateTerrain(CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT, {
@@ -2383,6 +2414,7 @@ function updateVictoryDefeat(deltaTime) {
  */
 function startNextRound() {
     currentRound++;
+    Money.startRound();  // Reset round earnings tracking
     console.log(`[Main] Starting round ${currentRound}`);
     Game.setState(GAME_STATES.PLAYING);
 }
@@ -2393,7 +2425,7 @@ function startNextRound() {
 function returnToMenu() {
     // Reset game state
     currentRound = 1;
-    playerMoney = GAME.STARTING_MONEY;
+    Money.init();  // Reset money to starting amount
     playerTank = null;
     enemyTank = null;
     currentTerrain = null;
