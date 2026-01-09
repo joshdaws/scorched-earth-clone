@@ -296,3 +296,9 @@
 **Files:** js/ai.js
 **Commit:** 46bb263
 ---
+## scorched-earth-7hv.3 - Implement Hard AI
+**Status:** Completed
+**Changes:** Implemented Hard AI with iterative trajectory solver for accurate aiming, full wind compensation through simulation, terrain obstruction detection with high-arc fallback, and strategic weapon selection based on battlefield conditions (valley detection, terrain blocking, area damage weapons).
+**Files:** js/ai.js, js/main.js
+**Commit:** 82e221e
+---

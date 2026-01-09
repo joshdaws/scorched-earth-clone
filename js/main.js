@@ -658,7 +658,8 @@ function updatePlaying(deltaTime) {
     if (phase === TURN_PHASES.AI_AIM) {
         // Start AI turn if not already active
         if (!AI.isTurnActive() && enemyTank && playerTank) {
-            AI.startTurn(enemyTank, playerTank, Wind.getWind());
+            // Pass terrain for Hard AI's iterative solver and strategic weapon selection
+            AI.startTurn(enemyTank, playerTank, Wind.getWind(), currentTerrain);
         }
 
         // Update AI turn and check if ready to fire
@@ -1919,6 +1920,9 @@ async function init() {
     });
 
     console.log('Scorched Earth initialized');
+
+    // Expose AI module for debugging/testing
+    window.AI = AI;
 
     // Start the game loop with update, render, and context
     Game.startLoop(update, render, ctx);

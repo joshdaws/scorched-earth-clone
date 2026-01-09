@@ -6,7 +6,8 @@
  * Each difficulty level has different accuracy and behavior characteristics.
  */
 
-import { CANVAS } from './constants.js';
+import { CANVAS, PHYSICS } from './constants.js';
+import { WEAPON_TYPES } from './weapons.js';
 
 // =============================================================================
 // AI DIFFICULTY LEVELS
@@ -292,6 +293,329 @@ function calculateEstimatedAngle(dx, dy, distance) {
     return baseAngle;
 }
 
+// =============================================================================
+// HARD AI - ITERATIVE TRAJECTORY SOLVER
+// =============================================================================
+
+/**
+ * Simulate a projectile trajectory and return where it lands.
+ * Used by Hard AI to find optimal angle/power combination.
+ *
+ * @param {number} startX - Starting X position
+ * @param {number} startY - Starting Y position (canvas coords, Y=0 is top)
+ * @param {number} angle - Fire angle in degrees
+ * @param {number} power - Fire power (0-100)
+ * @param {number} windValue - Current wind value
+ * @param {import('./terrain.js').Terrain} terrain - Terrain for collision checking
+ * @returns {{x: number, y: number, hit: boolean, blocked: boolean, blockX: number, blockY: number}}
+ *          Landing position, whether it hit terrain, and if it was blocked by terrain en route
+ */
+function simulateTrajectory(startX, startY, angle, power, windValue, terrain) {
+    const g = BALLISTIC_CONSTANTS.GRAVITY;
+    const maxVelocity = BALLISTIC_CONSTANTS.MAX_VELOCITY;
+
+    // Convert angle to radians and calculate initial velocity
+    const angleRad = angle * Math.PI / 180;
+    const v0 = (power / 100) * maxVelocity;
+
+    // Initial velocity components
+    let vx = Math.cos(angleRad) * v0;
+    let vy = -Math.sin(angleRad) * v0; // Negative because canvas Y increases downward
+
+    // Wind force per frame
+    const windForce = windValue * PHYSICS.WIND_FORCE_MULTIPLIER;
+
+    // Position
+    let x = startX;
+    let y = startY;
+
+    // Track if projectile was blocked by terrain before reaching target area
+    let blocked = false;
+    let blockX = 0;
+    let blockY = 0;
+
+    // Simulate up to 2000 frames (should be more than enough)
+    const maxFrames = 2000;
+
+    for (let frame = 0; frame < maxFrames; frame++) {
+        // Store previous position for collision checking
+        const prevX = x;
+        const prevY = y;
+
+        // Apply physics
+        vx += windForce;
+        vy += g;
+
+        // Update position
+        x += vx;
+        y += vy;
+
+        // Check bounds - projectile went off screen
+        if (x < 0 || x >= CANVAS.DESIGN_WIDTH) {
+            return { x, y, hit: false, blocked, blockX, blockY };
+        }
+
+        // Check terrain collision
+        if (terrain) {
+            const collision = terrain.checkTerrainCollision(x, y);
+            if (collision && collision.hit) {
+                // Check if this is early terrain blockage (before apex and far from target)
+                // Apex detection: vy was negative (going up) and now positive (going down)
+                if (vy < 0 && !blocked) {
+                    // Still ascending, check if terrain is blocking
+                    blocked = true;
+                    blockX = collision.x;
+                    blockY = collision.y;
+                }
+                return { x: collision.x, y: collision.y, hit: true, blocked, blockX, blockY };
+            }
+        }
+
+        // Check if projectile fell below bottom of screen
+        if (y >= CANVAS.DESIGN_HEIGHT) {
+            return { x, y: CANVAS.DESIGN_HEIGHT, hit: true, blocked, blockX, blockY };
+        }
+    }
+
+    // Max frames reached without landing
+    return { x, y, hit: false, blocked, blockX, blockY };
+}
+
+/**
+ * Check if terrain blocks the path between AI and player.
+ * Used to determine if a high arc or digger weapon is needed.
+ *
+ * @param {import('./tank.js').Tank} aiTank - AI's tank
+ * @param {import('./tank.js').Tank} playerTank - Player's tank
+ * @param {import('./terrain.js').Terrain} terrain - Terrain to check
+ * @returns {{blocked: boolean, blockX: number, maxTerrainHeight: number}}
+ */
+function checkTerrainObstruction(aiTank, playerTank, terrain) {
+    if (!terrain) {
+        return { blocked: false, blockX: 0, maxTerrainHeight: 0 };
+    }
+
+    const startX = Math.min(aiTank.x, playerTank.x);
+    const endX = Math.max(aiTank.x, playerTank.x);
+
+    // Get the height of both tanks (in canvas coords, lower Y = higher position)
+    const aiSurfaceY = aiTank.y;
+    const playerSurfaceY = playerTank.y;
+    const lineOfSightY = Math.min(aiSurfaceY, playerSurfaceY) - 20; // Slightly above the higher tank
+
+    let maxTerrainHeight = 0;
+    let blocked = false;
+    let blockX = 0;
+
+    // Check terrain height along the path
+    for (let x = startX + 10; x < endX - 10; x += 5) {
+        const terrainHeight = terrain.getHeight(x);
+        const terrainY = CANVAS.DESIGN_HEIGHT - terrainHeight;
+
+        if (terrainHeight > maxTerrainHeight) {
+            maxTerrainHeight = terrainHeight;
+        }
+
+        // If terrain is above the line of sight, it's blocking
+        if (terrainY < lineOfSightY) {
+            blocked = true;
+            blockX = x;
+        }
+    }
+
+    return { blocked, blockX, maxTerrainHeight };
+}
+
+/**
+ * Check if player is in a valley (surrounded by higher terrain).
+ * Used to determine if Roller weapon would be effective.
+ *
+ * @param {import('./tank.js').Tank} playerTank - Player's tank
+ * @param {import('./terrain.js').Terrain} terrain - Terrain to check
+ * @returns {boolean} True if player is in a valley
+ */
+function isPlayerInValley(playerTank, terrain) {
+    if (!terrain) return false;
+
+    const playerX = Math.floor(playerTank.x);
+    const playerTerrainHeight = terrain.getHeight(playerX);
+
+    // Check terrain height on both sides of the player
+    const checkDistance = 100; // pixels to check on each side
+    let higherOnLeft = false;
+    let higherOnRight = false;
+
+    // Check left side
+    for (let x = playerX - 20; x >= Math.max(0, playerX - checkDistance); x -= 10) {
+        if (terrain.getHeight(x) > playerTerrainHeight + 30) {
+            higherOnLeft = true;
+            break;
+        }
+    }
+
+    // Check right side
+    for (let x = playerX + 20; x <= Math.min(CANVAS.DESIGN_WIDTH - 1, playerX + checkDistance); x += 10) {
+        if (terrain.getHeight(x) > playerTerrainHeight + 30) {
+            higherOnRight = true;
+            break;
+        }
+    }
+
+    // Player is in a valley if terrain is higher on at least one side
+    // and they're at a relatively low point
+    return higherOnLeft || higherOnRight;
+}
+
+/**
+ * Iterative solver to find optimal angle and power for Hard AI.
+ * Simulates multiple trajectories to find the best shot.
+ *
+ * @param {import('./tank.js').Tank} aiTank - AI's tank
+ * @param {import('./tank.js').Tank} playerTank - Player's tank
+ * @param {number} windValue - Current wind value
+ * @param {import('./terrain.js').Terrain} terrain - Terrain for collision checking
+ * @returns {{angle: number, power: number, confidence: number}}
+ */
+function iterativeSolver(aiTank, playerTank, windValue, terrain) {
+    const firePos = aiTank.getFirePosition ? aiTank.getFirePosition() : { x: aiTank.x, y: aiTank.y };
+    const targetX = playerTank.x;
+    const targetY = playerTank.y;
+
+    // Determine if we're shooting left or right
+    const shootingLeft = targetX < firePos.x;
+
+    // Start with ballistic calculation as initial guess
+    const initialGuess = calculateBallisticAim(aiTank, playerTank);
+
+    let bestAngle = initialGuess.angle;
+    let bestPower = initialGuess.power;
+    let bestDistance = Infinity;
+    let confidence = 0;
+
+    // Search range around initial guess
+    const angleRange = 30; // Search ±30° around initial guess
+    const powerRange = 30; // Search ±30% around initial guess
+
+    // Coarse search first
+    const angleStep = 5;
+    const powerStep = 10;
+
+    for (let angleOffset = -angleRange; angleOffset <= angleRange; angleOffset += angleStep) {
+        const testAngle = Math.max(10, Math.min(170, initialGuess.angle + angleOffset));
+
+        for (let powerOffset = -powerRange; powerOffset <= powerRange; powerOffset += powerStep) {
+            const testPower = Math.max(20, Math.min(100, initialGuess.power + powerOffset));
+
+            const result = simulateTrajectory(firePos.x, firePos.y, testAngle, testPower, windValue, terrain);
+
+            if (result.hit) {
+                const dx = result.x - targetX;
+                const dy = result.y - targetY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    bestAngle = testAngle;
+                    bestPower = testPower;
+                }
+            }
+        }
+    }
+
+    // Fine search around best result
+    const fineAngleStep = 1;
+    const finePowerStep = 2;
+    const fineAngleRange = 8;
+    const finePowerRange = 15;
+
+    for (let angleOffset = -fineAngleRange; angleOffset <= fineAngleRange; angleOffset += fineAngleStep) {
+        const testAngle = Math.max(10, Math.min(170, bestAngle + angleOffset));
+
+        for (let powerOffset = -finePowerRange; powerOffset <= finePowerRange; powerOffset += finePowerStep) {
+            const testPower = Math.max(20, Math.min(100, bestPower + powerOffset));
+
+            const result = simulateTrajectory(firePos.x, firePos.y, testAngle, testPower, windValue, terrain);
+
+            if (result.hit) {
+                const dx = result.x - targetX;
+                const dy = result.y - targetY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    bestAngle = testAngle;
+                    bestPower = testPower;
+                }
+            }
+        }
+    }
+
+    // Calculate confidence based on how close we can get
+    // 0 distance = 100% confidence, 100+ pixels = low confidence
+    confidence = Math.max(0, 1 - (bestDistance / 100));
+
+    if (debugMode) {
+        console.log(`[AI] Iterative solver: best distance=${bestDistance.toFixed(1)}px, confidence=${(confidence * 100).toFixed(0)}%`);
+        console.log(`[AI]   Angle: ${bestAngle.toFixed(1)}°, Power: ${bestPower.toFixed(1)}%`);
+    }
+
+    return { angle: bestAngle, power: bestPower, confidence };
+}
+
+/**
+ * Try to find a high arc trajectory that clears terrain obstruction.
+ *
+ * @param {import('./tank.js').Tank} aiTank - AI's tank
+ * @param {import('./tank.js').Tank} playerTank - Player's tank
+ * @param {number} windValue - Current wind value
+ * @param {import('./terrain.js').Terrain} terrain - Terrain for collision checking
+ * @returns {{angle: number, power: number, found: boolean}}
+ */
+function findHighArcTrajectory(aiTank, playerTank, windValue, terrain) {
+    const firePos = aiTank.getFirePosition ? aiTank.getFirePosition() : { x: aiTank.x, y: aiTank.y };
+    const targetX = playerTank.x;
+    const targetY = playerTank.y;
+
+    // For high arc, use angles closer to vertical
+    const shootingLeft = targetX < firePos.x;
+    const baseAngle = shootingLeft ? 120 : 60; // More vertical angles
+
+    let bestAngle = baseAngle;
+    let bestPower = 80;
+    let bestDistance = Infinity;
+    let found = false;
+
+    // Search for high arc trajectory
+    for (let angleOffset = -25; angleOffset <= 25; angleOffset += 3) {
+        const testAngle = baseAngle + angleOffset;
+        if (testAngle < 45 || testAngle > 135) continue; // Keep it high
+
+        for (let power = 50; power <= 100; power += 5) {
+            const result = simulateTrajectory(firePos.x, firePos.y, testAngle, power, windValue, terrain);
+
+            // Check if trajectory wasn't blocked and hit near target
+            if (result.hit && !result.blocked) {
+                const dx = result.x - targetX;
+                const dy = result.y - targetY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    bestAngle = testAngle;
+                    bestPower = power;
+                    found = true;
+                }
+            }
+        }
+    }
+
+    if (debugMode && found) {
+        console.log(`[AI] Found high arc trajectory: angle=${bestAngle.toFixed(1)}°, power=${bestPower.toFixed(1)}%, distance=${bestDistance.toFixed(1)}px`);
+    }
+
+    return { angle: bestAngle, power: bestPower, found };
+}
+
 /**
  * Calculate an appropriate power level based on distance.
  * Simple heuristic: longer distance = more power.
@@ -332,38 +656,61 @@ function addRandomError(value, minError, maxError) {
  * Considers difficulty level for accuracy.
  *
  * Easy AI: Uses direct line targeting (no arc compensation)
- * Medium/Hard AI: Uses ballistic calculation to account for gravity
+ * Medium AI: Uses ballistic calculation to account for gravity
+ * Hard AI: Uses iterative solver for accurate trajectory with terrain awareness
  *
  * @param {import('./tank.js').Tank} aiTank - The AI's tank
  * @param {import('./tank.js').Tank} playerTank - The player's tank
  * @param {number} [windValue=0] - Current wind value (for wind compensation)
+ * @param {import('./terrain.js').Terrain} [terrain=null] - Terrain for Hard AI collision simulation
  * @returns {{angle: number, power: number}} Calculated angle and power
  */
-export function calculateAim(aiTank, playerTank, windValue = 0) {
+export function calculateAim(aiTank, playerTank, windValue = 0, terrain = null) {
     const config = DIFFICULTY_CONFIG[currentDifficulty];
 
     let angle, power;
 
     // Easy AI uses simple direct line targeting
-    // Medium/Hard AI uses proper ballistic calculation
     if (currentDifficulty === AI_DIFFICULTY.EASY) {
         // Easy AI: direct line to target (doesn't account for gravity arc)
         angle = calculateDirectAngle(aiTank, playerTank);
         power = calculateBasePower(aiTank, playerTank);
-    } else {
-        // Medium/Hard AI: ballistic calculation that accounts for gravity
+    } else if (currentDifficulty === AI_DIFFICULTY.MEDIUM) {
+        // Medium AI: ballistic calculation that accounts for gravity
         const ballisticAim = calculateBallisticAim(aiTank, playerTank);
         angle = ballisticAim.angle;
         power = ballisticAim.power;
+    } else {
+        // Hard AI: iterative solver with full simulation and terrain awareness
+        // This accounts for gravity, wind, and terrain automatically
+        const solverResult = iterativeSolver(aiTank, playerTank, windValue, terrain);
+        angle = solverResult.angle;
+        power = solverResult.power;
+
+        // If confidence is low (shot gets blocked by terrain), try high arc
+        if (solverResult.confidence < 0.5 && terrain) {
+            const obstruction = checkTerrainObstruction(aiTank, playerTank, terrain);
+            if (obstruction.blocked) {
+                if (debugMode) {
+                    console.log('[AI] Low confidence shot, terrain blocking. Trying high arc...');
+                }
+                const highArc = findHighArcTrajectory(aiTank, playerTank, windValue, terrain);
+                if (highArc.found) {
+                    angle = highArc.angle;
+                    power = highArc.power;
+                }
+            }
+        }
     }
 
     // Store base values for debug logging
     const baseAngle = angle;
     const basePower = power;
 
-    // Apply wind compensation (if difficulty supports it)
-    // Medium AI: 50% compensation, Hard AI: 85% compensation
-    if (config.compensatesWind && windValue !== 0) {
+    // Apply wind compensation (if difficulty supports it and not Hard AI)
+    // Hard AI's iterative solver already accounts for wind in the simulation
+    // Medium AI: 50% compensation
+    if (config.compensatesWind && windValue !== 0 && currentDifficulty !== AI_DIFFICULTY.HARD) {
         // Wind affects projectile by adding to horizontal velocity each frame
         // To compensate, we need to aim into the wind
         // The compensation amount depends on AI accuracy and wind strength
@@ -372,7 +719,7 @@ export function calculateAim(aiTank, playerTank, windValue = 0) {
 
         // Calculate wind compensation factor
         // Wind compensation affects angle: stronger wind needs more angle adjustment
-        // Multiply by accuracy (0.5 for Medium, 0.85 for Hard)
+        // Multiply by accuracy (0.5 for Medium)
         const windEffect = windValue * config.windCompensationAccuracy * 3;
 
         // Adjust angle based on which direction we're shooting
@@ -402,7 +749,9 @@ export function calculateAim(aiTank, playerTank, windValue = 0) {
     if (debugMode) {
         console.log(`[AI] ${config.name} AI calculating aim:`);
         console.log(`[AI]   Target: (${playerTank.x.toFixed(0)}, ${playerTank.y.toFixed(0)})`);
-        console.log(`[AI]   Calculation method: ${currentDifficulty === AI_DIFFICULTY.EASY ? 'direct line' : 'ballistic'}`);
+        const method = currentDifficulty === AI_DIFFICULTY.EASY ? 'direct line' :
+                       currentDifficulty === AI_DIFFICULTY.MEDIUM ? 'ballistic' : 'iterative solver';
+        console.log(`[AI]   Calculation method: ${method}`);
         console.log(`[AI]   Base angle: ${baseAngle.toFixed(1)}°, Base power: ${basePower.toFixed(1)}%`);
         console.log(`[AI]   Wind: ${windValue.toFixed(1)}, Compensates: ${config.compensatesWind} (${config.windCompensationAccuracy * 100}%)`);
         console.log(`[AI]   Final angle: ${angle.toFixed(1)}° (error: ${config.angleErrorMin} to ${config.angleErrorMax})`);
@@ -432,12 +781,14 @@ const HARD_AI_PREFERRED_WEAPONS = ['nuke', 'mini-nuke', 'mirv', 'deaths-head', '
  * Select which weapon the AI should use.
  * - Easy AI: Always uses basic-shot
  * - Medium AI: 50% chance to use Missiles or Rollers if available
- * - Hard AI: Higher chance to use optimal weapons based on situation
+ * - Hard AI: Strategic selection based on terrain and player position
  *
  * @param {import('./tank.js').Tank} aiTank - The AI's tank
+ * @param {import('./tank.js').Tank} [playerTank=null] - Player's tank (for Hard AI strategic selection)
+ * @param {import('./terrain.js').Terrain} [terrain=null] - Terrain (for Hard AI strategic selection)
  * @returns {string} Weapon ID to use
  */
-export function selectWeapon(aiTank) {
+export function selectWeapon(aiTank, playerTank = null, terrain = null) {
     const config = DIFFICULTY_CONFIG[currentDifficulty];
 
     // Easy AI always uses basic weapon
@@ -448,37 +799,141 @@ export function selectWeapon(aiTank) {
         return 'basic-shot';
     }
 
-    // Get list of preferred weapons based on difficulty
-    let preferredWeapons;
-    let useSpecialChance;
-
+    // Medium AI: 50% chance to use better weapon if available (simple priority list)
     if (currentDifficulty === AI_DIFFICULTY.MEDIUM) {
-        // Medium AI: 50% chance to use better weapon if available
-        preferredWeapons = MEDIUM_AI_PREFERRED_WEAPONS;
-        useSpecialChance = 0.5;
-    } else {
-        // Hard AI: 80% chance to use better weapon
-        preferredWeapons = HARD_AI_PREFERRED_WEAPONS;
-        useSpecialChance = 0.8;
+        if (Math.random() < 0.5) {
+            // Check inventory for preferred weapons (in priority order)
+            for (const weaponId of MEDIUM_AI_PREFERRED_WEAPONS) {
+                const ammo = aiTank.getAmmo(weaponId);
+                if (ammo > 0) {
+                    if (debugMode) {
+                        console.log(`[AI] Medium AI selected ${weaponId} (${ammo} ammo remaining)`);
+                    }
+                    return weaponId;
+                }
+            }
+        }
+        if (debugMode) {
+            console.log('[AI] Medium AI using basic-shot');
+        }
+        return 'basic-shot';
     }
 
-    // Roll to see if AI should try to use a special weapon
-    if (Math.random() < useSpecialChance) {
-        // Check inventory for preferred weapons (in priority order)
-        for (const weaponId of preferredWeapons) {
-            const ammo = aiTank.getAmmo(weaponId);
-            if (ammo > 0) {
-                if (debugMode) {
-                    console.log(`[AI] Selected ${weaponId} (${ammo} ammo remaining)`);
-                }
-                return weaponId;
+    // Hard AI: Strategic weapon selection based on situation
+    // Roll to see if we use strategic selection (90% chance)
+    if (Math.random() > 0.9) {
+        // 10% chance to just use basic shot (adds unpredictability)
+        if (debugMode) {
+            console.log('[AI] Hard AI using basic-shot (random choice)');
+        }
+        return 'basic-shot';
+    }
+
+    // Check terrain conditions for strategic selection
+    const inValley = playerTank && terrain ? isPlayerInValley(playerTank, terrain) : false;
+    const obstructed = playerTank && terrain ?
+        checkTerrainObstruction(aiTank, playerTank, terrain).blocked : false;
+
+    if (debugMode) {
+        console.log(`[AI] Hard AI strategic analysis: inValley=${inValley}, obstructed=${obstructed}`);
+    }
+
+    // Priority 1: If terrain is blocking shot, consider Digger
+    if (obstructed) {
+        // Try Heavy Digger first, then regular Digger
+        if (aiTank.getAmmo('heavy-digger') > 0) {
+            if (debugMode) {
+                console.log('[AI] Hard AI selected heavy-digger (terrain blocking shot)');
             }
+            return 'heavy-digger';
+        }
+        if (aiTank.getAmmo('digger') > 0) {
+            if (debugMode) {
+                console.log('[AI] Hard AI selected digger (terrain blocking shot)');
+            }
+            return 'digger';
         }
     }
 
-    // Default to basic-shot if no preferred weapon available or didn't roll to use one
+    // Priority 2: If player is in a valley, Roller weapons are very effective
+    if (inValley) {
+        if (aiTank.getAmmo('heavy-roller') > 0) {
+            if (debugMode) {
+                console.log('[AI] Hard AI selected heavy-roller (player in valley)');
+            }
+            return 'heavy-roller';
+        }
+        if (aiTank.getAmmo('roller') > 0) {
+            if (debugMode) {
+                console.log('[AI] Hard AI selected roller (player in valley)');
+            }
+            return 'roller';
+        }
+    }
+
+    // Priority 3: Area damage weapons for high-value shots
+    // Use these 60% of the time when available
+    if (Math.random() < 0.6) {
+        // Nuclear weapons - devastating but rare
+        if (aiTank.getAmmo('nuke') > 0) {
+            if (debugMode) {
+                console.log('[AI] Hard AI selected nuke (maximum damage)');
+            }
+            return 'nuke';
+        }
+        if (aiTank.getAmmo('mini-nuke') > 0) {
+            if (debugMode) {
+                console.log('[AI] Hard AI selected mini-nuke (high damage)');
+            }
+            return 'mini-nuke';
+        }
+
+        // Splitting weapons for area damage
+        if (aiTank.getAmmo('deaths-head') > 0) {
+            if (debugMode) {
+                console.log('[AI] Hard AI selected deaths-head (area denial)');
+            }
+            return 'deaths-head';
+        }
+        if (aiTank.getAmmo('mirv') > 0) {
+            if (debugMode) {
+                console.log('[AI] Hard AI selected mirv (multi-warhead)');
+            }
+            return 'mirv';
+        }
+    }
+
+    // Priority 4: Standard upgrade weapons
+    if (aiTank.getAmmo('big-shot') > 0) {
+        if (debugMode) {
+            console.log('[AI] Hard AI selected big-shot (high damage)');
+        }
+        return 'big-shot';
+    }
+    if (aiTank.getAmmo('missile') > 0) {
+        if (debugMode) {
+            console.log('[AI] Hard AI selected missile (standard upgrade)');
+        }
+        return 'missile';
+    }
+
+    // Fallback: Roller weapons even if not in valley (still useful)
+    if (aiTank.getAmmo('heavy-roller') > 0) {
+        if (debugMode) {
+            console.log('[AI] Hard AI selected heavy-roller (fallback)');
+        }
+        return 'heavy-roller';
+    }
+    if (aiTank.getAmmo('roller') > 0) {
+        if (debugMode) {
+            console.log('[AI] Hard AI selected roller (fallback)');
+        }
+        return 'roller';
+    }
+
+    // Default to basic-shot
     if (debugMode) {
-        console.log('[AI] Using basic-shot (default or no preferred weapon available)');
+        console.log('[AI] Hard AI using basic-shot (no special weapons available)');
     }
     return 'basic-shot';
 }
@@ -534,13 +989,16 @@ const aiTurnState = {
  * @param {import('./tank.js').Tank} aiTank - The AI's tank
  * @param {import('./tank.js').Tank} playerTank - The player's tank
  * @param {number} [windValue=0] - Current wind value
+ * @param {import('./terrain.js').Terrain} [terrain=null] - Terrain for Hard AI
  */
-export function startTurn(aiTank, playerTank, windValue = 0) {
+export function startTurn(aiTank, playerTank, windValue = 0, terrain = null) {
     aiTurnState.active = true;
     aiTurnState.startTime = performance.now();
     aiTurnState.thinkingDelay = getThinkingDelay();
-    aiTurnState.calculatedAim = calculateAim(aiTank, playerTank, windValue);
-    aiTurnState.selectedWeapon = selectWeapon(aiTank);
+    // Hard AI uses terrain for iterative solver; Easy/Medium don't need it
+    aiTurnState.calculatedAim = calculateAim(aiTank, playerTank, windValue, terrain);
+    // Hard AI uses player position and terrain for strategic weapon selection
+    aiTurnState.selectedWeapon = selectWeapon(aiTank, playerTank, terrain);
 
     if (debugMode) {
         console.log('[AI] Turn started - thinking...');
