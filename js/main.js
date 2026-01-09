@@ -11,7 +11,7 @@ import * as Sound from './sound.js';
 import * as Assets from './assets.js';
 import * as Debug from './debug.js';
 import * as Turn from './turn.js';
-import { COLORS, DEBUG, CANVAS, UI, GAME_STATES, TURN_PHASES, PHYSICS, TANK, PROJECTILE } from './constants.js';
+import { COLORS, DEBUG, CANVAS, UI, GAME_STATES, TURN_PHASES, PHYSICS, TANK, PROJECTILE, GAME } from './constants.js';
 import { generateTerrain } from './terrain.js';
 import { placeTanksOnTerrain, updateTankTerrainPosition } from './tank.js';
 import { Projectile, createProjectileFromTank, checkTankCollision, createSplitProjectiles } from './projectile.js';
@@ -19,6 +19,7 @@ import { applyExplosionDamage, applyExplosionToAllTanks, DAMAGE } from './damage
 import * as Wind from './wind.js';
 import { WeaponRegistry, WEAPON_TYPES } from './weapons.js';
 import * as AI from './ai.js';
+import * as HUD from './ui.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -51,6 +52,12 @@ let enemyTank = null;
  * @type {number}
  */
 let currentRound = 1;
+
+/**
+ * Player's current money
+ * @type {number}
+ */
+let playerMoney = GAME.STARTING_MONEY;
 
 // =============================================================================
 // PROJECTILE STATE
@@ -2048,59 +2055,48 @@ function renderPlaying(ctx) {
     // Render active projectile and trail (on top of terrain and tanks)
     renderActiveProjectile(ctx);
 
-    // Render turn indicator at top of screen
-    Turn.renderTurnIndicator(ctx);
-
-    // Render wind indicator at top-left
-    Wind.renderWindIndicator(ctx);
-
-    // Render round and difficulty indicator below wind
-    renderRoundIndicator(ctx);
-
-    // Render weapon HUD at top-right
-    renderWeaponHUD(ctx);
-
-    // Draw phase-specific content
-    const phase = Turn.getPhase();
-
-    // Draw playing state indicator (temporary)
-    ctx.fillStyle = COLORS.TEXT_MUTED;
-    ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('PLAYING STATE', CANVAS.DESIGN_WIDTH / 2, 70);
-
-    // Draw current phase info
-    ctx.fillStyle = COLORS.TEXT_MUTED;
-    ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
-    ctx.fillText(`Current Phase: ${phase}`, CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 - 40);
-
-    // Draw aiming values
-    ctx.fillStyle = COLORS.NEON_CYAN;
-    ctx.font = `${UI.FONT_SIZE_LARGE}px ${UI.FONT_FAMILY}`;
-    ctx.fillText(`ANGLE: ${playerAim.angle.toFixed(1)}°`, CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2);
-    ctx.fillStyle = COLORS.NEON_PINK;
-    ctx.fillText(`POWER: ${playerAim.power.toFixed(1)}%`, CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 35);
-
-    // Draw current weapon and ammo
+    // Sync playerTank's angle/power with playerAim for HUD display
+    // (The tank stores the values, but playerAim is used for real-time input)
     if (playerTank) {
-        const weapon = WeaponRegistry.getWeapon(playerTank.currentWeapon);
-        const ammo = playerTank.getAmmo(playerTank.currentWeapon);
-        const ammoDisplay = ammo === Infinity ? '∞' : ammo;
-        ctx.fillStyle = COLORS.TEXT_LIGHT;
-        ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
-        ctx.fillText(`WEAPON: ${weapon ? weapon.name : playerTank.currentWeapon} (${ammoDisplay})`, CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 65);
+        playerTank.angle = playerAim.angle;
+        playerTank.power = playerAim.power;
     }
 
-    // Draw controls help based on current phase
-    if (Turn.canPlayerAim()) {
+    // Determine turn state for HUD
+    const phase = Turn.getPhase();
+    const isPlayerTurn = Turn.canPlayerAim();
+    const isFiring = phase === TURN_PHASES.PROJECTILE_FLIGHT ||
+                     phase === TURN_PHASES.PLAYER_FIRE ||
+                     phase === TURN_PHASES.AI_FIRE;
+    const currentTurnTeam = isPlayerTurn ? 'player' :
+                            (phase === TURN_PHASES.AI_AIM || phase === TURN_PHASES.AI_FIRE) ? 'enemy' :
+                            (isFiring ? null : 'player');
+
+    // Render the complete HUD using the new ui.js module
+    HUD.renderHUD(ctx, {
+        playerTank,
+        enemyTank,
+        money: playerMoney,
+        turn: isFiring ? (activeProjectiles.length > 0 ? null : currentTurnTeam) : currentTurnTeam,
+        isFiring,
+        isPlayerTurn
+    });
+
+    // Render round and difficulty indicator (still uses existing function)
+    renderRoundIndicator(ctx);
+
+    // Draw controls help at bottom of screen during player's turn
+    if (isPlayerTurn) {
+        ctx.save();
         ctx.fillStyle = COLORS.TEXT_LIGHT;
         ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
-        ctx.fillText('Press SPACE to fire!', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 105);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText('Press SPACE to fire!', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT - 60);
         ctx.fillStyle = COLORS.TEXT_MUTED;
         ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
-        ctx.fillText('← → Arrow keys: Adjust angle | ↑ ↓ Arrow keys: Adjust power', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 135);
-        ctx.fillText('TAB / Shift+TAB: Cycle weapons', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 160);
+        ctx.fillText('← → Adjust angle  |  ↑ ↓ Adjust power  |  TAB Cycle weapons', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT - 40);
+        ctx.restore();
     }
 
     // Restore context if screen shake was applied

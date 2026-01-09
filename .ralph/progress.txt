@@ -318,5 +318,12 @@
 **Status:** Completed
 **Changes:** Implemented full synthwave-styled main menu with sunset gradient background, neon glowing title, animated buttons, disabled Options button, decorative frame with corner accents, and smooth 500ms fade-out transition to gameplay
 **Files:** js/main.js (lines 246-664 - menu state rendering)
-**Commit:** (pending)
+**Commit:** 30d69af
 ---
+## scorched-earth-x47.2 - Implement In-Game HUD
+**Status:** Completed
+**Changes:** Created ui.js module with complete HUD system including health bars, angle/power display, wind indicator, weapon panel, money display, and turn indicator. All styled with synthwave aesthetics (neon borders, dark panels). Updated main.js to use the new HUD module.
+**Files:** js/ui.js (new), js/main.js (modified)
+**Commit:** pending
+---
+**Commit:** 49a7ca2
