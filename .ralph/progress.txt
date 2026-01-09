@@ -4,3 +4,9 @@
 **Files:** js/input.js - Updated handleMouseUp, handleMouseMove, handleTouchStart, handleTouchEnd, handleTouchMove
 **Commit:** 9cc9657
 ---
+## scorched-earth-iug.11 - QA: Economy & Shop validation
+**Status:** Completed
+**Changes:** QA validation of Economy & Shop system completed. Found 1 bug (HIT_BASE_REWARD=100 instead of 50). Created bug issue scorched-earth-f4n. All other criteria passed.
+**Files:** Reviewed js/money.js, js/shop.js, js/constants.js
+**Commit:** (pending)
+---
