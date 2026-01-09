@@ -19,6 +19,8 @@ www/
 # Ralph temp files
 .ralph/output.tmp
 .ralph/generated_prompt.md
+.ralph/progress.txt
+.ralph/ralph.log
 
 # Logs
 *.log
