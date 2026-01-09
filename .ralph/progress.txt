@@ -27,3 +27,9 @@ Comprehensive validation of all game controls and input methods against the spec
 **Files:** No code changes - QA validation only
 **Commit:** (none - validation task)
 ---
+## scorched-earth-iug.7 - QA: Physics System validation
+**Status:** Completed
+**Changes:** Validated all 14 physics system acceptance criteria through code review and browser testing
+**Files:** js/projectile.js, js/wind.js, js/constants.js, js/main.js (read-only validation)
+**Commit:** N/A (validation task - no code changes)
+---
