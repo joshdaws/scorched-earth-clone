@@ -16,16 +16,17 @@ import * as Sound from './sound.js';
 /**
  * Volume controls panel dimensions and styling.
  * Designed to be centered or positioned by the parent container.
+ * Touch-optimized: larger handles and increased spacing for easy tapping.
  */
 const VOLUME_PANEL = {
-    WIDTH: 320,
-    HEIGHT: 220,
-    PADDING: 20,
-    SLIDER_HEIGHT: 8,
-    SLIDER_WIDTH: 240,
-    SLIDER_SPACING: 50,
-    HANDLE_RADIUS: 12,
-    LABEL_OFFSET: 24
+    WIDTH: 340,
+    HEIGHT: 260,
+    PADDING: 24,
+    SLIDER_HEIGHT: 12,         // Thicker track for easier tapping
+    SLIDER_WIDTH: 260,
+    SLIDER_SPACING: 56,        // More space between sliders
+    HANDLE_RADIUS: 18,         // Touch-friendly: 36px diameter exceeds 44px hit area with padding
+    LABEL_OFFSET: 28
 };
 
 // =============================================================================
@@ -82,16 +83,17 @@ function getSliders(panelX, panelY) {
 
 /**
  * Get mute button bounds.
+ * Touch-optimized: button is 120x48px for easy tapping.
  * @param {number} panelX - Panel X position
  * @param {number} panelY - Panel Y position
  * @returns {{x: number, y: number, width: number, height: number}}
  */
 function getMuteButton(panelX, panelY) {
     return {
-        x: panelX + (VOLUME_PANEL.WIDTH - 100) / 2,
-        y: panelY + VOLUME_PANEL.HEIGHT - 50,
-        width: 100,
-        height: 32
+        x: panelX + (VOLUME_PANEL.WIDTH - 120) / 2,
+        y: panelY + VOLUME_PANEL.HEIGHT - 60,
+        width: 120,            // Touch-friendly width
+        height: 48             // Touch-friendly: exceeds 44px minimum
     };
 }
 

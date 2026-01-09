@@ -53,6 +53,12 @@ let onDoneCallback = null;
  */
 let purchaseFeedback = null;
 
+/**
+ * Currently pressed button/card for touch feedback.
+ * @type {string|null}
+ */
+let pressedElementId = null;
+
 // =============================================================================
 // SHOP LAYOUT CONSTANTS
 // =============================================================================
@@ -60,44 +66,45 @@ let purchaseFeedback = null;
 /**
  * Shop layout configuration.
  * Centered on screen with weapon cards in a grid layout.
+ * Touch-optimized: larger cards and buttons with adequate spacing.
  */
 const SHOP_LAYOUT = {
     // Main shop panel - fills most of the screen to fit all 5 weapon categories
     PANEL: {
         X: CANVAS.DESIGN_WIDTH / 2,
         Y: CANVAS.DESIGN_HEIGHT / 2,
-        WIDTH: 900,
-        HEIGHT: 770,
+        WIDTH: 920,
+        HEIGHT: 780,
         PADDING: 15
     },
     // Title area - compact
     TITLE: {
-        Y_OFFSET: -355,
+        Y_OFFSET: -360,
         FONT_SIZE: 32
     },
     // Balance display - compact
     BALANCE: {
-        Y_OFFSET: -310,
+        Y_OFFSET: -315,
         HEIGHT: 30
     },
     // Weapon categories - tighter spacing
     CATEGORY: {
-        Y_START: -260,
+        Y_START: -265,
         HEIGHT: 20,
         SPACING: 5
     },
-    // Weapon cards grid - compact to fit all 5 categories
+    // Weapon cards grid - touch-optimized with adequate spacing
     CARD: {
-        WIDTH: 200,
-        HEIGHT: 85,   // Compact cards
-        GAP: 8,       // Minimal gap
+        WIDTH: 205,
+        HEIGHT: 90,   // Touch-friendly height
+        GAP: 12,      // Adequate spacing between cards for touch
         COLUMNS: 4
     },
-    // Done button - positioned after content
+    // Done button - touch-optimized
     DONE_BUTTON: {
-        Y_OFFSET: 355,
-        WIDTH: 160,
-        HEIGHT: 45
+        Y_OFFSET: 360,
+        WIDTH: 180,           // Touch-friendly width
+        HEIGHT: 56            // Touch-friendly: exceeds 44px minimum
     }
 };
 
@@ -293,7 +300,83 @@ function getWeaponAtPoint(x, y) {
 }
 
 /**
- * Handle click/tap on the shop screen.
+ * Handle pointer down on the shop screen.
+ * Sets pressed state for touch feedback.
+ * @param {number} x - X coordinate in design space
+ * @param {number} y - Y coordinate in design space
+ * @returns {boolean} True if an element was pressed
+ */
+export function handlePointerDown(x, y) {
+    if (!isVisible) return false;
+
+    // Check done button
+    if (isInsideButton(x, y, doneButton)) {
+        pressedElementId = 'done';
+        return true;
+    }
+
+    // Check weapon cards
+    const weaponInfo = getWeaponAtPoint(x, y);
+    if (weaponInfo) {
+        const weapon = WeaponRegistry.getWeapon(weaponInfo.weaponId);
+        if (weapon && weapon.cost > 0) {  // Can't purchase basic shot
+            pressedElementId = `weapon_${weaponInfo.weaponId}`;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Handle pointer up on the shop screen.
+ * Triggers action if released on the same element that was pressed.
+ * @param {number} x - X coordinate in design space
+ * @param {number} y - Y coordinate in design space
+ * @returns {boolean} True if an action was triggered
+ */
+export function handlePointerUp(x, y) {
+    if (!isVisible) {
+        pressedElementId = null;
+        return false;
+    }
+
+    const wasPressed = pressedElementId;
+    pressedElementId = null;
+
+    if (!wasPressed) return false;
+
+    // Check done button release
+    if (wasPressed === 'done' && isInsideButton(x, y, doneButton)) {
+        playClickSound();
+        console.log('[Shop] Done clicked');
+        if (onDoneCallback) {
+            onDoneCallback();
+        }
+        hide();
+        return true;
+    }
+
+    // Check weapon card release
+    if (wasPressed.startsWith('weapon_')) {
+        const weaponId = wasPressed.replace('weapon_', '');
+        const weaponInfo = getWeaponAtPoint(x, y);
+
+        if (weaponInfo && weaponInfo.weaponId === weaponId) {
+            const weapon = WeaponRegistry.getWeapon(weaponId);
+            if (weapon && weapon.cost > 0) {  // Can't purchase basic shot
+                purchaseWeapon(weaponId);
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Handle click/tap on the shop screen (legacy - immediate action).
+ * Prefer using handlePointerDown/handlePointerUp for touch feedback.
  * @param {number} x - X coordinate in design space
  * @param {number} y - Y coordinate in design space
  * @returns {boolean} True if a button was clicked
@@ -330,7 +413,8 @@ export function handleClick(x, y) {
 // =============================================================================
 
 /**
- * Draw a neon-styled button.
+ * Draw a neon-styled button with touch feedback.
+ * Shows pressed state when button is being touched/clicked.
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  * @param {Object} button - Button definition
  * @param {number} pulseIntensity - Glow pulse intensity (0-1)
@@ -340,25 +424,35 @@ function renderButton(ctx, button, pulseIntensity) {
     const halfHeight = button.height / 2;
     const btnX = button.x - halfWidth;
     const btnY = button.y - halfHeight;
+    const isPressed = pressedElementId === 'done';
 
     ctx.save();
 
-    // Button background with rounded corners
-    ctx.fillStyle = 'rgba(26, 26, 46, 0.9)';
+    // Pressed offset for tactile feedback
+    const pressOffset = isPressed ? 2 : 0;
+
+    // Button background with rounded corners - brighter when pressed
+    ctx.fillStyle = isPressed ? 'rgba(40, 40, 70, 0.95)' : 'rgba(26, 26, 46, 0.9)';
     ctx.beginPath();
-    ctx.roundRect(btnX, btnY, button.width, button.height, 8);
+    ctx.roundRect(btnX, btnY + pressOffset, button.width, button.height, 10);
     ctx.fill();
 
-    // Neon glow effect (pulsing)
+    // Neon glow effect (pulsing) - stronger when pressed
     ctx.shadowColor = button.color;
-    ctx.shadowBlur = 12 + pulseIntensity * 8;
+    ctx.shadowBlur = isPressed ? 20 : (12 + pulseIntensity * 8);
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
 
-    // Button border
+    // Button border - thicker when pressed
     ctx.strokeStyle = button.color;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = isPressed ? 3 : 2;
     ctx.stroke();
+
+    // Inner highlight when pressed
+    if (isPressed) {
+        ctx.fillStyle = `${button.color}25`;  // 15% opacity highlight
+        ctx.fill();
+    }
 
     // Reset shadow for text
     ctx.shadowBlur = 0;
@@ -370,13 +464,14 @@ function renderButton(ctx, button, pulseIntensity) {
     ctx.font = `bold ${UI.FONT_SIZE_LARGE}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(button.text, button.x, button.y);
+    ctx.fillText(button.text, button.x, button.y + pressOffset);
 
     ctx.restore();
 }
 
 /**
- * Draw a weapon card.
+ * Draw a weapon card with touch feedback.
+ * Shows pressed state when card is being touched/tapped.
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  * @param {Object} weapon - Weapon definition
  * @param {number} x - Card X position
@@ -390,6 +485,7 @@ function renderButton(ctx, button, pulseIntensity) {
 function renderWeaponCard(ctx, weapon, x, y, currentAmmo, canAfford, pulseIntensity, showFeedback = false, feedbackSuccess = false) {
     const cardWidth = SHOP_LAYOUT.CARD.WIDTH;
     const cardHeight = SHOP_LAYOUT.CARD.HEIGHT;
+    const isPressed = pressedElementId === `weapon_${weapon.id}`;
 
     // Determine card color based on weapon type
     let borderColor = COLORS.NEON_CYAN;
@@ -403,10 +499,15 @@ function renderWeaponCard(ctx, weapon, x, y, currentAmmo, canAfford, pulseIntens
 
     ctx.save();
 
-    // Card background
-    ctx.fillStyle = dimmed ? 'rgba(20, 20, 40, 0.85)' : 'rgba(26, 26, 46, 0.9)';
+    // Pressed offset for tactile feedback
+    const pressOffset = isPressed ? 1 : 0;
+
+    // Card background - brighter when pressed
+    const bgColor = isPressed ? 'rgba(40, 40, 70, 0.95)' :
+                    (dimmed ? 'rgba(20, 20, 40, 0.85)' : 'rgba(26, 26, 46, 0.9)');
+    ctx.fillStyle = bgColor;
     ctx.beginPath();
-    ctx.roundRect(x, y, cardWidth, cardHeight, 5);
+    ctx.roundRect(x, y + pressOffset, cardWidth, cardHeight, 6);
     ctx.fill();
 
     // Feedback flash
@@ -416,65 +517,74 @@ function renderWeaponCard(ctx, weapon, x, y, currentAmmo, canAfford, pulseIntens
         ctx.fill();
     }
 
-    // Border with glow
+    // Pressed highlight
+    if (isPressed && !dimmed) {
+        ctx.fillStyle = `${borderColor}20`;  // 12% opacity highlight
+        ctx.fill();
+    }
+
+    // Border with glow - stronger when pressed
     ctx.strokeStyle = dimmed ? COLORS.TEXT_MUTED : borderColor;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = isPressed ? 3 : 2;
     if (!dimmed) {
         ctx.shadowColor = borderColor;
-        ctx.shadowBlur = showFeedback && feedbackSuccess ? 15 : 4;
+        ctx.shadowBlur = isPressed ? 12 : (showFeedback && feedbackSuccess ? 15 : 4);
     }
     ctx.stroke();
 
     ctx.shadowBlur = 0;
+
+    // Apply press offset to all text positions
+    const textY = y + pressOffset;
 
     // Weapon name (row 1)
     ctx.fillStyle = dimmed ? COLORS.TEXT_MUTED : COLORS.TEXT_LIGHT;
     ctx.font = `bold ${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillText(weapon.name, x + 6, y + 5);
+    ctx.fillText(weapon.name, x + 8, textY + 6);
 
     // Cost on right of name row
     ctx.textAlign = 'right';
     ctx.font = `${UI.FONT_SIZE_SMALL - 2}px ${UI.FONT_FAMILY}`;
     ctx.fillStyle = weapon.cost === 0 ? '#00ff88' : (canAfford ? COLORS.NEON_YELLOW : COLORS.NEON_PINK);
     const costText = weapon.cost === 0 ? 'FREE' : `$${weapon.cost.toLocaleString()}`;
-    ctx.fillText(costText, x + cardWidth - 6, y + 5);
+    ctx.fillText(costText, x + cardWidth - 8, textY + 6);
 
     // Stats row: DMG, RAD, OWNED (row 2)
     ctx.font = `${UI.FONT_SIZE_SMALL - 2}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'left';
     ctx.fillStyle = dimmed ? 'rgba(136, 136, 153, 0.5)' : COLORS.TEXT_MUTED;
-    ctx.fillText(`D:${weapon.damage} R:${weapon.blastRadius}`, x + 6, y + 24);
+    ctx.fillText(`D:${weapon.damage} R:${weapon.blastRadius}`, x + 8, textY + 26);
 
     // Ammo owned
     ctx.textAlign = 'right';
     ctx.fillStyle = currentAmmo > 0 || currentAmmo === Infinity ? '#00ff88' : COLORS.TEXT_MUTED;
     const ownedAmmo = currentAmmo === Infinity ? '∞' : currentAmmo;
-    ctx.fillText(`x${ownedAmmo}`, x + cardWidth - 6, y + 24);
+    ctx.fillText(`x${ownedAmmo}`, x + cardWidth - 8, textY + 26);
 
     // Ammo per purchase (row 3)
     ctx.textAlign = 'left';
     ctx.fillStyle = COLORS.TEXT_MUTED;
     const ammoPerPurchase = weapon.ammo === Infinity ? '∞/buy' : `+${weapon.ammo}/buy`;
-    ctx.fillText(ammoPerPurchase, x + 6, y + 42);
+    ctx.fillText(ammoPerPurchase, x + 8, textY + 44);
 
-    // Buy indicator (row 4, bottom of card)
+    // Buy indicator (row 4, bottom of card) - larger touch-friendly tap zone
     if (weapon.cost > 0 && canAfford) {
         ctx.fillStyle = borderColor;
-        ctx.font = `bold ${UI.FONT_SIZE_SMALL - 2}px ${UI.FONT_FAMILY}`;
+        ctx.font = `bold ${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
         ctx.textAlign = 'center';
-        ctx.fillText('BUY', x + cardWidth / 2, y + cardHeight - 12);
+        ctx.fillText('TAP TO BUY', x + cardWidth / 2, textY + cardHeight - 14);
     } else if (weapon.cost === 0) {
         ctx.fillStyle = COLORS.TEXT_MUTED;
-        ctx.font = `${UI.FONT_SIZE_SMALL - 3}px ${UI.FONT_FAMILY}`;
+        ctx.font = `${UI.FONT_SIZE_SMALL - 2}px ${UI.FONT_FAMILY}`;
         ctx.textAlign = 'center';
-        ctx.fillText('DEFAULT', x + cardWidth / 2, y + cardHeight - 12);
+        ctx.fillText('DEFAULT', x + cardWidth / 2, textY + cardHeight - 14);
     } else if (weapon.cost > 0 && !canAfford) {
         ctx.fillStyle = COLORS.NEON_PINK;
-        ctx.font = `bold ${UI.FONT_SIZE_SMALL - 3}px ${UI.FONT_FAMILY}`;
+        ctx.font = `bold ${UI.FONT_SIZE_SMALL - 2}px ${UI.FONT_FAMILY}`;
         ctx.textAlign = 'center';
-        ctx.fillText('NO FUNDS', x + cardWidth / 2, y + cardHeight - 12);
+        ctx.fillText('NO FUNDS', x + cardWidth / 2, textY + cardHeight - 14);
     }
 
     ctx.restore();

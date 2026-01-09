@@ -22,25 +22,26 @@ import * as Wind from './wind.js';
 /**
  * Aiming controls layout configuration.
  * Designed for touch-friendly sizing (minimum 44px tap targets).
+ * UI positioned for comfortable thumb access on mobile devices.
  */
 const CONTROLS = {
-    // Power bar on the left side
+    // Power bar on the left side - positioned for left thumb access
     POWER_BAR: {
-        X: 40,
-        Y: 200,
-        WIDTH: 50,
-        HEIGHT: 300,
-        PADDING: 8,
-        KNOB_HEIGHT: 40,
-        TOUCH_ZONE_PADDING: 20  // Extra padding for touch targets
+        X: 50,              // Slightly inward for better thumb reach
+        Y: 220,             // Positioned in thumb-accessible zone
+        WIDTH: 55,          // Touch-friendly width
+        HEIGHT: 280,        // Slightly shorter for thumb reach
+        PADDING: 10,
+        KNOB_HEIGHT: 48,    // Touch-friendly: exceeds 44px minimum
+        TOUCH_ZONE_PADDING: 24  // Extra padding for touch targets
     },
-    // Fire button at bottom center
+    // Fire button at bottom center - touch-optimized for easy thumb access
     FIRE_BUTTON: {
         X: CANVAS.DESIGN_WIDTH / 2,
-        Y: CANVAS.DESIGN_HEIGHT - 100,
-        WIDTH: 180,
-        HEIGHT: 70,
-        BORDER_RADIUS: 12
+        Y: CANVAS.DESIGN_HEIGHT - 110,  // Slightly higher for thumb reach
+        WIDTH: 200,         // Extra wide for easy tapping
+        HEIGHT: 80,         // Touch-friendly: well over 44px minimum
+        BORDER_RADIUS: 14
     },
     // Angle arc around tank turret
     ANGLE_ARC: {
@@ -300,8 +301,9 @@ function renderAngleArc(ctx, tank, angle) {
 // =============================================================================
 
 /**
- * Render the fire button.
+ * Render the fire button with touch feedback.
  * A large, neon-styled button at the bottom center.
+ * Shows strong tactile feedback when pressed.
  *
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  * @param {boolean} canFire - Whether player can currently fire
@@ -319,47 +321,53 @@ function renderFireButton(ctx, canFire) {
     const btnX = btn.X - btn.WIDTH / 2;
     const btnY = btn.Y - btn.HEIGHT / 2;
 
-    // Button shadow/press effect
-    const offsetY = isPressed ? 2 : 0;
+    // Button shadow/press effect - more pronounced for touch feedback
+    const offsetY = isPressed ? 4 : 0;
 
-    // Button background
-    ctx.fillStyle = isPressed ? 'rgba(255, 42, 109, 0.3)' : 'rgba(10, 10, 26, 0.9)';
+    // Button background - brighter when pressed
+    ctx.fillStyle = isPressed ? 'rgba(255, 42, 109, 0.4)' : 'rgba(10, 10, 26, 0.9)';
     ctx.beginPath();
     ctx.roundRect(btnX, btnY + offsetY, btn.WIDTH, btn.HEIGHT, btn.BORDER_RADIUS);
     ctx.fill();
 
-    // Neon border with glow
+    // Inner highlight when pressed
+    if (isPressed && canFire) {
+        ctx.fillStyle = 'rgba(255, 42, 109, 0.25)';
+        ctx.fill();
+    }
+
+    // Neon border with glow - stronger when pressed
     const borderColor = canFire ? COLORS.NEON_PINK : COLORS.TEXT_MUTED;
     ctx.strokeStyle = borderColor;
-    ctx.lineWidth = 4;
+    ctx.lineWidth = isPressed ? 5 : 4;
     ctx.shadowColor = borderColor;
-    ctx.shadowBlur = canFire ? 15 * pulse : 0;
+    ctx.shadowBlur = isPressed ? 25 : (canFire ? 15 * pulse : 0);
     ctx.stroke();
     ctx.shadowBlur = 0;
 
-    // Inner glow when hovered
-    if (isHovered && canFire) {
+    // Inner glow when hovered (desktop) or pressed (touch)
+    if ((isHovered || isPressed) && canFire) {
         ctx.strokeStyle = 'rgba(255, 42, 109, 0.5)';
-        ctx.lineWidth = 8;
+        ctx.lineWidth = 10;
         ctx.stroke();
     }
 
-    // Button text
+    // Button text - larger for touch
     ctx.fillStyle = canFire ? COLORS.TEXT_LIGHT : COLORS.TEXT_MUTED;
-    ctx.font = `bold ${UI.FONT_SIZE_LARGE + 4}px ${UI.FONT_FAMILY}`;
+    ctx.font = `bold ${UI.FONT_SIZE_LARGE + 8}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     if (canFire) {
         ctx.shadowColor = COLORS.NEON_PINK;
-        ctx.shadowBlur = 8 * pulse;
+        ctx.shadowBlur = isPressed ? 15 : 8 * pulse;
     }
     ctx.fillText('FIRE!', btn.X, btn.Y + offsetY);
 
-    // Keyboard hint
+    // Keyboard hint - smaller and subtle
     ctx.shadowBlur = 0;
     ctx.fillStyle = COLORS.TEXT_MUTED;
     ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
-    ctx.fillText('[SPACE]', btn.X, btn.Y + btn.HEIGHT / 2 - 10 + offsetY);
+    ctx.fillText('[SPACE]', btn.X, btn.Y + btn.HEIGHT / 2 - 8 + offsetY);
 
     ctx.restore();
 }

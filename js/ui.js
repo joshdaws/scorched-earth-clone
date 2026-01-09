@@ -36,13 +36,13 @@ const HUD = {
         HEIGHT: 80,
         PADDING: 10
     },
-    // Weapon panel on right side
+    // Weapon panel on right side - touch-friendly for tap to cycle
     WEAPON_PANEL: {
         X: CANVAS.DESIGN_WIDTH - 20,
         Y: 100,
-        WIDTH: 180,
-        HEIGHT: 70,
-        PADDING: 10
+        WIDTH: 190,         // Slightly wider for touch
+        HEIGHT: 75,         // Touch-friendly height
+        PADDING: 12
     },
     // Money display at bottom right
     MONEY_PANEL: {
@@ -123,6 +123,7 @@ let previousColor = '';
 
 /**
  * Draw a rounded rectangle panel with synthwave styling.
+ * Supports pressed state for touch feedback.
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  * @param {number} x - X position (left edge for left-aligned, right edge for right-aligned)
  * @param {number} y - Y position
@@ -130,23 +131,30 @@ let previousColor = '';
  * @param {number} height - Panel height
  * @param {string} borderColor - Border color
  * @param {boolean} [rightAligned=false] - If true, x is the right edge
+ * @param {boolean} [isPressed=false] - Whether panel is being pressed (touch feedback)
  */
-function drawPanel(ctx, x, y, width, height, borderColor, rightAligned = false) {
+function drawPanel(ctx, x, y, width, height, borderColor, rightAligned = false, isPressed = false) {
     const drawX = rightAligned ? x - width : x;
 
     ctx.save();
 
-    // Dark translucent background
-    ctx.fillStyle = 'rgba(10, 10, 26, 0.85)';
+    // Dark translucent background - brighter when pressed
+    ctx.fillStyle = isPressed ? 'rgba(30, 30, 60, 0.95)' : 'rgba(10, 10, 26, 0.85)';
     ctx.beginPath();
-    ctx.roundRect(drawX, y, width, height, 6);
+    ctx.roundRect(drawX, y, width, height, 8);
     ctx.fill();
 
-    // Glowing border
+    // Inner highlight when pressed
+    if (isPressed) {
+        ctx.fillStyle = `${borderColor}15`;  // 8% opacity highlight
+        ctx.fill();
+    }
+
+    // Glowing border - stronger when pressed
     ctx.strokeStyle = borderColor;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = isPressed ? 3 : 2;
     ctx.shadowColor = borderColor;
-    ctx.shadowBlur = 4;
+    ctx.shadowBlur = isPressed ? 10 : 4;
     ctx.stroke();
 
     ctx.restore();
@@ -345,8 +353,12 @@ export function renderWindIndicator(ctx) {
 // WEAPON & AMMO DISPLAY
 // =============================================================================
 
+/** @type {boolean} Whether the weapon panel is currently pressed (for touch feedback) */
+let weaponPanelPressed = false;
+
 /**
  * Render the weapon panel showing current weapon and ammo.
+ * Panel is tappable to cycle weapons on touch devices.
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  * @param {import('./tank.js').Tank} playerTank - Player tank
  */
@@ -370,8 +382,11 @@ export function renderWeaponPanel(ctx, playerTank) {
         borderColor = COLORS.NEON_YELLOW;
     }
 
-    // Draw panel background (right-aligned)
-    const panelX = drawPanel(ctx, panel.X, panel.Y, panel.WIDTH, panel.HEIGHT, borderColor, true);
+    // Pressed offset for touch feedback
+    const pressOffset = weaponPanelPressed ? 2 : 0;
+
+    // Draw panel background (right-aligned) with touch feedback
+    const panelX = drawPanel(ctx, panel.X, panel.Y + pressOffset, panel.WIDTH, panel.HEIGHT, borderColor, true, weaponPanelPressed);
 
     ctx.save();
 
@@ -380,20 +395,45 @@ export function renderWeaponPanel(ctx, playerTank) {
     ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillText(weapon.name, panelX + panel.PADDING, panel.Y + 12);
+    ctx.fillText(weapon.name, panelX + panel.PADDING, panel.Y + 12 + pressOffset);
 
     // Ammo count
     ctx.fillStyle = ammo === Infinity ? COLORS.TEXT_MUTED : COLORS.NEON_YELLOW;
     ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
-    ctx.fillText(`Ammo: ${ammoDisplay}`, panelX + panel.PADDING, panel.Y + 38);
+    ctx.fillText(`Ammo: ${ammoDisplay}`, panelX + panel.PADDING, panel.Y + 38 + pressOffset);
 
-    // Weapon switch hint
+    // Weapon switch hint - touch-friendly text
     ctx.fillStyle = COLORS.TEXT_MUTED;
-    ctx.font = `${UI.FONT_SIZE_SMALL - 2}px ${UI.FONT_FAMILY}`;
+    ctx.font = `${UI.FONT_SIZE_SMALL - 1}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'right';
-    ctx.fillText('[TAB] Switch', panel.X - panel.PADDING, panel.Y + 52);
+    ctx.fillText('TAP TO SWITCH', panel.X - panel.PADDING, panel.Y + 58 + pressOffset);
 
     ctx.restore();
+}
+
+/**
+ * Check if a point is inside the weapon panel.
+ * @param {number} x - X coordinate in design space
+ * @param {number} y - Y coordinate in design space
+ * @returns {boolean} True if inside weapon panel
+ */
+export function isInsideWeaponPanel(x, y) {
+    const panel = HUD.WEAPON_PANEL;
+    const panelX = panel.X - panel.WIDTH;
+    return (
+        x >= panelX &&
+        x <= panel.X &&
+        y >= panel.Y &&
+        y <= panel.Y + panel.HEIGHT
+    );
+}
+
+/**
+ * Set weapon panel pressed state for touch feedback.
+ * @param {boolean} pressed - Whether the panel is pressed
+ */
+export function setWeaponPanelPressed(pressed) {
+    weaponPanelPressed = pressed;
 }
 
 // =============================================================================

@@ -236,7 +236,10 @@ export const UI = {
     WIND_INDICATOR_X: 100,     // X position from left edge
     WIND_INDICATOR_Y: 30,      // Y position from top
     WIND_ARROW_MAX_WIDTH: 60,  // Max arrow width at max wind strength
-    WIND_ARROW_HEIGHT: 20      // Arrow height
+    WIND_ARROW_HEIGHT: 20,     // Arrow height
+    // Touch-friendly minimum sizes (Apple HIG recommends 44pt minimum)
+    TOUCH_MIN_SIZE: 44,        // Minimum touch target size in pixels
+    TOUCH_SPACING: 12          // Minimum spacing between touch targets
 };
 
 // =============================================================================

@@ -16,14 +16,16 @@ import * as Sound from './sound.js';
 
 /**
  * Pause menu panel dimensions and styling.
+ * Touch-optimized: buttons are at least 56px tall (exceeds 44px minimum)
+ * with 16px spacing for clear separation.
  */
 const PAUSE_PANEL = {
-    WIDTH: 360,
-    HEIGHT: 340,
+    WIDTH: 380,
+    HEIGHT: 380,
     PADDING: 30,
-    BUTTON_WIDTH: 280,
-    BUTTON_HEIGHT: 50,
-    BUTTON_SPACING: 20
+    BUTTON_WIDTH: 300,
+    BUTTON_HEIGHT: 56,      // Touch-friendly: exceeds 44px minimum
+    BUTTON_SPACING: 16      // Clear spacing between buttons
 };
 
 // =============================================================================
@@ -50,6 +52,9 @@ let showTimestamp = 0;
 
 /** @type {number} Minimum time in ms before "click outside" can close the menu */
 const CLICK_OUTSIDE_DELAY = 100;
+
+/** @type {string|null} Currently pressed button ID for touch feedback */
+let pressedButtonId = null;
 
 // =============================================================================
 // BUTTON DEFINITIONS
@@ -98,14 +103,15 @@ function getButtons(panelX, panelY) {
 
 /**
  * Get quit confirmation button definitions.
+ * Touch-optimized: buttons are at least 48px tall with adequate spacing.
  * @param {number} panelX - Panel X position
  * @param {number} panelY - Panel Y position
  * @returns {Array<{id: string, label: string, x: number, y: number, width: number, height: number, color: string}>}
  */
 function getQuitConfirmButtons(panelX, panelY) {
-    const buttonWidth = 120;
-    const buttonHeight = 45;
-    const spacing = 20;
+    const buttonWidth = 130;   // Touch-friendly width
+    const buttonHeight = 52;   // Touch-friendly: exceeds 44px minimum
+    const spacing = 24;        // Clear spacing between buttons
     const totalWidth = buttonWidth * 2 + spacing;
     const startX = panelX + (PAUSE_PANEL.WIDTH - totalWidth) / 2;
     const buttonY = panelY + 180;
@@ -160,12 +166,12 @@ export function render(ctx) {
     if (showingOptions) {
         VolumeControls.render(ctx, centerX, centerY);
 
-        // Back button below volume controls
+        // Back button below volume controls - touch-friendly sizing
         const backButton = {
-            x: centerX - 60,
+            x: centerX - 70,
             y: centerY + VolumeControls.getPanelDimensions().height / 2 + 30,
-            width: 120,
-            height: 40
+            width: 140,         // Touch-friendly width
+            height: 48          // Touch-friendly: exceeds 44px minimum
         };
         renderButton(ctx, { ...backButton, id: 'back', label: 'BACK', color: COLORS.NEON_CYAN });
 
@@ -220,33 +226,45 @@ export function render(ctx) {
 }
 
 /**
- * Render a single button.
+ * Render a single button with touch feedback.
+ * Shows pressed state when button is being touched/clicked.
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  * @param {Object} button - Button definition
  */
 function renderButton(ctx, button) {
+    const isPressed = pressedButtonId === button.id;
+
     ctx.save();
 
-    // Button background
-    ctx.fillStyle = 'rgba(10, 10, 26, 0.8)';
+    // Pressed offset for tactile feedback
+    const pressOffset = isPressed ? 2 : 0;
+
+    // Button background - brighter when pressed
+    ctx.fillStyle = isPressed ? 'rgba(30, 30, 60, 0.95)' : 'rgba(10, 10, 26, 0.8)';
     ctx.beginPath();
-    ctx.roundRect(button.x, button.y, button.width, button.height, 6);
+    ctx.roundRect(button.x, button.y + pressOffset, button.width, button.height, 8);
     ctx.fill();
 
-    // Button border with glow
+    // Button border with glow - stronger glow when pressed
     ctx.strokeStyle = button.color;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = isPressed ? 3 : 2;
     ctx.shadowColor = button.color;
-    ctx.shadowBlur = 6;
+    ctx.shadowBlur = isPressed ? 15 : 6;
     ctx.stroke();
     ctx.shadowBlur = 0;
+
+    // Inner highlight when pressed
+    if (isPressed) {
+        ctx.fillStyle = `${button.color}20`;  // 12% opacity highlight
+        ctx.fill();
+    }
 
     // Button text
     ctx.fillStyle = button.color;
     ctx.font = `bold ${UI.FONT_SIZE_LARGE}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(button.label, button.x + button.width / 2, button.y + button.height / 2);
+    ctx.fillText(button.label, button.x + button.width / 2, button.y + button.height / 2 + pressOffset);
 
     ctx.restore();
 }
@@ -304,6 +322,7 @@ function renderQuitConfirmation(ctx, panelX, panelY) {
 
 /**
  * Handle pointer down on pause menu.
+ * Sets pressed state for touch feedback before processing action.
  * @param {number} x - X coordinate in design space
  * @param {number} y - Y coordinate in design space
  * @returns {{action: string, data?: any} | null} Action to perform, or null if not handled
@@ -321,17 +340,16 @@ export function handlePointerDown(x, y) {
         const centerX = CANVAS.DESIGN_WIDTH / 2;
         const centerY = CANVAS.DESIGN_HEIGHT / 2;
         const backButton = {
-            x: centerX - 60,
+            id: 'back',
+            x: centerX - 70,
             y: centerY + VolumeControls.getPanelDimensions().height / 2 + 30,
-            width: 120,
-            height: 40
+            width: 140,
+            height: 48    // Touch-friendly height
         };
 
         if (isInsideButton(x, y, backButton)) {
-            showingOptions = false;
-            VolumeControls.reset();
-            Sound.playClickSound();
-            return { action: 'handled' };
+            pressedButtonId = 'back';
+            return null;  // Wait for pointer up
         }
 
         // Click outside - close options
@@ -360,13 +378,8 @@ export function handlePointerDown(x, y) {
 
         for (const button of buttons) {
             if (isInsideButton(x, y, button)) {
-                Sound.playClickSound();
-                if (button.id === 'confirm_yes') {
-                    return { action: 'quit' };
-                } else {
-                    showingQuitConfirm = false;
-                    return { action: 'handled' };
-                }
+                pressedButtonId = button.id;
+                return null;  // Wait for pointer up to trigger action
             }
         }
 
@@ -374,23 +387,13 @@ export function handlePointerDown(x, y) {
         return { action: 'handled' };
     }
 
-    // Check main buttons
+    // Check main buttons - set pressed state but wait for pointer up
     const buttons = getButtons(panelPosition.x, panelPosition.y);
 
     for (const button of buttons) {
         if (isInsideButton(x, y, button)) {
-            Sound.playClickSound();
-
-            switch (button.id) {
-                case 'resume':
-                    return { action: 'resume' };
-                case 'options':
-                    showingOptions = true;
-                    return { action: 'handled' };
-                case 'quit':
-                    showingQuitConfirm = true;
-                    return { action: 'handled' };
-            }
+            pressedButtonId = button.id;
+            return null;  // Wait for pointer up to trigger action
         }
     }
 
@@ -416,6 +419,90 @@ export function handlePointerDown(x, y) {
 }
 
 /**
+ * Handle pointer up on pause menu.
+ * Triggers action if released on the same button that was pressed.
+ * @param {number} x - X coordinate in design space
+ * @param {number} y - Y coordinate in design space
+ * @returns {{action: string, data?: any} | null} Action to perform, or null if not handled
+ */
+export function handlePointerUpWithAction(x, y) {
+    if (!isVisible || !panelPosition) {
+        pressedButtonId = null;
+        return null;
+    }
+
+    const wasPressed = pressedButtonId;
+    pressedButtonId = null;
+
+    if (!wasPressed) {
+        // No button was pressed, handle slider release
+        if (showingOptions) {
+            return VolumeControls.handlePointerUp() ? { action: 'handled' } : null;
+        }
+        return null;
+    }
+
+    // Handle back button in options
+    if (showingOptions && wasPressed === 'back') {
+        const centerX = CANVAS.DESIGN_WIDTH / 2;
+        const centerY = CANVAS.DESIGN_HEIGHT / 2;
+        const backButton = {
+            x: centerX - 70,
+            y: centerY + VolumeControls.getPanelDimensions().height / 2 + 30,
+            width: 140,
+            height: 48
+        };
+
+        if (isInsideButton(x, y, backButton)) {
+            showingOptions = false;
+            VolumeControls.reset();
+            Sound.playClickSound();
+            return { action: 'handled' };
+        }
+        return null;
+    }
+
+    // Handle quit confirmation buttons
+    if (showingQuitConfirm) {
+        const confirmY = CANVAS.DESIGN_HEIGHT / 2 - 130;
+        const buttons = getQuitConfirmButtons(panelPosition.x, confirmY);
+        const button = buttons.find(b => b.id === wasPressed);
+
+        if (button && isInsideButton(x, y, button)) {
+            Sound.playClickSound();
+            if (button.id === 'confirm_yes') {
+                return { action: 'quit' };
+            } else {
+                showingQuitConfirm = false;
+                return { action: 'handled' };
+            }
+        }
+        return null;
+    }
+
+    // Handle main menu buttons
+    const buttons = getButtons(panelPosition.x, panelPosition.y);
+    const button = buttons.find(b => b.id === wasPressed);
+
+    if (button && isInsideButton(x, y, button)) {
+        Sound.playClickSound();
+
+        switch (button.id) {
+            case 'resume':
+                return { action: 'resume' };
+            case 'options':
+                showingOptions = true;
+                return { action: 'handled' };
+            case 'quit':
+                showingQuitConfirm = true;
+                return { action: 'handled' };
+        }
+    }
+
+    return null;
+}
+
+/**
  * Handle pointer move for slider dragging.
  * @param {number} x - X coordinate in design space
  * @param {number} y - Y coordinate in design space
@@ -433,9 +520,12 @@ export function handlePointerMove(x, y) {
 
 /**
  * Handle pointer up to end slider drag.
+ * Also clears pressed button state.
  * @returns {boolean} True if was dragging
  */
 export function handlePointerUp() {
+    pressedButtonId = null;
+
     if (!isVisible) return false;
 
     if (showingOptions) {
