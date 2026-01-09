@@ -252,3 +252,9 @@
 **Files:** js/tank.js, js/main.js
 **Commit:** d7485af
 ---
+## scorched-earth-8qc.3 - Implement Standard Weapons (Missile, Big Shot)
+**Status:** Completed
+**Changes:** Implemented ammo consumption on fire, weapon cycling with TAB key, HUD weapon/ammo display, auto-switch to basic-shot when weapon runs out
+**Files:** js/main.js - fireProjectile(), handleSelectWeapon(), renderPlaying(), PLAYING state onEnter
+**Commit:** 9c39873
+---

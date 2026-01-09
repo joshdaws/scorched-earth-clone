@@ -187,11 +187,13 @@ function setupMenuState() {
 /**
  * Fire a projectile from the specified tank.
  * Creates a new projectile and sets it as active.
+ * Consumes ammo for the current weapon.
  *
  * @param {import('./tank.js').Tank} tank - The tank firing the projectile
+ * @returns {boolean} True if projectile was fired, false if no ammo
  */
 function fireProjectile(tank) {
-    if (!tank) return;
+    if (!tank) return false;
 
     // Update tank's angle/power from player aim if it's the player tank
     if (tank === playerTank) {
@@ -199,9 +201,22 @@ function fireProjectile(tank) {
         tank.power = playerAim.power;
     }
 
+    // Consume ammo - if tank has no ammo for current weapon, this returns false
+    // The tank will auto-switch to basic-shot if current weapon runs out
+    if (!tank.consumeAmmo()) {
+        console.warn(`${tank.team} tank cannot fire: no ammo for ${tank.currentWeapon}`);
+        return false;
+    }
+
+    // Get weapon info for logging
+    const weapon = WeaponRegistry.getWeapon(tank.currentWeapon);
+    const ammoRemaining = tank.getAmmo(tank.currentWeapon);
+    const ammoDisplay = ammoRemaining === Infinity ? '∞' : ammoRemaining;
+
     // Create projectile from tank's barrel position
     activeProjectile = createProjectileFromTank(tank);
-    console.log(`Projectile fired from ${tank.team} at angle ${tank.angle}°, power ${tank.power}%`);
+    console.log(`Projectile fired from ${tank.team} at angle ${tank.angle}°, power ${tank.power}% (${weapon ? weapon.name : tank.currentWeapon}, ammo: ${ammoDisplay})`);
+    return true;
 }
 
 /**
@@ -811,11 +826,42 @@ function handleFire() {
 }
 
 /**
- * Handle weapon select input event
+ * Handle weapon select input event.
+ * Cycles through available weapons that the player has ammo for.
+ * The cycle order follows the weapon registry order:
+ * Basic Shot → Missile → Big Shot → MIRV → etc.
  */
 function handleSelectWeapon() {
-    // TODO: Implement weapon cycling when weapon system is ready
-    console.log('Weapon select pressed (not yet implemented)');
+    if (!playerTank) return;
+
+    // Get all weapons from registry
+    const allWeapons = WeaponRegistry.getAllWeapons();
+
+    // Filter to only weapons the player has ammo for
+    const availableWeapons = allWeapons.filter(weapon => {
+        const ammo = playerTank.getAmmo(weapon.id);
+        return ammo > 0 || ammo === Infinity;
+    });
+
+    if (availableWeapons.length === 0) {
+        console.warn('No weapons available with ammo!');
+        return;
+    }
+
+    // Find current weapon index
+    const currentIndex = availableWeapons.findIndex(w => w.id === playerTank.currentWeapon);
+
+    // Cycle to next weapon (wrap around to start if at end)
+    const nextIndex = (currentIndex + 1) % availableWeapons.length;
+    const nextWeapon = availableWeapons[nextIndex];
+
+    // Set the new weapon
+    playerTank.setWeapon(nextWeapon.id);
+
+    // Log the change with ammo info
+    const ammo = playerTank.getAmmo(nextWeapon.id);
+    const ammoDisplay = ammo === Infinity ? '∞' : ammo;
+    console.log(`Weapon selected: ${nextWeapon.name} (ammo: ${ammoDisplay})`);
 }
 
 /**
@@ -860,15 +906,25 @@ function renderPlaying(ctx) {
     ctx.fillStyle = COLORS.NEON_PINK;
     ctx.fillText(`POWER: ${playerAim.power.toFixed(1)}%`, CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 35);
 
+    // Draw current weapon and ammo
+    if (playerTank) {
+        const weapon = WeaponRegistry.getWeapon(playerTank.currentWeapon);
+        const ammo = playerTank.getAmmo(playerTank.currentWeapon);
+        const ammoDisplay = ammo === Infinity ? '∞' : ammo;
+        ctx.fillStyle = COLORS.TEXT_LIGHT;
+        ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+        ctx.fillText(`WEAPON: ${weapon ? weapon.name : playerTank.currentWeapon} (${ammoDisplay})`, CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 65);
+    }
+
     // Draw controls help based on current phase
     if (Turn.canPlayerAim()) {
         ctx.fillStyle = COLORS.TEXT_LIGHT;
         ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
-        ctx.fillText('Press SPACE to fire!', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 90);
+        ctx.fillText('Press SPACE to fire!', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 105);
         ctx.fillStyle = COLORS.TEXT_MUTED;
         ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
-        ctx.fillText('← → Arrow keys: Adjust angle | ↑ ↓ Arrow keys: Adjust power', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 120);
-        ctx.fillText('TAB: Select weapon', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 145);
+        ctx.fillText('← → Arrow keys: Adjust angle | ↑ ↓ Arrow keys: Adjust power', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 135);
+        ctx.fillText('TAB: Cycle weapons', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 160);
     }
 }
 
@@ -948,6 +1004,11 @@ function setupPlayingState() {
             const tanks = placeTanksOnTerrain(currentTerrain);
             playerTank = tanks.player;
             enemyTank = tanks.enemy;
+
+            // Give player starting ammo for Missile and Big Shot (for testing)
+            // In the final game, these will be purchased from the shop
+            playerTank.addAmmo('missile', 5);
+            playerTank.addAmmo('big-shot', 3);
 
             // Generate random wind for this round
             // Wind value -10 to +10: negative = left, positive = right
