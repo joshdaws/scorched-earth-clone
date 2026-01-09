@@ -143,3 +143,9 @@
 **Files:** js/sound.js
 **Commit:** c89deb7
 ---
+## scorched-earth-qff - Visual Effects
+**Status:** Completed
+**Changes:** Closed epic after verifying all 5 child issues were complete. Epic scope included: explosion particles, screen shake, screen flash, synthwave background layers, CRT/scanline effects.
+**Files:** js/effects.js, js/main.js, js/volumeControls.js
+**Commit:** N/A (epic closure only)
+---
