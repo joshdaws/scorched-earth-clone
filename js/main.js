@@ -2723,6 +2723,13 @@ function setupPlayingState() {
             // Play gameplay music
             Music.playForState(GAME_STATES.PLAYING);
 
+            // If resuming from pause, skip all initialization - game state is already set up
+            if (fromState === GAME_STATES.PAUSED) {
+                console.log('[Main] Resuming from pause - no reinitialization needed');
+                Input.enableGameInput();
+                return;
+            }
+
             // Determine if this is a new game or continuation
             // New game comes from MENU or DIFFICULTY_SELECT (since difficulty selection is part of new game flow)
             const isNewGame = fromState === GAME_STATES.MENU || fromState === GAME_STATES.DIFFICULTY_SELECT;
