@@ -24,7 +24,7 @@ import * as AimingControls from './aimingControls.js';
 import * as VictoryDefeat from './victoryDefeat.js';
 import * as Money from './money.js';
 import * as Shop from './shop.js';
-import { spawnExplosionParticles, updateParticles, renderParticles, clearParticles, getParticleCount, screenShakeForBlastRadius, getScreenShakeOffset, clearScreenShake, screenFlash, renderScreenFlash, clearScreenFlash, initBackground, updateBackground, renderBackground, clearBackground } from './effects.js';
+import { spawnExplosionParticles, updateParticles, renderParticles, clearParticles, getParticleCount, screenShakeForBlastRadius, getScreenShakeOffset, clearScreenShake, screenFlash, renderScreenFlash, clearScreenFlash, initBackground, updateBackground, renderBackground, clearBackground, renderCrtEffects, setCrtEnabled, isCrtEnabled, toggleCrt } from './effects.js';
 import * as Music from './music.js';
 import * as VolumeControls from './volumeControls.js';
 import * as PauseMenu from './pauseMenu.js';
@@ -817,6 +817,9 @@ function renderMenu(ctx) {
     if (optionsOverlayVisible) {
         renderOptionsOverlay(ctx);
     }
+
+    // Render CRT effects as final post-processing overlay
+    renderCrtEffects(ctx, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
 }
 
 /**
@@ -2283,6 +2286,9 @@ function renderPlaying(ctx) {
 
     // Render screen flash on top of everything (not affected by shake)
     renderScreenFlash(ctx, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+
+    // Render CRT effects as final post-processing overlay
+    renderCrtEffects(ctx, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
 }
 
 /**

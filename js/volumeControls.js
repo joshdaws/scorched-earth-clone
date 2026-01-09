@@ -8,6 +8,7 @@
 
 import { COLORS, UI, CANVAS } from './constants.js';
 import * as Sound from './sound.js';
+import { isCrtEnabled, toggleCrt } from './effects.js';
 
 // =============================================================================
 // LAYOUT CONFIGURATION
@@ -20,13 +21,16 @@ import * as Sound from './sound.js';
  */
 const VOLUME_PANEL = {
     WIDTH: 340,
-    HEIGHT: 260,
+    HEIGHT: 330,               // Increased to fit CRT toggle
     PADDING: 24,
     SLIDER_HEIGHT: 12,         // Thicker track for easier tapping
     SLIDER_WIDTH: 260,
     SLIDER_SPACING: 56,        // More space between sliders
     HANDLE_RADIUS: 18,         // Touch-friendly: 36px diameter exceeds 44px hit area with padding
-    LABEL_OFFSET: 28
+    LABEL_OFFSET: 28,
+    BUTTON_WIDTH: 120,         // Standard button width
+    BUTTON_HEIGHT: 48,         // Touch-friendly height
+    BUTTON_SPACING: 12         // Space between buttons
 };
 
 // =============================================================================
@@ -89,11 +93,30 @@ function getSliders(panelX, panelY) {
  * @returns {{x: number, y: number, width: number, height: number}}
  */
 function getMuteButton(panelX, panelY) {
+    const totalWidth = VOLUME_PANEL.BUTTON_WIDTH * 2 + VOLUME_PANEL.BUTTON_SPACING;
+    const startX = panelX + (VOLUME_PANEL.WIDTH - totalWidth) / 2;
     return {
-        x: panelX + (VOLUME_PANEL.WIDTH - 120) / 2,
-        y: panelY + VOLUME_PANEL.HEIGHT - 60,
-        width: 120,            // Touch-friendly width
-        height: 48             // Touch-friendly: exceeds 44px minimum
+        x: startX,
+        y: panelY + VOLUME_PANEL.HEIGHT - 70,
+        width: VOLUME_PANEL.BUTTON_WIDTH,
+        height: VOLUME_PANEL.BUTTON_HEIGHT
+    };
+}
+
+/**
+ * Get CRT effects toggle button bounds.
+ * @param {number} panelX - Panel X position
+ * @param {number} panelY - Panel Y position
+ * @returns {{x: number, y: number, width: number, height: number}}
+ */
+function getCrtButton(panelX, panelY) {
+    const totalWidth = VOLUME_PANEL.BUTTON_WIDTH * 2 + VOLUME_PANEL.BUTTON_SPACING;
+    const startX = panelX + (VOLUME_PANEL.WIDTH - totalWidth) / 2;
+    return {
+        x: startX + VOLUME_PANEL.BUTTON_WIDTH + VOLUME_PANEL.BUTTON_SPACING,
+        y: panelY + VOLUME_PANEL.HEIGHT - 70,
+        width: VOLUME_PANEL.BUTTON_WIDTH,
+        height: VOLUME_PANEL.BUTTON_HEIGHT
     };
 }
 
@@ -135,7 +158,7 @@ export function render(ctx, centerX = CANVAS.DESIGN_WIDTH / 2, centerY = CANVAS.
     ctx.font = `bold ${UI.FONT_SIZE_LARGE}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.fillText('AUDIO SETTINGS', centerX, panelY + VOLUME_PANEL.PADDING);
+    ctx.fillText('SETTINGS', centerX, panelY + VOLUME_PANEL.PADDING);
 
     // Render sliders
     const sliders = getSliders(panelX, panelY);
@@ -145,6 +168,9 @@ export function render(ctx, centerX = CANVAS.DESIGN_WIDTH / 2, centerY = CANVAS.
 
     // Render mute button
     renderMuteButton(ctx, getMuteButton(panelX, panelY));
+
+    // Render CRT effects toggle button
+    renderCrtButton(ctx, getCrtButton(panelX, panelY));
 
     ctx.restore();
 }
@@ -238,6 +264,37 @@ function renderMuteButton(ctx, button) {
     ctx.restore();
 }
 
+/**
+ * Render the CRT effects toggle button.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {Object} button - Button bounds
+ */
+function renderCrtButton(ctx, button) {
+    const crtOn = isCrtEnabled();
+
+    ctx.save();
+
+    // Button background - purple theme to distinguish from audio controls
+    ctx.fillStyle = crtOn ? 'rgba(211, 0, 197, 0.3)' : 'rgba(211, 0, 197, 0.1)';
+    ctx.beginPath();
+    ctx.roundRect(button.x, button.y, button.width, button.height, 6);
+    ctx.fill();
+
+    // Button border
+    ctx.strokeStyle = COLORS.NEON_PURPLE;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Button text
+    ctx.fillStyle = crtOn ? COLORS.NEON_PURPLE : COLORS.TEXT_MUTED;
+    ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(crtOn ? 'CRT ON' : 'CRT OFF', button.x + button.width / 2, button.y + button.height / 2);
+
+    ctx.restore();
+}
+
 // =============================================================================
 // INPUT HANDLING
 // =============================================================================
@@ -267,6 +324,14 @@ export function handlePointerDown(x, y) {
     const muteBtn = getMuteButton(panelPosition.x, panelPosition.y);
     if (isInsideButton(x, y, muteBtn)) {
         Sound.toggleMute();
+        Sound.playClickSound();
+        return true;
+    }
+
+    // Check CRT toggle button
+    const crtBtn = getCrtButton(panelPosition.x, panelPosition.y);
+    if (isInsideButton(x, y, crtBtn)) {
+        toggleCrt();
         Sound.playClickSound();
         return true;
     }

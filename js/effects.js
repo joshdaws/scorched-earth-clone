@@ -1174,3 +1174,224 @@ export function clearBackground() {
     mountainCache = null;
     backgroundAnimTime = 0;
 }
+
+// =============================================================================
+// CRT/SCANLINE EFFECTS
+// =============================================================================
+
+/**
+ * CRT effect configuration.
+ * Creates a retro monitor look with scanlines, vignette, and chromatic aberration.
+ */
+export const CRT_CONFIG = {
+    // Scanlines
+    SCANLINE_SPACING: 2,         // Pixels between scanlines
+    SCANLINE_OPACITY: 0.10,      // Opacity of scanlines (0-1)
+    SCANLINE_COLOR: '#000000',   // Scanline color (black)
+
+    // Vignette (darker corners)
+    VIGNETTE_INTENSITY: 0.35,    // How dark the corners get (0-1)
+    VIGNETTE_RADIUS: 0.75,       // Size of the vignette (0-1, larger = smaller dark area)
+
+    // Chromatic aberration (RGB color fringing)
+    CHROMATIC_ABERRATION_ENABLED: true,
+    CHROMATIC_OFFSET: 2,         // Pixel offset for RGB channels
+
+    // Subtle CRT curvature simulation (via vignette gradient)
+    CURVATURE_ENABLED: true
+};
+
+/**
+ * CRT effects state
+ */
+let crtEnabled = false;
+
+/**
+ * Cached scanline pattern for performance
+ * @type {CanvasPattern|null}
+ */
+let scanlinePattern = null;
+
+/**
+ * Canvas dimensions for pattern regeneration
+ */
+let patternWidth = 0;
+let patternHeight = 0;
+
+/**
+ * Enable or disable CRT effects.
+ * @param {boolean} enabled - Whether CRT effects should be rendered
+ */
+export function setCrtEnabled(enabled) {
+    crtEnabled = enabled;
+    console.log(`CRT effects ${enabled ? 'enabled' : 'disabled'}`);
+}
+
+/**
+ * Check if CRT effects are enabled.
+ * @returns {boolean} True if CRT effects are enabled
+ */
+export function isCrtEnabled() {
+    return crtEnabled;
+}
+
+/**
+ * Toggle CRT effects on/off.
+ * @returns {boolean} New enabled state
+ */
+export function toggleCrt() {
+    crtEnabled = !crtEnabled;
+    console.log(`CRT effects ${crtEnabled ? 'enabled' : 'disabled'}`);
+    return crtEnabled;
+}
+
+/**
+ * Initialize/regenerate the scanline pattern.
+ * Called automatically when rendering if dimensions change.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} width - Canvas width
+ * @param {number} height - Canvas height
+ */
+function initScanlinePattern(ctx, width, height) {
+    // Create a small canvas for the repeating pattern
+    const patternCanvas = document.createElement('canvas');
+    const patternCtx = patternCanvas.getContext('2d');
+
+    // Pattern is 1 pixel wide, SCANLINE_SPACING pixels tall
+    patternCanvas.width = 1;
+    patternCanvas.height = CRT_CONFIG.SCANLINE_SPACING;
+
+    // Clear (transparent)
+    patternCtx.clearRect(0, 0, 1, CRT_CONFIG.SCANLINE_SPACING);
+
+    // Draw single scanline (1 pixel tall)
+    patternCtx.fillStyle = CRT_CONFIG.SCANLINE_COLOR;
+    patternCtx.globalAlpha = CRT_CONFIG.SCANLINE_OPACITY;
+    patternCtx.fillRect(0, 0, 1, 1);
+
+    // Create repeating pattern
+    scanlinePattern = ctx.createPattern(patternCanvas, 'repeat');
+    patternWidth = width;
+    patternHeight = height;
+}
+
+/**
+ * Render scanlines overlay.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} width - Canvas width
+ * @param {number} height - Canvas height
+ */
+function renderScanlines(ctx, width, height) {
+    // Regenerate pattern if dimensions changed
+    if (!scanlinePattern || patternWidth !== width || patternHeight !== height) {
+        initScanlinePattern(ctx, width, height);
+    }
+
+    ctx.save();
+    ctx.fillStyle = scanlinePattern;
+    ctx.fillRect(0, 0, width, height);
+    ctx.restore();
+}
+
+/**
+ * Render vignette effect (darker corners).
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} width - Canvas width
+ * @param {number} height - Canvas height
+ */
+function renderVignette(ctx, width, height) {
+    const centerX = width / 2;
+    const centerY = height / 2;
+
+    // Calculate radius based on canvas diagonal
+    const diagonal = Math.sqrt(width * width + height * height);
+    const innerRadius = diagonal * CRT_CONFIG.VIGNETTE_RADIUS * 0.5;
+    const outerRadius = diagonal * 0.75;
+
+    ctx.save();
+
+    // Create radial gradient from center (transparent) to edges (dark)
+    const gradient = ctx.createRadialGradient(
+        centerX, centerY, innerRadius,
+        centerX, centerY, outerRadius
+    );
+
+    gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    gradient.addColorStop(0.5, `rgba(0, 0, 0, ${CRT_CONFIG.VIGNETTE_INTENSITY * 0.3})`);
+    gradient.addColorStop(1, `rgba(0, 0, 0, ${CRT_CONFIG.VIGNETTE_INTENSITY})`);
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.restore();
+}
+
+/**
+ * Render chromatic aberration effect.
+ * This is a subtle RGB color fringing at the edges.
+ * Note: This is a lightweight approximation - true chromatic aberration
+ * would require reading and shifting pixel data.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} width - Canvas width
+ * @param {number} height - Canvas height
+ */
+function renderChromaticAberration(ctx, width, height) {
+    if (!CRT_CONFIG.CHROMATIC_ABERRATION_ENABLED) return;
+
+    const offset = CRT_CONFIG.CHROMATIC_OFFSET;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    ctx.globalAlpha = 0.03;
+
+    // Red channel offset (slight right/down shift at edges)
+    const redGradient = ctx.createLinearGradient(0, 0, width, 0);
+    redGradient.addColorStop(0, 'rgba(255, 0, 0, 0.5)');
+    redGradient.addColorStop(0.1, 'rgba(255, 0, 0, 0)');
+    redGradient.addColorStop(0.9, 'rgba(255, 0, 0, 0)');
+    redGradient.addColorStop(1, 'rgba(255, 0, 0, 0.5)');
+    ctx.fillStyle = redGradient;
+    ctx.fillRect(offset, 0, width, height);
+
+    // Blue channel offset (slight left/up shift at edges)
+    const blueGradient = ctx.createLinearGradient(0, 0, width, 0);
+    blueGradient.addColorStop(0, 'rgba(0, 0, 255, 0.5)');
+    blueGradient.addColorStop(0.1, 'rgba(0, 0, 255, 0)');
+    blueGradient.addColorStop(0.9, 'rgba(0, 0, 255, 0)');
+    blueGradient.addColorStop(1, 'rgba(0, 0, 255, 0.5)');
+    ctx.fillStyle = blueGradient;
+    ctx.fillRect(-offset, 0, width, height);
+
+    ctx.restore();
+}
+
+/**
+ * Render all CRT effects as a post-processing overlay.
+ * Call this AFTER all other rendering is complete.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} width - Canvas width
+ * @param {number} height - Canvas height
+ */
+export function renderCrtEffects(ctx, width, height) {
+    if (!crtEnabled) return;
+
+    // Render effects in order (back to front)
+    // 1. Chromatic aberration (subtle color fringing)
+    renderChromaticAberration(ctx, width, height);
+
+    // 2. Scanlines (horizontal lines)
+    renderScanlines(ctx, width, height);
+
+    // 3. Vignette (darker corners) - on top
+    renderVignette(ctx, width, height);
+}
+
+/**
+ * Clear CRT effect caches.
+ * Call when canvas dimensions change significantly.
+ */
+export function clearCrtCache() {
+    scanlinePattern = null;
+    patternWidth = 0;
+    patternHeight = 0;
+}
