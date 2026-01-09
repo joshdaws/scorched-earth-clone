@@ -104,20 +104,8 @@ let splitEffect = null;
 let explosionEffect = null;
 
 // =============================================================================
-// WEAPON HUD STATE
+// PAUSE BUTTON STATE
 // =============================================================================
-
-/**
- * Weapon HUD panel dimensions and position.
- * Located at top-right of the screen. Clickable to cycle weapons.
- */
-const weaponHUD = {
-    x: CANVAS.DESIGN_WIDTH - 20,  // 20px from right edge (right-aligned)
-    y: 15,                          // 15px from top
-    width: 200,
-    height: 50,
-    padding: 10
-};
 
 /**
  * Pause button dimensions and position.
@@ -175,78 +163,6 @@ function renderPauseButton(ctx) {
     ctx.fillRect(centerX - gap / 2 - barWidth, centerY - barHeight / 2, barWidth, barHeight);
     // Right bar
     ctx.fillRect(centerX + gap / 2, centerY - barHeight / 2, barWidth, barHeight);
-
-    ctx.restore();
-}
-
-/**
- * Check if a point is inside the weapon HUD panel.
- * @param {number} x - X coordinate in design space
- * @param {number} y - Y coordinate in design space
- * @returns {boolean} True if point is inside the weapon HUD
- */
-function isInsideWeaponHUD(x, y) {
-    const left = weaponHUD.x - weaponHUD.width;
-    const right = weaponHUD.x;
-    const top = weaponHUD.y;
-    const bottom = weaponHUD.y + weaponHUD.height;
-    return x >= left && x <= right && y >= top && y <= bottom;
-}
-
-/**
- * Render the weapon HUD panel.
- * Shows current weapon name and ammo count.
- * Clickable to cycle to next weapon.
- * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
- */
-function renderWeaponHUD(ctx) {
-    if (!playerTank) return;
-
-    const weapon = WeaponRegistry.getWeapon(playerTank.currentWeapon);
-    if (!weapon) return;
-
-    const ammo = playerTank.getAmmo(playerTank.currentWeapon);
-    const ammoDisplay = ammo === Infinity ? '∞' : ammo;
-
-    ctx.save();
-
-    // Background panel
-    const bgX = weaponHUD.x - weaponHUD.width;
-    ctx.fillStyle = 'rgba(10, 10, 26, 0.85)';
-    ctx.beginPath();
-    ctx.roundRect(bgX, weaponHUD.y, weaponHUD.width, weaponHUD.height, 6);
-    ctx.fill();
-
-    // Border with weapon-type color hint
-    let borderColor = COLORS.NEON_CYAN;
-    if (weapon.type === 'nuclear') {
-        borderColor = COLORS.NEON_ORANGE;
-    } else if (weapon.type === 'splitting') {
-        borderColor = COLORS.NEON_PURPLE;
-    } else if (weapon.type === 'rolling' || weapon.type === 'digging') {
-        borderColor = COLORS.NEON_YELLOW;
-    }
-    ctx.strokeStyle = borderColor;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Weapon name
-    ctx.fillStyle = COLORS.TEXT_LIGHT;
-    ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'top';
-    ctx.fillText(weapon.name, weaponHUD.x - weaponHUD.padding, weaponHUD.y + 8);
-
-    // Ammo count
-    ctx.fillStyle = ammo === Infinity ? COLORS.TEXT_MUTED : COLORS.NEON_YELLOW;
-    ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
-    ctx.fillText(`Ammo: ${ammoDisplay}`, weaponHUD.x - weaponHUD.padding, weaponHUD.y + 28);
-
-    // Click hint (subtle)
-    ctx.fillStyle = COLORS.TEXT_MUTED;
-    ctx.font = `${UI.FONT_SIZE_SMALL - 2}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'left';
-    ctx.fillText('◀ ▶', bgX + 8, weaponHUD.y + weaponHUD.height / 2 - 4);
 
     ctx.restore();
 }
@@ -2634,8 +2550,8 @@ function handlePlayingPointerDown(pos) {
         }
     }
 
-    // Check if click is on weapon HUD (only during player aim phase)
-    if (Turn.canPlayerAim() && isInsideWeaponHUD(pos.x, pos.y)) {
+    // Check if click is on weapon panel (only during player aim phase)
+    if (Turn.canPlayerAim() && HUD.isInsideWeaponPanel(pos.x, pos.y)) {
         handleSelectWeapon();
         return;
     }
