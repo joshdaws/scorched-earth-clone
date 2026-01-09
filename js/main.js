@@ -30,6 +30,7 @@ import * as VolumeControls from './volumeControls.js';
 import * as PauseMenu from './pauseMenu.js';
 import * as TouchAiming from './touchAiming.js';
 import * as Haptics from './haptics.js';
+import * as DebugTools from './debugTools.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -3008,6 +3009,19 @@ async function init() {
         }
     });
 
+    // Initialize debug tools with game state accessors
+    DebugTools.init({
+        getPlayerTank: () => playerTank,
+        getEnemyTank: () => enemyTank,
+        getCurrentRound: () => currentRound,
+        setCurrentRound: (round) => { currentRound = round; }
+    });
+
+    // Register debug keyboard shortcuts (Shift+1-9 when debug mode is on)
+    document.addEventListener('keydown', (event) => {
+        DebugTools.handleKeyDown(event);
+    });
+
     console.log('Scorched Earth initialized');
 
     // Expose modules for debugging/testing
@@ -3016,6 +3030,10 @@ async function init() {
     window.Shop = Shop;
     window.Money = Money;
     window.VictoryDefeat = VictoryDefeat;
+    window.DebugTools = DebugTools;
+    // Expose DebugTools as 'Debug' for convenience (e.g., Debug.skipToShop())
+    // This creates a merged object with both Debug module and DebugTools functions
+    window.Debug = { ...Debug, ...DebugTools };
 
     // Start the game loop with update, render, and context
     Game.startLoop(update, render, ctx);

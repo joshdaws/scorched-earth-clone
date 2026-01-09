@@ -7,6 +7,7 @@
  */
 
 import { DEBUG, PROJECTILE } from './constants.js';
+import * as DebugTools from './debugTools.js';
 
 // =============================================================================
 // DAMAGE CALCULATION CONSTANTS
@@ -127,6 +128,14 @@ export function calculateDamage(explosion, tank, weapon = null) {
  */
 export function applyExplosionDamage(explosion, tank, weapon = null) {
     if (!tank || tank.isDestroyed()) {
+        return { damage: 0, actualDamage: 0, isDirectHit: false };
+    }
+
+    // God mode protection: player tank takes no damage when god mode is enabled
+    if (tank.team === 'player' && DebugTools.isGodModeEnabled()) {
+        if (DEBUG.ENABLED) {
+            console.log('[Damage] God mode: Player tank protected from damage');
+        }
         return { damage: 0, actualDamage: 0, isDirectHit: false };
     }
 
