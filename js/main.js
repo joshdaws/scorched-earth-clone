@@ -26,6 +26,7 @@ import * as Money from './money.js';
 import * as Shop from './shop.js';
 import { spawnExplosionParticles, updateParticles, renderParticles, clearParticles, getParticleCount, screenShakeForBlastRadius, getScreenShakeOffset, clearScreenShake, screenFlash, renderScreenFlash, clearScreenFlash, initBackground, updateBackground, renderBackground, clearBackground } from './effects.js';
 import * as Music from './music.js';
+import * as VolumeControls from './volumeControls.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -305,9 +306,20 @@ const menuButtons = {
         height: 60,
         text: 'OPTIONS',
         color: COLORS.NEON_PURPLE,
-        enabled: false  // Disabled for V1
+        enabled: true  // Enabled for volume controls
     }
 };
+
+// =============================================================================
+// OPTIONS OVERLAY STATE
+// =============================================================================
+
+/**
+ * Whether the options overlay (volume controls) is currently shown.
+ * Can be shown from main menu or pause menu.
+ * @type {boolean}
+ */
+let optionsOverlayVisible = false;
 
 /**
  * Check if a point is inside a menu button
@@ -364,9 +376,54 @@ function handleMenuClick(pos) {
     } else if (isInsideButton(pos.x, pos.y, menuButtons.options) && menuButtons.options.enabled) {
         // Play click sound
         Sound.playClickSound();
-        // Options - would go to options menu (not implemented for V1)
-        console.log('Options clicked (not implemented)');
+        // Show options overlay with volume controls
+        optionsOverlayVisible = true;
+        console.log('Options overlay opened');
     }
+}
+
+/**
+ * Handle click on options overlay.
+ * Passes clicks to volume controls or closes overlay if clicking outside.
+ * @param {{x: number, y: number}} pos - Click position in design coordinates
+ * @returns {boolean} True if click was handled
+ */
+function handleOptionsOverlayClick(pos) {
+    if (!optionsOverlayVisible) return false;
+
+    // Check if click is on volume controls
+    if (VolumeControls.handlePointerDown(pos.x, pos.y)) {
+        return true;
+    }
+
+    // Click outside panel - close overlay
+    const panelDims = VolumeControls.getPanelDimensions();
+    const panelX = CANVAS.DESIGN_WIDTH / 2 - panelDims.width / 2;
+    const panelY = CANVAS.DESIGN_HEIGHT / 2 - panelDims.height / 2;
+
+    const isInsidePanel = (
+        pos.x >= panelX &&
+        pos.x <= panelX + panelDims.width &&
+        pos.y >= panelY &&
+        pos.y <= panelY + panelDims.height
+    );
+
+    if (!isInsidePanel) {
+        closeOptionsOverlay();
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Close the options overlay.
+ */
+function closeOptionsOverlay() {
+    optionsOverlayVisible = false;
+    VolumeControls.reset();
+    Sound.playClickSound();
+    console.log('Options overlay closed');
 }
 
 /**
@@ -687,6 +744,35 @@ function renderMenu(ctx) {
     ctx.restore();
 
     ctx.restore();
+
+    // Render options overlay on top if visible
+    if (optionsOverlayVisible) {
+        renderOptionsOverlay(ctx);
+    }
+}
+
+/**
+ * Render the options overlay with volume controls.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ */
+function renderOptionsOverlay(ctx) {
+    ctx.save();
+
+    // Semi-transparent dark overlay
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+
+    // Render volume controls panel
+    VolumeControls.render(ctx);
+
+    // Close hint at bottom
+    ctx.fillStyle = COLORS.TEXT_MUTED;
+    ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText('Press ESC or click outside to close', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT - 30);
+
+    ctx.restore();
 }
 
 /**
@@ -702,6 +788,11 @@ function setupMenuState() {
         },
         onExit: (toState) => {
             console.log('Exiting MENU state');
+            // Close options overlay if open
+            if (optionsOverlayVisible) {
+                optionsOverlayVisible = false;
+                VolumeControls.reset();
+            }
         },
         render: renderMenu
     });
@@ -709,18 +800,67 @@ function setupMenuState() {
     // Register click handler for menu interactions
     // Note: onMouseDown callback receives (x, y, button) - coordinates first
     Input.onMouseDown((x, y, button) => {
+        if (Game.getState() !== GAME_STATES.MENU) return;
+
+        // Check options overlay first
+        if (optionsOverlayVisible) {
+            handleOptionsOverlayClick({ x, y });
+            return;
+        }
+
         handleMenuClick({ x, y });
     });
 
     // Register touch handler for menu interactions
     Input.onTouchStart((x, y) => {
+        if (Game.getState() !== GAME_STATES.MENU) return;
+
+        // Check options overlay first
+        if (optionsOverlayVisible) {
+            handleOptionsOverlayClick({ x, y });
+            return;
+        }
+
         handleMenuClick({ x, y });
     });
 
-    // Also handle keyboard - Space or Enter to start
+    // Register pointer move for slider dragging
+    Input.onMouseMove((x, y) => {
+        if (Game.getState() === GAME_STATES.MENU && optionsOverlayVisible) {
+            VolumeControls.handlePointerMove(x, y);
+        }
+    });
+
+    Input.onTouchMove((x, y) => {
+        if (Game.getState() === GAME_STATES.MENU && optionsOverlayVisible) {
+            VolumeControls.handlePointerMove(x, y);
+        }
+    });
+
+    // Register pointer up to end slider dragging
+    Input.onMouseUp((x, y, button) => {
+        if (Game.getState() === GAME_STATES.MENU && optionsOverlayVisible) {
+            VolumeControls.handlePointerUp();
+        }
+    });
+
+    Input.onTouchEnd((x, y) => {
+        if (Game.getState() === GAME_STATES.MENU && optionsOverlayVisible) {
+            VolumeControls.handlePointerUp();
+        }
+    });
+
+    // Also handle keyboard - Space or Enter to start, Escape to close options
     Input.onKeyDown((keyCode) => {
         if (Game.getState() === GAME_STATES.MENU) {
-            if (keyCode === 'Space' || keyCode === 'Enter') {
+            // Escape closes options overlay
+            if (keyCode === 'Escape' && optionsOverlayVisible) {
+                closeOptionsOverlay();
+                return;
+            }
+
+            // Space/Enter starts game (only if options not open)
+            if (!optionsOverlayVisible && (keyCode === 'Space' || keyCode === 'Enter')) {
                 Game.setState(GAME_STATES.PLAYING);
             }
         }

@@ -44,9 +44,28 @@ let currentMusicId = null;
 // AUDIO CONFIGURATION
 // =============================================================================
 
-const DEFAULT_MASTER_VOLUME = 0.8;
+const DEFAULT_MASTER_VOLUME = 0.5;
 const DEFAULT_MUSIC_VOLUME = 0.5;
-const DEFAULT_SFX_VOLUME = 0.8;
+const DEFAULT_SFX_VOLUME = 0.5;
+
+// =============================================================================
+// LOCAL STORAGE KEYS
+// =============================================================================
+
+const STORAGE_KEY_MASTER_VOLUME = 'scorched-earth-master-volume';
+const STORAGE_KEY_MUSIC_VOLUME = 'scorched-earth-music-volume';
+const STORAGE_KEY_SFX_VOLUME = 'scorched-earth-sfx-volume';
+const STORAGE_KEY_MUTED = 'scorched-earth-muted';
+
+// =============================================================================
+// MUTE STATE
+// =============================================================================
+
+/** @type {boolean} Whether audio is currently muted */
+let isMuted = false;
+
+/** @type {number} Volume before mute was applied (for restoring) */
+let preMuteVolume = DEFAULT_MASTER_VOLUME;
 
 // =============================================================================
 // PUBLIC API
@@ -87,24 +106,34 @@ export function init() {
     }
 
     try {
+        // Load persisted settings before creating gain nodes
+        const savedMaster = loadVolumeSetting(STORAGE_KEY_MASTER_VOLUME, DEFAULT_MASTER_VOLUME);
+        const savedMusic = loadVolumeSetting(STORAGE_KEY_MUSIC_VOLUME, DEFAULT_MUSIC_VOLUME);
+        const savedSfx = loadVolumeSetting(STORAGE_KEY_SFX_VOLUME, DEFAULT_SFX_VOLUME);
+        const savedMuted = loadMuteSetting();
+
         // Create audio context (with webkit fallback for older Safari)
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         audioContext = new AudioContextClass();
 
         // Create master gain node (controls overall volume)
         masterGain = audioContext.createGain();
-        masterGain.gain.value = DEFAULT_MASTER_VOLUME;
         masterGain.connect(audioContext.destination);
 
         // Create music gain node (for background music volume)
         musicGain = audioContext.createGain();
-        musicGain.gain.value = DEFAULT_MUSIC_VOLUME;
+        musicGain.gain.value = savedMusic;
         musicGain.connect(masterGain);
 
         // Create SFX gain node (for sound effects volume)
         sfxGain = audioContext.createGain();
-        sfxGain.gain.value = DEFAULT_SFX_VOLUME;
+        sfxGain.gain.value = savedSfx;
         sfxGain.connect(masterGain);
+
+        // Apply saved mute state
+        isMuted = savedMuted;
+        preMuteVolume = savedMaster;
+        masterGain.gain.value = isMuted ? 0 : savedMaster;
 
         // Resume context if it's in suspended state (common on mobile)
         if (audioContext.state === 'suspended') {
@@ -112,11 +141,75 @@ export function init() {
         }
 
         initialized = true;
-        console.log('Audio initialized');
+        console.log(`Audio initialized (master: ${savedMaster}, music: ${savedMusic}, sfx: ${savedSfx}, muted: ${isMuted})`);
         return true;
     } catch (error) {
         console.error('Failed to initialize audio:', error);
         return false;
+    }
+}
+
+// =============================================================================
+// LOCAL STORAGE HELPERS
+// =============================================================================
+
+/**
+ * Load a volume setting from localStorage.
+ * @param {string} key - Storage key
+ * @param {number} defaultValue - Default value if not found or invalid
+ * @returns {number} Volume value (0-1)
+ */
+function loadVolumeSetting(key, defaultValue) {
+    try {
+        const stored = localStorage.getItem(key);
+        if (stored === null) return defaultValue;
+
+        const value = parseFloat(stored);
+        if (isNaN(value) || value < 0 || value > 1) return defaultValue;
+
+        return value;
+    } catch (e) {
+        // localStorage may be disabled or inaccessible
+        console.warn('Could not load volume setting:', e);
+        return defaultValue;
+    }
+}
+
+/**
+ * Save a volume setting to localStorage.
+ * @param {string} key - Storage key
+ * @param {number} value - Volume value (0-1)
+ */
+function saveVolumeSetting(key, value) {
+    try {
+        localStorage.setItem(key, value.toString());
+    } catch (e) {
+        // localStorage may be disabled or full
+        console.warn('Could not save volume setting:', e);
+    }
+}
+
+/**
+ * Load mute state from localStorage.
+ * @returns {boolean} Mute state
+ */
+function loadMuteSetting() {
+    try {
+        return localStorage.getItem(STORAGE_KEY_MUTED) === 'true';
+    } catch (e) {
+        return false;
+    }
+}
+
+/**
+ * Save mute state to localStorage.
+ * @param {boolean} muted - Mute state
+ */
+function saveMuteSetting(muted) {
+    try {
+        localStorage.setItem(STORAGE_KEY_MUTED, muted.toString());
+    } catch (e) {
+        console.warn('Could not save mute setting:', e);
     }
 }
 
@@ -149,39 +242,63 @@ export function getSfxGain() {
 
 /**
  * Set the master volume (affects both music and SFX).
+ * Automatically unmutes if setting a non-zero volume while muted.
+ * Persists to localStorage for next session.
  * @param {number} volume - Volume level from 0 to 1
  */
 export function setMasterVolume(volume) {
+    const clampedVolume = Math.max(0, Math.min(1, volume));
+    preMuteVolume = clampedVolume;
+    saveVolumeSetting(STORAGE_KEY_MASTER_VOLUME, clampedVolume);
+
     if (masterGain) {
-        masterGain.gain.value = Math.max(0, Math.min(1, volume));
+        // If changing volume while muted and new volume > 0, unmute
+        if (isMuted && clampedVolume > 0) {
+            isMuted = false;
+            saveMuteSetting(false);
+        }
+        masterGain.gain.value = isMuted ? 0 : clampedVolume;
     }
 }
 
 /**
  * Set the music volume.
+ * Persists to localStorage for next session.
  * @param {number} volume - Volume level from 0 to 1
  */
 export function setMusicVolume(volume) {
+    const clampedVolume = Math.max(0, Math.min(1, volume));
+    saveVolumeSetting(STORAGE_KEY_MUSIC_VOLUME, clampedVolume);
+
     if (musicGain) {
-        musicGain.gain.value = Math.max(0, Math.min(1, volume));
+        musicGain.gain.value = clampedVolume;
     }
 }
 
 /**
  * Set the sound effects volume.
+ * Persists to localStorage for next session.
  * @param {number} volume - Volume level from 0 to 1
  */
 export function setSfxVolume(volume) {
+    const clampedVolume = Math.max(0, Math.min(1, volume));
+    saveVolumeSetting(STORAGE_KEY_SFX_VOLUME, clampedVolume);
+
     if (sfxGain) {
-        sfxGain.gain.value = Math.max(0, Math.min(1, volume));
+        sfxGain.gain.value = clampedVolume;
     }
 }
 
 /**
  * Get current master volume.
+ * Returns the configured volume even when muted (not 0).
  * @returns {number} Volume level from 0 to 1, or 0 if not initialized
  */
 export function getMasterVolume() {
+    // Return the pre-mute volume if muted, so UI shows correct slider position
+    if (isMuted) {
+        return preMuteVolume;
+    }
     return masterGain ? masterGain.gain.value : 0;
 }
 
@@ -199,6 +316,51 @@ export function getMusicVolume() {
  */
 export function getSfxVolume() {
     return sfxGain ? sfxGain.gain.value : 0;
+}
+
+// =============================================================================
+// MUTE CONTROLS
+// =============================================================================
+
+/**
+ * Toggle mute state. When muted, master volume is set to 0.
+ * When unmuted, master volume is restored to previous level.
+ * Persists to localStorage.
+ * @returns {boolean} New mute state (true = muted)
+ */
+export function toggleMute() {
+    isMuted = !isMuted;
+    saveMuteSetting(isMuted);
+
+    if (masterGain) {
+        masterGain.gain.value = isMuted ? 0 : preMuteVolume;
+    }
+
+    console.log(`Audio ${isMuted ? 'muted' : 'unmuted'}`);
+    return isMuted;
+}
+
+/**
+ * Set mute state directly.
+ * @param {boolean} muted - Whether to mute
+ */
+export function setMuted(muted) {
+    if (isMuted === muted) return;
+
+    isMuted = muted;
+    saveMuteSetting(isMuted);
+
+    if (masterGain) {
+        masterGain.gain.value = isMuted ? 0 : preMuteVolume;
+    }
+}
+
+/**
+ * Check if audio is currently muted.
+ * @returns {boolean} True if muted
+ */
+export function getMuted() {
+    return isMuted;
 }
 
 /**
