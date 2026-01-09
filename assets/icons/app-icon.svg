@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff0080"/>
+      <stop offset="50%" style="stop-color:#7928ca"/>
+      <stop offset="100%" style="stop-color:#0a0a0f"/>
+    </linearGradient>
+    <linearGradient id="neon" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#00ffff"/>
+      <stop offset="100%" style="stop-color:#ff00ff"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+
+  <!-- Grid lines -->
+  <g stroke="#00ffff" stroke-opacity="0.3" stroke-width="2">
+    <line x1="0" y1="256" x2="1024" y2="256"/>
+    <line x1="0" y1="512" x2="1024" y2="512"/>
+    <line x1="0" y1="768" x2="1024" y2="768"/>
+    <line x1="256" y1="0" x2="256" y2="1024"/>
+    <line x1="512" y1="0" x2="512" y2="1024"/>
+    <line x1="768" y1="0" x2="768" y2="1024"/>
+  </g>
+
+  <!-- Stylized terrain/mountain -->
+  <polygon points="0,900 200,650 350,750 512,500 674,750 824,650 1024,900 1024,1024 0,1024" fill="#1a1a2e"/>
+
+  <!-- Tank silhouette -->
+  <g transform="translate(312, 420)">
+    <!-- Tank body -->
+    <rect x="50" y="80" width="300" height="80" rx="10" fill="url(#neon)"/>
+    <!-- Tank turret -->
+    <rect x="130" y="40" width="140" height="50" rx="8" fill="url(#neon)"/>
+    <!-- Tank barrel -->
+    <rect x="250" y="50" width="150" height="20" rx="5" fill="url(#neon)"/>
+    <!-- Tracks -->
+    <ellipse cx="100" cy="170" rx="60" ry="30" fill="#00ffff"/>
+    <ellipse cx="300" cy="170" rx="60" ry="30" fill="#00ffff"/>
+  </g>
+
+  <!-- Explosion/star burst -->
+  <g transform="translate(750, 250)">
+    <circle cx="0" cy="0" r="60" fill="#ff0080" opacity="0.8"/>
+    <circle cx="0" cy="0" r="40" fill="#ffff00" opacity="0.9"/>
+    <circle cx="0" cy="0" r="20" fill="#ffffff"/>
+  </g>
+
+  <!-- Text "SE" -->
+  <text x="512" y="920" font-family="Arial Black, sans-serif" font-size="120" font-weight="bold" fill="#00ffff" text-anchor="middle" stroke="#ff00ff" stroke-width="3">SE</text>
+</svg>

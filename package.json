@@ -1,0 +1,40 @@
+{
+  "name": "scorched-earth",
+  "version": "1.0.0",
+  "description": "A modern reimagining of the classic 1991 DOS artillery game with synthwave aesthetics",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build:web": "rm -rf www && mkdir -p www && cp -r index.html style.css js assets www/",
+    "build:ios": "npm run build:web && npx cap sync ios",
+    "open:ios": "npx cap open ios",
+    "serve": "python3 -m http.server 8000"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/joshdaws/scorched-earth-clone.git"
+  },
+  "keywords": [
+    "game",
+    "artillery",
+    "canvas",
+    "synthwave",
+    "retro"
+  ],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/joshdaws/scorched-earth-clone/issues"
+  },
+  "homepage": "https://github.com/joshdaws/scorched-earth-clone#readme",
+  "dependencies": {
+    "@capacitor/cli": "^8.0.0",
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/haptics": "^8.0.0",
+    "@capacitor/ios": "^8.0.0",
+    "sharp": "^0.34.5"
+  }
+}

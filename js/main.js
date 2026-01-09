@@ -29,6 +29,7 @@ import * as Music from './music.js';
 import * as VolumeControls from './volumeControls.js';
 import * as PauseMenu from './pauseMenu.js';
 import * as TouchAiming from './touchAiming.js';
+import * as Haptics from './haptics.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -988,6 +989,9 @@ function fireProjectile(tank) {
     // Play fire sound
     Sound.playFireSound();
 
+    // Haptic feedback for firing (mobile devices)
+    Haptics.hapticFire();
+
     console.log(`Projectile fired from ${tank.team} at angle ${tank.angle}°, power ${tank.power}% (${weapon ? weapon.name : firedWeaponId}, ammo: ${ammoDisplay})`);
     return true;
 }
@@ -1078,6 +1082,9 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
     // Screen shake for ALL weapons (intensity/duration based on blast radius)
     // Smaller weapons get subtle shakes, larger weapons get dramatic shakes
     screenShakeForBlastRadius(blastRadius);
+
+    // Haptic feedback for explosions (mobile devices)
+    Haptics.hapticExplosion(blastRadius);
 
     // Destroy terrain
     if (currentTerrain) {
@@ -1329,6 +1336,9 @@ function checkRoundEnd() {
         // Show victory screen after short delay
         VictoryDefeat.showVictory(roundEarnings, roundDamage, 1200);
 
+        // Haptic feedback for victory (mobile devices)
+        Haptics.hapticVictory();
+
         // Transition to victory state
         Game.setState(GAME_STATES.VICTORY);
         return;
@@ -1347,6 +1357,9 @@ function checkRoundEnd() {
 
         // Show defeat screen after short delay
         VictoryDefeat.showDefeat(roundEarnings, roundDamage, 1200);
+
+        // Haptic feedback for defeat (mobile devices)
+        Haptics.hapticDefeat();
 
         // Transition to defeat state
         Game.setState(GAME_STATES.DEFEAT);
@@ -2955,6 +2968,9 @@ async function init() {
 
     // Initialize touch aiming (Angry Birds-style drag controls)
     TouchAiming.init();
+
+    // Initialize haptic feedback (for mobile devices)
+    await Haptics.initHaptics();
 
     // Set up audio initialization on first user interaction
     // Web Audio API requires user gesture to start

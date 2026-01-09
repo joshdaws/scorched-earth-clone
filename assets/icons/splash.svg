@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2732 2732">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff0080"/>
+      <stop offset="40%" style="stop-color:#7928ca"/>
+      <stop offset="100%" style="stop-color:#0a0a0f"/>
+    </linearGradient>
+    <linearGradient id="neon" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#00ffff"/>
+      <stop offset="100%" style="stop-color:#ff00ff"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="2732" height="2732" fill="url(#bg)"/>
+
+  <!-- Horizontal grid lines with perspective -->
+  <g stroke="#00ffff" stroke-opacity="0.2" stroke-width="2">
+    <line x1="0" y1="1800" x2="2732" y2="1800"/>
+    <line x1="0" y1="1900" x2="2732" y2="1900"/>
+    <line x1="0" y1="2000" x2="2732" y2="2000"/>
+    <line x1="0" y1="2100" x2="2732" y2="2100"/>
+    <line x1="0" y1="2200" x2="2732" y2="2200"/>
+    <line x1="0" y1="2300" x2="2732" y2="2300"/>
+    <line x1="0" y1="2400" x2="2732" y2="2400"/>
+    <line x1="0" y1="2500" x2="2732" y2="2500"/>
+    <line x1="0" y1="2600" x2="2732" y2="2600"/>
+  </g>
+
+  <!-- Vertical perspective lines -->
+  <g stroke="#00ffff" stroke-opacity="0.2" stroke-width="2">
+    <line x1="1366" y1="1700" x2="0" y2="2732"/>
+    <line x1="1366" y1="1700" x2="500" y2="2732"/>
+    <line x1="1366" y1="1700" x2="1000" y2="2732"/>
+    <line x1="1366" y1="1700" x2="1366" y2="2732"/>
+    <line x1="1366" y1="1700" x2="1732" y2="2732"/>
+    <line x1="1366" y1="1700" x2="2232" y2="2732"/>
+    <line x1="1366" y1="1700" x2="2732" y2="2732"/>
+  </g>
+
+  <!-- Sun/circle glow -->
+  <circle cx="1366" cy="1200" r="400" fill="#ff0080" opacity="0.3"/>
+  <circle cx="1366" cy="1200" r="300" fill="#ff6b6b" opacity="0.5"/>
+  <circle cx="1366" cy="1200" r="200" fill="#feca57" opacity="0.7"/>
+
+  <!-- Title -->
+  <text x="1366" y="900" font-family="Arial Black, sans-serif" font-size="180" font-weight="bold" fill="url(#neon)" text-anchor="middle" letter-spacing="10">SCORCHED</text>
+  <text x="1366" y="1100" font-family="Arial Black, sans-serif" font-size="180" font-weight="bold" fill="url(#neon)" text-anchor="middle" letter-spacing="10">EARTH</text>
+  <text x="1366" y="1400" font-family="Arial, sans-serif" font-size="60" fill="#00ffff" text-anchor="middle" opacity="0.8">SYNTHWAVE EDITION</text>
+</svg>

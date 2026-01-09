@@ -149,3 +149,9 @@
 **Files:** js/effects.js, js/main.js, js/volumeControls.js
 **Commit:** N/A (epic closure only)
 ---
+## scorched-earth-pxn.4 - Add Capacitor Wrapper for iOS
+**Status:** Completed
+**Changes:** Added complete Capacitor wrapper for iOS deployment including package.json, capacitor.config.json, iOS platform, app icons (13 sizes), splash screens (9 sizes), and haptic feedback module with integration into explosion/fire/victory/defeat events. iOS simulator verification blocked by Xcode unavailability - created follow-up issue scorched-earth-pxn.6.
+**Files:** package.json, capacitor.config.json, .gitignore, js/main.js, js/haptics.js (NEW), assets/icons/ (22 new images), ios/ (Capacitor iOS project)
+**Commit:** 4a4e2a8
+---

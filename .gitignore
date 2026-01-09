@@ -14,6 +14,7 @@ node_modules/
 # Build output
 dist/
 build/
+www/
 
 # Ralph temp files
 .ralph/output.tmp
@@ -21,3 +22,11 @@ build/
 
 # Logs
 *.log
+
+# Capacitor
+ios/App/Pods/
+ios/App/App/public/
+ios/App/DerivedData/
+ios/App/*.xcworkspace
+*.xcuserstate
+xcuserdata/

@@ -1,0 +1,30 @@
+{
+  "appId": "com.scorched.earth",
+  "appName": "Scorched Earth",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "ios": {
+    "contentInset": "automatic",
+    "allowsLinkPreview": false,
+    "scrollEnabled": false,
+    "backgroundColor": "#0a0a0f"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "launchAutoHide": true,
+      "backgroundColor": "#0a0a0f",
+      "showSpinner": false,
+      "androidScaleType": "CENTER_CROP",
+      "splashFullScreen": true,
+      "splashImmersive": true
+    },
+    "Haptics": {
+      "enabled": true
+    }
+  },
+  "server": {
+    "hostname": "scorched-earth.local",
+    "iosScheme": "capacitor"
+  }
+}
