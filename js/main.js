@@ -2009,7 +2009,18 @@ export function destroyTerrainAt(x, y, radius) {
         console.warn('Cannot destroy terrain: no terrain loaded');
         return false;
     }
-    return currentTerrain.destroyTerrain(x, y, radius);
+
+    const wasDestroyed = currentTerrain.destroyTerrain(x, y, radius);
+
+    // Apply falling dirt physics after terrain destruction
+    if (wasDestroyed) {
+        const fallingResult = currentTerrain.applyFallingDirt(x, radius);
+        if (fallingResult.modified) {
+            console.log('Falling dirt physics applied');
+        }
+    }
+
+    return wasDestroyed;
 }
 
 /**

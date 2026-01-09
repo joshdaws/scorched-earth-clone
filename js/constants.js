@@ -189,7 +189,17 @@ export const TERRAIN = {
     RESOLUTION: 1,              // Pixels per terrain column
     MIN_HEIGHT: 100,            // Minimum terrain height from bottom
     MAX_HEIGHT: 500,            // Maximum terrain height from bottom
-    DESTRUCTION_SMOOTHING: 3    // Smoothing iterations after explosion
+    DESTRUCTION_SMOOTHING: 3,   // Smoothing iterations after explosion
+
+    // Falling dirt physics settings
+    FALLING_DIRT: {
+        ENABLED: true,              // Can be toggled off for performance
+        HEIGHT_THRESHOLD: 15,       // Min height difference to trigger fall (pixels)
+        FALL_SPEED: 200,            // Pixels per second when animated
+        MAX_ITERATIONS: 100,        // Safety limit for settling iterations
+        NEIGHBOR_RADIUS: 5,         // How many neighbors to check on each side
+        INSTANT_MODE: true          // If true, settle instantly; if false, animate
+    }
 };
 
 // =============================================================================

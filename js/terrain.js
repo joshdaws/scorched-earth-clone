@@ -318,6 +318,139 @@ export class Terrain {
 
         return terrainModified;
     }
+
+    /**
+     * Apply falling dirt physics after terrain destruction.
+     * Detects "floating" terrain (columns significantly higher than their neighbors)
+     * and lowers them to settle into craters naturally.
+     *
+     * Floating terrain is detected when a column is significantly higher than
+     * the average height of its neighbors within NEIGHBOR_RADIUS.
+     *
+     * In INSTANT_MODE, settling happens immediately. Otherwise, it returns
+     * the columns that need to fall for animated settling.
+     *
+     * @param {number} centerX - Center x-coordinate of the affected area
+     * @param {number} radius - Radius of the affected area
+     * @returns {{modified: boolean, fallingColumns: Array<{x: number, targetHeight: number}>}}
+     */
+    applyFallingDirt(centerX, radius) {
+        const settings = TERRAIN.FALLING_DIRT;
+
+        // Early exit if falling dirt is disabled
+        if (!settings.ENABLED) {
+            return { modified: false, fallingColumns: [] };
+        }
+
+        // Expand search area slightly beyond blast radius to catch edge cases
+        const searchPadding = settings.NEIGHBOR_RADIUS * 2;
+        const minX = Math.max(0, Math.floor(centerX - radius - searchPadding));
+        const maxX = Math.min(this.width - 1, Math.ceil(centerX + radius + searchPadding));
+
+        let modified = false;
+        const fallingColumns = [];
+        let iterations = 0;
+
+        // Iterate until no more changes occur (dirt has settled)
+        // Use a do-while to ensure at least one pass
+        let hasChanges = true;
+
+        while (hasChanges && iterations < settings.MAX_ITERATIONS) {
+            hasChanges = false;
+            iterations++;
+
+            for (let x = minX; x <= maxX; x++) {
+                const currentHeight = this.heightmap[x];
+
+                // Skip columns at minimum height (nothing to fall)
+                if (currentHeight <= 0) continue;
+
+                // Calculate average height of neighbors
+                const { avgHeight, lowestNeighbor } = this._getNeighborHeights(x, settings.NEIGHBOR_RADIUS);
+
+                // Check if this column is "floating" - significantly higher than neighbors
+                const heightDifference = currentHeight - avgHeight;
+
+                if (heightDifference > settings.HEIGHT_THRESHOLD) {
+                    // This column should fall
+                    // Target height: settle to slightly above the average of neighbors
+                    // but not below the lowest neighbor (to create natural settling)
+                    const targetHeight = Math.max(
+                        lowestNeighbor,
+                        avgHeight + (settings.HEIGHT_THRESHOLD * 0.5)
+                    );
+
+                    if (settings.INSTANT_MODE) {
+                        // Apply immediately
+                        this.heightmap[x] = targetHeight;
+                        hasChanges = true;
+                        modified = true;
+                    } else {
+                        // Queue for animated falling
+                        fallingColumns.push({ x, targetHeight, currentHeight });
+                    }
+                }
+            }
+        }
+
+        if (modified) {
+            console.log(`Falling dirt settled after ${iterations} iteration(s), affected range ${minX}-${maxX}`);
+        }
+
+        return { modified, fallingColumns };
+    }
+
+    /**
+     * Get height statistics for neighboring columns.
+     * Used by applyFallingDirt to detect floating terrain.
+     *
+     * @param {number} x - Center x-coordinate
+     * @param {number} radius - Number of neighbors to check on each side
+     * @returns {{avgHeight: number, lowestNeighbor: number, highestNeighbor: number}}
+     * @private
+     */
+    _getNeighborHeights(x, radius) {
+        let sum = 0;
+        let count = 0;
+        let lowestNeighbor = Infinity;
+        let highestNeighbor = -Infinity;
+
+        for (let offset = -radius; offset <= radius; offset++) {
+            // Skip the center column itself
+            if (offset === 0) continue;
+
+            const neighborX = x + offset;
+
+            // Bounds check
+            if (neighborX < 0 || neighborX >= this.width) continue;
+
+            const neighborHeight = this.heightmap[neighborX];
+            sum += neighborHeight;
+            count++;
+
+            if (neighborHeight < lowestNeighbor) {
+                lowestNeighbor = neighborHeight;
+            }
+            if (neighborHeight > highestNeighbor) {
+                highestNeighbor = neighborHeight;
+            }
+        }
+
+        // Handle edge case where no neighbors exist (shouldn't happen in practice)
+        if (count === 0) {
+            return {
+                avgHeight: this.heightmap[x],
+                lowestNeighbor: this.heightmap[x],
+                highestNeighbor: this.heightmap[x]
+            };
+        }
+
+        return {
+            avgHeight: sum / count,
+            lowestNeighbor: lowestNeighbor === Infinity ? 0 : lowestNeighbor,
+            highestNeighbor: highestNeighbor === -Infinity ? 0 : highestNeighbor
+        };
+    }
 }
 
 /**

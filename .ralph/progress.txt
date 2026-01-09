@@ -28,3 +28,14 @@
 **Files:** js/money.js (money multiplier system), js/main.js (HUD indicator, Money.startRound() calls)
 **Commit:** 0a072a4
 ---
+## scorched-earth-v3c.6 - Implement Falling Dirt Physics
+**Status:** Completed
+**Changes:** Implemented falling dirt physics that detects and settles floating terrain columns after explosions. Added configurable parameters for height threshold, neighbor radius, and instant/animated modes.
+**Files:** js/constants.js, js/terrain.js, js/main.js
+**Commit:** (pending)
+---
+## scorched-earth-v3c - Terrain System (EPIC)
+**Status:** Completed
+**Changes:** All 6 child issues complete - heightmap, generation, rendering, destruction, tank placement, and falling dirt physics
+**Commit:** 4aa7ab0
+---
