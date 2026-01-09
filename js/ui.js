@@ -75,9 +75,16 @@ const HUD = {
         X: CANVAS.DESIGN_WIDTH / 2,  // Center X
         Y: 12,                        // Top padding
         WIDTH: 360,                   // Wide enough for content
-        MIN_HEIGHT: 50,               // Minimum height (auto-expands with content)
+        MIN_HEIGHT: 100,              // Height to accommodate turn indicator, round, and wind
         PADDING: 16,
-        BORDER_RADIUS: 12
+        BORDER_RADIUS: 12,
+        // Wind bar dimensions (inside the panel)
+        WIND_BAR: {
+            HEIGHT: 20,              // Height of the wind bar
+            MARGIN_TOP: 8,           // Space above wind bar
+            ARROW_MIN_LENGTH: 10,    // Minimum arrow length
+            ARROW_MAX_LENGTH: 80     // Maximum arrow length at max wind
+        }
     },
     // Weapon bar at bottom-center - horizontal selection bar
     // Positioned to the left of the fire button
@@ -291,10 +298,13 @@ export function renderGameStatePanel(ctx, turnPhase = null, shooter = 'player', 
 /**
  * Render the turn indicator inside the game state panel.
  * Shows "YOUR TURN" or "ENEMY TURN" with appropriate glow effects.
+ * Also renders the wind indicator bar below round/difficulty.
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  * @param {Object} bounds - Panel bounds from drawGameStatePanel
  * @param {string} turnPhase - Current turn phase
  * @param {string} shooter - Who fired ('player' or 'ai')
+ * @param {number} currentRound - Current round number
+ * @param {string} difficulty - Difficulty level
  */
 function renderTurnIndicatorInPanel(ctx, bounds, turnPhase, shooter, currentRound = 1, difficulty = 'medium') {
     // Determine text and color based on turn phase
@@ -329,8 +339,8 @@ function renderTurnIndicatorInPanel(ctx, bounds, turnPhase, shooter, currentRoun
 
     // Calculate center position in panel
     const centerX = bounds.x + bounds.width / 2;
-    // Shift turn indicator up slightly to make room for round/difficulty below
-    const turnY = bounds.y + bounds.height / 2 - 8;
+    // Position turn indicator near the top of the panel
+    const turnY = bounds.y + 24;
 
     // Pulsing glow effect
     const pulse = Math.sin(animationTime * 3) * 0.2 + 0.8;
@@ -357,7 +367,7 @@ function renderTurnIndicatorInPanel(ctx, bounds, turnPhase, shooter, currentRoun
     ctx.fillText(text, centerX, turnY);
 
     // Render round and difficulty info below turn indicator
-    const roundY = turnY + 22; // Position below turn text
+    const roundY = turnY + 20; // Position below turn text
     const roundText = `ROUND ${currentRound} | ${difficulty.toUpperCase()}`;
 
     // Smaller font for round/difficulty
@@ -370,6 +380,193 @@ function renderTurnIndicatorInPanel(ctx, bounds, turnPhase, shooter, currentRoun
     ctx.shadowBlur = 4;
     ctx.fillStyle = COLORS.TEXT_MUTED;
     ctx.fillText(roundText, centerX, roundY);
+
+    ctx.restore();
+
+    // Render wind indicator bar below round/difficulty
+    renderWindBarInPanel(ctx, bounds, roundY);
+}
+
+/**
+ * Render the wind indicator bar inside the game state panel.
+ * Shows a horizontal bar with directional arrow and numerical value.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {Object} bounds - Panel bounds from drawGameStatePanel
+ * @param {number} roundY - Y position of the round text (to position wind bar below)
+ */
+function renderWindBarInPanel(ctx, bounds, roundY) {
+    const windBarConfig = HUD.GAME_STATE_PANEL.WIND_BAR;
+    const currentWind = Wind.getWind();
+    const normalizedStrength = Wind.getNormalizedStrength();
+
+    // Calculate wind bar dimensions and position
+    const barWidth = bounds.width - HUD.GAME_STATE_PANEL.PADDING * 4; // Leave padding on sides
+    const barHeight = windBarConfig.HEIGHT;
+    const barX = bounds.x + (bounds.width - barWidth) / 2;
+    const barY = roundY + windBarConfig.MARGIN_TOP + 6; // Position below round text
+
+    ctx.save();
+
+    // ==========================================================================
+    // WIND BAR BACKGROUND
+    // ==========================================================================
+
+    // Draw bar background with rounded corners
+    ctx.fillStyle = 'rgba(20, 20, 40, 0.8)';
+    ctx.beginPath();
+    ctx.roundRect(barX, barY, barWidth, barHeight, 4);
+    ctx.fill();
+
+    // Draw bar border
+    ctx.strokeStyle = 'rgba(100, 100, 140, 0.6)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // ==========================================================================
+    // WIND DIRECTION ARROW INSIDE BAR
+    // ==========================================================================
+
+    const barCenterX = barX + barWidth / 2;
+    const barCenterY = barY + barHeight / 2;
+
+    if (Math.abs(currentWind) < 0.5) {
+        // Zero/calm wind: Draw a centered double-arrow or dash indicator
+        renderCalmWindIndicator(ctx, barCenterX, barCenterY, barHeight);
+    } else {
+        // Non-zero wind: Draw directional arrow
+        const isRightWind = currentWind > 0;
+        const arrowLength = windBarConfig.ARROW_MIN_LENGTH +
+            normalizedStrength * (windBarConfig.ARROW_MAX_LENGTH - windBarConfig.ARROW_MIN_LENGTH);
+
+        // Determine arrow color based on direction (cyan for left, pink for right)
+        const arrowColor = isRightWind ? COLORS.NEON_PINK : COLORS.NEON_CYAN;
+
+        renderWindArrowInBar(ctx, barCenterX, barCenterY, arrowLength, barHeight - 6, isRightWind, arrowColor);
+    }
+
+    ctx.restore();
+
+    // ==========================================================================
+    // WIND NUMERICAL VALUE BELOW BAR
+    // ==========================================================================
+
+    const windLabelY = barY + barHeight + 12; // Position below the bar
+    const windValue = Math.abs(Math.round(currentWind));
+
+    ctx.save();
+
+    ctx.font = `bold 11px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // Color based on wind presence
+    if (Math.abs(currentWind) < 0.5) {
+        ctx.fillStyle = COLORS.TEXT_MUTED;
+        ctx.fillText('WIND 0', bounds.x + bounds.width / 2, windLabelY);
+    } else {
+        // Add subtle glow for non-zero wind
+        const labelColor = currentWind > 0 ? COLORS.NEON_PINK : COLORS.NEON_CYAN;
+        ctx.shadowColor = labelColor;
+        ctx.shadowBlur = 4;
+        ctx.fillStyle = COLORS.TEXT_LIGHT;
+        ctx.fillText(`WIND ${windValue}`, bounds.x + bounds.width / 2, windLabelY);
+    }
+
+    ctx.restore();
+}
+
+/**
+ * Render a calm wind indicator (centered double-arrow or dash).
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {number} centerX - Center X of the indicator
+ * @param {number} centerY - Center Y of the indicator
+ * @param {number} barHeight - Height of the containing bar
+ */
+function renderCalmWindIndicator(ctx, centerX, centerY, barHeight) {
+    ctx.save();
+
+    // Draw a simple centered horizontal line to indicate calm
+    const lineWidth = 30;
+    const lineHeight = 2;
+
+    ctx.fillStyle = COLORS.TEXT_MUTED;
+    ctx.fillRect(centerX - lineWidth / 2, centerY - lineHeight / 2, lineWidth, lineHeight);
+
+    // Add small arrows at both ends pointing outward to indicate "no wind"
+    const arrowSize = 5;
+    ctx.beginPath();
+    // Left arrow (pointing left)
+    ctx.moveTo(centerX - lineWidth / 2, centerY);
+    ctx.lineTo(centerX - lineWidth / 2 + arrowSize, centerY - arrowSize);
+    ctx.lineTo(centerX - lineWidth / 2 + arrowSize, centerY + arrowSize);
+    ctx.closePath();
+    ctx.fill();
+
+    // Right arrow (pointing right)
+    ctx.beginPath();
+    ctx.moveTo(centerX + lineWidth / 2, centerY);
+    ctx.lineTo(centerX + lineWidth / 2 - arrowSize, centerY - arrowSize);
+    ctx.lineTo(centerX + lineWidth / 2 - arrowSize, centerY + arrowSize);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+}
+
+/**
+ * Render a directional wind arrow inside the bar.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {number} centerX - Center X of the bar
+ * @param {number} centerY - Center Y of the bar
+ * @param {number} arrowLength - Length of the arrow (scales with wind strength)
+ * @param {number} maxHeight - Maximum height for the arrow
+ * @param {boolean} pointRight - True if arrow points right
+ * @param {string} color - Arrow color
+ */
+function renderWindArrowInBar(ctx, centerX, centerY, arrowLength, maxHeight, pointRight, color) {
+    ctx.save();
+
+    // Apply glow effect
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = color;
+
+    const arrowHeight = Math.min(maxHeight, 12);
+    const headWidth = Math.min(arrowLength * 0.35, 12);
+    const shaftHeight = arrowHeight * 0.4;
+
+    // Calculate positions based on direction
+    const direction = pointRight ? 1 : -1;
+    const startX = centerX - direction * (arrowLength / 2);
+    const endX = centerX + direction * (arrowLength / 2);
+    const shaftEndX = endX - direction * headWidth;
+
+    ctx.beginPath();
+
+    // Draw arrow shape
+    // Start at shaft back-top
+    ctx.moveTo(startX, centerY - shaftHeight / 2);
+
+    // Shaft top edge
+    ctx.lineTo(shaftEndX, centerY - shaftHeight / 2);
+
+    // Arrow head top
+    ctx.lineTo(shaftEndX, centerY - arrowHeight / 2);
+
+    // Arrow point
+    ctx.lineTo(endX, centerY);
+
+    // Arrow head bottom
+    ctx.lineTo(shaftEndX, centerY + arrowHeight / 2);
+
+    // Shaft bottom edge
+    ctx.lineTo(shaftEndX, centerY + shaftHeight / 2);
+
+    // Shaft back-bottom
+    ctx.lineTo(startX, centerY + shaftHeight / 2);
+
+    ctx.closePath();
+    ctx.fill();
 
     ctx.restore();
 }
@@ -1515,11 +1712,10 @@ export function renderHUD(ctx, state) {
     // Render enemy health bar separately (top-right)
     renderEnemyHealthBar(ctx, enemyTank);
 
-    // Note: Turn indicator is now rendered inside renderGameStatePanel
-    // The legacy renderTurnIndicatorPhase is kept for backwards compatibility
+    // Note: Turn indicator and wind indicator are now rendered inside renderGameStatePanel
+    // The legacy renderTurnIndicatorPhase and renderWindIndicator are kept for backwards compatibility
     // but no longer called from renderHUD
 
-    renderWindIndicator(ctx);
     renderWeaponPanel(ctx, playerTank);
 
     // Render new weapon bar at bottom-center (left of fire button)
