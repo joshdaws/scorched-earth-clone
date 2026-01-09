@@ -2499,6 +2499,43 @@ function handleSelectPrevWeapon() {
 }
 
 /**
+ * Handle selecting a specific weapon by ID (from weapon bar click).
+ * Only selects if the player has ammo for this weapon.
+ * @param {string} weaponId - The weapon ID to select
+ * @returns {boolean} True if weapon was selected, false if not available
+ */
+function handleSelectSpecificWeapon(weaponId) {
+    if (!playerTank) return false;
+
+    // Check if player has ammo for this weapon
+    const ammo = playerTank.getAmmo(weaponId);
+    if (ammo === 0) {
+        console.log(`Cannot select ${weaponId}: no ammo`);
+        return false;
+    }
+
+    // Get weapon info for logging
+    const weapon = WeaponRegistry.getWeapon(weaponId);
+    if (!weapon) {
+        console.warn(`Unknown weapon: ${weaponId}`);
+        return false;
+    }
+
+    // Set the weapon (this will also handle switching if already on this weapon)
+    const success = playerTank.setWeapon(weaponId);
+
+    if (success) {
+        const ammoDisplay = ammo === Infinity ? '∞' : ammo;
+        console.log(`Weapon selected: ${weapon.name} (ammo: ${ammoDisplay})`);
+
+        // Scroll weapon bar to show selected weapon
+        HUD.scrollToWeapon(weaponId);
+    }
+
+    return success;
+}
+
+/**
  * Render the playing screen
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  */
@@ -2635,6 +2672,27 @@ function handlePlayingPointerDown(pos) {
     if (Turn.canPlayerAim() && HUD.isInsideWeaponPanel(pos.x, pos.y)) {
         handleSelectWeapon();
         return;
+    }
+
+    // Check if click is on weapon bar (only during player aim phase)
+    if (Turn.canPlayerAim() && HUD.isInsideWeaponBar(pos.x, pos.y)) {
+        // Check navigation arrows first
+        if (HUD.isInsideWeaponBarLeftArrow(pos.x, pos.y)) {
+            HUD.scrollWeaponBarLeft();
+            return;
+        }
+        if (HUD.isInsideWeaponBarRightArrow(pos.x, pos.y)) {
+            const totalWeapons = WeaponRegistry.getWeaponCount();
+            HUD.scrollWeaponBarRight(totalWeapons);
+            return;
+        }
+
+        // Check if click is on a weapon slot
+        const weaponId = HUD.getWeaponSlotAtPosition(pos.x, pos.y);
+        if (weaponId) {
+            handleSelectSpecificWeapon(weaponId);
+            return;
+        }
     }
 }
 

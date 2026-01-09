@@ -1028,14 +1028,24 @@ export function setWeaponPanelPressed(pressed) {
 // =============================================================================
 
 /**
- * Render the weapon bar container at bottom-center of the screen.
- * Shows navigation arrows and weapon slot placeholders.
- * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
- * @param {import('./tank.js').Tank} playerTank - Player tank (for current weapon)
- * @param {number} [totalWeapons=11] - Total number of weapons available
+ * Cache of weapon slot positions for hit testing.
+ * Populated during renderWeaponBar().
+ * @type {Array<{x: number, y: number, size: number, weaponId: string}>}
  */
-export function renderWeaponBar(ctx, playerTank, totalWeapons = 11) {
+let weaponSlotPositions = [];
+
+/**
+ * Render the weapon bar container at bottom-center of the screen.
+ * Shows navigation arrows and weapon icons from player inventory.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {import('./tank.js').Tank} playerTank - Player tank (for inventory and current weapon)
+ */
+export function renderWeaponBar(ctx, playerTank) {
     if (!ctx) return;
+
+    // Get all weapons from registry
+    const allWeapons = WeaponRegistry.getAllWeapons();
+    const totalWeapons = allWeapons.length;
 
     const bar = HUD.WEAPON_BAR;
     const drawX = bar.RIGHT_EDGE - bar.WIDTH;
@@ -1091,7 +1101,7 @@ export function renderWeaponBar(ctx, playerTank, totalWeapons = 11) {
         'right', canScrollRight, weaponBarRightPressed);
 
     // ==========================================================================
-    // WEAPON SLOT PLACEHOLDERS
+    // WEAPON SLOTS
     // ==========================================================================
     const slotsStartX = leftArrowX + bar.ARROW_WIDTH + bar.SLOT_GAP;
     const slotsWidth = rightArrowX - slotsStartX - bar.SLOT_GAP;
@@ -1099,16 +1109,31 @@ export function renderWeaponBar(ctx, playerTank, totalWeapons = 11) {
     const slotY = drawY + (bar.HEIGHT - slotSize) / 2;
 
     // Get current weapon for highlighting
-    const currentWeaponId = playerTank ? playerTank.currentWeapon : 'basic';
+    const currentWeaponId = playerTank ? playerTank.currentWeapon : 'basic-shot';
+
+    // Clear and rebuild slot positions cache
+    weaponSlotPositions = [];
 
     for (let i = 0; i < bar.VISIBLE_SLOTS; i++) {
         const weaponIndex = weaponBarScrollIndex + i;
         if (weaponIndex >= totalWeapons) break;
 
+        const weapon = allWeapons[weaponIndex];
         const slotX = slotsStartX + i * (slotSize + bar.SLOT_GAP);
-        const isSelected = i === 0; // Placeholder: first visible is selected for now
+        const isSelected = weapon.id === currentWeaponId;
 
-        renderWeaponSlot(ctx, slotX, slotY, slotSize, isSelected, weaponIndex);
+        // Get ammo from player inventory (0 if not owned)
+        const ammo = playerTank ? playerTank.getAmmo(weapon.id) : 0;
+
+        // Cache slot position for hit testing
+        weaponSlotPositions.push({
+            x: slotX,
+            y: slotY,
+            size: slotSize,
+            weaponId: weapon.id
+        });
+
+        renderWeaponSlot(ctx, slotX, slotY, slotSize, isSelected, weapon, ammo);
     }
 }
 
@@ -1158,22 +1183,161 @@ function renderWeaponBarArrow(ctx, x, y, width, height, direction, enabled, pres
 }
 
 /**
- * Render a weapon slot placeholder in the weapon bar.
- * Will eventually show weapon icon and ammo count.
+ * Weapon icon shapes mapped by weapon type.
+ * Each returns a function that draws the icon shape.
+ */
+const WEAPON_ICONS = {
+    'basic-shot': (ctx, cx, cy, r) => {
+        // Circle (basic shot)
+        ctx.arc(cx, cy, r * 0.6, 0, Math.PI * 2);
+    },
+    'missile': (ctx, cx, cy, r) => {
+        // Triangle pointing up (missile)
+        ctx.moveTo(cx, cy - r);
+        ctx.lineTo(cx + r, cy + r * 0.8);
+        ctx.lineTo(cx - r, cy + r * 0.8);
+        ctx.closePath();
+    },
+    'big-shot': (ctx, cx, cy, r) => {
+        // Large circle with inner ring
+        ctx.arc(cx, cy, r * 0.8, 0, Math.PI * 2);
+        ctx.moveTo(cx + r * 0.4, cy);
+        ctx.arc(cx, cy, r * 0.4, 0, Math.PI * 2);
+    },
+    'mirv': (ctx, cx, cy, r) => {
+        // Star (splitting)
+        drawStar(ctx, cx, cy, 5, r * 0.9, r * 0.4);
+    },
+    'deaths-head': (ctx, cx, cy, r) => {
+        // Skull-like shape (9-point star)
+        drawStar(ctx, cx, cy, 9, r * 0.9, r * 0.5);
+    },
+    'roller': (ctx, cx, cy, r) => {
+        // Circle with horizontal line (rolling)
+        ctx.arc(cx, cy, r * 0.6, 0, Math.PI * 2);
+        ctx.moveTo(cx - r * 0.8, cy + r * 0.7);
+        ctx.lineTo(cx + r * 0.8, cy + r * 0.7);
+    },
+    'heavy-roller': (ctx, cx, cy, r) => {
+        // Larger circle with two lines
+        ctx.arc(cx, cy, r * 0.7, 0, Math.PI * 2);
+        ctx.moveTo(cx - r * 0.9, cy + r * 0.8);
+        ctx.lineTo(cx + r * 0.9, cy + r * 0.8);
+    },
+    'digger': (ctx, cx, cy, r) => {
+        // Down arrow (digging)
+        ctx.moveTo(cx, cy + r);
+        ctx.lineTo(cx + r * 0.7, cy - r * 0.3);
+        ctx.lineTo(cx + r * 0.3, cy - r * 0.3);
+        ctx.lineTo(cx + r * 0.3, cy - r);
+        ctx.lineTo(cx - r * 0.3, cy - r);
+        ctx.lineTo(cx - r * 0.3, cy - r * 0.3);
+        ctx.lineTo(cx - r * 0.7, cy - r * 0.3);
+        ctx.closePath();
+    },
+    'heavy-digger': (ctx, cx, cy, r) => {
+        // Thicker down arrow
+        ctx.moveTo(cx, cy + r);
+        ctx.lineTo(cx + r * 0.8, cy - r * 0.2);
+        ctx.lineTo(cx + r * 0.4, cy - r * 0.2);
+        ctx.lineTo(cx + r * 0.4, cy - r);
+        ctx.lineTo(cx - r * 0.4, cy - r);
+        ctx.lineTo(cx - r * 0.4, cy - r * 0.2);
+        ctx.lineTo(cx - r * 0.8, cy - r * 0.2);
+        ctx.closePath();
+    },
+    'mini-nuke': (ctx, cx, cy, r) => {
+        // Radiation symbol (3 sectors)
+        const sectors = 3;
+        const sectorAngle = (Math.PI * 2) / sectors;
+        for (let i = 0; i < sectors; i++) {
+            const angle = -Math.PI / 2 + i * sectorAngle;
+            ctx.moveTo(cx, cy);
+            ctx.arc(cx, cy, r * 0.8, angle, angle + sectorAngle * 0.6);
+            ctx.closePath();
+        }
+    },
+    'nuke': (ctx, cx, cy, r) => {
+        // Larger radiation symbol with center dot
+        const sectors = 3;
+        const sectorAngle = (Math.PI * 2) / sectors;
+        for (let i = 0; i < sectors; i++) {
+            const angle = -Math.PI / 2 + i * sectorAngle;
+            ctx.moveTo(cx, cy);
+            ctx.arc(cx, cy, r * 0.9, angle, angle + sectorAngle * 0.6);
+            ctx.closePath();
+        }
+        // Center dot (will need to be drawn separately)
+    }
+};
+
+/**
+ * Get the color for a weapon based on its type.
+ * @param {Object} weapon - Weapon definition
+ * @param {boolean} isSelected - Whether the weapon is selected
+ * @param {boolean} hasAmmo - Whether the player has ammo for this weapon
+ * @returns {string} The color to use for the weapon icon
+ */
+function getWeaponColor(weapon, isSelected, hasAmmo) {
+    if (!hasAmmo) {
+        return 'rgba(60, 60, 80, 0.5)'; // Grayed out
+    }
+
+    if (isSelected) {
+        // Selected weapons use a bright version of their type color
+        switch (weapon.type) {
+            case 'nuclear': return COLORS.NEON_ORANGE;
+            case 'splitting': return COLORS.NEON_PURPLE;
+            case 'rolling': return COLORS.NEON_YELLOW;
+            case 'digging': return COLORS.NEON_YELLOW;
+            default: return COLORS.NEON_CYAN;
+        }
+    }
+
+    // Unselected but available weapons
+    switch (weapon.type) {
+        case 'nuclear': return '#a85700';
+        case 'splitting': return '#8b008b';
+        case 'rolling': return '#8b8b00';
+        case 'digging': return '#6b6b00';
+        default: return 'rgba(100, 150, 160, 0.9)';
+    }
+}
+
+/**
+ * Render a weapon slot in the weapon bar.
+ * Shows weapon icon, ammo count, and selection state.
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  * @param {number} x - X position
  * @param {number} y - Y position
  * @param {number} size - Slot size (width and height are equal)
  * @param {boolean} isSelected - Whether this slot is currently selected
- * @param {number} index - Weapon index (for placeholder differentiation)
+ * @param {Object} weapon - Weapon definition from WeaponRegistry
+ * @param {number} ammo - Ammo count (0 if not owned, Infinity for unlimited)
  */
-function renderWeaponSlot(ctx, x, y, size, isSelected, index) {
+function renderWeaponSlot(ctx, x, y, size, isSelected, weapon, ammo) {
     ctx.save();
 
-    const borderColor = isSelected ? COLORS.NEON_CYAN : 'rgba(100, 100, 140, 0.6)';
+    const hasAmmo = ammo > 0 || ammo === Infinity;
 
-    // Slot background
-    ctx.fillStyle = isSelected ? 'rgba(5, 217, 232, 0.15)' : 'rgba(20, 20, 40, 0.8)';
+    // Determine border color based on selection and availability
+    let borderColor;
+    if (isSelected) {
+        borderColor = COLORS.NEON_CYAN;
+    } else if (!hasAmmo) {
+        borderColor = 'rgba(50, 50, 70, 0.4)';
+    } else {
+        borderColor = 'rgba(100, 100, 140, 0.6)';
+    }
+
+    // Slot background - dimmer if no ammo
+    if (!hasAmmo) {
+        ctx.fillStyle = 'rgba(15, 15, 25, 0.6)';
+    } else if (isSelected) {
+        ctx.fillStyle = 'rgba(5, 217, 232, 0.15)';
+    } else {
+        ctx.fillStyle = 'rgba(20, 20, 40, 0.8)';
+    }
     ctx.beginPath();
     ctx.roundRect(x, y, size, size, 6);
     ctx.fill();
@@ -1181,64 +1345,59 @@ function renderWeaponSlot(ctx, x, y, size, isSelected, index) {
     // Slot border with glow for selected
     ctx.strokeStyle = borderColor;
     ctx.lineWidth = isSelected ? 2 : 1;
-    if (isSelected) {
+    if (isSelected && hasAmmo) {
         ctx.shadowColor = COLORS.NEON_CYAN;
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = 12;
     }
     ctx.stroke();
     ctx.shadowBlur = 0;
 
-    // Placeholder icon (simple shape to indicate weapon slot)
-    const iconSize = size * 0.5;
-    const iconX = x + (size - iconSize) / 2;
-    const iconY = y + (size - iconSize) / 2 - 4; // Offset up for ammo text
+    // Weapon icon
+    const iconSize = size * 0.35;
+    const iconX = x + size / 2;
+    const iconY = y + size / 2 - 6; // Offset up for ammo text
 
-    ctx.fillStyle = isSelected ? COLORS.NEON_CYAN : 'rgba(100, 100, 140, 0.8)';
+    const iconColor = getWeaponColor(weapon, isSelected, hasAmmo);
+    ctx.fillStyle = iconColor;
+    ctx.strokeStyle = iconColor;
+    ctx.lineWidth = 2;
 
-    // Draw different placeholder shapes based on index for visual variety
+    // Draw weapon icon
     ctx.beginPath();
-    switch (index % 6) {
-        case 0: // Circle (basic shot)
-            ctx.arc(iconX + iconSize / 2, iconY + iconSize / 2, iconSize / 3, 0, Math.PI * 2);
-            break;
-        case 1: // Triangle (missile)
-            ctx.moveTo(iconX + iconSize / 2, iconY);
-            ctx.lineTo(iconX + iconSize, iconY + iconSize);
-            ctx.lineTo(iconX, iconY + iconSize);
-            ctx.closePath();
-            break;
-        case 2: // Star (MIRV)
-            drawStar(ctx, iconX + iconSize / 2, iconY + iconSize / 2, 5, iconSize / 2.5, iconSize / 5);
-            break;
-        case 3: // Square with X (nuke)
-            ctx.rect(iconX + iconSize * 0.15, iconY + iconSize * 0.15, iconSize * 0.7, iconSize * 0.7);
-            break;
-        case 4: // Diamond (roller)
-            ctx.moveTo(iconX + iconSize / 2, iconY);
-            ctx.lineTo(iconX + iconSize, iconY + iconSize / 2);
-            ctx.lineTo(iconX + iconSize / 2, iconY + iconSize);
-            ctx.lineTo(iconX, iconY + iconSize / 2);
-            ctx.closePath();
-            break;
-        case 5: // Down arrow (digger)
-            ctx.moveTo(iconX + iconSize / 2, iconY + iconSize);
-            ctx.lineTo(iconX + iconSize, iconY);
-            ctx.lineTo(iconX + iconSize * 0.65, iconY);
-            ctx.lineTo(iconX + iconSize * 0.65, iconY - iconSize * 0.3);
-            ctx.lineTo(iconX + iconSize * 0.35, iconY - iconSize * 0.3);
-            ctx.lineTo(iconX + iconSize * 0.35, iconY);
-            ctx.lineTo(iconX, iconY);
-            ctx.closePath();
-            break;
+    const iconDrawFn = WEAPON_ICONS[weapon.id];
+    if (iconDrawFn) {
+        iconDrawFn(ctx, iconX, iconY, iconSize);
+    } else {
+        // Fallback: simple circle
+        ctx.arc(iconX, iconY, iconSize * 0.5, 0, Math.PI * 2);
     }
     ctx.fill();
 
-    // Placeholder ammo count
-    ctx.fillStyle = isSelected ? COLORS.NEON_YELLOW : COLORS.TEXT_MUTED;
+    // For nuke, add center dot
+    if (weapon.id === 'nuke' || weapon.id === 'mini-nuke') {
+        ctx.fillStyle = hasAmmo ? 'rgba(10, 10, 26, 0.9)' : 'rgba(30, 30, 50, 0.6)';
+        ctx.beginPath();
+        ctx.arc(iconX, iconY, iconSize * 0.2, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Ammo count
+    const ammoText = ammo === Infinity ? '∞' : (ammo === 0 ? '0' : ammo.toString());
+
+    if (!hasAmmo) {
+        ctx.fillStyle = 'rgba(80, 80, 100, 0.5)';
+    } else if (isSelected) {
+        ctx.fillStyle = COLORS.NEON_YELLOW;
+        ctx.shadowColor = COLORS.NEON_YELLOW;
+        ctx.shadowBlur = 4;
+    } else {
+        ctx.fillStyle = COLORS.TEXT_MUTED;
+    }
+
     ctx.font = `bold ${UI.FONT_SIZE_SMALL - 2}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
-    ctx.fillText(`x${index === 0 ? '∞' : (10 - index)}`, x + size / 2, y + size - 2);
+    ctx.fillText(ammoText, x + size / 2, y + size - 3);
 
     ctx.restore();
 }
@@ -1393,6 +1552,66 @@ export function resetWeaponBarScroll() {
  */
 export function getWeaponBarLayout() {
     return { ...HUD.WEAPON_BAR };
+}
+
+/**
+ * Check if a point is inside a weapon slot and return the weapon ID if so.
+ * Uses the cached slot positions from the last renderWeaponBar() call.
+ * @param {number} x - X coordinate in design space
+ * @param {number} y - Y coordinate in design space
+ * @returns {string|null} Weapon ID if inside a slot, null otherwise
+ */
+export function getWeaponSlotAtPosition(x, y) {
+    for (const slot of weaponSlotPositions) {
+        if (x >= slot.x && x <= slot.x + slot.size &&
+            y >= slot.y && y <= slot.y + slot.size) {
+            return slot.weaponId;
+        }
+    }
+    return null;
+}
+
+/**
+ * Check if a point is inside any weapon slot.
+ * @param {number} x - X coordinate in design space
+ * @param {number} y - Y coordinate in design space
+ * @returns {boolean} True if inside a weapon slot
+ */
+export function isInsideWeaponSlot(x, y) {
+    return getWeaponSlotAtPosition(x, y) !== null;
+}
+
+/**
+ * Scroll the weapon bar to ensure the specified weapon is visible.
+ * @param {string} weaponId - The weapon ID to scroll to
+ * @returns {boolean} True if scroll position changed
+ */
+export function scrollToWeapon(weaponId) {
+    const allWeapons = WeaponRegistry.getAllWeapons();
+    const weaponIndex = allWeapons.findIndex(w => w.id === weaponId);
+
+    if (weaponIndex === -1) return false;
+
+    const bar = HUD.WEAPON_BAR;
+
+    // Check if weapon is already visible
+    if (weaponIndex >= weaponBarScrollIndex &&
+        weaponIndex < weaponBarScrollIndex + bar.VISIBLE_SLOTS) {
+        return false; // Already visible
+    }
+
+    // Scroll to make weapon visible (preferably in center)
+    const newScrollIndex = Math.max(0, Math.min(
+        weaponIndex - Math.floor(bar.VISIBLE_SLOTS / 2),
+        allWeapons.length - bar.VISIBLE_SLOTS
+    ));
+
+    if (newScrollIndex !== weaponBarScrollIndex) {
+        weaponBarScrollIndex = newScrollIndex;
+        return true;
+    }
+
+    return false;
 }
 
 // =============================================================================
