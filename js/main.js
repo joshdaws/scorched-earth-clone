@@ -25,6 +25,7 @@ import * as VictoryDefeat from './victoryDefeat.js';
 import * as Money from './money.js';
 import * as Shop from './shop.js';
 import { spawnExplosionParticles, updateParticles, renderParticles, clearParticles, getParticleCount, screenShakeForBlastRadius, getScreenShakeOffset, clearScreenShake, screenFlash, renderScreenFlash, clearScreenFlash, initBackground, updateBackground, renderBackground, clearBackground } from './effects.js';
+import * as Music from './music.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -696,6 +697,8 @@ function setupMenuState() {
     Game.registerStateHandlers(GAME_STATES.MENU, {
         onEnter: (fromState) => {
             console.log('Entered MENU state');
+            // Play menu music
+            Music.playForState(GAME_STATES.MENU);
         },
         onExit: (toState) => {
             console.log('Exiting MENU state');
@@ -2166,6 +2169,8 @@ function setupPlayingState() {
     Game.registerStateHandlers(GAME_STATES.PLAYING, {
         onEnter: (fromState) => {
             console.log('Entered PLAYING state - Game started!');
+            // Play gameplay music
+            Music.playForState(GAME_STATES.PLAYING);
 
             // Determine if this is a new game or continuation
             const isNewGame = fromState === GAME_STATES.MENU;
@@ -2365,6 +2370,8 @@ function setupVictoryState() {
             AI.cancelTurn();
             // Disable game input
             Input.disableGameInput();
+            // Play victory music/stinger
+            Music.playForState(GAME_STATES.VICTORY);
         },
         onExit: (toState) => {
             console.log('Exiting VICTORY state');
@@ -2401,6 +2408,8 @@ function setupDefeatState() {
             AI.cancelTurn();
             // Disable game input
             Input.disableGameInput();
+            // Play defeat music/stinger
+            Music.playForState(GAME_STATES.DEFEAT);
         },
         onExit: (toState) => {
             console.log('Exiting DEFEAT state');
@@ -2442,6 +2451,8 @@ function setupShopState() {
             Shop.show(playerTank);
             // Disable game input (handled by shop)
             Input.disableGameInput();
+            // Play shop music
+            Music.playForState(GAME_STATES.SHOP);
         },
         onExit: (toState) => {
             console.log('Exiting SHOP state');
@@ -2469,8 +2480,12 @@ function setupAudioInit(canvas) {
         if (!Sound.isInitialized()) {
             Sound.init();
         }
-        // Remove listeners after first successful init
+        // Initialize music system and start playing for current state
         if (Sound.isInitialized()) {
+            Music.init();
+            Music.playForState(Game.getState());
+
+            // Remove listeners after first successful init
             canvas.removeEventListener('click', initAudio);
             canvas.removeEventListener('touchstart', initAudio);
             document.removeEventListener('keydown', initAudio);
