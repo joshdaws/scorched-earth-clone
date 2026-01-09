@@ -210,3 +210,15 @@
 **Files:** js/projectile.js
 **Commit:** a88308f
 ---
+## scorched-earth-wu8.4 - Implement Projectile Rendering
+**Status:** Completed
+**Changes:** Implemented projectile rendering with synthwave-styled glowing yellow circle and fading trail effect. Added trail tracking to Projectile class, created rendering functions for projectile and trail, integrated with turn system.
+**Files:** js/projectile.js, js/main.js
+**Commit:** ec0360b
+---
+## scorched-earth-wu8.5 - Implement Terrain Collision Detection
+**Status:** Completed
+**Changes:** Added checkTerrainCollision(x, y) method to Terrain class and integrated collision checking into the projectile physics update loop. Projectiles now detect terrain hits, create craters on impact, and correctly handle out-of-bounds cases.
+**Files:** js/terrain.js, js/main.js
+**Commit:** 56358c8
+---

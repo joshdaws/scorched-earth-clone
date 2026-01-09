@@ -194,6 +194,57 @@ export class Terrain {
     }
 
     /**
+     * Check if a point collides with the terrain.
+     *
+     * Collision occurs when the point is at or below the terrain surface.
+     * In canvas coordinates: Y increases downward, so collision happens when
+     * canvasY >= DESIGN_HEIGHT - terrainHeight.
+     *
+     * Or equivalently, when the point's height from bottom is <= terrain height.
+     *
+     * @param {number} x - X-coordinate in canvas coordinates
+     * @param {number} y - Y-coordinate in canvas coordinates (Y=0 is top)
+     * @returns {{hit: boolean, x: number, y: number}|null} Hit info with collision point, or null if out of bounds
+     */
+    checkTerrainCollision(x, y) {
+        // Handle out of bounds cases
+        // Return null for projectiles outside terrain bounds (off-screen horizontally)
+        const flooredX = Math.floor(x);
+
+        if (flooredX < 0 || flooredX >= this.width) {
+            // Projectile is horizontally off-screen
+            // Return null to indicate no terrain collision (out of bounds)
+            return null;
+        }
+
+        // Get terrain height at this x-coordinate (distance from bottom)
+        const terrainHeight = this.heightmap[flooredX];
+
+        // Convert terrain height to canvas Y-coordinate
+        // Terrain surface in canvas coords = DESIGN_HEIGHT - terrainHeight
+        const terrainSurfaceY = CANVAS.DESIGN_HEIGHT - terrainHeight;
+
+        // Collision occurs when projectile Y >= terrain surface Y
+        // (projectile is at or below the terrain surface)
+        if (y >= terrainSurfaceY) {
+            // Return collision point at terrain surface
+            // Use the actual terrain surface Y as the collision point
+            return {
+                hit: true,
+                x: flooredX,
+                y: terrainSurfaceY
+            };
+        }
+
+        // No collision - projectile is above terrain
+        return {
+            hit: false,
+            x: flooredX,
+            y: y
+        };
+    }
+
+    /**
      * Destroy terrain in a circular crater pattern centered at (x, y).
      * The crater is carved into the terrain by lowering the heightmap within the blast radius.
      *

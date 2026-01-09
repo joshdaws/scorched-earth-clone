@@ -210,6 +210,12 @@ function fireProjectile(tank) {
 /**
  * Update the active projectile physics and check for completion.
  * Called each frame during projectile flight.
+ *
+ * Each frame:
+ * 1. Update projectile physics (gravity, wind, position)
+ * 2. Check for terrain collision
+ * 3. If collision: destroy terrain, deactivate projectile, resolve turn
+ * 4. If out of bounds: deactivate projectile, resolve turn
  */
 function updateProjectile() {
     if (!activeProjectile) return;
@@ -217,12 +223,44 @@ function updateProjectile() {
     // Update projectile physics with current wind
     activeProjectile.update(currentWind);
 
-    // Check if projectile is no longer active (went out of bounds)
+    // Check if projectile went out of bounds (handled in projectile._checkBounds)
     if (!activeProjectile.isActive()) {
         // Clean up trail when projectile is destroyed
         activeProjectile.clearTrail();
         activeProjectile = null;
         Turn.projectileResolved();
+        return;
+    }
+
+    // Check for terrain collision
+    if (currentTerrain) {
+        const pos = activeProjectile.getPosition();
+        const collision = currentTerrain.checkTerrainCollision(pos.x, pos.y);
+
+        // collision is null if projectile is outside horizontal bounds
+        // collision.hit is true if projectile hit terrain
+        if (collision && collision.hit) {
+            console.log(`Projectile hit terrain at (${collision.x}, ${collision.y.toFixed(1)})`);
+
+            // Destroy terrain at impact point with blast radius
+            // Using a default radius for now - will be weapon-dependent later
+            const blastRadius = 40;
+            destroyTerrainAt(pos.x, pos.y, blastRadius);
+
+            // Update tank positions to match new terrain height
+            if (playerTank && currentTerrain) {
+                updateTankTerrainPosition(playerTank, currentTerrain);
+            }
+            if (enemyTank && currentTerrain) {
+                updateTankTerrainPosition(enemyTank, currentTerrain);
+            }
+
+            // Deactivate projectile and clean up
+            activeProjectile.deactivate();
+            activeProjectile.clearTrail();
+            activeProjectile = null;
+            Turn.projectileResolved();
+        }
     }
 }
 
