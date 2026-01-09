@@ -85,6 +85,63 @@
       "height": 60
     }
   },
+  "weaponIcons": {
+    "basic-shot": {
+      "path": "images/ui/weapon-icon-basic-shot.png",
+      "width": 64,
+      "height": 64
+    },
+    "missile": {
+      "path": "images/ui/weapon-icon-missile.png",
+      "width": 64,
+      "height": 64
+    },
+    "big-shot": {
+      "path": "images/ui/weapon-icon-big-shot.png",
+      "width": 64,
+      "height": 64
+    },
+    "mirv": {
+      "path": "images/ui/weapon-icon-mirv.png",
+      "width": 64,
+      "height": 64
+    },
+    "deaths-head": {
+      "path": "images/ui/weapon-icon-deaths-head.png",
+      "width": 64,
+      "height": 64
+    },
+    "roller": {
+      "path": "images/ui/weapon-icon-roller.png",
+      "width": 64,
+      "height": 64
+    },
+    "heavy-roller": {
+      "path": "images/ui/weapon-icon-heavy-roller.png",
+      "width": 64,
+      "height": 64
+    },
+    "digger": {
+      "path": "images/ui/weapon-icon-digger.png",
+      "width": 64,
+      "height": 64
+    },
+    "heavy-digger": {
+      "path": "images/ui/weapon-icon-heavy-digger.png",
+      "width": 64,
+      "height": 64
+    },
+    "mini-nuke": {
+      "path": "images/ui/weapon-icon-mini-nuke.png",
+      "width": 64,
+      "height": 64
+    },
+    "nuke": {
+      "path": "images/ui/weapon-icon-nuke.png",
+      "width": 64,
+      "height": 64
+    }
+  },
   "backgrounds": {
     "sky": {
       "path": "images/backgrounds/bg-sky.png",

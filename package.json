@@ -36,5 +36,8 @@
     "@capacitor/haptics": "^8.0.0",
     "@capacitor/ios": "^8.0.0",
     "sharp": "^0.34.5"
+  },
+  "devDependencies": {
+    "canvas": "^3.2.0"
   }
 }

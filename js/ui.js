@@ -10,6 +10,7 @@
 import { CANVAS, COLORS, UI, TANK, TURN_PHASES } from './constants.js';
 import { WeaponRegistry } from './weapons.js';
 import * as Wind from './wind.js';
+import * as Assets from './assets.js';
 
 // =============================================================================
 // HUD LAYOUT CONSTANTS
@@ -1325,28 +1326,56 @@ function renderWeaponSlot(ctx, x, y, size, isSelected, weapon, ammo) {
     const iconX = x + size / 2;
     const iconY = y + size / 2 - 6; // Offset up for ammo text
 
-    const iconColor = getWeaponColor(weapon, isSelected, hasAmmo);
-    ctx.fillStyle = iconColor;
-    ctx.strokeStyle = iconColor;
-    ctx.lineWidth = 2;
+    // Try to use loaded weapon icon image first
+    const iconAssetKey = `weaponIcons.${weapon.id}`;
+    const iconImage = Assets.get(iconAssetKey);
+    let usedImage = false;
 
-    // Draw weapon icon
-    ctx.beginPath();
-    const iconDrawFn = WEAPON_ICONS[weapon.id];
-    if (iconDrawFn) {
-        iconDrawFn(ctx, iconX, iconY, iconSize);
-    } else {
-        // Fallback: simple circle
-        ctx.arc(iconX, iconY, iconSize * 0.5, 0, Math.PI * 2);
+    if (iconImage && iconImage.complete && iconImage.naturalWidth > 0) {
+        // Calculate image draw position (centered, matching icon size)
+        const imgSize = iconSize * 2; // Icon images are 64x64, scale to fit
+        const imgX = iconX - imgSize / 2;
+        const imgY = iconY - imgSize / 2;
+
+        // Apply gray filter if no ammo
+        if (!hasAmmo) {
+            ctx.globalAlpha = 0.4;
+            ctx.filter = 'grayscale(80%)';
+        }
+
+        ctx.drawImage(iconImage, imgX, imgY, imgSize, imgSize);
+
+        // Reset filters
+        ctx.globalAlpha = 1.0;
+        ctx.filter = 'none';
+        usedImage = true;
     }
-    ctx.fill();
 
-    // For nuke, add center dot
-    if (weapon.id === 'nuke' || weapon.id === 'mini-nuke') {
-        ctx.fillStyle = hasAmmo ? 'rgba(10, 10, 26, 0.9)' : 'rgba(30, 30, 50, 0.6)';
+    // Fallback to procedural icon drawing if image not available
+    if (!usedImage) {
+        const iconColor = getWeaponColor(weapon, isSelected, hasAmmo);
+        ctx.fillStyle = iconColor;
+        ctx.strokeStyle = iconColor;
+        ctx.lineWidth = 2;
+
+        // Draw weapon icon
         ctx.beginPath();
-        ctx.arc(iconX, iconY, iconSize * 0.2, 0, Math.PI * 2);
+        const iconDrawFn = WEAPON_ICONS[weapon.id];
+        if (iconDrawFn) {
+            iconDrawFn(ctx, iconX, iconY, iconSize);
+        } else {
+            // Fallback: simple circle
+            ctx.arc(iconX, iconY, iconSize * 0.5, 0, Math.PI * 2);
+        }
         ctx.fill();
+
+        // For nuke, add center dot
+        if (weapon.id === 'nuke' || weapon.id === 'mini-nuke') {
+            ctx.fillStyle = hasAmmo ? 'rgba(10, 10, 26, 0.9)' : 'rgba(30, 30, 50, 0.6)';
+            ctx.beginPath();
+            ctx.arc(iconX, iconY, iconSize * 0.2, 0, Math.PI * 2);
+            ctx.fill();
+        }
     }
 
     // Ammo count
