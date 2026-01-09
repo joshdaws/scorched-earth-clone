@@ -186,3 +186,9 @@
 **Files:** js/terrain.js, js/main.js
 **Commit:** (pending)
 ---
+## scorched-earth-wu8.1 - Create Tank Entity Class
+**Status:** Completed
+**Changes:** Created Tank class with all gameplay properties (x, y, health, angle, power, team), clamping setters, damage/health methods, and weapon reference support with inventory management
+**Files:** js/tank.js (new)
+**Commit:** de001e7
+---
