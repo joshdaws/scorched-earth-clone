@@ -203,3 +203,134 @@ export class Terrain {
 export function createTerrain() {
     return new Terrain(CANVAS.DESIGN_WIDTH);
 }
+
+// =============================================================================
+// TERRAIN GENERATION - MIDPOINT DISPLACEMENT ALGORITHM
+// =============================================================================
+
+/**
+ * Simple seeded random number generator (Mulberry32).
+ * Allows for deterministic terrain generation when a seed is provided.
+ *
+ * @param {number} seed - The seed value for the RNG
+ * @returns {function(): number} A function that returns random numbers in [0, 1)
+ */
+function createSeededRandom(seed) {
+    return function() {
+        // Mulberry32 PRNG - fast and good statistical properties
+        let t = seed += 0x6D2B79F5;
+        t = Math.imul(t ^ t >>> 15, t | 1);
+        t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+}
+
+/**
+ * Generate terrain using the midpoint displacement algorithm.
+ *
+ * The algorithm works by:
+ * 1. Setting the endpoints to random heights within the valid range
+ * 2. Finding the midpoint and setting it to the average of endpoints plus a random displacement
+ * 3. Recursively subdividing each segment until we reach single-pixel resolution
+ * 4. Each level of recursion reduces the displacement range by a roughness factor
+ *
+ * The roughness parameter controls how jagged the terrain appears:
+ * - Lower values (0.3-0.4) create smoother, rolling hills
+ * - Higher values (0.6-0.7) create more jagged, mountainous terrain
+ * - Values around 0.5 provide a good balance for gameplay
+ *
+ * @param {number} width - Width of the terrain in pixels
+ * @param {number} height - Height of the canvas (used for height calculations)
+ * @param {Object} [options={}] - Generation options
+ * @param {number} [options.roughness=0.5] - Roughness factor (0.4-0.6 recommended)
+ * @param {number} [options.seed=null] - Seed for random generation (null for random seed)
+ * @param {number} [options.minHeightPercent=0.2] - Minimum terrain height as percentage of canvas
+ * @param {number} [options.maxHeightPercent=0.9] - Maximum terrain height as percentage of canvas
+ * @returns {Terrain} A new Terrain instance with generated heightmap
+ */
+export function generateTerrain(width, height, options = {}) {
+    // Extract options with defaults
+    const {
+        roughness = 0.5,
+        seed = null,
+        minHeightPercent = 0.2,
+        maxHeightPercent = 0.9
+    } = options;
+
+    // Validate roughness is in reasonable range
+    const clampedRoughness = Math.max(0.3, Math.min(0.7, roughness));
+
+    // Calculate height bounds in pixels
+    const minHeight = height * minHeightPercent;
+    const maxHeight = height * maxHeightPercent;
+    const heightRange = maxHeight - minHeight;
+
+    // Create random number generator (seeded or unseeded)
+    const actualSeed = seed !== null ? seed : Math.floor(Math.random() * 2147483647);
+    const random = createSeededRandom(actualSeed);
+
+    // Create terrain instance
+    const terrain = new Terrain(width);
+
+    // Temporary array for algorithm (we need power-of-2 + 1 points for clean subdivision)
+    // Find the smallest power of 2 >= width
+    const pow2 = Math.pow(2, Math.ceil(Math.log2(width)));
+    const numPoints = pow2 + 1;
+    const points = new Float32Array(numPoints);
+
+    // Initialize endpoints with random heights
+    points[0] = minHeight + random() * heightRange;
+    points[numPoints - 1] = minHeight + random() * heightRange;
+
+    // Midpoint displacement algorithm
+    // Start with the full range and subdivide
+    let segmentLength = pow2;
+    let displacement = heightRange; // Initial displacement matches the full height range
+
+    while (segmentLength > 1) {
+        const halfLength = segmentLength / 2;
+
+        // Process each segment at this level
+        for (let i = 0; i < numPoints - 1; i += segmentLength) {
+            const leftIndex = i;
+            const rightIndex = i + segmentLength;
+            const midIndex = i + halfLength;
+
+            // Midpoint is average of endpoints plus random displacement
+            // The random displacement is scaled by the current displacement value
+            // and centered around 0 (using random() - 0.5)
+            const midpoint = (points[leftIndex] + points[rightIndex]) / 2;
+            const randomOffset = (random() - 0.5) * displacement;
+            points[midIndex] = midpoint + randomOffset;
+        }
+
+        // Reduce displacement for next iteration
+        // The roughness factor controls how quickly displacement diminishes
+        // Higher roughness = displacement stays larger = more jagged terrain
+        displacement *= clampedRoughness;
+        segmentLength = halfLength;
+    }
+
+    // Clamp all values to valid height range
+    for (let i = 0; i < numPoints; i++) {
+        points[i] = Math.max(minHeight, Math.min(maxHeight, points[i]));
+    }
+
+    // Copy points to terrain heightmap, handling width differences
+    // If width < numPoints, we sample; if width > numPoints, we interpolate
+    for (let x = 0; x < width; x++) {
+        // Map x coordinate to points array
+        const pointIndex = (x / (width - 1)) * (numPoints - 1);
+        const leftIndex = Math.floor(pointIndex);
+        const rightIndex = Math.min(leftIndex + 1, numPoints - 1);
+        const t = pointIndex - leftIndex;
+
+        // Linear interpolation between adjacent points
+        const interpolatedHeight = points[leftIndex] * (1 - t) + points[rightIndex] * t;
+        terrain.heightmap[x] = interpolatedHeight;
+    }
+
+    console.log(`Terrain generated: seed=${actualSeed}, roughness=${clampedRoughness.toFixed(2)}, height range=[${terrain.getMinHeight().toFixed(0)}, ${terrain.getMaxHeight().toFixed(0)}]`);
+
+    return terrain;
+}

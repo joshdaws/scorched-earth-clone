@@ -12,6 +12,17 @@ import * as Assets from './assets.js';
 import * as Debug from './debug.js';
 import * as Turn from './turn.js';
 import { COLORS, DEBUG, CANVAS, UI, GAME_STATES, TURN_PHASES, PHYSICS } from './constants.js';
+import { generateTerrain } from './terrain.js';
+
+// =============================================================================
+// TERRAIN STATE
+// =============================================================================
+
+/**
+ * Current terrain instance (generated when game starts)
+ * @type {import('./terrain.js').Terrain|null}
+ */
+let currentTerrain = null;
 
 // =============================================================================
 // MENU STATE
@@ -185,6 +196,66 @@ let aiAimStartTime = null;
 let projectileFlightStartTime = null;
 
 // =============================================================================
+// TERRAIN RENDERING
+// =============================================================================
+
+/**
+ * Render the terrain as a filled polygon.
+ * Terrain heights are stored as distance from bottom, so we need to flip Y
+ * since canvas Y=0 is at the top.
+ *
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ */
+function renderTerrain(ctx) {
+    if (!currentTerrain) return;
+
+    const terrain = currentTerrain;
+    const width = terrain.getWidth();
+
+    // Create gradient for terrain (synthwave ground look)
+    const gradient = ctx.createLinearGradient(0, CANVAS.DESIGN_HEIGHT, 0, CANVAS.DESIGN_HEIGHT * 0.3);
+    gradient.addColorStop(0, COLORS.TERRAIN);  // Bottom: darker purple
+    gradient.addColorStop(0.5, '#3d2b5e');     // Middle: medium purple
+    gradient.addColorStop(1, '#4a3068');       // Top: lighter purple
+
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+
+    // Start at bottom-left corner
+    ctx.moveTo(0, CANVAS.DESIGN_HEIGHT);
+
+    // Draw terrain profile
+    // Heights are distance from bottom, so canvas Y = DESIGN_HEIGHT - terrainHeight
+    for (let x = 0; x < width; x++) {
+        const terrainHeight = terrain.getHeight(x);
+        const canvasY = CANVAS.DESIGN_HEIGHT - terrainHeight;
+        ctx.lineTo(x, canvasY);
+    }
+
+    // Close the path at bottom-right corner
+    ctx.lineTo(width - 1, CANVAS.DESIGN_HEIGHT);
+    ctx.closePath();
+
+    // Fill the terrain
+    ctx.fill();
+
+    // Draw terrain outline for synthwave glow effect
+    ctx.strokeStyle = COLORS.NEON_PURPLE;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let x = 0; x < width; x++) {
+        const terrainHeight = terrain.getHeight(x);
+        const canvasY = CANVAS.DESIGN_HEIGHT - terrainHeight;
+        if (x === 0) {
+            ctx.moveTo(x, canvasY);
+        } else {
+            ctx.lineTo(x, canvasY);
+        }
+    }
+    ctx.stroke();
+}
+
+// =============================================================================
 // PLAYER AIMING STATE
 // =============================================================================
 
@@ -234,6 +305,9 @@ function handleSelectWeapon() {
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  */
 function renderPlaying(ctx) {
+    // Render terrain first (background)
+    renderTerrain(ctx);
+
     // Render turn indicator at top of screen
     Turn.renderTurnIndicator(ctx);
 
@@ -294,6 +368,15 @@ function setupPlayingState() {
     Game.registerStateHandlers(GAME_STATES.PLAYING, {
         onEnter: (fromState) => {
             console.log('Entered PLAYING state - Game started!');
+
+            // Generate new terrain for this game
+            // Uses midpoint displacement algorithm for natural-looking hills and valleys
+            currentTerrain = generateTerrain(CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT, {
+                roughness: 0.5,  // Balanced jaggedness (0.4-0.6 recommended)
+                minHeightPercent: 0.2,  // Terrain starts at 20% of canvas height minimum
+                maxHeightPercent: 0.7   // Terrain peaks at 70% of canvas height maximum
+            });
+
             // Initialize the turn system when entering playing state
             Turn.init();
             // Sync turn debug mode with game debug mode

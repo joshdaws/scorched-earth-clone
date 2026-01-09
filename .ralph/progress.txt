@@ -162,3 +162,15 @@
 **Files:** js/assets.js, js/main.js
 **Commit:** 5d362ca
 ---
+## scorched-earth-v3c.1 - Implement Terrain Heightmap Data Structure
+**Status:** Completed
+**Changes:** Created terrain.js with Terrain class implementing Float32Array heightmap storage, getHeight/setHeight with bounds checking, and serialize/deserialize for save/load
+**Files:** js/terrain.js (new)
+**Commit:** 75a21ed
+---
+## scorched-earth-v3c.2 - Implement Terrain Generation Algorithm
+**Status:** Completed
+**Changes:** Implemented midpoint displacement algorithm for procedural terrain generation with seeded random, configurable roughness, and height clamping. Added terrain rendering to the playing state.
+**Files:** js/terrain.js (added generateTerrain, createSeededRandom), js/main.js (added terrain state, renderTerrain, generation on game start)
+**Commit:** 8f3e45d
+---
