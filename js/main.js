@@ -17,7 +17,7 @@ import { placeTanksOnTerrain, updateTankTerrainPosition } from './tank.js';
 import { Projectile, createProjectileFromTank, checkTankCollision, createSplitProjectiles } from './projectile.js';
 import { applyExplosionDamage, applyExplosionToAllTanks, DAMAGE } from './damage.js';
 import * as Wind from './wind.js';
-import { WeaponRegistry } from './weapons.js';
+import { WeaponRegistry, WEAPON_TYPES } from './weapons.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -69,6 +69,31 @@ function getActiveProjectile() {
  * @type {{active: boolean, x: number, y: number, startTime: number, duration: number}|null}
  */
 let splitEffect = null;
+
+// =============================================================================
+// NUCLEAR WEAPON EFFECT STATE
+// =============================================================================
+
+/**
+ * Screen shake effect state for nuclear explosions.
+ * When active, the canvas is offset by random amounts each frame.
+ * @type {{active: boolean, intensity: number, startTime: number, duration: number}|null}
+ */
+let screenShakeEffect = null;
+
+/**
+ * Screen flash effect state for nuclear explosions.
+ * Creates a bright white flash that fades out.
+ * @type {{active: boolean, startTime: number, duration: number}|null}
+ */
+let screenFlashEffect = null;
+
+/**
+ * Explosion effect state for visual feedback on projectile impact.
+ * Nuclear weapons create larger, more dramatic explosions.
+ * @type {{active: boolean, x: number, y: number, radius: number, startTime: number, duration: number, isNuclear: boolean, hasMushroomCloud: boolean}|null}
+ */
+let explosionEffect = null;
 
 // =============================================================================
 // MENU STATE
@@ -216,6 +241,11 @@ function fireProjectile(tank) {
         tank.power = playerAim.power;
     }
 
+    // IMPORTANT: Capture the weapon ID BEFORE consuming ammo
+    // consumeAmmo() will switch to basic-shot if the current weapon runs out,
+    // but we want to fire the weapon that was actually selected
+    const firedWeaponId = tank.currentWeapon;
+
     // Consume ammo - if tank has no ammo for current weapon, this returns false
     // The tank will auto-switch to basic-shot if current weapon runs out
     if (!tank.consumeAmmo()) {
@@ -223,21 +253,27 @@ function fireProjectile(tank) {
         return false;
     }
 
-    // Get weapon info for logging
-    const weapon = WeaponRegistry.getWeapon(tank.currentWeapon);
-    const ammoRemaining = tank.getAmmo(tank.currentWeapon);
+    // Get weapon info for logging (use the weapon that was fired, not current)
+    const weapon = WeaponRegistry.getWeapon(firedWeaponId);
+    const ammoRemaining = tank.getAmmo(firedWeaponId);
     const ammoDisplay = ammoRemaining === Infinity ? '∞' : ammoRemaining;
 
-    // Create projectile from tank's barrel position and add to array
+    // Create projectile from tank's barrel position with the fired weapon
+    // We need to temporarily set the weapon back for createProjectileFromTank
+    const postFireWeapon = tank.currentWeapon;
+    tank.currentWeapon = firedWeaponId;
     const projectile = createProjectileFromTank(tank);
+    tank.currentWeapon = postFireWeapon; // Restore to post-fire weapon (may be basic-shot)
+
     activeProjectiles = [projectile]; // Clear and set new projectile
-    console.log(`Projectile fired from ${tank.team} at angle ${tank.angle}°, power ${tank.power}% (${weapon ? weapon.name : tank.currentWeapon}, ammo: ${ammoDisplay})`);
+    console.log(`Projectile fired from ${tank.team} at angle ${tank.angle}°, power ${tank.power}% (${weapon ? weapon.name : firedWeaponId}, ammo: ${ammoDisplay})`);
     return true;
 }
 
 /**
  * Handle a single projectile's explosion (on terrain or tank hit).
  * Creates crater, applies damage, updates tank positions.
+ * Triggers special effects for nuclear weapons.
  *
  * @param {import('./projectile.js').Projectile} projectile - The projectile that exploded
  * @param {{x: number, y: number}} pos - Impact position
@@ -247,6 +283,7 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
     const weaponId = projectile.weaponId;
     const weapon = WeaponRegistry.getWeapon(weaponId);
     const blastRadius = weapon ? weapon.blastRadius : 30;
+    const isNuclear = weapon && weapon.type === WEAPON_TYPES.NUCLEAR;
 
     const explosion = {
         x: pos.x,
@@ -284,6 +321,52 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
         if (enemyTank && currentTerrain) {
             updateTankTerrainPosition(enemyTank, currentTerrain);
         }
+    }
+
+    // Trigger explosion visual effect for all weapons
+    // Nuclear weapons get longer duration and special mushroom cloud
+    const explosionDuration = isNuclear ? 800 : 400;
+    explosionEffect = {
+        active: true,
+        x: pos.x,
+        y: pos.y,
+        radius: blastRadius,
+        startTime: performance.now(),
+        duration: explosionDuration,
+        isNuclear: isNuclear,
+        hasMushroomCloud: weapon?.mushroomCloud || false
+    };
+
+    // Nuclear weapon special effects
+    if (isNuclear) {
+        console.log(`Nuclear explosion at (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}) - ${weapon.name}`);
+
+        // Screen flash effect (white flash)
+        if (weapon.screenFlash) {
+            screenFlashEffect = {
+                active: true,
+                startTime: performance.now(),
+                duration: 300 // 300ms flash
+            };
+        }
+
+        // Screen shake effect (intensity based on blast radius)
+        if (weapon.screenShake) {
+            // Mini Nuke (80px radius) = moderate shake, Nuke (150px radius) = intense shake
+            const shakeIntensity = Math.min(blastRadius / 10, 20);
+            screenShakeEffect = {
+                active: true,
+                intensity: shakeIntensity,
+                startTime: performance.now(),
+                duration: 600 // 600ms shake
+            };
+        }
+
+        // Play nuclear explosion sound
+        playNuclearExplosionSound(blastRadius);
+    } else {
+        // Standard explosion sound for non-nuclear weapons
+        playExplosionSound(blastRadius);
     }
 }
 
@@ -994,15 +1077,196 @@ function renderSplitEffect(ctx) {
 }
 
 /**
+ * Render the explosion effect (expanding fireball/ring).
+ * Nuclear weapons have larger, more dramatic explosions with mushroom clouds.
+ *
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ */
+function renderExplosionEffect(ctx) {
+    if (!explosionEffect || !explosionEffect.active) return;
+
+    const elapsed = performance.now() - explosionEffect.startTime;
+    if (elapsed > explosionEffect.duration) {
+        explosionEffect = null;
+        return;
+    }
+
+    const progress = elapsed / explosionEffect.duration;
+    const { x, y, radius, isNuclear, hasMushroomCloud } = explosionEffect;
+
+    ctx.save();
+
+    if (isNuclear) {
+        // Nuclear explosion - more dramatic multi-ring effect
+
+        // Phase 1: Initial bright flash (0-20%)
+        if (progress < 0.2) {
+            const flashProgress = progress / 0.2;
+            const flashAlpha = 1 - flashProgress;
+            const flashRadius = radius * 0.5 * (1 + flashProgress);
+
+            // Bright white center
+            ctx.beginPath();
+            ctx.arc(x, y, flashRadius, 0, Math.PI * 2);
+            const gradient = ctx.createRadialGradient(x, y, 0, x, y, flashRadius);
+            gradient.addColorStop(0, `rgba(255, 255, 255, ${flashAlpha})`);
+            gradient.addColorStop(0.5, `rgba(255, 200, 100, ${flashAlpha * 0.8})`);
+            gradient.addColorStop(1, `rgba(255, 100, 50, 0)`);
+            ctx.fillStyle = gradient;
+            ctx.fill();
+        }
+
+        // Phase 2: Expanding fireball (0-60%)
+        if (progress < 0.6) {
+            const fireProgress = progress / 0.6;
+            const fireRadius = radius * fireProgress;
+            const fireAlpha = 1 - fireProgress * 0.5;
+
+            // Orange/red fireball
+            ctx.beginPath();
+            ctx.arc(x, y, fireRadius, 0, Math.PI * 2);
+            const fireGradient = ctx.createRadialGradient(x, y, 0, x, y, fireRadius);
+            fireGradient.addColorStop(0, `rgba(255, 150, 50, ${fireAlpha})`);
+            fireGradient.addColorStop(0.4, `rgba(255, 100, 30, ${fireAlpha * 0.7})`);
+            fireGradient.addColorStop(0.7, `rgba(200, 50, 20, ${fireAlpha * 0.4})`);
+            fireGradient.addColorStop(1, `rgba(100, 20, 10, 0)`);
+            ctx.fillStyle = fireGradient;
+            ctx.fill();
+        }
+
+        // Phase 3: Expanding shockwave ring (20-100%)
+        if (progress > 0.1) {
+            const ringProgress = (progress - 0.1) / 0.9;
+            const ringRadius = radius * 1.5 * ringProgress;
+            const ringAlpha = 1 - ringProgress;
+
+            ctx.beginPath();
+            ctx.arc(x, y, ringRadius, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(255, 200, 100, ${ringAlpha * 0.6})`;
+            ctx.lineWidth = 8 * (1 - ringProgress);
+            ctx.shadowColor = '#ff8800';
+            ctx.shadowBlur = 30 * ringAlpha;
+            ctx.stroke();
+        }
+
+        // Mushroom cloud effect for the big nuke (40-100%)
+        if (hasMushroomCloud && progress > 0.3) {
+            const cloudProgress = (progress - 0.3) / 0.7;
+            const cloudAlpha = 0.6 * (1 - cloudProgress);
+
+            // Rising smoke column
+            const columnHeight = radius * 2 * cloudProgress;
+            const columnWidth = radius * 0.3;
+
+            ctx.beginPath();
+            ctx.fillStyle = `rgba(80, 60, 60, ${cloudAlpha})`;
+            ctx.ellipse(x, y - columnHeight / 2, columnWidth, columnHeight / 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Mushroom cap
+            if (progress > 0.5) {
+                const capProgress = (progress - 0.5) / 0.5;
+                const capRadius = radius * 0.8 * capProgress;
+                const capY = y - columnHeight;
+
+                ctx.beginPath();
+                ctx.fillStyle = `rgba(100, 70, 70, ${cloudAlpha * 0.8})`;
+                ctx.ellipse(x, capY, capRadius, capRadius * 0.5, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+    } else {
+        // Standard explosion - simpler effect
+        const expandedRadius = radius * (0.5 + progress * 0.5);
+        const alpha = 1 - progress;
+
+        // Main fireball
+        ctx.beginPath();
+        ctx.arc(x, y, expandedRadius, 0, Math.PI * 2);
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, expandedRadius);
+        gradient.addColorStop(0, `rgba(255, 200, 100, ${alpha})`);
+        gradient.addColorStop(0.5, `rgba(255, 100, 50, ${alpha * 0.7})`);
+        gradient.addColorStop(1, `rgba(200, 50, 20, 0)`);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+
+        // Outer ring
+        ctx.beginPath();
+        ctx.arc(x, y, expandedRadius * 1.2, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(255, 150, 50, ${alpha * 0.5})`;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+    }
+
+    ctx.restore();
+}
+
+/**
+ * Render the screen flash effect (white flash for nuclear explosions).
+ * Covers the entire screen with a fading white overlay.
+ *
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ */
+function renderScreenFlash(ctx) {
+    if (!screenFlashEffect || !screenFlashEffect.active) return;
+
+    const elapsed = performance.now() - screenFlashEffect.startTime;
+    if (elapsed > screenFlashEffect.duration) {
+        screenFlashEffect = null;
+        return;
+    }
+
+    const progress = elapsed / screenFlashEffect.duration;
+    // Fast fade: high opacity at start, quickly fading
+    const alpha = Math.pow(1 - progress, 2) * 0.9;
+
+    ctx.save();
+    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+    ctx.fillRect(0, 0, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    ctx.restore();
+}
+
+/**
+ * Get the current screen shake offset for rendering.
+ * Returns {x, y} offset to apply to canvas translation.
+ *
+ * @returns {{x: number, y: number}} Shake offset
+ */
+function getScreenShakeOffset() {
+    if (!screenShakeEffect || !screenShakeEffect.active) {
+        return { x: 0, y: 0 };
+    }
+
+    const elapsed = performance.now() - screenShakeEffect.startTime;
+    if (elapsed > screenShakeEffect.duration) {
+        screenShakeEffect = null;
+        return { x: 0, y: 0 };
+    }
+
+    const progress = elapsed / screenShakeEffect.duration;
+    // Intensity decreases over time
+    const currentIntensity = screenShakeEffect.intensity * (1 - progress);
+
+    // Random offset within intensity range
+    const offsetX = (Math.random() - 0.5) * 2 * currentIntensity;
+    const offsetY = (Math.random() - 0.5) * 2 * currentIntensity;
+
+    return { x: offsetX, y: offsetY };
+}
+
+/**
  * Render all active projectiles and their trails.
  * Trail is rendered first (behind), then the projectile on top.
- * Also renders the split effect if active.
+ * Also renders the split effect and explosion effects if active.
  *
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  */
 function renderActiveProjectile(ctx) {
     // Render split effect first (behind projectiles)
     renderSplitEffect(ctx);
+
+    // Render explosion effect
+    renderExplosionEffect(ctx);
 
     // Render each active projectile
     for (const projectile of activeProjectiles) {
@@ -1014,6 +1278,125 @@ function renderActiveProjectile(ctx) {
         // Render projectile on top
         renderProjectile(ctx, projectile);
     }
+}
+
+// =============================================================================
+// AUDIO EFFECTS
+// =============================================================================
+
+/**
+ * Play a standard explosion sound using Web Audio synthesis.
+ * Creates a short noise burst with filtering for an explosion effect.
+ *
+ * @param {number} blastRadius - Explosion radius (affects sound character)
+ */
+function playExplosionSound(blastRadius) {
+    if (!Sound.isInitialized()) return;
+
+    const ctx = Sound.getContext();
+    const sfxGain = Sound.getSfxGain();
+    if (!ctx || !sfxGain) return;
+
+    // Create noise buffer for explosion
+    const duration = 0.3;
+    const sampleRate = ctx.sampleRate;
+    const bufferSize = Math.floor(duration * sampleRate);
+    const buffer = ctx.createBuffer(1, bufferSize, sampleRate);
+    const data = buffer.getChannelData(0);
+
+    // Fill with noise that decays
+    for (let i = 0; i < bufferSize; i++) {
+        const decay = 1 - (i / bufferSize);
+        data[i] = (Math.random() * 2 - 1) * decay * decay;
+    }
+
+    // Create source and filter
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 500 + (blastRadius * 5); // Larger = deeper
+
+    const gainNode = ctx.createGain();
+    gainNode.gain.value = 0.4;
+
+    source.connect(filter);
+    filter.connect(gainNode);
+    gainNode.connect(sfxGain);
+
+    source.start();
+}
+
+/**
+ * Play a nuclear explosion sound using Web Audio synthesis.
+ * Creates a dramatic, bass-heavy rumbling explosion with longer decay.
+ *
+ * @param {number} blastRadius - Explosion radius (affects sound intensity)
+ */
+function playNuclearExplosionSound(blastRadius) {
+    if (!Sound.isInitialized()) return;
+
+    const ctx = Sound.getContext();
+    const sfxGain = Sound.getSfxGain();
+    if (!ctx || !sfxGain) return;
+
+    // Longer duration for nuclear explosion
+    const duration = 1.2;
+    const sampleRate = ctx.sampleRate;
+    const bufferSize = Math.floor(duration * sampleRate);
+    const buffer = ctx.createBuffer(1, bufferSize, sampleRate);
+    const data = buffer.getChannelData(0);
+
+    // Fill with layered noise: initial crack + rumbling decay
+    for (let i = 0; i < bufferSize; i++) {
+        const t = i / bufferSize;
+
+        // Initial sharp crack (first 10%)
+        let sample = 0;
+        if (t < 0.1) {
+            const crackEnvelope = 1 - (t / 0.1);
+            sample = (Math.random() * 2 - 1) * crackEnvelope * crackEnvelope;
+        }
+
+        // Deep rumble (throughout)
+        const rumbleEnvelope = Math.pow(1 - t, 1.5);
+        const rumble = (Math.random() * 2 - 1) * rumbleEnvelope * 0.8;
+
+        // Low frequency modulation for "womp" effect
+        const lfoFreq = 8 + t * 20;
+        const lfo = Math.sin(t * Math.PI * 2 * lfoFreq) * 0.3;
+
+        sample += rumble * (1 + lfo * rumbleEnvelope);
+        data[i] = sample;
+    }
+
+    // Create source
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+
+    // Very low pass filter for bass-heavy sound
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 200 + (blastRadius * 2);
+    filter.Q.value = 2;
+
+    // Additional sub-bass boost
+    const bassBoost = ctx.createBiquadFilter();
+    bassBoost.type = 'lowshelf';
+    bassBoost.frequency.value = 100;
+    bassBoost.gain.value = 10;
+
+    const gainNode = ctx.createGain();
+    // Louder for nuclear
+    gainNode.gain.value = 0.7;
+
+    source.connect(filter);
+    filter.connect(bassBoost);
+    bassBoost.connect(gainNode);
+    gainNode.connect(sfxGain);
+
+    source.start();
 }
 
 // =============================================================================
@@ -1128,6 +1511,13 @@ function handleSelectWeapon() {
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  */
 function renderPlaying(ctx) {
+    // Apply screen shake offset if active
+    const shakeOffset = getScreenShakeOffset();
+    if (shakeOffset.x !== 0 || shakeOffset.y !== 0) {
+        ctx.save();
+        ctx.translate(shakeOffset.x, shakeOffset.y);
+    }
+
     // Render terrain first (background)
     renderTerrain(ctx);
 
@@ -1185,6 +1575,14 @@ function renderPlaying(ctx) {
         ctx.fillText('← → Arrow keys: Adjust angle | ↑ ↓ Arrow keys: Adjust power', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 135);
         ctx.fillText('TAB: Cycle weapons', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 160);
     }
+
+    // Restore context if screen shake was applied
+    if (shakeOffset.x !== 0 || shakeOffset.y !== 0) {
+        ctx.restore();
+    }
+
+    // Render screen flash on top of everything (not affected by shake)
+    renderScreenFlash(ctx);
 }
 
 /**
@@ -1274,6 +1672,8 @@ function setupPlayingState() {
             playerTank.addAmmo('heavy-roller', 2); // Heavy Roller for testing
             playerTank.addAmmo('digger', 3); // Digger for testing tunneling mechanic
             playerTank.addAmmo('heavy-digger', 2); // Heavy Digger for testing
+            playerTank.addAmmo('mini-nuke', 2); // Mini Nuke for testing nuclear effects
+            playerTank.addAmmo('nuke', 1); // Nuke for testing big nuclear effects
 
             // Generate random wind for this round
             // Wind value -10 to +10: negative = left, positive = right
@@ -1291,6 +1691,10 @@ function setupPlayingState() {
             }
             activeProjectiles = [];
             splitEffect = null;
+            // Reset nuclear effect states
+            screenShakeEffect = null;
+            screenFlashEffect = null;
+            explosionEffect = null;
             // Reset player aim
             playerAim.angle = 45;
             playerAim.power = 50;
