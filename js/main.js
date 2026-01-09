@@ -28,6 +28,7 @@ import { spawnExplosionParticles, updateParticles, renderParticles, clearParticl
 import * as Music from './music.js';
 import * as VolumeControls from './volumeControls.js';
 import * as PauseMenu from './pauseMenu.js';
+import * as TouchAiming from './touchAiming.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -2241,8 +2242,19 @@ function renderPlaying(ctx) {
     // Render pause button
     renderPauseButton(ctx);
 
+    // Render touch aiming visuals (drag zone, rubber band, etc.)
+    // This is rendered first so button-based controls appear on top
+    if (isPlayerTurn) {
+        TouchAiming.setEnabled(true);
+        TouchAiming.render(ctx, playerTank, currentTerrain);
+    } else {
+        TouchAiming.setEnabled(false);
+    }
+
     // Render aiming controls (power bar, angle arc, fire button, trajectory preview)
     // These are only shown during player's turn
+    // Note: If touch aiming is active, these are still rendered but touch aiming
+    // handles trajectory preview separately
     AimingControls.renderAimingControls(ctx, {
         playerTank,
         angle: playerAim.angle,
@@ -2253,13 +2265,14 @@ function renderPlaying(ctx) {
     });
 
     // Draw keyboard hints at bottom of screen during player's turn (compact version)
-    if (isPlayerTurn) {
+    // Skip if touch aiming is actively being used (less distracting)
+    if (isPlayerTurn && !TouchAiming.isActive()) {
         ctx.save();
         ctx.fillStyle = COLORS.TEXT_MUTED;
         ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
-        ctx.fillText('← → Angle  |  ↑ ↓ Power  |  TAB Weapon  |  SPACE Fire', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT - 20);
+        ctx.fillText('← → Angle  |  ↑ ↓ Power  |  TAB Weapon  |  SPACE Fire  |  Drag tank to aim', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT - 20);
         ctx.restore();
     }
 
@@ -2934,6 +2947,9 @@ async function init() {
     // Initialize input with canvas
     Input.init(canvas);
 
+    // Initialize touch aiming (Angry Birds-style drag controls)
+    TouchAiming.init();
+
     // Set up audio initialization on first user interaction
     // Web Audio API requires user gesture to start
     setupAudioInit(canvas);
@@ -2993,6 +3009,9 @@ function update(deltaTime) {
 
     // Update aiming controls animation
     AimingControls.update(deltaTime);
+
+    // Update touch aiming animation
+    TouchAiming.update(deltaTime);
 
     // Update continuous input (held keys generate events over time)
     Input.updateContinuousInput(deltaTime);

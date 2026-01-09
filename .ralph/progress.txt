@@ -125,3 +125,9 @@
 **Files:** js/shop.js (SHOP_LAYOUT constants, renderWeaponCard function)
 **Commit:** cf131da
 ---
+## scorched-earth-pxn.1 - Implement Touch Gesture Aiming
+**Status:** Completed
+**Changes:** Implemented Angry Birds-style drag-to-aim touch controls with rubber band visual effect, trajectory preview, and slingshot mechanics. Works alongside existing button-based controls.
+**Files:** js/touchAiming.js (NEW), js/main.js (modified)
+**Commit:** 6eb6755
+---
