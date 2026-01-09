@@ -21,6 +21,7 @@ import { WeaponRegistry, WEAPON_TYPES } from './weapons.js';
 import * as AI from './ai.js';
 import * as HUD from './ui.js';
 import * as AimingControls from './aimingControls.js';
+import * as VictoryDefeat from './victoryDefeat.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -1041,8 +1042,56 @@ function updateProjectile() {
 
     // Check if all projectiles are resolved
     if (activeProjectiles.length === 0) {
-        Turn.projectileResolved();
+        // Check if a tank was destroyed before transitioning to next turn
+        checkRoundEnd();
     }
+}
+
+/**
+ * Check if the round has ended (one tank destroyed).
+ * Transitions to VICTORY or DEFEAT state if so, otherwise continues to next turn.
+ */
+function checkRoundEnd() {
+    const playerDestroyed = playerTank && playerTank.health <= 0;
+    const enemyDestroyed = enemyTank && enemyTank.health <= 0;
+
+    if (enemyDestroyed) {
+        // Player wins!
+        console.log('[Main] Enemy destroyed - VICTORY!');
+
+        // Calculate round earnings (base + damage bonus)
+        const baseEarnings = 500;
+        const damageBonus = Math.floor((100 - (playerTank?.health || 0)) * 2);  // Bonus for surviving with damage
+        const moneyEarned = baseEarnings + damageBonus;
+
+        playerMoney += moneyEarned;
+
+        // Show victory screen after short delay
+        VictoryDefeat.showVictory(moneyEarned, 0, 1200);
+
+        // Transition to victory state
+        Game.setState(GAME_STATES.VICTORY);
+        return;
+    }
+
+    if (playerDestroyed) {
+        // Player loses
+        console.log('[Main] Player destroyed - DEFEAT!');
+
+        // Give consolation earnings
+        const moneyEarned = 100;
+        playerMoney += moneyEarned;
+
+        // Show defeat screen after short delay
+        VictoryDefeat.showDefeat(moneyEarned, 0, 1200);
+
+        // Transition to defeat state
+        Game.setState(GAME_STATES.DEFEAT);
+        return;
+    }
+
+    // No one destroyed - continue to next turn
+    Turn.projectileResolved();
 }
 
 /**
@@ -2292,6 +2341,150 @@ function setupPlayingState() {
     });
 }
 
+// =============================================================================
+// VICTORY/DEFEAT STATE
+// =============================================================================
+
+/**
+ * Handle click on victory/defeat screen.
+ * @param {{x: number, y: number}} pos - Click position in design coordinates
+ */
+function handleVictoryDefeatClick(pos) {
+    const state = Game.getState();
+    if (state !== GAME_STATES.VICTORY && state !== GAME_STATES.DEFEAT) return;
+
+    VictoryDefeat.handleClick(pos.x, pos.y);
+}
+
+/**
+ * Render the victory/defeat screen overlay.
+ * Shows the current game state underneath with the overlay on top.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ */
+function renderVictoryDefeatState(ctx) {
+    // First render the game state underneath (terrain, tanks, etc.)
+    renderPlaying(ctx);
+
+    // Then render the victory/defeat overlay on top
+    VictoryDefeat.render(ctx);
+}
+
+/**
+ * Update victory/defeat screen animations.
+ * @param {number} deltaTime - Time since last frame in ms
+ */
+function updateVictoryDefeat(deltaTime) {
+    VictoryDefeat.update(deltaTime);
+}
+
+/**
+ * Start a new round after victory.
+ * Increments round counter and generates new terrain/tanks.
+ */
+function startNextRound() {
+    currentRound++;
+    console.log(`[Main] Starting round ${currentRound}`);
+    Game.setState(GAME_STATES.PLAYING);
+}
+
+/**
+ * Return to main menu and reset game state.
+ */
+function returnToMenu() {
+    // Reset game state
+    currentRound = 1;
+    playerMoney = GAME.STARTING_MONEY;
+    playerTank = null;
+    enemyTank = null;
+    currentTerrain = null;
+    activeProjectiles = [];
+
+    VictoryDefeat.hide();
+    Game.setState(GAME_STATES.MENU);
+}
+
+/**
+ * Set up victory state handlers.
+ */
+function setupVictoryState() {
+    // Register callbacks for button clicks
+    VictoryDefeat.onContinue(() => {
+        // TODO: When shop is implemented, go to SHOP state
+        // For now, just start next round
+        VictoryDefeat.hide();
+        startNextRound();
+    });
+
+    VictoryDefeat.onQuit(() => {
+        returnToMenu();
+    });
+
+    // Register click handlers
+    Input.onMouseDown((x, y, button) => {
+        if (button === 0 && Game.getState() === GAME_STATES.VICTORY) {
+            handleVictoryDefeatClick({ x, y });
+        }
+    });
+
+    Input.onTouchStart((x, y) => {
+        if (Game.getState() === GAME_STATES.VICTORY) {
+            handleVictoryDefeatClick({ x, y });
+        }
+    });
+
+    Game.registerStateHandlers(GAME_STATES.VICTORY, {
+        onEnter: (fromState) => {
+            console.log('Entered VICTORY state');
+            // Cancel any pending AI turn
+            AI.cancelTurn();
+            // Disable game input
+            Input.disableGameInput();
+        },
+        onExit: (toState) => {
+            console.log('Exiting VICTORY state');
+            VictoryDefeat.hide();
+        },
+        update: updateVictoryDefeat,
+        render: renderVictoryDefeatState
+    });
+}
+
+/**
+ * Set up defeat state handlers.
+ */
+function setupDefeatState() {
+    // Defeat uses the same VictoryDefeat module, but registered to DEFEAT state
+    // Click handlers are shared with victory state through handleVictoryDefeatClick
+
+    Input.onMouseDown((x, y, button) => {
+        if (button === 0 && Game.getState() === GAME_STATES.DEFEAT) {
+            handleVictoryDefeatClick({ x, y });
+        }
+    });
+
+    Input.onTouchStart((x, y) => {
+        if (Game.getState() === GAME_STATES.DEFEAT) {
+            handleVictoryDefeatClick({ x, y });
+        }
+    });
+
+    Game.registerStateHandlers(GAME_STATES.DEFEAT, {
+        onEnter: (fromState) => {
+            console.log('Entered DEFEAT state');
+            // Cancel any pending AI turn
+            AI.cancelTurn();
+            // Disable game input
+            Input.disableGameInput();
+        },
+        onExit: (toState) => {
+            console.log('Exiting DEFEAT state');
+            VictoryDefeat.hide();
+        },
+        update: updateVictoryDefeat,
+        render: renderVictoryDefeatState
+    });
+}
+
 /**
  * Set up audio initialization on first user interaction.
  * Web Audio API requires a user gesture (click/touch) to start.
@@ -2357,6 +2550,8 @@ async function init() {
     // These register the update/render functions for each state
     setupMenuState();
     setupPlayingState();
+    setupVictoryState();
+    setupDefeatState();
 
     // Register 'D' key to toggle debug mode
     Input.onKeyDown((keyCode) => {
