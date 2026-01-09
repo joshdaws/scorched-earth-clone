@@ -28,11 +28,39 @@ export const DAMAGE = {
 };
 
 // =============================================================================
+// DISTANCE HELPERS
+// =============================================================================
+
+/**
+ * Calculate the minimum distance from a point to a rectangle (bounding box).
+ * Returns 0 if the point is inside the rectangle.
+ *
+ * @param {number} px - Point X coordinate
+ * @param {number} py - Point Y coordinate
+ * @param {Object} bounds - Rectangle bounds {x, y, width, height}
+ * @returns {number} Minimum distance from point to rectangle edge (0 if inside)
+ */
+function distanceToRect(px, py, bounds) {
+    // Calculate the closest point on the rectangle to the given point
+    const closestX = Math.max(bounds.x, Math.min(px, bounds.x + bounds.width));
+    const closestY = Math.max(bounds.y, Math.min(py, bounds.y + bounds.height));
+
+    // Calculate distance from original point to closest point on rectangle
+    const dx = px - closestX;
+    const dy = py - closestY;
+
+    return Math.sqrt(dx * dx + dy * dy);
+}
+
+// =============================================================================
 // DAMAGE CALCULATION
 // =============================================================================
 
 /**
  * Calculate damage to a tank based on explosion proximity.
+ *
+ * Uses the minimum distance from explosion to tank's bounding box for collision.
+ * This ensures hits anywhere on the tank body register damage, not just near the center.
  *
  * Uses linear falloff: damage = maxDamage * (1 - distance/blastRadius)
  * - At center (distance = 0): full damage
@@ -57,13 +85,12 @@ export function calculateDamage(explosion, tank, weapon = null) {
         return 0;
     }
 
-    // Get tank center for distance calculation
-    const tankCenter = tank.getCenter();
+    // Get tank bounding box for collision - uses full tank body, not just center point
+    const tankBounds = tank.getBounds();
 
-    // Calculate distance from explosion center to tank center
-    const dx = explosion.x - tankCenter.x;
-    const dy = explosion.y - tankCenter.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
+    // Calculate minimum distance from explosion to tank bounds
+    // This registers hits on any part of the tank, not just near center
+    const distance = distanceToRect(explosion.x, explosion.y, tankBounds);
 
     // Determine blast radius (weapon-specific, explosion-specific, or default)
     let blastRadius = DAMAGE.DEFAULT_BLAST_RADIUS;
@@ -146,11 +173,9 @@ export function applyExplosionDamage(explosion, tank, weapon = null) {
         return { damage: 0, actualDamage: 0, isDirectHit: false };
     }
 
-    // Check if it's a direct hit (for return value)
-    const tankCenter = tank.getCenter();
-    const dx = explosion.x - tankCenter.x;
-    const dy = explosion.y - tankCenter.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
+    // Check if it's a direct hit (for return value) - use bounding box distance
+    const tankBounds = tank.getBounds();
+    const distance = distanceToRect(explosion.x, explosion.y, tankBounds);
     const isDirectHit = distance < DAMAGE.DIRECT_HIT_DISTANCE;
 
     // Apply damage to tank (tank.takeDamage handles clamping and returns actual damage dealt)
