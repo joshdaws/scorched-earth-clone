@@ -32,7 +32,7 @@
 **Status:** Completed
 **Changes:** Implemented falling dirt physics that detects and settles floating terrain columns after explosions. Added configurable parameters for height threshold, neighbor radius, and instant/animated modes.
 **Files:** js/constants.js, js/terrain.js, js/main.js
-**Commit:** (pending)
+**Commit:** 20436c9
 ---
 ## scorched-earth-v3c - Terrain System (EPIC)
 **Status:** Completed
@@ -56,4 +56,10 @@
 - Root cause: Browser ES module caching served stale terrain.js without the new method
 - Resolution: Hard refresh or cache clear resolves the issue; no code changes needed
 **Files:** No files modified (code was already correct)
+---
+## scorched-earth-qff.2 - Implement Screen Shake Effect
+**Status:** Completed
+**Changes:** Implemented screen shake system in effects.js that triggers on ALL weapon explosions. Shake intensity (2-20px) and duration (200-500ms) scale with blast radius. Removed duplicate nuclear-only shake code from main.js.
+**Files:** js/effects.js, js/main.js
+**Commit:** 20436c9
 ---

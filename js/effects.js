@@ -449,3 +449,143 @@ export function clearParticles() {
 export function getParticleCount() {
     return particleSystem.getParticleCount();
 }
+
+// =============================================================================
+// SCREEN SHAKE SYSTEM
+// =============================================================================
+
+/**
+ * Screen shake configuration.
+ * Maps blast radius to intensity and duration.
+ */
+export const SCREEN_SHAKE_CONFIG = {
+    /** Minimum shake intensity in pixels (for smallest explosions) */
+    MIN_INTENSITY: 2,
+    /** Maximum shake intensity in pixels (for largest explosions) */
+    MAX_INTENSITY: 20,
+    /** Minimum shake duration in milliseconds */
+    MIN_DURATION: 200,
+    /** Maximum shake duration in milliseconds */
+    MAX_DURATION: 500,
+    /** Blast radius at which minimum shake occurs */
+    MIN_BLAST_RADIUS: 20,
+    /** Blast radius at which maximum shake occurs */
+    MAX_BLAST_RADIUS: 150
+};
+
+/**
+ * Screen shake effect state.
+ * Tracks active shake with intensity decay over time.
+ * @type {{active: boolean, intensity: number, startTime: number, duration: number}|null}
+ */
+let screenShakeState = null;
+
+/**
+ * Trigger a screen shake effect.
+ * Intensity decays linearly over the duration.
+ * New shakes replace existing shakes (no additive stacking).
+ *
+ * @param {number} intensity - Shake intensity in pixels (2-20 range recommended)
+ * @param {number} duration - Shake duration in milliseconds (200-500 range recommended)
+ */
+export function screenShake(intensity, duration) {
+    // Clamp intensity to valid range
+    const clampedIntensity = Math.max(
+        SCREEN_SHAKE_CONFIG.MIN_INTENSITY,
+        Math.min(SCREEN_SHAKE_CONFIG.MAX_INTENSITY, intensity)
+    );
+
+    // Clamp duration to valid range
+    const clampedDuration = Math.max(
+        SCREEN_SHAKE_CONFIG.MIN_DURATION,
+        Math.min(SCREEN_SHAKE_CONFIG.MAX_DURATION, duration)
+    );
+
+    screenShakeState = {
+        active: true,
+        intensity: clampedIntensity,
+        startTime: performance.now(),
+        duration: clampedDuration
+    };
+
+    console.log(`Screen shake: intensity=${clampedIntensity.toFixed(1)}px, duration=${clampedDuration}ms`);
+}
+
+/**
+ * Trigger a screen shake based on weapon blast radius.
+ * Automatically calculates appropriate intensity and duration.
+ *
+ * @param {number} blastRadius - Weapon blast radius in pixels
+ */
+export function screenShakeForBlastRadius(blastRadius) {
+    // Calculate normalized position in blast radius range (0-1)
+    const normalizedRadius = Math.max(0, Math.min(1,
+        (blastRadius - SCREEN_SHAKE_CONFIG.MIN_BLAST_RADIUS) /
+        (SCREEN_SHAKE_CONFIG.MAX_BLAST_RADIUS - SCREEN_SHAKE_CONFIG.MIN_BLAST_RADIUS)
+    ));
+
+    // Interpolate intensity based on blast radius
+    const intensity = SCREEN_SHAKE_CONFIG.MIN_INTENSITY +
+        normalizedRadius * (SCREEN_SHAKE_CONFIG.MAX_INTENSITY - SCREEN_SHAKE_CONFIG.MIN_INTENSITY);
+
+    // Interpolate duration based on blast radius
+    const duration = SCREEN_SHAKE_CONFIG.MIN_DURATION +
+        normalizedRadius * (SCREEN_SHAKE_CONFIG.MAX_DURATION - SCREEN_SHAKE_CONFIG.MIN_DURATION);
+
+    screenShake(intensity, duration);
+}
+
+/**
+ * Get the current screen shake offset for rendering.
+ * Returns {x, y} offset to apply to canvas translation.
+ * The offset oscillates randomly within the current intensity range,
+ * with intensity decaying over the shake duration.
+ *
+ * @returns {{x: number, y: number}} Shake offset in pixels
+ */
+export function getScreenShakeOffset() {
+    if (!screenShakeState || !screenShakeState.active) {
+        return { x: 0, y: 0 };
+    }
+
+    const elapsed = performance.now() - screenShakeState.startTime;
+    if (elapsed > screenShakeState.duration) {
+        // Shake complete - reset state and return zero offset
+        screenShakeState = null;
+        return { x: 0, y: 0 };
+    }
+
+    // Calculate decay progress (0 at start, 1 at end)
+    const progress = elapsed / screenShakeState.duration;
+
+    // Intensity decreases linearly over duration (smooth decay)
+    const currentIntensity = screenShakeState.intensity * (1 - progress);
+
+    // Random offset within intensity range (oscillating shake)
+    const offsetX = (Math.random() - 0.5) * 2 * currentIntensity;
+    const offsetY = (Math.random() - 0.5) * 2 * currentIntensity;
+
+    return { x: offsetX, y: offsetY };
+}
+
+/**
+ * Check if a screen shake is currently active.
+ *
+ * @returns {boolean} True if shake is in progress
+ */
+export function isScreenShaking() {
+    if (!screenShakeState || !screenShakeState.active) {
+        return false;
+    }
+
+    const elapsed = performance.now() - screenShakeState.startTime;
+    return elapsed <= screenShakeState.duration;
+}
+
+/**
+ * Clear any active screen shake effect.
+ * Use when resetting game state.
+ */
+export function clearScreenShake() {
+    screenShakeState = null;
+}

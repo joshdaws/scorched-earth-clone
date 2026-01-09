@@ -24,7 +24,7 @@ import * as AimingControls from './aimingControls.js';
 import * as VictoryDefeat from './victoryDefeat.js';
 import * as Money from './money.js';
 import * as Shop from './shop.js';
-import { spawnExplosionParticles, updateParticles, renderParticles, clearParticles, getParticleCount } from './effects.js';
+import { spawnExplosionParticles, updateParticles, renderParticles, clearParticles, getParticleCount, screenShakeForBlastRadius, getScreenShakeOffset, clearScreenShake } from './effects.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -87,12 +87,7 @@ let splitEffect = null;
 // NUCLEAR WEAPON EFFECT STATE
 // =============================================================================
 
-/**
- * Screen shake effect state for nuclear explosions.
- * When active, the canvas is offset by random amounts each frame.
- * @type {{active: boolean, intensity: number, startTime: number, duration: number}|null}
- */
-let screenShakeEffect = null;
+// Screen shake is now handled by effects.js - see screenShakeForBlastRadius() and getScreenShakeOffset()
 
 /**
  * Screen flash effect state for nuclear explosions.
@@ -864,6 +859,10 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
     // Spawn explosion particles
     spawnExplosionParticles(pos.x, pos.y, blastRadius, isNuclear);
 
+    // Screen shake for ALL weapons (intensity/duration based on blast radius)
+    // Smaller weapons get subtle shakes, larger weapons get dramatic shakes
+    screenShakeForBlastRadius(blastRadius);
+
     // Destroy terrain
     if (currentTerrain) {
         destroyTerrainAt(pos.x, pos.y, blastRadius);
@@ -877,7 +876,7 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
         }
     }
 
-    // Nuclear weapon special effects
+    // Nuclear weapon special effects (flash only - shake handled above for all weapons)
     if (isNuclear) {
         console.log(`Nuclear explosion at (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}) - ${weapon.name}`);
 
@@ -887,18 +886,6 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
                 active: true,
                 startTime: performance.now(),
                 duration: 300 // 300ms flash
-            };
-        }
-
-        // Screen shake effect (intensity based on blast radius)
-        if (weapon.screenShake) {
-            // Mini Nuke (80px radius) = moderate shake, Nuke (150px radius) = intense shake
-            const shakeIntensity = Math.min(blastRadius / 10, 20);
-            screenShakeEffect = {
-                active: true,
-                intensity: shakeIntensity,
-                startTime: performance.now(),
-                duration: 600 // 600ms shake
             };
         }
 
@@ -1822,33 +1809,7 @@ function renderScreenFlash(ctx) {
     ctx.restore();
 }
 
-/**
- * Get the current screen shake offset for rendering.
- * Returns {x, y} offset to apply to canvas translation.
- *
- * @returns {{x: number, y: number}} Shake offset
- */
-function getScreenShakeOffset() {
-    if (!screenShakeEffect || !screenShakeEffect.active) {
-        return { x: 0, y: 0 };
-    }
-
-    const elapsed = performance.now() - screenShakeEffect.startTime;
-    if (elapsed > screenShakeEffect.duration) {
-        screenShakeEffect = null;
-        return { x: 0, y: 0 };
-    }
-
-    const progress = elapsed / screenShakeEffect.duration;
-    // Intensity decreases over time
-    const currentIntensity = screenShakeEffect.intensity * (1 - progress);
-
-    // Random offset within intensity range
-    const offsetX = (Math.random() - 0.5) * 2 * currentIntensity;
-    const offsetY = (Math.random() - 0.5) * 2 * currentIntensity;
-
-    return { x: offsetX, y: offsetY };
-}
+// getScreenShakeOffset() is now imported from effects.js
 
 /**
  * Render all active projectiles and their trails.
@@ -2416,8 +2377,8 @@ function setupPlayingState() {
             }
             activeProjectiles = [];
             splitEffect = null;
-            // Reset nuclear effect states
-            screenShakeEffect = null;
+            // Reset visual effect states
+            clearScreenShake();
             screenFlashEffect = null;
             explosionEffect = null;
             // Clear explosion particles
