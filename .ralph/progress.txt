@@ -10,3 +10,14 @@
 **Files:** Reviewed js/money.js, js/shop.js, js/constants.js
 **Commit:** (pending)
 ---
+## scorched-earth-iug.12 - QA: AI System validation
+**Status:** Completed
+**Changes:** Validated AI System against game spec (Section: AI Opponents, lines 580-710). All criteria PASS.
+**Verification:**
+- AI Difficulty Progression: Rounds 1-2 Easy, 3-4 Medium, 5+ Hard
+- Easy AI: ±15° angle, ±20% power, no wind compensation, basic shot only
+- Medium AI: ±8° angle, ±10% power, 50% wind compensation, missiles/rollers
+- Hard AI: ±3° angle, ±5% power, 85% wind compensation, strategic weapon selection, terrain awareness
+- AI Turn Execution: 1-2s thinking delay, proper phase transitions
+**Files:** js/ai.js (code review), docs/specs/game-spec.md (spec reference)
+---
