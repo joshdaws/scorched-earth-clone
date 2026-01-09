@@ -327,3 +327,9 @@
 **Commit:** pending
 ---
 **Commit:** 49a7ca2
+## scorched-earth-x47.3 - Create Aiming Controls UI
+**Status:** Completed
+**Changes:** Implemented visual aiming controls with synthwave styling including angle arc indicator around tank turret, vertical power bar slider, large neon fire button, and trajectory preview line. Controls are only active during player turn and support both mouse/touch and keyboard input.
+**Files:** js/aimingControls.js (new), js/main.js (modified)
+**Commit:** dd1b00b
+---

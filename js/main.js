@@ -20,6 +20,7 @@ import * as Wind from './wind.js';
 import { WeaponRegistry, WEAPON_TYPES } from './weapons.js';
 import * as AI from './ai.js';
 import * as HUD from './ui.js';
+import * as AimingControls from './aimingControls.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -2085,17 +2086,25 @@ function renderPlaying(ctx) {
     // Render round and difficulty indicator (still uses existing function)
     renderRoundIndicator(ctx);
 
-    // Draw controls help at bottom of screen during player's turn
+    // Render aiming controls (power bar, angle arc, fire button, trajectory preview)
+    // These are only shown during player's turn
+    AimingControls.renderAimingControls(ctx, {
+        playerTank,
+        angle: playerAim.angle,
+        power: playerAim.power,
+        canFire: Turn.canPlayerFire(),
+        isPlayerTurn,
+        terrain: currentTerrain
+    });
+
+    // Draw keyboard hints at bottom of screen during player's turn (compact version)
     if (isPlayerTurn) {
         ctx.save();
-        ctx.fillStyle = COLORS.TEXT_LIGHT;
-        ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
-        ctx.fillText('Press SPACE to fire!', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT - 60);
         ctx.fillStyle = COLORS.TEXT_MUTED;
         ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
-        ctx.fillText('← → Adjust angle  |  ↑ ↓ Adjust power  |  TAB Cycle weapons', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT - 40);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText('← → Angle  |  ↑ ↓ Power  |  TAB Weapon  |  SPACE Fire', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT - 20);
         ctx.restore();
     }
 
@@ -2109,37 +2118,53 @@ function renderPlaying(ctx) {
 }
 
 /**
- * Handle click in playing state - for testing terrain destruction.
- * Creates a crater at the click position.
+ * Handle pointer down in playing state.
+ * Checks aiming controls first, then weapon HUD.
  * @param {{x: number, y: number}} pos - Click position in design coordinates
  */
-function handlePlayingClick(pos) {
+function handlePlayingPointerDown(pos) {
     if (Game.getState() !== GAME_STATES.PLAYING) return;
+
+    // Check aiming controls first (power bar, angle arc, fire button)
+    if (Turn.canPlayerAim()) {
+        // Fire button, power bar, or angle arc
+        AimingControls.handlePointerDown(pos.x, pos.y, playerTank, Turn.canPlayerFire());
+
+        // Check if any control was activated - don't process other clicks
+        if (AimingControls.isInsideFireButton(pos.x, pos.y) ||
+            AimingControls.isInsidePowerBar(pos.x, pos.y) ||
+            AimingControls.isInsideAngleArc(pos.x, pos.y, playerTank)) {
+            return;
+        }
+    }
 
     // Check if click is on weapon HUD (only during player aim phase)
     if (Turn.canPlayerAim() && isInsideWeaponHUD(pos.x, pos.y)) {
         handleSelectWeapon();
         return;
     }
+}
 
-    // Default blast radius for testing (can be varied for different weapons later)
-    const testBlastRadius = 40;
+/**
+ * Handle pointer move in playing state.
+ * Updates aiming controls drag state.
+ * @param {{x: number, y: number}} pos - Pointer position in design coordinates
+ */
+function handlePlayingPointerMove(pos) {
+    if (Game.getState() !== GAME_STATES.PLAYING) return;
 
-    // Destroy terrain at click position
-    const destroyed = destroyTerrainAt(pos.x, pos.y, testBlastRadius);
+    AimingControls.handlePointerMove(pos.x, pos.y, playerTank);
+}
 
-    if (destroyed) {
-        console.log(`Crater created at (${pos.x.toFixed(0)}, ${pos.y.toFixed(0)}) with radius ${testBlastRadius}`);
+/**
+ * Handle pointer up in playing state.
+ * Finalizes aiming control interactions.
+ * @param {{x: number, y: number}} pos - Pointer position in design coordinates
+ */
+function handlePlayingPointerUp(pos) {
+    if (Game.getState() !== GAME_STATES.PLAYING) return;
 
-        // Update tank positions to match new terrain height
-        // This ensures tanks don't float after terrain is destroyed
-        if (playerTank && currentTerrain) {
-            updateTankTerrainPosition(playerTank, currentTerrain);
-        }
-        if (enemyTank && currentTerrain) {
-            updateTankTerrainPosition(enemyTank, currentTerrain);
-        }
-    }
+    AimingControls.handlePointerUp(pos.x, pos.y, Turn.canPlayerFire());
 }
 
 /**
@@ -2153,14 +2178,37 @@ function setupPlayingState() {
     Input.onGameInput(INPUT_EVENTS.SELECT_WEAPON, handleSelectWeapon);
     Input.onGameInput(INPUT_EVENTS.SELECT_PREV_WEAPON, handleSelectPrevWeapon);
 
-    // Register click handler for testing terrain destruction
-    // Note: This is for development testing - will be removed when projectile system is ready
+    // Register pointer handlers for aiming controls
+    // Mouse events
     Input.onMouseDown((x, y, button) => {
-        handlePlayingClick({ x, y });
+        if (button === 0) {  // Left click only
+            handlePlayingPointerDown({ x, y });
+        }
     });
 
+    Input.onMouseMove((x, y) => {
+        // Convert raw mouse coords to design space
+        // Note: Input callbacks already receive design-space coordinates
+        handlePlayingPointerMove({ x, y });
+    });
+
+    Input.onMouseUp((x, y, button) => {
+        if (button === 0) {
+            handlePlayingPointerUp({ x, y });
+        }
+    });
+
+    // Touch events
     Input.onTouchStart((x, y) => {
-        handlePlayingClick({ x, y });
+        handlePlayingPointerDown({ x, y });
+    });
+
+    Input.onTouchMove((x, y) => {
+        handlePlayingPointerMove({ x, y });
+    });
+
+    Input.onTouchEnd((x, y) => {
+        handlePlayingPointerUp({ x, y });
     });
 
     // Register phase change callback to enable/disable input
@@ -2337,6 +2385,9 @@ async function init() {
 function update(deltaTime) {
     // Update debug FPS tracking
     Debug.updateFps(performance.now());
+
+    // Update aiming controls animation
+    AimingControls.update(deltaTime);
 
     // Update continuous input (held keys generate events over time)
     Input.updateContinuousInput(deltaTime);
