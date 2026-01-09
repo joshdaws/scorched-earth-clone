@@ -87,11 +87,12 @@ const SHOP_LAYOUT = {
         Y_OFFSET: -315,
         HEIGHT: 30
     },
-    // Weapon categories - tighter spacing
+    // Weapon categories - proper containment with adequate spacing
     CATEGORY: {
         Y_START: -265,
-        HEIGHT: 20,
-        SPACING: 5
+        HEADER_HEIGHT: 28,     // Height reserved for category header (name + line)
+        SECTION_MARGIN: 24,    // Minimum margin between category sections (>20px per spec)
+        LABEL_PADDING: 8       // Padding below category label before cards
     },
     // Weapon cards grid - touch-optimized with adequate spacing
     CARD: {
@@ -697,7 +698,11 @@ export function render(ctx) {
     const columns = SHOP_LAYOUT.CARD.COLUMNS;
     const totalCardWidth = columns * cardWidth + (columns - 1) * cardGap;
     const gridStartX = panel.X - totalCardWidth / 2;
-    const gridStartY = panel.Y + SHOP_LAYOUT.CATEGORY.Y_START + 50;
+
+    // Category layout constants
+    const categoryHeaderHeight = SHOP_LAYOUT.CATEGORY.HEADER_HEIGHT;
+    const categorySectionMargin = SHOP_LAYOUT.CATEGORY.SECTION_MARGIN;
+    const categoryLabelPadding = SHOP_LAYOUT.CATEGORY.LABEL_PADDING;
 
     // Check feedback state
     let feedbackWeaponId = null;
@@ -712,47 +717,65 @@ export function render(ctx) {
         }
     }
 
-    // Render weapons by category
-    let currentRow = 0;
-    let currentCol = 0;
+    // Render weapons by category with proper containment
+    // Each category section consists of:
+    // 1. Category header (label + horizontal line)
+    // 2. Padding below header
+    // 3. Weapon cards grid
+    // 4. Margin before next category (minimum 24px per spec)
+
+    let currentY = panel.Y + SHOP_LAYOUT.CATEGORY.Y_START;
+    let isFirstCategory = true;
 
     for (const category of WEAPON_CATEGORIES) {
         const categoryWeapons = allWeapons.filter(w => w.type === category.type);
         if (categoryWeapons.length === 0) continue;
 
-        // Category header (placed before first weapon of this category)
-        if (currentCol > 0) {
-            // Move to next row if we're mid-row
-            currentRow++;
-            currentCol = 0;
+        // Add section margin BEFORE this category (except for first)
+        if (!isFirstCategory) {
+            currentY += categorySectionMargin;
         }
+        isFirstCategory = false;
 
-        const categoryY = gridStartY + currentRow * (cardHeight + cardGap) - 20;
+        // Calculate how many rows of cards this category needs
+        const numRows = Math.ceil(categoryWeapons.length / columns);
+
+        // === DRAW CATEGORY HEADER ===
+        // Header text is vertically centered in the header area
+        const categoryLabelY = currentY + categoryHeaderHeight / 2;
         ctx.save();
         ctx.font = `bold ${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
         ctx.fillStyle = category.color;
         ctx.textAlign = 'left';
-        ctx.fillText(category.name, gridStartX, categoryY);
+        ctx.textBaseline = 'middle';
+        ctx.fillText(category.name, gridStartX, categoryLabelY);
 
-        // Category line
+        // Horizontal line extends from after label text to right edge
+        const labelWidth = ctx.measureText(category.name).width;
         ctx.strokeStyle = category.color;
-        ctx.globalAlpha = 0.3;
+        ctx.globalAlpha = 0.4;
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(gridStartX + 80, categoryY - 5);
-        ctx.lineTo(gridStartX + totalCardWidth, categoryY - 5);
+        ctx.moveTo(gridStartX + labelWidth + 12, categoryLabelY);
+        ctx.lineTo(gridStartX + totalCardWidth, categoryLabelY);
         ctx.stroke();
         ctx.restore();
 
-        // Render weapons in this category
+        // === POSITION FOR CARDS ===
+        // Move past header area + padding to get card start position
+        const cardStartY = currentY + categoryHeaderHeight + categoryLabelPadding;
+
+        // === DRAW WEAPON CARDS ===
+        let col = 0;
+        let row = 0;
         for (const weapon of categoryWeapons) {
-            if (currentCol >= columns) {
-                currentCol = 0;
-                currentRow++;
+            if (col >= columns) {
+                col = 0;
+                row++;
             }
 
-            const cardX = gridStartX + currentCol * (cardWidth + cardGap);
-            const cardY = gridStartY + currentRow * (cardHeight + cardGap);
+            const cardX = gridStartX + col * (cardWidth + cardGap);
+            const cardY = cardStartY + row * (cardHeight + cardGap);
 
             const currentAmmo = playerTankRef ? playerTankRef.getAmmo(weapon.id) : 0;
             const canAfford = Money.canAfford(weapon.cost);
@@ -763,12 +786,12 @@ export function render(ctx) {
                 pulseIntensity, showFeedback, feedbackSuccess
             );
 
-            currentCol++;
+            col++;
         }
 
-        // Move to next row after category
-        currentRow++;
-        currentCol = 0;
+        // === UPDATE Y FOR NEXT CATEGORY ===
+        // Move past: header + padding + all card rows
+        currentY = cardStartY + numRows * cardHeight + (numRows - 1) * cardGap;
     }
 
     // Render Done button
