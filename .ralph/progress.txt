@@ -131,3 +131,9 @@
 **Files:** js/touchAiming.js (NEW), js/main.js (modified)
 **Commit:** 6eb6755
 ---
+## scorched-earth-pxn.2 - Implement Responsive Canvas Scaling
+**Status:** Completed
+**Changes:** Verified that responsive canvas scaling was already fully implemented in scorched-earth-5zm.1. All acceptance criteria verified through browser testing: canvas fills viewport, maintains 3:2 aspect ratio, handles devicePixelRatio, responds to resize/orientation changes, works on iPhone SE through iPad, no content cutoff, and touch coordinates map correctly.
+**Files:** js/renderer.js, js/input.js, js/constants.js, index.html, style.css (no changes needed - already implemented)
+**Commit:** N/A - verification only, no code changes
+---
