@@ -275,13 +275,15 @@ export class Tank {
         const radians = (this.angle * Math.PI) / 180;
 
         // Calculate offset from tank center to turret tip
-        // The turret pivots from the tank's top-center
+        // The turret pivots from the tank's top-center (top of body, not sprite)
+        // Use BODY_HEIGHT for placeholder consistency; sprites use same pivot point
+        const bodyHeight = TANK.BODY_HEIGHT || TANK.HEIGHT;
         const turretOffsetX = Math.cos(radians) * TANK.TURRET_LENGTH;
         const turretOffsetY = -Math.sin(radians) * TANK.TURRET_LENGTH; // Negative because canvas Y is inverted
 
         return {
             x: this.x + turretOffsetX,
-            y: this.y - TANK.HEIGHT + turretOffsetY // Turret base is at top of tank body
+            y: this.y - bodyHeight + turretOffsetY // Turret base is at top of tank body
         };
     }
 

@@ -52,8 +52,10 @@ export const PHYSICS = {
  */
 export const TANK = {
     WIDTH: 64,
-    HEIGHT: 32,
+    HEIGHT: 32,        // Total sprite height (including treads)
+    BODY_HEIGHT: 24,   // Placeholder body height (excluding turret)
     TURRET_LENGTH: 20,
+    TURRET_WIDTH: 4,   // Barrel width
     START_HEALTH: 100,
     MAX_HEALTH: 100
 };

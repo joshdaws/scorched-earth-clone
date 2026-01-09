@@ -192,3 +192,9 @@
 **Files:** js/tank.js (new)
 **Commit:** de001e7
 ---
+## scorched-earth-v3c.5 - Implement Tank Placement on Terrain
+**Status:** Completed
+**Changes:** Implemented tank placement system that positions player and enemy tanks on terrain at appropriate positions, avoiding deep valleys and enforcing minimum distance. Added tank rendering with synthwave styling.
+**Files:** js/tank.js, js/main.js
+**Commit:** c05d9ce
+---
