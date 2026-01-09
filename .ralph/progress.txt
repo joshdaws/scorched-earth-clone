@@ -69,3 +69,17 @@
 **Files:** js/effects.js, js/main.js
 **Commit:** (pending)
 ---
+## scorched-earth-qff.4 - Implement Synthwave Background Layers
+**Status:** Completed
+**Changes:** Added complete synthwave background system with 5 layers (sky gradient, stars with twinkle, synthwave sun with slices, mountain silhouettes with neon edges, perspective grid). Pre-computed data for performance.
+**Files:** 
+- js/effects.js - Added ~440 lines: BACKGROUND_CONFIG, initBackground(), updateBackground(), renderBackground()
+- js/main.js - Integrated background init/update/render calls
+**Commit:** f2e8d88
+---
+## scorched-earth-x47.7 - UI/UX Audit and Polish Pass
+**Status:** Completed
+**Changes:** Comprehensive audit of all UI screens using Playwright browser automation. Reviewed main menu, in-game HUD, aiming controls, weapon selection, shop screen, and victory/defeat screens. Created one bug issue for shop panel size issue with Nuclear weapons.
+**Files:** Screenshots saved to .playwright-mcp/ui-audit/
+**Issues Created:** scorched-earth-wzf.6 (Shop: Nuclear weapons category cut off)
+---
