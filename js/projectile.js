@@ -6,7 +6,7 @@
  * Projectiles spawn from tank barrel and follow parabolic arcs.
  */
 
-import { PHYSICS, PROJECTILE, CANVAS } from './constants.js';
+import { PHYSICS, PROJECTILE, CANVAS, DEBUG } from './constants.js';
 import { WeaponRegistry, WEAPON_TYPES } from './weapons.js';
 
 /**
@@ -551,6 +551,21 @@ export class Projectile {
         // In canvas coords: lower Y = higher on screen
         const heightDiff = currentSurfaceY - nextSurfaceY; // Positive if terrain goes up (roller goes uphill)
         const slopeAngle = Math.atan2(-heightDiff, lookAhead); // Negative heightDiff for correct direction
+
+        // Check for steep cliff - roller cannot climb slopes steeper than ~45 degrees
+        // If trying to climb (heightDiff > 0) and slope too steep, reverse direction
+        const maxClimbAngle = 45; // degrees - maximum slope the roller can climb
+        const slopeDegrees = Math.abs(Math.atan2(heightDiff, lookAhead) * 180 / Math.PI);
+
+        if (heightDiff > 1 && slopeDegrees > maxClimbAngle) {
+            // Cliff too steep - reverse direction and lose most momentum
+            this.rollDirection *= -1;
+            this.rollVelocity = Math.abs(this.rollVelocity) * 0.3 * this.rollDirection; // Lose 70% momentum on bounce
+
+            if (DEBUG.ENABLED) {
+                console.log(`[Roller] Cliff too steep (${slopeDegrees.toFixed(1)}°), reversing direction`);
+            }
+        }
 
         // Base roll speed affected by slope
         // Gravity effect: rolling downhill speeds up, uphill slows down
