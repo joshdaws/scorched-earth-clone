@@ -39,3 +39,9 @@
 **Files:** js/sound.js, js/music.js, js/main.js, js/pauseMenu.js (reviewed, no modifications)
 **Commit:** qa-validation
 ---
+## scorched-earth-iug.15 - QA: Game Flow & Menus validation
+**Status:** Completed
+**Changes:** Validated all game flow and menu systems. Main menu, pause menu, victory/defeat screens, shop, and round transitions all working correctly. Filed bug scorched-earth-vgy for missing difficulty selection screen.
+**Files:** No code changes - QA validation task
+**Commit:** (validation only, no code changes)
+---
