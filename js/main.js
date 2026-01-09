@@ -24,6 +24,7 @@ import * as AimingControls from './aimingControls.js';
 import * as VictoryDefeat from './victoryDefeat.js';
 import * as Money from './money.js';
 import * as Shop from './shop.js';
+import { spawnExplosionParticles, updateParticles, renderParticles, clearParticles, getParticleCount } from './effects.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -846,20 +847,7 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
         }
     }
 
-    // Destroy terrain
-    if (currentTerrain) {
-        destroyTerrainAt(pos.x, pos.y, blastRadius);
-
-        // Update tank positions to match new terrain height
-        if (playerTank && currentTerrain) {
-            updateTankTerrainPosition(playerTank, currentTerrain);
-        }
-        if (enemyTank && currentTerrain) {
-            updateTankTerrainPosition(enemyTank, currentTerrain);
-        }
-    }
-
-    // Trigger explosion visual effect for all weapons
+    // Trigger explosion visual effect for all weapons (before terrain destruction)
     // Nuclear weapons get longer duration and special mushroom cloud
     const explosionDuration = isNuclear ? 800 : 400;
     explosionEffect = {
@@ -872,6 +860,22 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
         isNuclear: isNuclear,
         hasMushroomCloud: weapon?.mushroomCloud || false
     };
+
+    // Spawn explosion particles
+    spawnExplosionParticles(pos.x, pos.y, blastRadius, isNuclear);
+
+    // Destroy terrain
+    if (currentTerrain) {
+        destroyTerrainAt(pos.x, pos.y, blastRadius);
+
+        // Update tank positions to match new terrain height
+        if (playerTank && currentTerrain) {
+            updateTankTerrainPosition(playerTank, currentTerrain);
+        }
+        if (enemyTank && currentTerrain) {
+            updateTankTerrainPosition(enemyTank, currentTerrain);
+        }
+    }
 
     // Nuclear weapon special effects
     if (isNuclear) {
@@ -1860,6 +1864,9 @@ function renderActiveProjectile(ctx) {
     // Render explosion effect
     renderExplosionEffect(ctx);
 
+    // Render explosion particles (after main explosion effect, adds detail)
+    renderParticles(ctx);
+
     // Render each active projectile
     for (const projectile of activeProjectiles) {
         if (!projectile.isActive()) continue;
@@ -2413,6 +2420,8 @@ function setupPlayingState() {
             screenShakeEffect = null;
             screenFlashEffect = null;
             explosionEffect = null;
+            // Clear explosion particles
+            clearParticles();
             // Reset player aim
             playerAim.angle = 45;
             playerAim.power = 50;
@@ -2727,6 +2736,9 @@ function update(deltaTime) {
 
     // Process all queued game input events
     Input.processInputQueue();
+
+    // Update particle system
+    updateParticles(deltaTime);
 
     // Clear single-fire input state at end of frame
     // This must be done after all game logic that checks wasKeyPressed()
