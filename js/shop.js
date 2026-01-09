@@ -94,12 +94,12 @@ const SHOP_LAYOUT = {
         SECTION_MARGIN: 24,    // Minimum margin between category sections (>20px per spec)
         LABEL_PADDING: 8       // Padding below category label before cards
     },
-    // Weapon cards grid - touch-optimized with adequate spacing
+    // Weapon cards grid - compact cards with touch-friendly sizing
     CARD: {
-        WIDTH: 205,
-        HEIGHT: 90,   // Touch-friendly height
-        GAP: 12,      // Adequate spacing between cards for touch
-        COLUMNS: 4
+        WIDTH: 110,   // Compact width (100-120px per spec)
+        HEIGHT: 80,   // Reduced but still touch-friendly (>44px)
+        GAP: 10,      // Balanced spacing for compact layout
+        COLUMNS: 5    // 5 columns fits well in 920px panel
     },
     // Done button - touch-optimized
     DONE_BUTTON: {
@@ -471,8 +471,8 @@ function renderButton(ctx, button, pulseIntensity) {
 }
 
 /**
- * Draw a weapon card with touch feedback.
- * Shows pressed state when card is being touched/tapped.
+ * Draw a compact weapon card with touch feedback.
+ * Cards are 110x80px to fit more weapons per row while staying touch-friendly.
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  * @param {Object} weapon - Weapon definition
  * @param {number} x - Card X position
@@ -508,7 +508,7 @@ function renderWeaponCard(ctx, weapon, x, y, currentAmmo, canAfford, pulseIntens
                     (dimmed ? 'rgba(20, 20, 40, 0.85)' : 'rgba(26, 26, 46, 0.9)');
     ctx.fillStyle = bgColor;
     ctx.beginPath();
-    ctx.roundRect(x, y + pressOffset, cardWidth, cardHeight, 6);
+    ctx.roundRect(x, y + pressOffset, cardWidth, cardHeight, 4);
     ctx.fill();
 
     // Feedback flash
@@ -526,10 +526,10 @@ function renderWeaponCard(ctx, weapon, x, y, currentAmmo, canAfford, pulseIntens
 
     // Border with glow - stronger when pressed
     ctx.strokeStyle = dimmed ? COLORS.TEXT_MUTED : borderColor;
-    ctx.lineWidth = isPressed ? 3 : 2;
+    ctx.lineWidth = isPressed ? 2 : 1;
     if (!dimmed) {
         ctx.shadowColor = borderColor;
-        ctx.shadowBlur = isPressed ? 12 : (showFeedback && feedbackSuccess ? 15 : 4);
+        ctx.shadowBlur = isPressed ? 8 : (showFeedback && feedbackSuccess ? 10 : 3);
     }
     ctx.stroke();
 
@@ -537,55 +537,49 @@ function renderWeaponCard(ctx, weapon, x, y, currentAmmo, canAfford, pulseIntens
 
     // Apply press offset to all text positions
     const textY = y + pressOffset;
+    const centerX = x + cardWidth / 2;
 
-    // Weapon name (row 1)
+    // Compact layout: stacked vertically, centered
+    // Row 1: Weapon name (centered, truncated if needed)
     ctx.fillStyle = dimmed ? COLORS.TEXT_MUTED : COLORS.TEXT_LIGHT;
-    ctx.font = `bold ${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'left';
+    ctx.font = `bold 10px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.fillText(weapon.name, x + 8, textY + 6);
 
-    // Cost on right of name row
-    ctx.textAlign = 'right';
-    ctx.font = `${UI.FONT_SIZE_SMALL - 2}px ${UI.FONT_FAMILY}`;
+    // Truncate long names to fit card width
+    let displayName = weapon.name;
+    const maxNameWidth = cardWidth - 12;
+    while (ctx.measureText(displayName).width > maxNameWidth && displayName.length > 3) {
+        displayName = displayName.slice(0, -1);
+    }
+    if (displayName !== weapon.name) {
+        displayName = displayName.slice(0, -1) + '…';
+    }
+    ctx.fillText(displayName, centerX, textY + 6);
+
+    // Row 2: Price (centered)
+    ctx.font = `bold 11px ${UI.FONT_FAMILY}`;
     ctx.fillStyle = weapon.cost === 0 ? '#00ff88' : (canAfford ? COLORS.NEON_YELLOW : COLORS.NEON_PINK);
     const costText = weapon.cost === 0 ? 'FREE' : `$${weapon.cost.toLocaleString()}`;
-    ctx.fillText(costText, x + cardWidth - 8, textY + 6);
+    ctx.fillText(costText, centerX, textY + 22);
 
-    // Stats row: DMG, RAD, OWNED (row 2)
-    ctx.font = `${UI.FONT_SIZE_SMALL - 2}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'left';
-    ctx.fillStyle = dimmed ? 'rgba(136, 136, 153, 0.5)' : COLORS.TEXT_MUTED;
-    ctx.fillText(`D:${weapon.damage} R:${weapon.blastRadius}`, x + 8, textY + 26);
-
-    // Ammo owned
-    ctx.textAlign = 'right';
+    // Row 3: Owned count (centered)
+    ctx.font = `10px ${UI.FONT_FAMILY}`;
     ctx.fillStyle = currentAmmo > 0 || currentAmmo === Infinity ? '#00ff88' : COLORS.TEXT_MUTED;
     const ownedAmmo = currentAmmo === Infinity ? '∞' : currentAmmo;
-    ctx.fillText(`x${ownedAmmo}`, x + cardWidth - 8, textY + 26);
+    ctx.fillText(`x${ownedAmmo}`, centerX, textY + 38);
 
-    // Ammo per purchase (row 3)
-    ctx.textAlign = 'left';
-    ctx.fillStyle = COLORS.TEXT_MUTED;
-    const ammoPerPurchase = weapon.ammo === Infinity ? '∞/buy' : `+${weapon.ammo}/buy`;
-    ctx.fillText(ammoPerPurchase, x + 8, textY + 44);
-
-    // Buy indicator (row 4, bottom of card) - larger touch-friendly tap zone
+    // Row 4: Status indicator at bottom
+    ctx.font = `bold 9px ${UI.FONT_FAMILY}`;
     if (weapon.cost > 0 && canAfford) {
         ctx.fillStyle = borderColor;
-        ctx.font = `bold ${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
-        ctx.textAlign = 'center';
-        ctx.fillText('TAP TO BUY', x + cardWidth / 2, textY + cardHeight - 14);
+        ctx.fillText('BUY', centerX, textY + cardHeight - 14);
     } else if (weapon.cost === 0) {
         ctx.fillStyle = COLORS.TEXT_MUTED;
-        ctx.font = `${UI.FONT_SIZE_SMALL - 2}px ${UI.FONT_FAMILY}`;
-        ctx.textAlign = 'center';
-        ctx.fillText('DEFAULT', x + cardWidth / 2, textY + cardHeight - 14);
+        ctx.fillText('FREE', centerX, textY + cardHeight - 14);
     } else if (weapon.cost > 0 && !canAfford) {
         ctx.fillStyle = COLORS.NEON_PINK;
-        ctx.font = `bold ${UI.FONT_SIZE_SMALL - 2}px ${UI.FONT_FAMILY}`;
-        ctx.textAlign = 'center';
-        ctx.fillText('NO FUNDS', x + cardWidth / 2, textY + cardHeight - 14);
+        ctx.fillText('$$$', centerX, textY + cardHeight - 14);
     }
 
     ctx.restore();
