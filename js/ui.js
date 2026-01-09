@@ -38,14 +38,7 @@ const HUD = {
         HEALTH_BAR_HEIGHT: 14,
         BORDER_RADIUS: 10
     },
-    // Angle/Power panel on left side
-    AIMING_PANEL: {
-        X: 20,
-        Y: 100,
-        WIDTH: 160,
-        HEIGHT: 80,
-        PADDING: 10
-    },
+
     // Weapon panel on right side - touch-friendly for tap to cycle
     WEAPON_PANEL: {
         X: CANVAS.DESIGN_WIDTH - 20,
@@ -925,52 +918,8 @@ export function renderEnemyHealthBar(ctx, enemyTank) {
 // ANGLE & POWER DISPLAY
 // =============================================================================
 
-/**
- * Render the aiming panel showing current angle and power.
- * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
- * @param {import('./tank.js').Tank} playerTank - Player tank
- * @param {boolean} [isPlayerTurn=true] - Whether it's the player's turn
- */
-export function renderAimingPanel(ctx, playerTank, isPlayerTurn = true) {
-    if (!ctx || !playerTank) return;
-
-    const panel = HUD.AIMING_PANEL;
-
-    // Draw panel background
-    const borderColor = isPlayerTurn ? COLORS.NEON_CYAN : COLORS.TEXT_MUTED;
-    drawPanel(ctx, panel.X, panel.Y, panel.WIDTH, panel.HEIGHT, borderColor);
-
-    ctx.save();
-
-    const textX = panel.X + panel.PADDING;
-    const textWidth = panel.WIDTH - panel.PADDING * 2;
-
-    // Angle display
-    ctx.fillStyle = COLORS.TEXT_LIGHT;
-    ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText('ANGLE', textX, panel.Y + 10);
-
-    ctx.fillStyle = COLORS.NEON_CYAN;
-    ctx.font = `bold ${UI.FONT_SIZE_LARGE}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'right';
-    ctx.fillText(`${Math.round(playerTank.angle)}°`, panel.X + panel.WIDTH - panel.PADDING, panel.Y + 8);
-
-    // Power display with bar
-    const powerY = panel.Y + 45;
-    ctx.fillStyle = COLORS.TEXT_LIGHT;
-    ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'left';
-    ctx.fillText('POWER', textX, powerY);
-
-    ctx.fillStyle = COLORS.NEON_PINK;
-    ctx.font = `bold ${UI.FONT_SIZE_LARGE}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'right';
-    ctx.fillText(`${Math.round(playerTank.power)}%`, panel.X + panel.WIDTH - panel.PADDING, powerY - 2);
-
-    ctx.restore();
-}
+// NOTE: The old renderAimingPanel function was removed as the angle/power
+// display is now consolidated into renderPlayerInfoPanel (Section 3).
 
 // =============================================================================
 // WIND INDICATOR (uses existing Wind module)
