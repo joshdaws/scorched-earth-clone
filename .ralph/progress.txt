@@ -258,3 +258,16 @@
 **Files:** js/main.js - fireProjectile(), handleSelectWeapon(), renderPlaying(), PLAYING state onEnter
 **Commit:** 9c39873
 ---
+## scorched-earth-8qc.4 - Implement MIRV Weapon
+**Status:** Completed
+**Changes:** Implemented MIRV weapon that splits into 5 warheads at trajectory apex. Added apex detection, child projectile spawning with 30° spread, multiple projectile tracking, and visual split effect.
+**Files:** js/projectile.js, js/main.js
+**Commit:** dd14a6d
+---
+
+## scorched-earth-8qc.5 - Implement Death's Head Weapon
+**Status:** Completed
+**Changes:** Implemented Death's Head splitting weapon - 9 warheads at 45° spread, neon magenta visuals to distinguish from MIRV. Added weapon-specific color rendering system.
+**Files:** js/weapons.js (weapon definition), js/main.js (color rendering, test ammo)
+**Commit:** pending
+---

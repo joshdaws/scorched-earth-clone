@@ -704,9 +704,24 @@ const PROJECTILE_VISUAL = {
 };
 
 /**
+ * Convert a hex color string to RGB values.
+ * @param {string} hex - Hex color (e.g., '#ff00ff')
+ * @returns {{r: number, g: number, b: number}} RGB values
+ */
+function hexToRgb(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+    } : { r: 249, g: 240, b: 2 }; // Default to yellow if parsing fails
+}
+
+/**
  * Render the projectile trail with fading effect.
  * Trail positions fade from transparent (oldest) to semi-opaque (newest).
  * Each trail point is rendered as a smaller, fading circle.
+ * Uses weapon-specific trail colors for distinct visual appearance.
  *
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  * @param {import('./projectile.js').Projectile} projectile - The projectile to render trail for
@@ -716,6 +731,11 @@ function renderProjectileTrail(ctx, projectile) {
     if (trail.length === 0) return;
 
     ctx.save();
+
+    // Get weapon-specific trail color (defaults to yellow if not specified)
+    const weapon = WeaponRegistry.getWeapon(projectile.weaponId);
+    const trailColor = weapon?.trailColor || PROJECTILE_VISUAL.GLOW_COLOR;
+    const rgb = hexToRgb(trailColor);
 
     // Trail circles are smaller than the main projectile
     const trailRadius = PROJECTILE_VISUAL.DIAMETER / 4;
@@ -730,14 +750,14 @@ function renderProjectileTrail(ctx, projectile) {
         const progress = i / trail.length;
         const alpha = 0.1 + progress * 0.6;
 
-        // Add subtle glow to trail
-        ctx.shadowColor = PROJECTILE_VISUAL.GLOW_COLOR;
+        // Add subtle glow to trail (using weapon-specific color)
+        ctx.shadowColor = trailColor;
         ctx.shadowBlur = 4 + progress * 4;
 
-        // Draw trail circle
+        // Draw trail circle with weapon-specific color
         ctx.beginPath();
         ctx.arc(pos.x, pos.y, trailRadius, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(249, 240, 2, ${alpha})`; // Yellow with varying alpha
+        ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
         ctx.fill();
     }
 
@@ -746,7 +766,8 @@ function renderProjectileTrail(ctx, projectile) {
 
 /**
  * Render the projectile as a glowing circle.
- * Per spec: 8px diameter circle in bright yellow (#f9f002) with glow effect.
+ * Per spec: 8px diameter circle with glow effect.
+ * Uses weapon-specific projectile colors for distinct visual appearance.
  *
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  * @param {import('./projectile.js').Projectile} projectile - The projectile to render
@@ -757,11 +778,16 @@ function renderProjectile(ctx, projectile) {
     const { x, y } = projectile.getPosition();
     const radius = PROJECTILE_VISUAL.DIAMETER / 2;
 
+    // Get weapon-specific projectile color (defaults to yellow if not specified)
+    const weapon = WeaponRegistry.getWeapon(projectile.weaponId);
+    const projectileColor = weapon?.projectileColor || PROJECTILE_VISUAL.COLOR;
+    const rgb = hexToRgb(projectileColor);
+
     ctx.save();
 
     // Apply glow effect using shadow blur
     // This creates the "glowing" synthwave effect
-    ctx.shadowColor = PROJECTILE_VISUAL.GLOW_COLOR;
+    ctx.shadowColor = projectileColor;
     ctx.shadowBlur = PROJECTILE_VISUAL.GLOW_BLUR;
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
@@ -769,13 +795,13 @@ function renderProjectile(ctx, projectile) {
     // Draw outer glow layer (slightly larger, more transparent)
     ctx.beginPath();
     ctx.arc(x, y, radius + 2, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(249, 240, 2, 0.4)';
+    ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.4)`;
     ctx.fill();
 
     // Draw main projectile circle
     ctx.beginPath();
     ctx.arc(x, y, radius, 0, Math.PI * 2);
-    ctx.fillStyle = PROJECTILE_VISUAL.COLOR;
+    ctx.fillStyle = projectileColor;
     ctx.fill();
 
     // Draw bright inner core for extra glow effect
@@ -1109,6 +1135,7 @@ function setupPlayingState() {
             playerTank.addAmmo('missile', 5);
             playerTank.addAmmo('big-shot', 3);
             playerTank.addAmmo('mirv', 3); // MIRV for testing splitting mechanic
+            playerTank.addAmmo('deaths-head', 2); // Death's Head for testing 9-warhead split
 
             // Generate random wind for this round
             // Wind value -10 to +10: negative = left, positive = right

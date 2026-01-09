@@ -76,7 +76,10 @@ function createWeapon(config) {
         // Visual effect flags
         screenShake: config.screenShake || false,
         screenFlash: config.screenFlash || false,
-        mushroomCloud: config.mushroomCloud || false
+        mushroomCloud: config.mushroomCloud || false,
+        // Projectile visual customization (for distinct weapon appearances)
+        projectileColor: config.projectileColor || '#f9f002', // Default yellow
+        trailColor: config.trailColor || config.projectileColor || '#f9f002'
     };
 
     // Freeze to prevent modification
@@ -150,9 +153,12 @@ const DEATHS_HEAD = createWeapon({
     damage: 15, // Per warhead
     blastRadius: 20,
     type: WEAPON_TYPES.SPLITTING,
-    description: 'Splits into 9 warheads at apex',
+    description: 'Splits into 9 warheads at apex - massive area denial',
     splitCount: 9,
-    splitAngle: 40 // Wider spread for more warheads
+    splitAngle: 45, // 45° spread for maximum area coverage (wider than MIRV's 30°)
+    // Distinct purple/magenta color to differentiate from MIRV's yellow
+    projectileColor: '#ff00ff', // Neon magenta
+    trailColor: '#cc00cc' // Slightly darker magenta for trail
 });
 
 // --- Rolling Weapons ---
