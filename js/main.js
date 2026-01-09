@@ -23,6 +23,7 @@ import * as HUD from './ui.js';
 import * as AimingControls from './aimingControls.js';
 import * as VictoryDefeat from './victoryDefeat.js';
 import * as Money from './money.js';
+import * as Shop from './shop.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -2441,10 +2442,9 @@ function returnToMenu() {
 function setupVictoryState() {
     // Register callbacks for button clicks
     VictoryDefeat.onContinue(() => {
-        // TODO: When shop is implemented, go to SHOP state
-        // For now, just start next round
+        // Transition to shop for purchasing weapons
         VictoryDefeat.hide();
-        startNextRound();
+        Game.setState(GAME_STATES.SHOP);
     });
 
     VictoryDefeat.onQuit(() => {
@@ -2518,6 +2518,54 @@ function setupDefeatState() {
 }
 
 /**
+ * Set up shop state handlers.
+ */
+function setupShopState() {
+    // Register callbacks for shop buttons
+    Shop.onDone(() => {
+        // Shop closed, start next round
+        Shop.hide();
+        startNextRound();
+    });
+
+    // Register click handlers for shop
+    Input.onMouseDown((x, y, button) => {
+        if (button === 0 && Game.getState() === GAME_STATES.SHOP) {
+            Shop.handleClick(x, y);
+        }
+    });
+
+    Input.onTouchStart((x, y) => {
+        if (Game.getState() === GAME_STATES.SHOP) {
+            Shop.handleClick(x, y);
+        }
+    });
+
+    Game.registerStateHandlers(GAME_STATES.SHOP, {
+        onEnter: (fromState) => {
+            console.log('Entered SHOP state');
+            // Initialize shop with player tank reference
+            Shop.show(playerTank);
+            // Disable game input (handled by shop)
+            Input.disableGameInput();
+        },
+        onExit: (toState) => {
+            console.log('Exiting SHOP state');
+            Shop.hide();
+        },
+        update: (deltaTime) => {
+            Shop.update(deltaTime);
+        },
+        render: (ctx) => {
+            // Render the playing state background first
+            renderPlaying(ctx);
+            // Then render shop overlay
+            Shop.render(ctx);
+        }
+    });
+}
+
+/**
  * Set up audio initialization on first user interaction.
  * Web Audio API requires a user gesture (click/touch) to start.
  * @param {HTMLCanvasElement} canvas - Canvas to listen for interactions
@@ -2584,6 +2632,7 @@ async function init() {
     setupPlayingState();
     setupVictoryState();
     setupDefeatState();
+    setupShopState();
 
     // Register 'D' key to toggle debug mode
     Input.onKeyDown((keyCode) => {
@@ -2594,8 +2643,12 @@ async function init() {
 
     console.log('Scorched Earth initialized');
 
-    // Expose AI module for debugging/testing
+    // Expose modules for debugging/testing
     window.AI = AI;
+    window.Game = Game;
+    window.Shop = Shop;
+    window.Money = Money;
+    window.VictoryDefeat = VictoryDefeat;
 
     // Start the game loop with update, render, and context
     Game.startLoop(update, render, ctx);

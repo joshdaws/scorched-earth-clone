@@ -138,6 +138,7 @@ const validTransitions = {
     ],
     [GAME_STATES.DEFEAT]: [
         GAME_STATES.MENU,
+        GAME_STATES.SHOP,       // Allow shop after defeat too
         GAME_STATES.GAME_OVER
     ],
     [GAME_STATES.GAME_OVER]: [
