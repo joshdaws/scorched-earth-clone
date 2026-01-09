@@ -25,7 +25,8 @@ export const INPUT_EVENTS = {
     ANGLE_CHANGE: 'angle_change',
     POWER_CHANGE: 'power_change',
     FIRE: 'fire',
-    SELECT_WEAPON: 'select_weapon'
+    SELECT_WEAPON: 'select_weapon',
+    SELECT_PREV_WEAPON: 'select_prev_weapon'
 };
 
 /**
@@ -48,7 +49,8 @@ const gameInputCallbacks = {
     [INPUT_EVENTS.ANGLE_CHANGE]: [],
     [INPUT_EVENTS.POWER_CHANGE]: [],
     [INPUT_EVENTS.FIRE]: [],
-    [INPUT_EVENTS.SELECT_WEAPON]: []
+    [INPUT_EVENTS.SELECT_WEAPON]: [],
+    [INPUT_EVENTS.SELECT_PREV_WEAPON]: []
 };
 
 /**
@@ -580,7 +582,7 @@ export function offGameInput(eventType, callback) {
  */
 function setupGameKeyBindings() {
     // Track key down for continuous input
-    keyDownCallbacks.push((keyCode) => {
+    keyDownCallbacks.push((keyCode, event) => {
         if (!inputEnabled) return;
 
         switch (keyCode) {
@@ -600,7 +602,12 @@ function setupGameKeyBindings() {
                 queueGameInput(INPUT_EVENTS.FIRE);
                 break;
             case KEYS.TAB:
-                queueGameInput(INPUT_EVENTS.SELECT_WEAPON);
+                // Shift+Tab cycles to previous weapon, Tab cycles to next
+                if (event && event.shiftKey) {
+                    queueGameInput(INPUT_EVENTS.SELECT_PREV_WEAPON);
+                } else {
+                    queueGameInput(INPUT_EVENTS.SELECT_WEAPON);
+                }
                 break;
         }
     });

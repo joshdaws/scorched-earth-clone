@@ -96,6 +96,94 @@ let screenFlashEffect = null;
 let explosionEffect = null;
 
 // =============================================================================
+// WEAPON HUD STATE
+// =============================================================================
+
+/**
+ * Weapon HUD panel dimensions and position.
+ * Located at top-right of the screen. Clickable to cycle weapons.
+ */
+const weaponHUD = {
+    x: CANVAS.DESIGN_WIDTH - 20,  // 20px from right edge (right-aligned)
+    y: 15,                          // 15px from top
+    width: 200,
+    height: 50,
+    padding: 10
+};
+
+/**
+ * Check if a point is inside the weapon HUD panel.
+ * @param {number} x - X coordinate in design space
+ * @param {number} y - Y coordinate in design space
+ * @returns {boolean} True if point is inside the weapon HUD
+ */
+function isInsideWeaponHUD(x, y) {
+    const left = weaponHUD.x - weaponHUD.width;
+    const right = weaponHUD.x;
+    const top = weaponHUD.y;
+    const bottom = weaponHUD.y + weaponHUD.height;
+    return x >= left && x <= right && y >= top && y <= bottom;
+}
+
+/**
+ * Render the weapon HUD panel.
+ * Shows current weapon name and ammo count.
+ * Clickable to cycle to next weapon.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ */
+function renderWeaponHUD(ctx) {
+    if (!playerTank) return;
+
+    const weapon = WeaponRegistry.getWeapon(playerTank.currentWeapon);
+    if (!weapon) return;
+
+    const ammo = playerTank.getAmmo(playerTank.currentWeapon);
+    const ammoDisplay = ammo === Infinity ? '∞' : ammo;
+
+    ctx.save();
+
+    // Background panel
+    const bgX = weaponHUD.x - weaponHUD.width;
+    ctx.fillStyle = 'rgba(10, 10, 26, 0.85)';
+    ctx.beginPath();
+    ctx.roundRect(bgX, weaponHUD.y, weaponHUD.width, weaponHUD.height, 6);
+    ctx.fill();
+
+    // Border with weapon-type color hint
+    let borderColor = COLORS.NEON_CYAN;
+    if (weapon.type === 'nuclear') {
+        borderColor = COLORS.NEON_ORANGE;
+    } else if (weapon.type === 'splitting') {
+        borderColor = COLORS.NEON_PURPLE;
+    } else if (weapon.type === 'rolling' || weapon.type === 'digging') {
+        borderColor = COLORS.NEON_YELLOW;
+    }
+    ctx.strokeStyle = borderColor;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Weapon name
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'top';
+    ctx.fillText(weapon.name, weaponHUD.x - weaponHUD.padding, weaponHUD.y + 8);
+
+    // Ammo count
+    ctx.fillStyle = ammo === Infinity ? COLORS.TEXT_MUTED : COLORS.NEON_YELLOW;
+    ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+    ctx.fillText(`Ammo: ${ammoDisplay}`, weaponHUD.x - weaponHUD.padding, weaponHUD.y + 28);
+
+    // Click hint (subtle)
+    ctx.fillStyle = COLORS.TEXT_MUTED;
+    ctx.font = `${UI.FONT_SIZE_SMALL - 2}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'left';
+    ctx.fillText('◀ ▶', bgX + 8, weaponHUD.y + weaponHUD.height / 2 - 4);
+
+    ctx.restore();
+}
+
+// =============================================================================
 // MENU STATE
 // =============================================================================
 
@@ -1468,6 +1556,20 @@ function handleFire() {
 }
 
 /**
+ * Get available weapons that the player has ammo for.
+ * @returns {Array} Array of weapon objects with ammo
+ */
+function getAvailableWeapons() {
+    if (!playerTank) return [];
+
+    const allWeapons = WeaponRegistry.getAllWeapons();
+    return allWeapons.filter(weapon => {
+        const ammo = playerTank.getAmmo(weapon.id);
+        return ammo > 0 || ammo === Infinity;
+    });
+}
+
+/**
  * Handle weapon select input event.
  * Cycles through available weapons that the player has ammo for.
  * The cycle order follows the weapon registry order:
@@ -1476,14 +1578,7 @@ function handleFire() {
 function handleSelectWeapon() {
     if (!playerTank) return;
 
-    // Get all weapons from registry
-    const allWeapons = WeaponRegistry.getAllWeapons();
-
-    // Filter to only weapons the player has ammo for
-    const availableWeapons = allWeapons.filter(weapon => {
-        const ammo = playerTank.getAmmo(weapon.id);
-        return ammo > 0 || ammo === Infinity;
-    });
+    const availableWeapons = getAvailableWeapons();
 
     if (availableWeapons.length === 0) {
         console.warn('No weapons available with ammo!');
@@ -1504,6 +1599,36 @@ function handleSelectWeapon() {
     const ammo = playerTank.getAmmo(nextWeapon.id);
     const ammoDisplay = ammo === Infinity ? '∞' : ammo;
     console.log(`Weapon selected: ${nextWeapon.name} (ammo: ${ammoDisplay})`);
+}
+
+/**
+ * Handle previous weapon select input event (Shift+Tab).
+ * Cycles backwards through available weapons that the player has ammo for.
+ */
+function handleSelectPrevWeapon() {
+    if (!playerTank) return;
+
+    const availableWeapons = getAvailableWeapons();
+
+    if (availableWeapons.length === 0) {
+        console.warn('No weapons available with ammo!');
+        return;
+    }
+
+    // Find current weapon index
+    const currentIndex = availableWeapons.findIndex(w => w.id === playerTank.currentWeapon);
+
+    // Cycle to previous weapon (wrap around to end if at start)
+    const prevIndex = (currentIndex - 1 + availableWeapons.length) % availableWeapons.length;
+    const prevWeapon = availableWeapons[prevIndex];
+
+    // Set the new weapon
+    playerTank.setWeapon(prevWeapon.id);
+
+    // Log the change with ammo info
+    const ammo = playerTank.getAmmo(prevWeapon.id);
+    const ammoDisplay = ammo === Infinity ? '∞' : ammo;
+    console.log(`Weapon selected: ${prevWeapon.name} (ammo: ${ammoDisplay})`);
 }
 
 /**
@@ -1532,6 +1657,9 @@ function renderPlaying(ctx) {
 
     // Render wind indicator at top-left
     Wind.renderWindIndicator(ctx);
+
+    // Render weapon HUD at top-right
+    renderWeaponHUD(ctx);
 
     // Draw phase-specific content
     const phase = Turn.getPhase();
@@ -1573,7 +1701,7 @@ function renderPlaying(ctx) {
         ctx.fillStyle = COLORS.TEXT_MUTED;
         ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
         ctx.fillText('← → Arrow keys: Adjust angle | ↑ ↓ Arrow keys: Adjust power', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 135);
-        ctx.fillText('TAB: Cycle weapons', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 160);
+        ctx.fillText('TAB / Shift+TAB: Cycle weapons', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 160);
     }
 
     // Restore context if screen shake was applied
@@ -1592,6 +1720,12 @@ function renderPlaying(ctx) {
  */
 function handlePlayingClick(pos) {
     if (Game.getState() !== GAME_STATES.PLAYING) return;
+
+    // Check if click is on weapon HUD (only during player aim phase)
+    if (Turn.canPlayerAim() && isInsideWeaponHUD(pos.x, pos.y)) {
+        handleSelectWeapon();
+        return;
+    }
 
     // Default blast radius for testing (can be varied for different weapons later)
     const testBlastRadius = 40;
@@ -1622,6 +1756,7 @@ function setupPlayingState() {
     Input.onGameInput(INPUT_EVENTS.POWER_CHANGE, handlePowerChange);
     Input.onGameInput(INPUT_EVENTS.FIRE, handleFire);
     Input.onGameInput(INPUT_EVENTS.SELECT_WEAPON, handleSelectWeapon);
+    Input.onGameInput(INPUT_EVENTS.SELECT_PREV_WEAPON, handleSelectPrevWeapon);
 
     // Register click handler for testing terrain destruction
     // Note: This is for development testing - will be removed when projectile system is ready
