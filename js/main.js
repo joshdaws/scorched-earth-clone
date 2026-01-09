@@ -2687,33 +2687,45 @@ function handlePlayingPointerDown(pos) {
             return;
         }
 
-        // Check if click is on a weapon slot
-        const weaponId = HUD.getWeaponSlotAtPosition(pos.x, pos.y);
-        if (weaponId) {
-            handleSelectSpecificWeapon(weaponId);
-            return;
-        }
+        // Start swipe gesture (will differentiate tap vs swipe on pointer up)
+        HUD.handleWeaponBarSwipeStart(pos.x, pos.y);
+        return;
     }
 }
 
 /**
  * Handle pointer move in playing state.
- * Updates aiming controls drag state.
+ * Updates aiming controls drag state and weapon bar swipe.
  * @param {{x: number, y: number}} pos - Pointer position in design coordinates
  */
 function handlePlayingPointerMove(pos) {
     if (Game.getState() !== GAME_STATES.PLAYING) return;
+
+    // Handle weapon bar swipe gesture first
+    if (HUD.handleWeaponBarSwipeMove(pos.x, pos.y)) {
+        return; // Swipe is active, don't process other moves
+    }
 
     AimingControls.handlePointerMove(pos.x, pos.y, playerTank);
 }
 
 /**
  * Handle pointer up in playing state.
- * Finalizes aiming control interactions.
+ * Finalizes aiming control interactions and weapon bar swipes.
  * @param {{x: number, y: number}} pos - Pointer position in design coordinates
  */
 function handlePlayingPointerUp(pos) {
     if (Game.getState() !== GAME_STATES.PLAYING) return;
+
+    // Handle weapon bar swipe end
+    const totalWeapons = WeaponRegistry.getWeaponCount();
+    const swipeResult = HUD.handleWeaponBarSwipeEnd(pos.x, pos.y, totalWeapons);
+
+    // If it was a tap on a weapon slot, select that weapon
+    if (swipeResult.wasTap && swipeResult.weaponId) {
+        handleSelectSpecificWeapon(swipeResult.weaponId);
+        return;
+    }
 
     AimingControls.handlePointerUp(pos.x, pos.y, Turn.canPlayerFire());
 }

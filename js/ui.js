@@ -142,6 +142,52 @@ let weaponBarLeftPressed = false;
 let weaponBarRightPressed = false;
 
 // =============================================================================
+// WEAPON BAR SWIPE GESTURE STATE
+// =============================================================================
+
+/**
+ * Swipe gesture configuration.
+ */
+const SWIPE_CONFIG = {
+    MIN_DISTANCE: 30,        // Minimum swipe distance to trigger scroll
+    VELOCITY_THRESHOLD: 0.3, // Minimum velocity (px/ms) for momentum scrolling
+    MOMENTUM_DECAY: 0.92,    // Momentum decay factor per frame
+    SNAP_THRESHOLD: 0.5,     // Threshold for snapping to next slot
+    ANIMATION_DURATION: 200, // Scroll animation duration in ms
+    TAP_THRESHOLD: 10        // Max distance for a tap vs swipe
+};
+
+/**
+ * Swipe gesture state for weapon bar.
+ */
+const swipeState = {
+    /** Whether a swipe gesture is in progress */
+    isActive: false,
+    /** X coordinate where swipe started */
+    startX: 0,
+    /** Y coordinate where swipe started */
+    startY: 0,
+    /** Timestamp when swipe started */
+    startTime: 0,
+    /** Current X coordinate during swipe */
+    currentX: 0,
+    /** Last X coordinate (for velocity calculation) */
+    lastX: 0,
+    /** Last timestamp (for velocity calculation) */
+    lastTime: 0,
+    /** Fractional scroll offset for smooth animation */
+    scrollOffset: 0,
+    /** Target scroll offset for animation */
+    targetOffset: 0,
+    /** Whether scroll animation is in progress */
+    isAnimating: false,
+    /** Animation start time */
+    animationStart: 0,
+    /** Animation start offset */
+    animationStartOffset: 0
+};
+
+// =============================================================================
 // TURN INDICATOR TRANSITION STATE
 // =============================================================================
 
@@ -1101,12 +1147,17 @@ export function renderWeaponBar(ctx, playerTank) {
         'right', canScrollRight, weaponBarRightPressed);
 
     // ==========================================================================
-    // WEAPON SLOTS
+    // WEAPON SLOTS (with swipe offset for smooth scrolling)
     // ==========================================================================
     const slotsStartX = leftArrowX + bar.ARROW_WIDTH + bar.SLOT_GAP;
     const slotsWidth = rightArrowX - slotsStartX - bar.SLOT_GAP;
     const slotSize = (slotsWidth - (bar.VISIBLE_SLOTS - 1) * bar.SLOT_GAP) / bar.VISIBLE_SLOTS;
     const slotY = drawY + (bar.HEIGHT - slotSize) / 2;
+    const slotStride = slotSize + bar.SLOT_GAP;
+
+    // Get swipe offset for smooth scrolling animation
+    const swipeOffset = getWeaponBarSwipeOffset();
+    const pixelOffset = swipeOffset * slotStride;
 
     // Get current weapon for highlighting
     const currentWeaponId = playerTank ? playerTank.currentWeapon : 'basic-shot';
@@ -1114,27 +1165,39 @@ export function renderWeaponBar(ctx, playerTank) {
     // Clear and rebuild slot positions cache
     weaponSlotPositions = [];
 
-    for (let i = 0; i < bar.VISIBLE_SLOTS; i++) {
-        const weaponIndex = weaponBarScrollIndex + i;
-        if (weaponIndex >= totalWeapons) break;
+    // Set up clipping region for weapon slots (to hide slots during swipe)
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(slotsStartX, drawY, slotsWidth, bar.HEIGHT);
+    ctx.clip();
 
+    // Render one extra slot on each side for smooth scrolling
+    const startIndex = Math.max(0, weaponBarScrollIndex - 1);
+    const endIndex = Math.min(totalWeapons, weaponBarScrollIndex + bar.VISIBLE_SLOTS + 1);
+
+    for (let weaponIndex = startIndex; weaponIndex < endIndex; weaponIndex++) {
         const weapon = allWeapons[weaponIndex];
-        const slotX = slotsStartX + i * (slotSize + bar.SLOT_GAP);
+        const visualIndex = weaponIndex - weaponBarScrollIndex;
+        const slotX = slotsStartX + visualIndex * slotStride - pixelOffset;
         const isSelected = weapon.id === currentWeaponId;
 
         // Get ammo from player inventory (0 if not owned)
         const ammo = playerTank ? playerTank.getAmmo(weapon.id) : 0;
 
-        // Cache slot position for hit testing
-        weaponSlotPositions.push({
-            x: slotX,
-            y: slotY,
-            size: slotSize,
-            weaponId: weapon.id
-        });
+        // Only cache visible slot positions for hit testing (not off-screen slots)
+        if (slotX >= slotsStartX - slotSize / 2 && slotX <= slotsStartX + slotsWidth - slotSize / 2) {
+            weaponSlotPositions.push({
+                x: slotX,
+                y: slotY,
+                size: slotSize,
+                weaponId: weapon.id
+            });
+        }
 
         renderWeaponSlot(ctx, slotX, slotY, slotSize, isSelected, weapon, ammo);
     }
+
+    ctx.restore();
 }
 
 /**
@@ -1888,6 +1951,182 @@ export function renderHUD(ctx, state) {
 
     // Render new weapon bar at bottom-center (left of fire button)
     renderWeaponBar(ctx, playerTank);
+}
+
+// =============================================================================
+// WEAPON BAR SWIPE GESTURE FUNCTIONS
+// =============================================================================
+
+/**
+ * Handle touch/pointer start on weapon bar for swipe gesture.
+ * @param {number} x - X coordinate in design space
+ * @param {number} y - Y coordinate in design space
+ * @returns {boolean} True if swipe gesture started on weapon bar
+ */
+export function handleWeaponBarSwipeStart(x, y) {
+    // Check if touch is inside weapon bar (but not on arrows)
+    if (!isInsideWeaponBar(x, y)) {
+        return false;
+    }
+
+    // Don't start swipe on navigation arrows
+    if (isInsideWeaponBarLeftArrow(x, y) || isInsideWeaponBarRightArrow(x, y)) {
+        return false;
+    }
+
+    const now = performance.now();
+    swipeState.isActive = true;
+    swipeState.startX = x;
+    swipeState.startY = y;
+    swipeState.startTime = now;
+    swipeState.currentX = x;
+    swipeState.lastX = x;
+    swipeState.lastTime = now;
+    swipeState.isAnimating = false;
+
+    return true;
+}
+
+/**
+ * Handle touch/pointer move during weapon bar swipe.
+ * @param {number} x - X coordinate in design space
+ * @param {number} y - Y coordinate in design space
+ * @returns {boolean} True if swipe is active and handled
+ */
+export function handleWeaponBarSwipeMove(x, y) {
+    if (!swipeState.isActive) {
+        return false;
+    }
+
+    const now = performance.now();
+    swipeState.lastX = swipeState.currentX;
+    swipeState.lastTime = now;
+    swipeState.currentX = x;
+
+    // Calculate drag distance in terms of weapon slots
+    const bar = HUD.WEAPON_BAR;
+    const slotWidth = bar.SLOT_SIZE + bar.SLOT_GAP;
+    const dragDistance = swipeState.startX - x;
+
+    // Update scroll offset based on drag (in fractional slots)
+    swipeState.scrollOffset = dragDistance / slotWidth;
+
+    return true;
+}
+
+/**
+ * Handle touch/pointer end for weapon bar swipe.
+ * Calculates final scroll position based on swipe velocity and distance.
+ * @param {number} x - X coordinate in design space
+ * @param {number} y - Y coordinate in design space
+ * @param {number} totalWeapons - Total number of weapons for bounds checking
+ * @returns {Object} Result with wasTap boolean and weaponId if tap was on a slot
+ */
+export function handleWeaponBarSwipeEnd(x, y, totalWeapons = 11) {
+    if (!swipeState.isActive) {
+        return { wasTap: false, weaponId: null };
+    }
+
+    swipeState.isActive = false;
+
+    const dragDistance = Math.abs(x - swipeState.startX);
+    const dragDistanceY = Math.abs(y - swipeState.startY);
+
+    // If it was a tap (minimal movement), let it be handled as weapon selection
+    if (dragDistance < SWIPE_CONFIG.TAP_THRESHOLD && dragDistanceY < SWIPE_CONFIG.TAP_THRESHOLD) {
+        swipeState.scrollOffset = 0;
+        const weaponId = getWeaponSlotAtPosition(swipeState.startX, swipeState.startY);
+        return { wasTap: true, weaponId };
+    }
+
+    // Calculate velocity
+    const now = performance.now();
+    const timeDelta = now - swipeState.lastTime;
+    const velocity = timeDelta > 0 ? (swipeState.lastX - x) / timeDelta : 0;
+
+    // Determine number of slots to scroll based on velocity and distance
+    const bar = HUD.WEAPON_BAR;
+    const slotWidth = bar.SLOT_SIZE + bar.SLOT_GAP;
+
+    let slotsToScroll = swipeState.scrollOffset;
+
+    // Add momentum based on velocity
+    if (Math.abs(velocity) > SWIPE_CONFIG.VELOCITY_THRESHOLD) {
+        slotsToScroll += velocity * 150 / slotWidth; // 150ms worth of momentum
+    }
+
+    // Round to nearest slot for snapping
+    const scrollDirection = slotsToScroll >= 0 ? 1 : -1;
+    const absSlotsToScroll = Math.abs(slotsToScroll);
+
+    // Use threshold to determine if we round up or down
+    const intSlots = Math.floor(absSlotsToScroll);
+    const fractional = absSlotsToScroll - intSlots;
+    const roundedSlots = fractional >= SWIPE_CONFIG.SNAP_THRESHOLD ? intSlots + 1 : intSlots;
+    const finalSlotsToScroll = roundedSlots * scrollDirection;
+
+    // Apply scroll
+    const newScrollIndex = Math.max(0, Math.min(
+        weaponBarScrollIndex + finalSlotsToScroll,
+        totalWeapons - bar.VISIBLE_SLOTS
+    ));
+
+    // Animate to new position
+    if (newScrollIndex !== weaponBarScrollIndex) {
+        swipeState.isAnimating = true;
+        swipeState.animationStart = now;
+        swipeState.animationStartOffset = swipeState.scrollOffset;
+        swipeState.targetOffset = newScrollIndex - weaponBarScrollIndex;
+        weaponBarScrollIndex = newScrollIndex;
+    }
+
+    swipeState.scrollOffset = 0;
+
+    return { wasTap: false, weaponId: null };
+}
+
+/**
+ * Check if a swipe gesture is currently active.
+ * @returns {boolean} True if user is swiping the weapon bar
+ */
+export function isWeaponBarSwipeActive() {
+    return swipeState.isActive;
+}
+
+/**
+ * Get current swipe scroll offset for smooth rendering.
+ * @returns {number} Fractional scroll offset (in weapon slots)
+ */
+export function getWeaponBarSwipeOffset() {
+    if (swipeState.isAnimating) {
+        const elapsed = performance.now() - swipeState.animationStart;
+        const progress = Math.min(1, elapsed / SWIPE_CONFIG.ANIMATION_DURATION);
+        // Use ease-out for smooth deceleration
+        const eased = 1 - Math.pow(1 - progress, 3);
+        if (progress >= 1) {
+            swipeState.isAnimating = false;
+            return 0;
+        }
+        return swipeState.animationStartOffset * (1 - eased);
+    }
+    return swipeState.scrollOffset;
+}
+
+/**
+ * Check if weapon bar scroll animation is in progress.
+ * @returns {boolean} True if animation is running
+ */
+export function isWeaponBarAnimating() {
+    return swipeState.isAnimating;
+}
+
+/**
+ * Cancel any active swipe gesture.
+ */
+export function cancelWeaponBarSwipe() {
+    swipeState.isActive = false;
+    swipeState.scrollOffset = 0;
+    swipeState.isAnimating = false;
 }
 
 // =============================================================================
