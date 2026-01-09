@@ -7,7 +7,7 @@
  */
 
 import { CANVAS, PHYSICS } from './constants.js';
-import { WEAPON_TYPES } from './weapons.js';
+import { WEAPON_TYPES, WeaponRegistry } from './weapons.js';
 
 // =============================================================================
 // AI DIFFICULTY LEVELS
@@ -1162,4 +1162,184 @@ export function getAllDifficulties() {
 export function getDifficultyName(difficulty) {
     const config = DIFFICULTY_CONFIG[difficulty];
     return config ? config.name : 'Unknown';
+}
+
+// =============================================================================
+// DIFFICULTY PROGRESSION SYSTEM
+// =============================================================================
+
+/**
+ * Get the AI difficulty for a given round number.
+ * Implements progressive difficulty:
+ * - Rounds 1-2: Easy AI
+ * - Rounds 3-4: Medium AI
+ * - Rounds 5+: Hard AI
+ *
+ * @param {number} roundNumber - Current round (1-based)
+ * @returns {string} AI difficulty level from AI_DIFFICULTY enum
+ */
+export function getAIDifficulty(roundNumber) {
+    if (roundNumber <= 2) {
+        return AI_DIFFICULTY.EASY;
+    } else if (roundNumber <= 4) {
+        return AI_DIFFICULTY.MEDIUM;
+    } else {
+        return AI_DIFFICULTY.HARD;
+    }
+}
+
+/**
+ * Set AI difficulty based on round number.
+ * Convenience function that combines getAIDifficulty and setDifficulty.
+ *
+ * @param {number} roundNumber - Current round (1-based)
+ * @returns {string} The difficulty that was set
+ */
+export function setDifficultyForRound(roundNumber) {
+    const difficulty = getAIDifficulty(roundNumber);
+    setDifficulty(difficulty);
+
+    if (debugMode) {
+        console.log(`[AI] Round ${roundNumber}: Difficulty set to ${getDifficultyName(difficulty)}`);
+    }
+
+    return difficulty;
+}
+
+// =============================================================================
+// AI WEAPON PURCHASING
+// =============================================================================
+
+/**
+ * Budget allocations for AI weapon purchasing by difficulty.
+ * Higher difficulty AIs get more money to spend.
+ */
+const AI_PURCHASE_BUDGETS = {
+    [AI_DIFFICULTY.EASY]: 0,        // Easy AI doesn't buy weapons
+    [AI_DIFFICULTY.MEDIUM]: 2000,   // Medium AI has modest budget
+    [AI_DIFFICULTY.HARD]: 5000      // Hard AI has generous budget
+};
+
+/**
+ * Preferred weapons by difficulty for purchasing.
+ * Order indicates priority - AI tries to buy earlier items first.
+ */
+const AI_PREFERRED_PURCHASES = {
+    [AI_DIFFICULTY.EASY]: [],  // Easy AI doesn't buy
+    [AI_DIFFICULTY.MEDIUM]: [
+        'missile',       // $500, 5 ammo - reliable upgrade
+        'roller',        // $1500, 3 ammo - good for valleys
+    ],
+    [AI_DIFFICULTY.HARD]: [
+        'mini-nuke',     // $4000, 2 ammo - high damage
+        'mirv',          // $3000, 2 ammo - area denial
+        'heavy-roller',  // $2500, 2 ammo - heavy damage
+        'heavy-digger',  // $3500, 2 ammo - terrain penetration
+        'big-shot',      // $1000, 3 ammo - solid damage
+        'missile',       // $500, 5 ammo - reliable
+        'digger',        // $2000, 3 ammo - terrain penetration
+        'roller',        // $1500, 3 ammo - rolling damage
+    ]
+};
+
+/**
+ * Purchase weapons for the AI tank based on difficulty.
+ * The AI spends its budget on preferred weapons for its difficulty level.
+ *
+ * @param {import('./tank.js').Tank} aiTank - The AI's tank to add weapons to
+ * @param {string} [difficulty=currentDifficulty] - Difficulty level (uses current if not specified)
+ * @returns {{purchased: Array<{weaponId: string, cost: number, ammo: number}>, totalSpent: number}}
+ */
+export function purchaseWeaponsForAI(aiTank, difficulty = currentDifficulty) {
+    const budget = AI_PURCHASE_BUDGETS[difficulty] || 0;
+    const preferredWeapons = AI_PREFERRED_PURCHASES[difficulty] || [];
+    const purchased = [];
+    let remaining = budget;
+
+    if (debugMode) {
+        console.log(`[AI] Purchasing weapons with budget $${budget} (${getDifficultyName(difficulty)} AI)`);
+    }
+
+    // Easy AI doesn't purchase anything
+    if (budget === 0 || preferredWeapons.length === 0) {
+        if (debugMode) {
+            console.log('[AI] No purchases (Easy AI or no budget)');
+        }
+        return { purchased, totalSpent: 0 };
+    }
+
+    // Try to buy each preferred weapon in order
+    for (const weaponId of preferredWeapons) {
+        const weapon = WeaponRegistry.getWeapon(weaponId);
+
+        if (!weapon) {
+            console.warn(`[AI] Unknown weapon: ${weaponId}`);
+            continue;
+        }
+
+        // Skip if we can't afford it
+        if (weapon.cost > remaining) {
+            if (debugMode) {
+                console.log(`[AI] Can't afford ${weapon.name} ($${weapon.cost}, remaining: $${remaining})`);
+            }
+            continue;
+        }
+
+        // Purchase the weapon
+        aiTank.addAmmo(weaponId, weapon.ammo);
+        remaining -= weapon.cost;
+
+        purchased.push({
+            weaponId: weaponId,
+            cost: weapon.cost,
+            ammo: weapon.ammo
+        });
+
+        if (debugMode) {
+            console.log(`[AI] Purchased ${weapon.name} ($${weapon.cost}, ${weapon.ammo} ammo) - remaining: $${remaining}`);
+        }
+
+        // Stop if we've run out of budget
+        if (remaining <= 0) {
+            break;
+        }
+    }
+
+    const totalSpent = budget - remaining;
+
+    if (debugMode) {
+        console.log(`[AI] Purchase complete: ${purchased.length} items, $${totalSpent} spent`);
+    }
+
+    return { purchased, totalSpent };
+}
+
+/**
+ * Set up AI for a new round with appropriate difficulty and weapons.
+ * This is the main entry point for round-based AI progression.
+ *
+ * @param {import('./tank.js').Tank} aiTank - The AI's tank
+ * @param {number} roundNumber - Current round number (1-based)
+ * @returns {{difficulty: string, difficultyName: string, purchases: Object}}
+ */
+export function setupAIForRound(aiTank, roundNumber) {
+    // Set difficulty based on round
+    const difficulty = setDifficultyForRound(roundNumber);
+    const difficultyName = getDifficultyName(difficulty);
+
+    // Purchase weapons based on difficulty
+    const purchases = purchaseWeaponsForAI(aiTank, difficulty);
+
+    if (debugMode) {
+        console.log(`[AI] Round ${roundNumber} setup complete:`);
+        console.log(`[AI]   Difficulty: ${difficultyName}`);
+        console.log(`[AI]   Weapons purchased: ${purchases.purchased.length}`);
+        console.log(`[AI]   Total spent: $${purchases.totalSpent}`);
+    }
+
+    return {
+        difficulty,
+        difficultyName,
+        purchases
+    };
 }

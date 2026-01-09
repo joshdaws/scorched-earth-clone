@@ -46,6 +46,12 @@ let playerTank = null;
  */
 let enemyTank = null;
 
+/**
+ * Current round number (1-based)
+ * @type {number}
+ */
+let currentRound = 1;
+
 // =============================================================================
 // PROJECTILE STATE
 // =============================================================================
@@ -180,6 +186,59 @@ function renderWeaponHUD(ctx) {
     ctx.font = `${UI.FONT_SIZE_SMALL - 2}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'left';
     ctx.fillText('◀ ▶', bgX + 8, weaponHUD.y + weaponHUD.height / 2 - 4);
+
+    ctx.restore();
+}
+
+/**
+ * Render the round and AI difficulty indicator.
+ * Displayed below the wind indicator at the top-left.
+ * @param {CanvasRenderingContext2D} ctx - Canvas rendering context
+ */
+function renderRoundIndicator(ctx) {
+    const difficulty = AI.getDifficulty();
+    const difficultyName = AI.getDifficultyName(difficulty);
+
+    // Position below wind indicator
+    const x = 20;
+    const y = 65; // Below wind indicator
+
+    ctx.save();
+
+    // Background pill
+    const pillWidth = 160;
+    const pillHeight = 24;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.beginPath();
+    ctx.roundRect(x, y, pillWidth, pillHeight, 8);
+    ctx.fill();
+
+    // Round text
+    ctx.font = `bold ${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+    ctx.fillStyle = COLORS.NEON_CYAN;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`ROUND ${currentRound}`, x + 10, y + pillHeight / 2);
+
+    // Difficulty text with color based on level
+    let difficultyColor;
+    switch (difficulty) {
+        case 'easy':
+            difficultyColor = '#00ff88'; // Green
+            break;
+        case 'medium':
+            difficultyColor = '#ffff00'; // Yellow
+            break;
+        case 'hard':
+            difficultyColor = '#ff4444'; // Red
+            break;
+        default:
+            difficultyColor = COLORS.TEXT_MUTED;
+    }
+
+    ctx.fillStyle = difficultyColor;
+    ctx.textAlign = 'right';
+    ctx.fillText(difficultyName.toUpperCase(), x + pillWidth - 10, y + pillHeight / 2);
 
     ctx.restore();
 }
@@ -1664,6 +1723,9 @@ function renderPlaying(ctx) {
     // Render wind indicator at top-left
     Wind.renderWindIndicator(ctx);
 
+    // Render round and difficulty indicator below wind
+    renderRoundIndicator(ctx);
+
     // Render weapon HUD at top-right
     renderWeaponHUD(ctx);
 
@@ -1815,6 +1877,11 @@ function setupPlayingState() {
             playerTank.addAmmo('heavy-digger', 2); // Heavy Digger for testing
             playerTank.addAmmo('mini-nuke', 2); // Mini Nuke for testing nuclear effects
             playerTank.addAmmo('nuke', 1); // Nuke for testing big nuclear effects
+
+            // Set up AI for this round with appropriate difficulty and weapons
+            // Rounds 1-2: Easy, Rounds 3-4: Medium, Rounds 5+: Hard
+            const aiSetup = AI.setupAIForRound(enemyTank, currentRound);
+            console.log(`Round ${currentRound}: AI difficulty is ${aiSetup.difficultyName}`);
 
             // Generate random wind for this round
             // Wind value -10 to +10: negative = left, positive = right
