@@ -184,7 +184,7 @@
 **Status:** Completed
 **Changes:** Added destroyTerrain(x, y, radius) method to Terrain class using circular crater algorithm. Added public API (destroyTerrainAt, getTerrain) in main.js for projectile system integration. Added click-to-crater test functionality.
 **Files:** js/terrain.js, js/main.js
-**Commit:** (pending)
+**Commit:** 424fe5b
 ---
 ## scorched-earth-wu8.1 - Create Tank Entity Class
 **Status:** Completed
@@ -221,4 +221,16 @@
 **Changes:** Added checkTerrainCollision(x, y) method to Terrain class and integrated collision checking into the projectile physics update loop. Projectiles now detect terrain hits, create craters on impact, and correctly handle out-of-bounds cases.
 **Files:** js/terrain.js, js/main.js
 **Commit:** 56358c8
+---
+## scorched-earth-wu8.6 - Implement Tank Collision Detection
+**Status:** Completed
+**Changes:** Implemented checkTankCollision() function for projectile-tank collision with rectangular hitbox detection. Features direct hit bonus (50% more damage when within 5px of center), skips destroyed tanks, handles overlapping tanks edge case. Integrated into main.js updateProjectile() before terrain collision.
+**Files:** js/projectile.js (added checkTankCollision function), js/main.js (integrated tank collision check)
+**Commit:** ab00d20
+---
+## scorched-earth-wu8.7 - Implement Damage Calculation
+**Status:** Completed
+**Changes:** Created damage calculation system with distance-based falloff, direct hit multipliers, and splash damage support. Integrated with projectile collision handling for both tank hits and terrain impacts.
+**Files:** js/damage.js (new), js/main.js (modified)
+**Commit:** 424fe5b
 ---

@@ -15,6 +15,7 @@ import { COLORS, DEBUG, CANVAS, UI, GAME_STATES, TURN_PHASES, PHYSICS, TANK, PRO
 import { generateTerrain } from './terrain.js';
 import { placeTanksOnTerrain, updateTankTerrainPosition } from './tank.js';
 import { Projectile, createProjectileFromTank, checkTankCollision } from './projectile.js';
+import { applyExplosionDamage, applyExplosionToAllTanks, DAMAGE } from './damage.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -242,17 +243,24 @@ function updateProjectile() {
     if (tankHit) {
         const { tank, directHit } = tankHit;
 
-        // Apply damage to the hit tank
-        // Direct hits deal bonus damage (50% more)
-        // Using a default damage for now - will be weapon-dependent later
-        const baseDamage = PROJECTILE.DEFAULT_DAMAGE;
-        const damage = directHit ? Math.floor(baseDamage * 1.5) : baseDamage;
-        tank.takeDamage(damage);
-
-        console.log(`Tank hit! ${tank.team} took ${damage} damage${directHit ? ' (DIRECT HIT!)' : ''}, health: ${tank.health}`);
-
-        // Destroy terrain at impact point with smaller blast radius for tank hits
+        // Create explosion data at impact point
+        // Blast radius is smaller for direct tank hits
         const blastRadius = 30;
+        const explosion = {
+            x: pos.x,
+            y: pos.y,
+            blastRadius: blastRadius
+        };
+
+        // Apply explosion damage to the hit tank using the damage calculation system
+        // This uses distance-based falloff with direct hit multiplier
+        const damageResult = applyExplosionDamage(explosion, tank, null /* weapon - will be used later */);
+
+        // Also check for splash damage to other tanks
+        const allTanks = [playerTank, enemyTank].filter(t => t !== null && t !== tank);
+        applyExplosionToAllTanks(explosion, allTanks, null);
+
+        console.log(`Tank hit! ${tank.team} took ${damageResult.actualDamage} damage${damageResult.isDirectHit ? ' (DIRECT HIT!)' : ''}, health: ${tank.health}`);
         if (currentTerrain) {
             destroyTerrainAt(pos.x, pos.y, blastRadius);
 
@@ -285,6 +293,24 @@ function updateProjectile() {
             // Destroy terrain at impact point with blast radius
             // Using a default radius for now - will be weapon-dependent later
             const blastRadius = 40;
+
+            // Create explosion data for damage calculation
+            const explosion = {
+                x: pos.x,
+                y: pos.y,
+                blastRadius: blastRadius
+            };
+
+            // Apply splash damage to all tanks near the explosion
+            const allTanks = [playerTank, enemyTank].filter(t => t !== null);
+            const damageResults = applyExplosionToAllTanks(explosion, allTanks, null);
+
+            // Log any damage dealt
+            for (const result of damageResults) {
+                console.log(`Splash damage: ${result.tank.team} tank took ${result.actualDamage} damage, health: ${result.tank.health}`);
+            }
+
+            // Destroy terrain
             destroyTerrainAt(pos.x, pos.y, blastRadius);
 
             // Update tank positions to match new terrain height
