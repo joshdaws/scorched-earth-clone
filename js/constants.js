@@ -92,6 +92,38 @@ export const GAME_STATES = {
 };
 
 // =============================================================================
+// TURN PHASES
+// =============================================================================
+
+/**
+ * Turn phases for the turn-based combat system.
+ * PLAYER_AIM: Player is adjusting angle and power
+ * PLAYER_FIRE: Player has fired, projectile is being launched
+ * PROJECTILE_FLIGHT: Projectile is in the air (shared phase for any shooter)
+ * AI_AIM: AI is calculating its shot
+ * AI_FIRE: AI has fired, projectile is being launched
+ */
+export const TURN_PHASES = {
+    PLAYER_AIM: 'player_aim',
+    PLAYER_FIRE: 'player_fire',
+    PROJECTILE_FLIGHT: 'projectile_flight',
+    AI_AIM: 'ai_aim',
+    AI_FIRE: 'ai_fire'
+};
+
+/**
+ * Valid turn phase transitions.
+ * Maps each phase to the phases it can transition to.
+ */
+export const TURN_PHASE_TRANSITIONS = {
+    [TURN_PHASES.PLAYER_AIM]: [TURN_PHASES.PLAYER_FIRE],
+    [TURN_PHASES.PLAYER_FIRE]: [TURN_PHASES.PROJECTILE_FLIGHT],
+    [TURN_PHASES.PROJECTILE_FLIGHT]: [TURN_PHASES.PLAYER_AIM, TURN_PHASES.AI_AIM],
+    [TURN_PHASES.AI_AIM]: [TURN_PHASES.AI_FIRE],
+    [TURN_PHASES.AI_FIRE]: [TURN_PHASES.PROJECTILE_FLIGHT]
+};
+
+// =============================================================================
 // COLORS - SYNTHWAVE PALETTE
 // =============================================================================
 

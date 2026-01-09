@@ -9,7 +9,8 @@ import * as Input from './input.js';
 import * as Sound from './sound.js';
 import * as Assets from './assets.js';
 import * as Debug from './debug.js';
-import { COLORS, DEBUG, CANVAS, UI, GAME_STATES } from './constants.js';
+import * as Turn from './turn.js';
+import { COLORS, DEBUG, CANVAS, UI, GAME_STATES, TURN_PHASES } from './constants.js';
 
 // =============================================================================
 // MENU STATE
@@ -141,22 +142,79 @@ function setupMenuState() {
 // =============================================================================
 
 /**
- * Render the playing screen (placeholder for now)
+ * Update the playing state - handle turn-based logic
+ * @param {number} deltaTime - Time since last frame in ms
+ */
+function updatePlaying(deltaTime) {
+    const phase = Turn.getPhase();
+
+    // Handle AI turn (simple placeholder - AI aims for a short time then fires)
+    if (phase === TURN_PHASES.AI_AIM) {
+        // For now, AI fires after a short delay (simulated with frame count)
+        // In the future, this will involve actual AI calculations
+        if (!aiAimStartTime) {
+            aiAimStartTime = performance.now();
+        }
+
+        // AI "thinks" for 1 second then fires
+        if (performance.now() - aiAimStartTime > 1000) {
+            Turn.aiFire();
+            aiAimStartTime = null;
+        }
+    }
+
+    // Handle projectile flight - check for resolution
+    if (phase === TURN_PHASES.PROJECTILE_FLIGHT) {
+        // For now, projectile resolves after a short simulated flight time
+        // In the future, this will be driven by actual projectile physics
+        if (!projectileFlightStartTime) {
+            projectileFlightStartTime = performance.now();
+        }
+
+        // Simulated flight time of 1.5 seconds
+        if (performance.now() - projectileFlightStartTime > 1500) {
+            Turn.projectileResolved();
+            projectileFlightStartTime = null;
+        }
+    }
+}
+
+// Timing state for simulated turn phases (will be replaced by actual game logic)
+let aiAimStartTime = null;
+let projectileFlightStartTime = null;
+
+/**
+ * Render the playing screen
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  */
 function renderPlaying(ctx) {
-    // Draw playing state indicator
-    ctx.fillStyle = COLORS.NEON_CYAN;
-    ctx.font = `bold ${UI.FONT_SIZE_LARGE}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('PLAYING STATE', CANVAS.DESIGN_WIDTH / 2, 50);
+    // Render turn indicator at top of screen
+    Turn.renderTurnIndicator(ctx);
 
-    // Draw instructions
+    // Draw phase-specific content
+    const phase = Turn.getPhase();
+
+    // Draw playing state indicator (temporary)
     ctx.fillStyle = COLORS.TEXT_MUTED;
     ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
-    ctx.fillText('Game is now in PLAYING state', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2);
-    ctx.fillText('(Press ESC to return to menu - not yet implemented)', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 30);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('PLAYING STATE', CANVAS.DESIGN_WIDTH / 2, 70);
+
+    // Draw current phase info
+    ctx.fillStyle = COLORS.TEXT_MUTED;
+    ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+    ctx.fillText(`Current Phase: ${phase}`, CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2);
+
+    // Draw controls help based on current phase
+    if (Turn.canPlayerAim()) {
+        ctx.fillStyle = COLORS.NEON_CYAN;
+        ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+        ctx.fillText('Press SPACE to fire!', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 40);
+        ctx.fillStyle = COLORS.TEXT_MUTED;
+        ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+        ctx.fillText('(Arrow keys will control angle/power when implemented)', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 70);
+    }
 }
 
 /**
@@ -166,11 +224,28 @@ function setupPlayingState() {
     Game.registerStateHandlers(GAME_STATES.PLAYING, {
         onEnter: (fromState) => {
             console.log('Entered PLAYING state - Game started!');
+            // Initialize the turn system when entering playing state
+            Turn.init();
+            // Sync turn debug mode with game debug mode
+            Turn.setDebugMode(Debug.isEnabled());
+            // Reset timing state
+            aiAimStartTime = null;
+            projectileFlightStartTime = null;
         },
         onExit: (toState) => {
             console.log('Exiting PLAYING state');
         },
+        update: updatePlaying,
         render: renderPlaying
+    });
+
+    // Handle space key to fire during player's turn
+    Input.onKeyDown((keyCode) => {
+        if (Game.getState() === GAME_STATES.PLAYING) {
+            if (keyCode === 'Space' && Turn.canPlayerFire()) {
+                Turn.playerFire();
+            }
+        }
     });
 }
 

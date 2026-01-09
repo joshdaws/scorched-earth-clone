@@ -138,3 +138,15 @@
 **Files:** js/game.js
 **Commit:** de25bff08b7760b8e944a2ff4040438a9db7643d
 ---
+## scorched-earth-5zm.3 - Create Game State Machine
+**Status:** Completed
+**Changes:** Added state transition validation map, implemented menu screen with START GAME button, fixed mouse coordinates to use design space
+**Files:** js/game.js, js/main.js, js/input.js
+**Commit:** 61295ad
+---
+## scorched-earth-5zm.4 - Implement Turn System
+**Status:** Completed
+**Changes:** Implemented turn-based combat system with 5 phases (PLAYER_AIM, PLAYER_FIRE, PROJECTILE_FLIGHT, AI_AIM, AI_FIRE), turn indicator UI, phase transition validation, and debug logging
+**Files:** js/turn.js (created), js/constants.js (modified), js/main.js (modified)
+**Commit:** pending
+---
