@@ -55,4 +55,40 @@ body {
     display: block;
     background-color: var(--bg-dark);
     /* Width, height, and position set dynamically by renderer.js */
+
+    /* iOS Safari: Prevent all default touch behaviors on canvas */
+    touch-action: none;
+    -webkit-touch-callout: none;  /* Prevent callout menu on long press */
+    -webkit-user-select: none;    /* Prevent text selection */
+    user-select: none;
+}
+
+/* iOS Safari: Prevent rubber-banding/bounce scroll */
+html {
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
+}
+
+body {
+    /* Prevent iOS Safari from zooming on double-tap */
+    touch-action: manipulation;
+    /* Prevent text selection throughout */
+    -webkit-user-select: none;
+    user-select: none;
+    /* Prevent callout on long press */
+    -webkit-touch-callout: none;
+    /* Fix for iOS Safari 100vh issue - use dvh if supported */
+    min-height: 100vh;
+    min-height: 100dvh;
+}
+
+/* Safe area insets for iPhone notch and home indicator */
+@supports (padding: env(safe-area-inset-bottom)) {
+    body {
+        /* Padding to avoid notch and home indicator */
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+    }
 }
