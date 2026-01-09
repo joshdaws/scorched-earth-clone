@@ -11,16 +11,22 @@
 
 **IMPORTANT: Complete exactly ONE issue per iteration, then STOP.**
 
+**KEY MINDSET:** Your job is to make PROGRESS, not achieve perfection. For each issue:
+- Implement what you can
+- File new issues for bugs, gaps, or blockers you discover
+- Close the issue when you've done what was asked (validation = went through criteria, filed issues for problems)
+- Don't get stuck waiting - file an issue and move on
+
 ### STEP 0: CLAIM THE ISSUE FIRST (MANDATORY)
 
-Before doing ANY other work, you MUST claim the issue:
+Before doing ANY other work, you MUST mark the issue as in progress:
 
 ```bash
 # 1. Find the next issue - USE THIS EXACT COMMAND (includes scope filter!)
 {{READY_CMD}}
 
-# 2. IMMEDIATELY claim it (this is required - do not skip!)
-bd update <issue-id> --claim
+# 2. IMMEDIATELY mark it in progress (this is required - do not skip!)
+bd update <issue-id> --status in_progress
 ```
 
 **CRITICAL SCOPE RULES:**
@@ -30,7 +36,14 @@ bd update <issue-id> --claim
 - If `{{READY_CMD}}` returns no issues, output `<promise>SCOPE COMPLETE</promise>` and STOP
 - Do NOT work on issues outside this scope, even if you see them
 
-**DO NOT proceed to any other step until you have run `bd update --claim`.**
+**EPIC HANDLING:**
+- If an **epic** (type: epic) appears in the ready list, **DO NOT work on the epic directly**
+- Instead: Read the epic with `bd show <epic-id>` to understand context
+- Then: Look at its children (shown at bottom of `bd show` output)
+- Pick the first OPEN child issue (type: task, bug, or feature) and claim THAT instead
+- Epics are containers for organizing work - the real work is in the child issues
+
+**DO NOT proceed to any other step until you have run `bd update --status in_progress` on an actionable issue (not an epic).**
 
 ### STEP 1: Understand the Issue
 
@@ -73,6 +86,15 @@ Implement the solution following project standards (see AGENT.md).
    - Did you actually do this? Verify it.
    - If YES: Mark it `[x]`
    - If NO: Go back and do it. Do not proceed.
+
+**FOR VALIDATION/QA TASKS:**
+- Each criterion should be marked with a result: PASS, FAIL, or BLOCKED
+- PASS = verified working as specified → mark `[x]`
+- FAIL = doesn't work as specified → create a **bug issue**, then mark `[x]` (you validated it, found a bug)
+- BLOCKED = can't test due to missing feature → create a **task issue**, then mark `[x]` (you validated scope, filed gap)
+- After going through ALL criteria (filing bugs/tasks as needed), the validation issue is COMPLETE
+- Don't leave validation issues open waiting for fixes - that's what the new bug issues are for
+
 3. Update the issue with ALL criteria checked:
 
 ```bash
@@ -174,7 +196,7 @@ After closing an issue that has a parent epic:
 8. Before creating new files, search to ensure they don't already exist.
 
 9. Beads is the ONLY source of truth for task status:
-   - Starting work: `bd update <issue-id> --claim`
+   - Starting work: `bd update <issue-id> --status in_progress`
    - Completing work: `bd close <issue-id>`
    - Finding bugs: `bd create --title "..." --type bug{{PARENT_FLAG}}`
    - New tasks: `bd create --title "..." --type task{{PARENT_FLAG}}`

@@ -1,6 +1,23 @@
-## scorched-earth-z1s - Add debug tools to advance game state for testing
-**Status:** Completed
-**Changes:** Created comprehensive debug tools module with console commands and keyboard shortcuts for testing game states. Commands include: skipToShop, setMoney, giveWeapon, giveAllWeapons, setRound, killEnemy, killSelf, toggleGodMode, and more. Keyboard shortcuts (Shift+1-9) available when debug mode is enabled.
-**Files:** js/debugTools.js (new), js/main.js (modified), js/damage.js (modified)
-**Commit:** 6bd03ab
----
+# Ralph Loop Progress Log
+
+## 2026-01-09: scorched-earth-iug.5 - QA: Controls & Input validation
+**Status:** CLOSED
+
+### Summary
+Comprehensive validation of all game controls and input methods against the spec (Section: Controls & Input, lines 107-171).
+
+### Testing Performed
+- **Desktop Controls (7/7 verified):** Arrow keys for angle/power adjustment, Tab for weapon cycling, Spacebar and FIRE button for firing, angle arc drag, power slider drag
+- **Mobile/Touch Controls (6/6 code review pass):** Angry Birds-style drag aiming implementation verified via code review in touchAiming.js
+- **Parameter Constraints (3/3 verified):** Angle clamped to 0-180°, power clamped to 0-100%, tested both boundaries
+
+### Key Findings
+- All controls function correctly per spec
+- Hold-to-adjust pattern working for keyboard controls
+- Visual feedback (trajectory preview, rubber band) implemented
+- Touch aiming calculates angle from drag direction, power from drag distance
+
+### Files Reviewed
+- js/aimingControls.js - Control layout and hit detection
+- js/touchAiming.js - Touch/mobile aiming implementation
+- js/constants.js - Design dimensions (1200x800)
