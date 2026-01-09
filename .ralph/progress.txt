@@ -284,3 +284,15 @@
 **Files:** js/projectile.js, js/main.js
 **Commit:** 9d57b84
 ---
+## scorched-earth-7hv.1 - Implement Easy AI
+**Status:** Completed
+**Changes:** Created new AI system module with Easy difficulty implementation. AI calculates direct-line angle to player, applies ±15° angle and ±20% power random error, no wind compensation, uses only Basic Shot weapon, and has 1-2 second thinking delay.
+**Files:** js/ai.js (new), js/main.js (modified)
+**Commit:** 37ad021
+---
+## scorched-earth-7hv.2 - Implement Medium AI
+**Status:** Completed
+**Changes:** Implemented Medium AI with ballistic trajectory calculation that accounts for gravity. Added calculateBallisticAim() using projectile motion equations with discriminant formula. Medium AI compensates for wind at 50% accuracy and has 50% chance to use Missiles/Rollers when available. Updated calculateAim() to use ballistic calculation for Medium/Hard AI while Easy AI continues using direct line targeting.
+**Files:** js/ai.js
+**Commit:** 46bb263
+---
