@@ -17,7 +17,7 @@
 - Close the issue when you've done what was asked (validation = went through criteria, filed issues for problems)
 - Don't get stuck waiting - file an issue and move on
 
-### STEP 0: CLAIM THE ISSUE FIRST (MANDATORY)
+### STEP 0: MARK ISSUE IN PROGRESS (MANDATORY)
 
 Before doing ANY other work, you MUST mark the issue as in progress:
 
@@ -40,7 +40,7 @@ bd update <issue-id> --status in_progress
 - If an **epic** (type: epic) appears in the ready list, **DO NOT work on the epic directly**
 - Instead: Read the epic with `bd show <epic-id>` to understand context
 - Then: Look at its children (shown at bottom of `bd show` output)
-- Pick the first OPEN child issue (type: task, bug, or feature) and claim THAT instead
+- Pick the first OPEN child issue (type: task, bug, or feature) and mark THAT as in_progress instead
 - Epics are containers for organizing work - the real work is in the child issues
 
 **DO NOT proceed to any other step until you have run `bd update --status in_progress` on an actionable issue (not an epic).**
