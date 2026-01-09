@@ -11,9 +11,10 @@ import * as Sound from './sound.js';
 import * as Assets from './assets.js';
 import * as Debug from './debug.js';
 import * as Turn from './turn.js';
-import { COLORS, DEBUG, CANVAS, UI, GAME_STATES, TURN_PHASES, PHYSICS, TANK } from './constants.js';
+import { COLORS, DEBUG, CANVAS, UI, GAME_STATES, TURN_PHASES, PHYSICS, TANK, PROJECTILE } from './constants.js';
 import { generateTerrain } from './terrain.js';
 import { placeTanksOnTerrain, updateTankTerrainPosition } from './tank.js';
+import { Projectile, createProjectileFromTank } from './projectile.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -40,6 +41,22 @@ let playerTank = null;
  * @type {import('./tank.js').Tank|null}
  */
 let enemyTank = null;
+
+// =============================================================================
+// PROJECTILE STATE
+// =============================================================================
+
+/**
+ * Currently active projectile (only one at a time in this game)
+ * @type {import('./projectile.js').Projectile|null}
+ */
+let activeProjectile = null;
+
+/**
+ * Current wind value for projectile physics
+ * @type {number}
+ */
+let currentWind = 0;
 
 // =============================================================================
 // MENU STATE
@@ -171,6 +188,45 @@ function setupMenuState() {
 // =============================================================================
 
 /**
+ * Fire a projectile from the specified tank.
+ * Creates a new projectile and sets it as active.
+ *
+ * @param {import('./tank.js').Tank} tank - The tank firing the projectile
+ */
+function fireProjectile(tank) {
+    if (!tank) return;
+
+    // Update tank's angle/power from player aim if it's the player tank
+    if (tank === playerTank) {
+        tank.angle = playerAim.angle;
+        tank.power = playerAim.power;
+    }
+
+    // Create projectile from tank's barrel position
+    activeProjectile = createProjectileFromTank(tank);
+    console.log(`Projectile fired from ${tank.team} at angle ${tank.angle}°, power ${tank.power}%`);
+}
+
+/**
+ * Update the active projectile physics and check for completion.
+ * Called each frame during projectile flight.
+ */
+function updateProjectile() {
+    if (!activeProjectile) return;
+
+    // Update projectile physics with current wind
+    activeProjectile.update(currentWind);
+
+    // Check if projectile is no longer active (went out of bounds)
+    if (!activeProjectile.isActive()) {
+        // Clean up trail when projectile is destroyed
+        activeProjectile.clearTrail();
+        activeProjectile = null;
+        Turn.projectileResolved();
+    }
+}
+
+/**
  * Update the playing state - handle turn-based logic
  * @param {number} deltaTime - Time since last frame in ms
  */
@@ -187,30 +243,26 @@ function updatePlaying(deltaTime) {
 
         // AI "thinks" for 1 second then fires
         if (performance.now() - aiAimStartTime > 1000) {
+            // Set AI aiming parameters before firing (placeholder)
+            if (enemyTank) {
+                enemyTank.angle = 135; // Aims left-ish toward player
+                enemyTank.power = 50;
+            }
             Turn.aiFire();
+            // Fire projectile after turn system transitions
+            fireProjectile(enemyTank);
             aiAimStartTime = null;
         }
     }
 
-    // Handle projectile flight - check for resolution
+    // Handle projectile flight - update physics
     if (phase === TURN_PHASES.PROJECTILE_FLIGHT) {
-        // For now, projectile resolves after a short simulated flight time
-        // In the future, this will be driven by actual projectile physics
-        if (!projectileFlightStartTime) {
-            projectileFlightStartTime = performance.now();
-        }
-
-        // Simulated flight time of 1.5 seconds
-        if (performance.now() - projectileFlightStartTime > 1500) {
-            Turn.projectileResolved();
-            projectileFlightStartTime = null;
-        }
+        updateProjectile();
     }
 }
 
-// Timing state for simulated turn phases (will be replaced by actual game logic)
+// Timing state for AI turn (will be replaced by actual AI system)
 let aiAimStartTime = null;
-let projectileFlightStartTime = null;
 
 // =============================================================================
 // TERRAIN RENDERING
@@ -469,6 +521,121 @@ function renderTanks(ctx) {
 }
 
 // =============================================================================
+// PROJECTILE RENDERING
+// =============================================================================
+
+/**
+ * Projectile visual constants
+ * Per spec: 8px diameter glowing circle in bright yellow (#f9f002)
+ */
+const PROJECTILE_VISUAL = {
+    DIAMETER: 8,
+    COLOR: '#f9f002',  // Bright yellow/white per spec
+    GLOW_COLOR: '#f9f002',
+    GLOW_BLUR: 12
+};
+
+/**
+ * Render the projectile trail with fading effect.
+ * Trail positions fade from transparent (oldest) to semi-opaque (newest).
+ * Each trail point is rendered as a smaller, fading circle.
+ *
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {import('./projectile.js').Projectile} projectile - The projectile to render trail for
+ */
+function renderProjectileTrail(ctx, projectile) {
+    const trail = projectile.getTrail();
+    if (trail.length === 0) return;
+
+    ctx.save();
+
+    // Trail circles are smaller than the main projectile
+    const trailRadius = PROJECTILE_VISUAL.DIAMETER / 4;
+
+    // Render each trail position with fading opacity
+    // Oldest positions (index 0) are most transparent, newest are most opaque
+    for (let i = 0; i < trail.length; i++) {
+        const pos = trail[i];
+
+        // Calculate opacity: oldest = 0.1, newest = 0.7
+        // Uses exponential falloff for more natural fade effect
+        const progress = i / trail.length;
+        const alpha = 0.1 + progress * 0.6;
+
+        // Add subtle glow to trail
+        ctx.shadowColor = PROJECTILE_VISUAL.GLOW_COLOR;
+        ctx.shadowBlur = 4 + progress * 4;
+
+        // Draw trail circle
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, trailRadius, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(249, 240, 2, ${alpha})`; // Yellow with varying alpha
+        ctx.fill();
+    }
+
+    ctx.restore();
+}
+
+/**
+ * Render the projectile as a glowing circle.
+ * Per spec: 8px diameter circle in bright yellow (#f9f002) with glow effect.
+ *
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {import('./projectile.js').Projectile} projectile - The projectile to render
+ */
+function renderProjectile(ctx, projectile) {
+    if (!projectile || !projectile.isActive()) return;
+
+    const { x, y } = projectile.getPosition();
+    const radius = PROJECTILE_VISUAL.DIAMETER / 2;
+
+    ctx.save();
+
+    // Apply glow effect using shadow blur
+    // This creates the "glowing" synthwave effect
+    ctx.shadowColor = PROJECTILE_VISUAL.GLOW_COLOR;
+    ctx.shadowBlur = PROJECTILE_VISUAL.GLOW_BLUR;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+
+    // Draw outer glow layer (slightly larger, more transparent)
+    ctx.beginPath();
+    ctx.arc(x, y, radius + 2, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(249, 240, 2, 0.4)';
+    ctx.fill();
+
+    // Draw main projectile circle
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fillStyle = PROJECTILE_VISUAL.COLOR;
+    ctx.fill();
+
+    // Draw bright inner core for extra glow effect
+    ctx.beginPath();
+    ctx.arc(x, y, radius * 0.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';  // White hot center
+    ctx.fill();
+
+    ctx.restore();
+}
+
+/**
+ * Render the active projectile and its trail.
+ * Trail is rendered first (behind), then the projectile on top.
+ *
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ */
+function renderActiveProjectile(ctx) {
+    if (!activeProjectile) return;
+
+    // Render trail first (behind projectile)
+    renderProjectileTrail(ctx, activeProjectile);
+
+    // Render projectile on top
+    renderProjectile(ctx, activeProjectile);
+}
+
+// =============================================================================
 // TERRAIN DESTRUCTION API
 // =============================================================================
 
@@ -531,6 +698,8 @@ function handlePowerChange(delta) {
 function handleFire() {
     if (Turn.canPlayerFire()) {
         Turn.playerFire();
+        // Fire projectile after turn system transitions
+        fireProjectile(playerTank);
     }
 }
 
@@ -552,6 +721,9 @@ function renderPlaying(ctx) {
 
     // Render tanks on terrain
     renderTanks(ctx);
+
+    // Render active projectile and trail (on top of terrain and tanks)
+    renderActiveProjectile(ctx);
 
     // Render turn indicator at top of screen
     Turn.renderTurnIndicator(ctx);
@@ -673,7 +845,11 @@ function setupPlayingState() {
             Turn.setDebugMode(Debug.isEnabled());
             // Reset timing state
             aiAimStartTime = null;
-            projectileFlightStartTime = null;
+            // Reset projectile state
+            if (activeProjectile) {
+                activeProjectile.clearTrail();
+                activeProjectile = null;
+            }
             // Reset player aim
             playerAim.angle = 45;
             playerAim.power = 50;

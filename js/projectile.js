@@ -100,6 +100,20 @@ export class Projectile {
          */
         this.launchPower = power;
 
+        /**
+         * Trail positions for visual effect.
+         * Stores past positions for rendering a fading trail behind the projectile.
+         * Each entry is {x, y} coordinates.
+         * @type {Array<{x: number, y: number}>}
+         */
+        this.trail = [];
+
+        /**
+         * Maximum number of trail positions to keep.
+         * @type {number}
+         */
+        this.maxTrailLength = PROJECTILE.TRAIL_LENGTH;
+
         // Calculate initial velocity from power and angle
         this._calculateInitialVelocity(angle, power);
 
@@ -139,14 +153,24 @@ export class Projectile {
      * Update projectile position and velocity for one frame.
      *
      * Physics applied each frame:
-     * 1. Wind affects horizontal velocity (constant force)
-     * 2. Gravity affects vertical velocity (constant acceleration)
-     * 3. Position updated based on current velocity
+     * 1. Store current position in trail for rendering
+     * 2. Wind affects horizontal velocity (constant force)
+     * 3. Gravity affects vertical velocity (constant acceleration)
+     * 4. Position updated based on current velocity
      *
      * @param {number} [wind=0] - Current wind value (positive = right, negative = left)
      */
     update(wind = 0) {
         if (!this.active) return;
+
+        // Store current position in trail before moving
+        // Trail is used for rendering a fading effect behind the projectile
+        this.trail.push({ x: this.x, y: this.y });
+
+        // Keep trail at max length by removing oldest positions
+        while (this.trail.length > this.maxTrailLength) {
+            this.trail.shift();
+        }
 
         // Apply wind to horizontal velocity
         // Wind is a constant force that affects velocity each frame
@@ -259,6 +283,23 @@ export class Projectile {
      */
     getRadius() {
         return PROJECTILE.DEFAULT_RADIUS;
+    }
+
+    /**
+     * Get the trail positions for rendering.
+     * Trail positions are ordered from oldest to newest.
+     * @returns {Array<{x: number, y: number}>} Array of trail positions
+     */
+    getTrail() {
+        return this.trail;
+    }
+
+    /**
+     * Clear the trail.
+     * Call this when projectile is destroyed to clean up.
+     */
+    clearTrail() {
+        this.trail = [];
     }
 
     /**
