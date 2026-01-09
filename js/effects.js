@@ -735,3 +735,442 @@ export function isScreenFlashing() {
 export function clearScreenFlash() {
     screenFlashState = null;
 }
+
+// =============================================================================
+// SYNTHWAVE BACKGROUND SYSTEM
+// =============================================================================
+
+/**
+ * Background configuration.
+ * Defines the visual parameters for the synthwave background layers.
+ */
+export const BACKGROUND_CONFIG = {
+    /** Y position of the horizon as percentage of canvas height */
+    HORIZON_PERCENT: 0.55,
+    /** Number of stars to render */
+    STAR_COUNT: 80,
+    /** Star twinkle animation speed (lower = slower) */
+    TWINKLE_SPEED: 0.002,
+    /** Sun radius in pixels */
+    SUN_RADIUS: 100,
+    /** Number of horizontal lines in the perspective grid */
+    GRID_HORIZONTAL_LINES: 12,
+    /** Number of vertical lines in the perspective grid */
+    GRID_VERTICAL_LINES: 16,
+    /** Number of mountain layers */
+    MOUNTAIN_LAYERS: 3,
+    /** Mountain base height range (min, max) as percentage of canvas height */
+    MOUNTAIN_HEIGHT_RANGE: [0.08, 0.18]
+};
+
+/**
+ * Pre-computed star positions for consistent rendering.
+ * Generated once and reused for performance.
+ * @type {Array<{x: number, y: number, size: number, brightness: number, twinkleOffset: number}>}
+ */
+let starCache = null;
+
+/**
+ * Pre-computed mountain silhouette data for consistent rendering.
+ * @type {Array<Array<{x: number, y: number}>>}
+ */
+let mountainCache = null;
+
+/**
+ * Background animation time for twinkle effects.
+ * @type {number}
+ */
+let backgroundAnimTime = 0;
+
+/**
+ * Initialize the background with cached star and mountain data.
+ * Call this once at game start or when canvas dimensions change.
+ *
+ * @param {number} width - Canvas width (design coordinates)
+ * @param {number} height - Canvas height (design coordinates)
+ * @param {number} [seed=42] - Seed for deterministic star/mountain placement
+ */
+export function initBackground(width, height, seed = 42) {
+    const horizonY = height * BACKGROUND_CONFIG.HORIZON_PERCENT;
+
+    // Generate star positions
+    starCache = generateStars(width, horizonY, seed);
+
+    // Generate mountain silhouettes
+    mountainCache = generateMountains(width, height, horizonY, seed + 1000);
+
+    console.log(`Background initialized: ${starCache.length} stars, ${mountainCache.length} mountain layers`);
+}
+
+/**
+ * Generate deterministic star positions.
+ *
+ * @param {number} width - Canvas width
+ * @param {number} maxY - Maximum Y position for stars (horizon line)
+ * @param {number} seed - Random seed
+ * @returns {Array} Array of star data objects
+ */
+function generateStars(width, maxY, seed) {
+    const stars = [];
+    let s = seed;
+
+    // Simple seeded random (mulberry32-like)
+    const random = () => {
+        s = (s * 1103515245 + 12345) & 0x7fffffff;
+        return s / 0x7fffffff;
+    };
+
+    for (let i = 0; i < BACKGROUND_CONFIG.STAR_COUNT; i++) {
+        stars.push({
+            x: random() * width,
+            y: random() * maxY * 0.85, // Stars in upper 85% of sky area
+            size: 0.5 + random() * 1.5,
+            brightness: 0.3 + random() * 0.7,
+            twinkleOffset: random() * Math.PI * 2
+        });
+    }
+
+    return stars;
+}
+
+/**
+ * Generate mountain silhouette paths.
+ * Creates multiple layers with decreasing height for depth.
+ *
+ * @param {number} width - Canvas width
+ * @param {number} height - Canvas height
+ * @param {number} horizonY - Y position of horizon
+ * @param {number} seed - Random seed
+ * @returns {Array} Array of mountain layer point arrays
+ */
+function generateMountains(width, height, horizonY, seed) {
+    const layers = [];
+    let s = seed;
+
+    const random = () => {
+        s = (s * 1103515245 + 12345) & 0x7fffffff;
+        return s / 0x7fffffff;
+    };
+
+    const [minHeightPct, maxHeightPct] = BACKGROUND_CONFIG.MOUNTAIN_HEIGHT_RANGE;
+
+    for (let layer = 0; layer < BACKGROUND_CONFIG.MOUNTAIN_LAYERS; layer++) {
+        const points = [];
+
+        // Back layers are taller, front layers are shorter
+        const layerFactor = 1 - (layer / BACKGROUND_CONFIG.MOUNTAIN_LAYERS);
+        const baseHeight = height * (minHeightPct + (maxHeightPct - minHeightPct) * layerFactor);
+
+        // Number of peaks varies by layer
+        const numPeaks = 5 + layer * 2;
+        const segmentWidth = width / numPeaks;
+
+        // Start at bottom left
+        points.push({ x: 0, y: horizonY });
+
+        // Generate mountain peaks
+        for (let i = 0; i <= numPeaks; i++) {
+            const x = i * segmentWidth;
+            const isPeak = i % 2 === 1;
+
+            let y;
+            if (isPeak) {
+                // Peak - go up
+                const peakHeight = baseHeight * (0.7 + random() * 0.6);
+                y = horizonY - peakHeight;
+            } else {
+                // Valley - stay closer to horizon
+                const valleyHeight = baseHeight * (0.1 + random() * 0.3);
+                y = horizonY - valleyHeight;
+            }
+
+            points.push({ x, y });
+        }
+
+        // End at bottom right
+        points.push({ x: width, y: horizonY });
+
+        layers.push(points);
+    }
+
+    return layers;
+}
+
+/**
+ * Update background animation state.
+ * Call this each frame to animate star twinkle.
+ *
+ * @param {number} deltaTime - Time since last update in milliseconds
+ */
+export function updateBackground(deltaTime) {
+    backgroundAnimTime += deltaTime * BACKGROUND_CONFIG.TWINKLE_SPEED;
+}
+
+/**
+ * Render the complete synthwave background.
+ * Renders layers in order: sky gradient → stars → sun → grid → mountains.
+ *
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D rendering context
+ * @param {number} width - Canvas width (design coordinates)
+ * @param {number} height - Canvas height (design coordinates)
+ */
+export function renderBackground(ctx, width, height) {
+    const horizonY = height * BACKGROUND_CONFIG.HORIZON_PERCENT;
+
+    ctx.save();
+
+    // Layer 1: Sky gradient (back-most layer)
+    renderSkyGradient(ctx, width, height, horizonY);
+
+    // Layer 2: Stars (in the sky portion)
+    renderStars(ctx);
+
+    // Layer 3: Synthwave sun at horizon
+    renderSun(ctx, width, horizonY);
+
+    // Layer 4: Mountain silhouettes (in front of sun)
+    renderMountains(ctx, width, horizonY);
+
+    // Layer 5: Perspective grid (ground, closest to viewer)
+    renderGrid(ctx, width, height, horizonY);
+
+    ctx.restore();
+}
+
+/**
+ * Render the sky gradient.
+ * Creates a sunset gradient from dark purple at top to orange/pink at horizon.
+ *
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} width - Canvas width
+ * @param {number} height - Canvas height
+ * @param {number} horizonY - Y position of horizon
+ */
+function renderSkyGradient(ctx, width, height, horizonY) {
+    // Sky gradient (dark purple top → orange/pink at horizon)
+    const skyGradient = ctx.createLinearGradient(0, 0, 0, horizonY);
+    skyGradient.addColorStop(0, '#0a0a1a');      // Deep space blue-black
+    skyGradient.addColorStop(0.3, '#1a0a2e');    // Dark purple
+    skyGradient.addColorStop(0.55, '#2d1b4e');   // Mid purple
+    skyGradient.addColorStop(0.75, '#4a1a5e');   // Brighter purple
+    skyGradient.addColorStop(0.9, '#ff2a6d');    // Neon pink
+    skyGradient.addColorStop(1, '#ff6b35');      // Orange at horizon
+
+    ctx.fillStyle = skyGradient;
+    ctx.fillRect(0, 0, width, horizonY);
+
+    // Ground area (below horizon) - dark gradient
+    const groundGradient = ctx.createLinearGradient(0, horizonY, 0, height);
+    groundGradient.addColorStop(0, '#1a0a2e');   // Purple at horizon
+    groundGradient.addColorStop(0.3, '#0f0a1a'); // Dark purple
+    groundGradient.addColorStop(1, '#0a0a1a');   // Near black at bottom
+
+    ctx.fillStyle = groundGradient;
+    ctx.fillRect(0, horizonY, width, height - horizonY);
+}
+
+/**
+ * Render stars with twinkle effect.
+ * Stars are rendered from the pre-computed cache.
+ *
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ */
+function renderStars(ctx) {
+    if (!starCache) return;
+
+    for (const star of starCache) {
+        // Calculate twinkle alpha using sine wave
+        const twinkle = Math.sin(backgroundAnimTime + star.twinkleOffset);
+        const alpha = star.brightness * (0.5 + twinkle * 0.5);
+
+        ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+/**
+ * Render the synthwave sun with horizontal slice lines.
+ * The sun sits at the horizon with a gradient and horizontal scan lines.
+ *
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} width - Canvas width
+ * @param {number} horizonY - Y position of horizon
+ */
+function renderSun(ctx, width, horizonY) {
+    const sunX = width / 2;
+    const sunY = horizonY;
+    const sunRadius = BACKGROUND_CONFIG.SUN_RADIUS;
+
+    ctx.save();
+
+    // Clip to only draw top half of sun (semi-circle above horizon)
+    ctx.beginPath();
+    ctx.rect(0, 0, width, horizonY);
+    ctx.clip();
+
+    // Sun radial gradient
+    const sunGradient = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunRadius);
+    sunGradient.addColorStop(0, '#ffff88');     // Bright yellow center
+    sunGradient.addColorStop(0.3, '#ffcc44');   // Yellow-orange
+    sunGradient.addColorStop(0.5, '#ff8844');   // Orange
+    sunGradient.addColorStop(0.7, '#ff2a6d');   // Pink
+    sunGradient.addColorStop(1, 'rgba(255, 42, 109, 0)'); // Fade to transparent
+
+    // Draw sun glow (slightly larger for bloom effect)
+    ctx.fillStyle = sunGradient;
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, sunRadius * 1.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Draw main sun
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, sunRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Horizontal slice lines (synthwave effect)
+    // These create the "sliced" look of synthwave suns
+    ctx.globalCompositeOperation = 'destination-out';
+
+    const numSlices = 6;
+    const sliceGap = sunRadius / (numSlices + 1);
+
+    for (let i = 1; i <= numSlices; i++) {
+        // Slices get thicker toward the bottom
+        const sliceY = sunY - sunRadius + (i * sliceGap);
+        const sliceHeight = 2 + (i * 0.5);
+
+        // Only draw slices that are above horizon
+        if (sliceY < horizonY) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.fillRect(sunX - sunRadius, sliceY, sunRadius * 2, sliceHeight);
+        }
+    }
+
+    ctx.restore();
+}
+
+/**
+ * Render mountain silhouettes with neon edge highlights.
+ * Back layers are darker, front layers have brighter edges.
+ *
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} width - Canvas width
+ * @param {number} horizonY - Y position of horizon
+ */
+function renderMountains(ctx, width, horizonY) {
+    if (!mountainCache) return;
+
+    const numLayers = mountainCache.length;
+
+    for (let layerIndex = 0; layerIndex < numLayers; layerIndex++) {
+        const points = mountainCache[layerIndex];
+
+        // Back layers are darker, front layers are lighter
+        const depthFactor = layerIndex / (numLayers - 1);
+
+        // Fill color: progressively lighter purple for front layers
+        const fillR = Math.round(20 + depthFactor * 15);
+        const fillG = Math.round(10 + depthFactor * 10);
+        const fillB = Math.round(35 + depthFactor * 25);
+
+        // Edge color: progressively brighter neon for front layers
+        const edgeAlpha = 0.3 + depthFactor * 0.5;
+
+        ctx.save();
+
+        // Draw filled mountain silhouette
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+
+        for (let i = 1; i < points.length; i++) {
+            ctx.lineTo(points[i].x, points[i].y);
+        }
+
+        // Close to bottom
+        ctx.lineTo(width, horizonY);
+        ctx.lineTo(0, horizonY);
+        ctx.closePath();
+
+        ctx.fillStyle = `rgb(${fillR}, ${fillG}, ${fillB})`;
+        ctx.fill();
+
+        // Draw neon edge highlight (only on the mountain outline, not the bottom)
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+
+        for (let i = 1; i < points.length - 1; i++) {
+            ctx.lineTo(points[i].x, points[i].y);
+        }
+
+        // Neon pink/purple edge glow
+        ctx.strokeStyle = `rgba(211, 0, 197, ${edgeAlpha})`;
+        ctx.lineWidth = 1 + depthFactor;
+        ctx.shadowColor = '#d300c5';
+        ctx.shadowBlur = 3 + depthFactor * 5;
+        ctx.stroke();
+
+        ctx.restore();
+    }
+}
+
+/**
+ * Render the perspective grid on the ground.
+ * Creates converging vertical lines and exponentially-spaced horizontal lines.
+ *
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} width - Canvas width
+ * @param {number} height - Canvas height
+ * @param {number} horizonY - Y position of horizon
+ */
+function renderGrid(ctx, width, height, horizonY) {
+    ctx.save();
+
+    // Grid color with synthwave purple glow
+    ctx.strokeStyle = 'rgba(211, 0, 197, 0.5)';
+    ctx.lineWidth = 1;
+    ctx.shadowColor = '#d300c5';
+    ctx.shadowBlur = 3;
+
+    const vanishingPointX = width / 2;
+    const groundHeight = height - horizonY;
+
+    // Horizontal lines (closer together near horizon, further apart at bottom)
+    // Uses exponential spacing for perspective effect
+    const numHorizontal = BACKGROUND_CONFIG.GRID_HORIZONTAL_LINES;
+    for (let i = 1; i <= numHorizontal; i++) {
+        const t = i / numHorizontal;
+        // Exponential curve for perspective (closer lines near horizon)
+        const y = horizonY + groundHeight * Math.pow(t, 1.8);
+
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+    }
+
+    // Vertical lines (converge at vanishing point on horizon)
+    const numVertical = BACKGROUND_CONFIG.GRID_VERTICAL_LINES;
+    for (let i = 0; i <= numVertical; i++) {
+        const t = i / numVertical;
+        const bottomX = t * width;
+
+        ctx.beginPath();
+        ctx.moveTo(vanishingPointX, horizonY);
+        ctx.lineTo(bottomX, height);
+        ctx.stroke();
+    }
+
+    ctx.restore();
+}
+
+/**
+ * Clear cached background data.
+ * Call this when resetting the game or changing canvas dimensions.
+ */
+export function clearBackground() {
+    starCache = null;
+    mountainCache = null;
+    backgroundAnimTime = 0;
+}

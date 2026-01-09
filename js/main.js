@@ -24,7 +24,7 @@ import * as AimingControls from './aimingControls.js';
 import * as VictoryDefeat from './victoryDefeat.js';
 import * as Money from './money.js';
 import * as Shop from './shop.js';
-import { spawnExplosionParticles, updateParticles, renderParticles, clearParticles, getParticleCount, screenShakeForBlastRadius, getScreenShakeOffset, clearScreenShake, screenFlash, renderScreenFlash, clearScreenFlash } from './effects.js';
+import { spawnExplosionParticles, updateParticles, renderParticles, clearParticles, getParticleCount, screenShakeForBlastRadius, getScreenShakeOffset, clearScreenShake, screenFlash, renderScreenFlash, clearScreenFlash, initBackground, updateBackground, renderBackground, clearBackground } from './effects.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -2092,7 +2092,10 @@ function renderPlaying(ctx) {
         ctx.translate(shakeOffset.x, shakeOffset.y);
     }
 
-    // Render terrain first (background)
+    // Render synthwave background (behind everything)
+    renderBackground(ctx, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+
+    // Render terrain (in front of background)
     renderTerrain(ctx);
 
     // Render tanks on terrain
@@ -2619,6 +2622,9 @@ async function init() {
     // Initialize debug module
     Debug.init();
 
+    // Initialize synthwave background (static layer behind gameplay)
+    initBackground(CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+
     // Setup state handlers BEFORE starting the loop
     // These register the update/render functions for each state
     setupMenuState();
@@ -2666,6 +2672,9 @@ function update(deltaTime) {
 
     // Update particle system
     updateParticles(deltaTime);
+
+    // Update background animation (star twinkle)
+    updateBackground(deltaTime);
 
     // Clear single-fire input state at end of frame
     // This must be done after all game logic that checks wasKeyPressed()
