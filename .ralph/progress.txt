@@ -180,3 +180,9 @@
 **Files:** js/main.js (renderTerrain function, lines 198-278)
 **Commit:** f64a2e5
 ---
+## scorched-earth-v3c.4 - Implement Terrain Destruction
+**Status:** Completed
+**Changes:** Added destroyTerrain(x, y, radius) method to Terrain class using circular crater algorithm. Added public API (destroyTerrainAt, getTerrain) in main.js for projectile system integration. Added click-to-crater test functionality.
+**Files:** js/terrain.js, js/main.js
+**Commit:** (pending)
+---

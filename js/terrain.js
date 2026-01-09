@@ -192,6 +192,81 @@ export class Terrain {
         copy.heightmap.set(this.heightmap);
         return copy;
     }
+
+    /**
+     * Destroy terrain in a circular crater pattern centered at (x, y).
+     * The crater is carved into the terrain by lowering the heightmap within the blast radius.
+     *
+     * How it works:
+     * - The explosion occurs at canvas coordinates (x, y) where Y=0 is top
+     * - Terrain heights are stored as distance from bottom (terrainHeight = DESIGN_HEIGHT - canvasY)
+     * - For each x-column within the blast radius, we calculate how much to lower the terrain
+     * - The crater has a smooth circular edge using the circle equation: r² = dx² + dy²
+     *
+     * @param {number} x - X-coordinate of explosion center (in design coordinates)
+     * @param {number} y - Y-coordinate of explosion center (in design coordinates, Y=0 is top)
+     * @param {number} radius - Blast radius in pixels
+     * @returns {boolean} True if any terrain was destroyed, false otherwise
+     */
+    destroyTerrain(x, y, radius) {
+        // Validate inputs
+        if (radius <= 0) return false;
+
+        // Convert canvas Y to terrain height (distance from bottom)
+        // Canvas Y=0 is top, so lower Y means higher terrain height
+        const explosionHeight = CANVAS.DESIGN_HEIGHT - y;
+
+        // Track if any terrain was actually modified
+        let terrainModified = false;
+
+        // Calculate the x-range affected by the explosion
+        // We need to check columns from (x - radius) to (x + radius)
+        const minX = Math.max(0, Math.floor(x - radius));
+        const maxX = Math.min(this.width - 1, Math.ceil(x + radius));
+
+        // For each x-column in the blast radius
+        for (let xi = minX; xi <= maxX; xi++) {
+            // Calculate horizontal distance from explosion center
+            const dx = xi - x;
+
+            // Skip if outside horizontal radius (shouldn't happen due to bounds, but safety check)
+            if (Math.abs(dx) > radius) continue;
+
+            // Calculate the vertical extent of the crater at this x-column
+            // Using circle equation: r² = dx² + dy² → dy = sqrt(r² - dx²)
+            // This gives us the vertical "slice" of the circle at this x position
+            const verticalExtent = Math.sqrt(radius * radius - dx * dx);
+
+            // The crater affects terrain from (explosionHeight - verticalExtent) to (explosionHeight + verticalExtent)
+            // But we only carve DOWN into terrain, not up (explosions don't create terrain)
+            const craterTop = explosionHeight + verticalExtent;
+            const craterBottom = explosionHeight - verticalExtent;
+
+            // Get current terrain height at this column
+            const currentHeight = this.heightmap[xi];
+
+            // Only modify if the crater intersects with the terrain
+            // The terrain surface is at currentHeight (from bottom)
+            // If craterBottom is below currentHeight, we need to carve
+
+            if (craterBottom < currentHeight) {
+                // New terrain height is the crater bottom, but not below 0
+                const newHeight = Math.max(0, craterBottom);
+
+                // Only modify if we're actually lowering the terrain
+                if (newHeight < currentHeight) {
+                    this.heightmap[xi] = newHeight;
+                    terrainModified = true;
+                }
+            }
+        }
+
+        if (terrainModified) {
+            console.log(`Terrain destroyed at (${x.toFixed(0)}, ${y.toFixed(0)}) with radius ${radius}, affected columns ${minX}-${maxX}`);
+        }
+
+        return terrainModified;
+    }
 }
 
 /**

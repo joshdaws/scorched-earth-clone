@@ -278,6 +278,35 @@ function renderTerrain(ctx) {
 }
 
 // =============================================================================
+// TERRAIN DESTRUCTION API
+// =============================================================================
+
+/**
+ * Destroy terrain at a given position with a circular crater.
+ * This is the public API for terrain destruction, called by projectile impacts.
+ *
+ * @param {number} x - X-coordinate of impact (design coordinates)
+ * @param {number} y - Y-coordinate of impact (design coordinates, Y=0 is top)
+ * @param {number} radius - Blast radius in pixels
+ * @returns {boolean} True if terrain was destroyed, false otherwise
+ */
+export function destroyTerrainAt(x, y, radius) {
+    if (!currentTerrain) {
+        console.warn('Cannot destroy terrain: no terrain loaded');
+        return false;
+    }
+    return currentTerrain.destroyTerrain(x, y, radius);
+}
+
+/**
+ * Get the current terrain instance (for reading terrain heights).
+ * @returns {import('./terrain.js').Terrain|null} The current terrain, or null if not loaded
+ */
+export function getTerrain() {
+    return currentTerrain;
+}
+
+// =============================================================================
 // PLAYER AIMING STATE
 // =============================================================================
 
@@ -368,6 +397,25 @@ function renderPlaying(ctx) {
 }
 
 /**
+ * Handle click in playing state - for testing terrain destruction.
+ * Creates a crater at the click position.
+ * @param {{x: number, y: number}} pos - Click position in design coordinates
+ */
+function handlePlayingClick(pos) {
+    if (Game.getState() !== GAME_STATES.PLAYING) return;
+
+    // Default blast radius for testing (can be varied for different weapons later)
+    const testBlastRadius = 40;
+
+    // Destroy terrain at click position
+    const destroyed = destroyTerrainAt(pos.x, pos.y, testBlastRadius);
+
+    if (destroyed) {
+        console.log(`Crater created at (${pos.x.toFixed(0)}, ${pos.y.toFixed(0)}) with radius ${testBlastRadius}`);
+    }
+}
+
+/**
  * Setup playing state handlers
  */
 function setupPlayingState() {
@@ -376,6 +424,16 @@ function setupPlayingState() {
     Input.onGameInput(INPUT_EVENTS.POWER_CHANGE, handlePowerChange);
     Input.onGameInput(INPUT_EVENTS.FIRE, handleFire);
     Input.onGameInput(INPUT_EVENTS.SELECT_WEAPON, handleSelectWeapon);
+
+    // Register click handler for testing terrain destruction
+    // Note: This is for development testing - will be removed when projectile system is ready
+    Input.onMouseDown((x, y, button) => {
+        handlePlayingClick({ x, y });
+    });
+
+    Input.onTouchStart((x, y) => {
+        handlePlayingClick({ x, y });
+    });
 
     // Register phase change callback to enable/disable input
     Turn.onPhaseChange((newPhase, oldPhase) => {
