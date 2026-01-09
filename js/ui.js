@@ -28,6 +28,16 @@ const HUD = {
         Y: 55,  // Below wind indicator and round indicator
         BORDER_RADIUS: 4
     },
+    // Consolidated player info panel at top-left (below wind and round indicators)
+    PLAYER_INFO_PANEL: {
+        X: 20,
+        Y: 95,  // Below round indicator (Y=65, height=24, ends at Y=89)
+        WIDTH: 200,
+        PADDING: 12,
+        SECTION_GAP: 8,
+        HEALTH_BAR_HEIGHT: 14,
+        BORDER_RADIUS: 10
+    },
     // Angle/Power panel on left side
     AIMING_PANEL: {
         X: 20,
@@ -237,6 +247,208 @@ export function renderGameStatePanel(ctx) {
 }
 
 /**
+ * Render consolidated player info panel at top-left.
+ * Contains: health bar, currency, and placeholder for angle/power.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {Object} playerTank - Player tank object with health, angle, power
+ * @param {number} money - Player's current money
+ * @param {boolean} [isPlayerTurn=true] - Whether it's currently player's turn
+ */
+export function renderPlayerInfoPanel(ctx, playerTank, money, isPlayerTurn = true) {
+    if (!ctx) return;
+
+    const panel = HUD.PLAYER_INFO_PANEL;
+    const healthBarHeight = panel.HEALTH_BAR_HEIGHT;
+
+    // Calculate panel height based on content
+    // Section 1: Health bar (label + bar)
+    // Section 2: Currency
+    // Section 3: Angle/Power placeholder (compact)
+    const labelHeight = 16;
+    const healthSection = labelHeight + healthBarHeight + 4;
+    const currencySection = 26;
+    const aimingSection = 50; // Two-column compact aiming data
+    const totalHeight = panel.PADDING * 2 + healthSection + panel.SECTION_GAP +
+                        currencySection + panel.SECTION_GAP + aimingSection;
+
+    ctx.save();
+
+    // Draw panel background
+    ctx.fillStyle = 'rgba(10, 10, 26, 0.85)';
+    ctx.beginPath();
+    ctx.roundRect(panel.X, panel.Y, panel.WIDTH, totalHeight, panel.BORDER_RADIUS);
+    ctx.fill();
+
+    // Glowing border - cyan for player
+    ctx.strokeStyle = COLORS.NEON_CYAN;
+    ctx.lineWidth = 2;
+    ctx.shadowColor = COLORS.NEON_CYAN;
+    ctx.shadowBlur = 6;
+    ctx.stroke();
+
+    // Subtle inner glow
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = `${COLORS.NEON_CYAN}30`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(panel.X + 2, panel.Y + 2, panel.WIDTH - 4, totalHeight - 4, panel.BORDER_RADIUS - 2);
+    ctx.stroke();
+
+    ctx.restore();
+
+    // =========================================================================
+    // SECTION 1: HEALTH BAR
+    // =========================================================================
+    let currentY = panel.Y + panel.PADDING;
+    const contentX = panel.X + panel.PADDING;
+    const contentWidth = panel.WIDTH - panel.PADDING * 2;
+
+    const playerPercent = playerTank ? (playerTank.health / TANK.MAX_HEALTH) * 100 : 100;
+
+    ctx.save();
+
+    // Health label and percentage
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.font = `bold ${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText('PLAYER', contentX, currentY);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = playerPercent > 30 ? COLORS.TEXT_LIGHT : COLORS.NEON_PINK;
+    ctx.fillText(`${Math.round(playerPercent)}%`, panel.X + panel.WIDTH - panel.PADDING, currentY);
+
+    ctx.restore();
+
+    currentY += labelHeight;
+
+    // Health bar
+    const barWidth = contentWidth;
+    const fillWidth = (playerPercent / 100) * barWidth;
+
+    ctx.save();
+
+    // Bar background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.beginPath();
+    ctx.roundRect(contentX, currentY, barWidth, healthBarHeight, 3);
+    ctx.fill();
+
+    // Bar border
+    ctx.strokeStyle = COLORS.NEON_CYAN;
+    ctx.lineWidth = 1;
+    ctx.shadowColor = COLORS.NEON_CYAN;
+    ctx.shadowBlur = 2;
+    ctx.stroke();
+
+    // Health fill
+    if (fillWidth > 0) {
+        const gradient = ctx.createLinearGradient(contentX, currentY, contentX + fillWidth, currentY);
+        gradient.addColorStop(0, COLORS.NEON_CYAN);
+        gradient.addColorStop(1, adjustColorBrightness(COLORS.NEON_CYAN, -40));
+
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.roundRect(contentX + 1, currentY + 1, Math.max(0, fillWidth - 2), healthBarHeight - 2, 2);
+        ctx.fill();
+    }
+
+    ctx.restore();
+
+    currentY += healthBarHeight + 4;
+
+    // =========================================================================
+    // SECTION DIVIDER 1
+    // =========================================================================
+    currentY += panel.SECTION_GAP / 2;
+
+    ctx.save();
+    ctx.strokeStyle = `${COLORS.NEON_CYAN}40`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(contentX, currentY);
+    ctx.lineTo(contentX + contentWidth, currentY);
+    ctx.stroke();
+    ctx.restore();
+
+    currentY += panel.SECTION_GAP / 2;
+
+    // =========================================================================
+    // SECTION 2: CURRENCY
+    // =========================================================================
+    ctx.save();
+
+    // Dollar sign with glow
+    ctx.fillStyle = COLORS.NEON_YELLOW;
+    ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.shadowColor = COLORS.NEON_YELLOW;
+    ctx.shadowBlur = 4;
+    ctx.fillText('$', contentX, currentY);
+
+    // Money amount
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.textAlign = 'right';
+    const moneyValue = money !== undefined ? money : 0;
+    ctx.fillText(moneyValue.toLocaleString(), panel.X + panel.WIDTH - panel.PADDING, currentY);
+
+    ctx.restore();
+
+    currentY += currencySection;
+
+    // =========================================================================
+    // SECTION DIVIDER 2
+    // =========================================================================
+    currentY += panel.SECTION_GAP / 2;
+
+    ctx.save();
+    ctx.strokeStyle = `${COLORS.NEON_CYAN}40`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(contentX, currentY);
+    ctx.lineTo(contentX + contentWidth, currentY);
+    ctx.stroke();
+    ctx.restore();
+
+    currentY += panel.SECTION_GAP / 2;
+
+    // =========================================================================
+    // SECTION 3: ANGLE/POWER PLACEHOLDER
+    // =========================================================================
+    // This will be fully implemented in separate issue scorched-earth-4nh.8
+    const halfWidth = (contentWidth - panel.SECTION_GAP) / 2;
+    const angleX = contentX;
+    const powerX = contentX + halfWidth + panel.SECTION_GAP;
+
+    ctx.save();
+
+    // Labels
+    ctx.fillStyle = COLORS.TEXT_MUTED;
+    ctx.font = `bold ${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('ANGLE', angleX + halfWidth / 2, currentY);
+    ctx.fillText('POWER', powerX + halfWidth / 2, currentY);
+
+    currentY += 14;
+
+    // Values
+    const angle = playerTank ? Math.round(playerTank.angle) : 45;
+    const power = playerTank ? Math.round(playerTank.power) : 50;
+
+    ctx.font = `bold ${UI.FONT_SIZE_LARGE}px ${UI.FONT_FAMILY}`;
+    ctx.fillStyle = isPlayerTurn ? COLORS.NEON_CYAN : COLORS.TEXT_MUTED;
+    ctx.fillText(`${angle}°`, angleX + halfWidth / 2, currentY);
+
+    ctx.fillStyle = isPlayerTurn ? COLORS.NEON_PINK : COLORS.TEXT_MUTED;
+    ctx.fillText(`${power}%`, powerX + halfWidth / 2, currentY);
+
+    ctx.restore();
+}
+
+/**
  * Draw a health bar with gradient fill.
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  * @param {number} x - X position
@@ -355,6 +567,33 @@ export function renderHealthBars(ctx, playerTank, enemyTank) {
             'ENEMY'
         );
     }
+}
+
+/**
+ * Render only the enemy health bar at top-right.
+ * Used when player info is in the consolidated panel.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {import('./tank.js').Tank} enemyTank - Enemy tank
+ */
+export function renderEnemyHealthBar(ctx, enemyTank) {
+    if (!ctx || !enemyTank) return;
+
+    const barWidth = HUD.HEALTH_BAR.WIDTH;
+    const barHeight = HUD.HEALTH_BAR.HEIGHT;
+    const padding = HUD.HEALTH_BAR.PADDING;
+    const y = HUD.HEALTH_BAR.Y;
+
+    const enemyPercent = (enemyTank.health / TANK.MAX_HEALTH) * 100;
+    drawHealthBar(
+        ctx,
+        CANVAS.DESIGN_WIDTH - padding - barWidth,
+        y + 10,
+        barWidth,
+        barHeight,
+        enemyPercent,
+        COLORS.PLAYER_2,
+        'ENEMY'
+    );
 }
 
 // =============================================================================
@@ -748,8 +987,12 @@ export function renderHUD(ctx, state) {
     // Render game state panel first (container at top-center)
     renderGameStatePanel(ctx);
 
-    // Render all HUD elements
-    renderHealthBars(ctx, playerTank, enemyTank);
+    // Render consolidated player info panel (top-left)
+    // Contains: health, currency, angle/power placeholder
+    renderPlayerInfoPanel(ctx, playerTank, money, isPlayerTurn);
+
+    // Render enemy health bar separately (top-right)
+    renderEnemyHealthBar(ctx, enemyTank);
 
     // Use phase-based indicator if phase is provided, otherwise fall back to legacy
     if (phase) {
@@ -759,9 +1002,7 @@ export function renderHUD(ctx, state) {
     }
 
     renderWindIndicator(ctx);
-    renderAimingPanel(ctx, playerTank, isPlayerTurn);
     renderWeaponPanel(ctx, playerTank);
-    renderMoneyPanel(ctx, money);
 }
 
 // =============================================================================
