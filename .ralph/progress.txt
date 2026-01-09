@@ -9,3 +9,9 @@
 **Files:** js/damage.js, js/tank.js, js/constants.js (code reviewed, not modified)
 **Commit:** N/A (validation only, no code changes)
 ---
+## scorched-earth-iug.9 - QA: Weapons System validation
+**Status:** Completed
+**Changes:** Validated all 11 weapons against game spec - Standard (Basic Shot, Missile, Big Shot), Splitting (MIRV, Death's Head), Rolling (Roller, Heavy Roller), Digging (Digger, Heavy Digger), Nuclear (Mini Nuke, Nuke). Verified weapon selection UI with TAB cycling and ammo display.
+**Files:** No code changes - QA validation only
+**Commit:** qa validation
+---
