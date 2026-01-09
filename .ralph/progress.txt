@@ -234,3 +234,15 @@
 **Files:** js/damage.js (new), js/main.js (modified)
 **Commit:** 424fe5b
 ---
+## scorched-earth-wu8.8 - Implement Wind System
+**Status:** Completed
+**Changes:** Implemented wind system with random wind generation per round, wind physics affecting projectile trajectory, and visual wind indicator UI
+**Files:** js/wind.js (new), js/constants.js, js/main.js
+**Commit:** 0f15d71
+---
+## scorched-earth-8qc.1 - Create Weapon Data Structure and Registry
+**Status:** Completed
+**Changes:** Created complete weapon system with WEAPON_TYPES enum, createWeapon() factory, all 11 weapon definitions matching game spec, and WeaponRegistry with full API (getWeapon, getAllWeapons, getWeaponsByType, etc.)
+**Files:** js/weapons.js (new)
+**Commit:** pending
+---
