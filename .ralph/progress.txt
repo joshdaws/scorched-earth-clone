@@ -198,3 +198,15 @@
 **Files:** js/tank.js, js/main.js
 **Commit:** c05d9ce
 ---
+## scorched-earth-wu8.2 - Implement Tank Rendering with Turret
+**Status:** Completed
+**Changes:** Implemented tank rendering with 64x24 placeholder body, neon glow effects (cyan/pink), rotating turret, and sprite asset fallback support
+**Files:** js/constants.js, js/main.js, js/tank.js
+**Commit:** 364aa61
+---
+## scorched-earth-wu8.3 - Implement Projectile Physics
+**Status:** Completed
+**Changes:** Created Projectile class with ballistic physics (gravity, wind, velocity from power/angle). Includes createProjectileFromTank helper and calculateTrajectory utility for AI/preview.
+**Files:** js/projectile.js
+**Commit:** a88308f
+---
