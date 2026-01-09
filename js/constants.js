@@ -35,7 +35,8 @@ export const CANVAS = {
 export const PHYSICS = {
     GRAVITY: 0.15,
     MAX_VELOCITY: 20,
-    WIND_RANGE: 10,
+    WIND_RANGE: 10,           // Max wind strength: -10 (left) to +10 (right)
+    WIND_FORCE_MULTIPLIER: 0.01, // Wind value to velocity conversion factor
     MAX_POWER: 100,
     MIN_POWER: 0,
     MAX_ANGLE: 180,
@@ -220,7 +221,12 @@ export const UI = {
     FONT_SIZE_MEDIUM: 16,
     FONT_SIZE_LARGE: 24,
     FONT_SIZE_TITLE: 48,
-    FONT_FAMILY: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+    FONT_FAMILY: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+    // Wind indicator settings
+    WIND_INDICATOR_X: 100,     // X position from left edge
+    WIND_INDICATOR_Y: 30,      // Y position from top
+    WIND_ARROW_MAX_WIDTH: 60,  // Max arrow width at max wind strength
+    WIND_ARROW_HEIGHT: 20      // Arrow height
 };
 
 // =============================================================================

@@ -16,6 +16,7 @@ import { generateTerrain } from './terrain.js';
 import { placeTanksOnTerrain, updateTankTerrainPosition } from './tank.js';
 import { Projectile, createProjectileFromTank, checkTankCollision } from './projectile.js';
 import { applyExplosionDamage, applyExplosionToAllTanks, DAMAGE } from './damage.js';
+import * as Wind from './wind.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -52,12 +53,6 @@ let enemyTank = null;
  * @type {import('./projectile.js').Projectile|null}
  */
 let activeProjectile = null;
-
-/**
- * Current wind value for projectile physics
- * @type {number}
- */
-let currentWind = 0;
 
 // =============================================================================
 // MENU STATE
@@ -221,8 +216,9 @@ function fireProjectile(tank) {
 function updateProjectile() {
     if (!activeProjectile) return;
 
-    // Update projectile physics with current wind
-    activeProjectile.update(currentWind);
+    // Update projectile physics with current wind force
+    // Wind.getWindForce() converts wind value to velocity change per frame
+    activeProjectile.update(Wind.getWindForce());
 
     // Check if projectile went out of bounds (handled in projectile._checkBounds)
     if (!activeProjectile.isActive()) {
@@ -832,6 +828,9 @@ function renderPlaying(ctx) {
     // Render turn indicator at top of screen
     Turn.renderTurnIndicator(ctx);
 
+    // Render wind indicator at top-left
+    Wind.renderWindIndicator(ctx);
+
     // Draw phase-specific content
     const phase = Turn.getPhase();
 
@@ -942,6 +941,10 @@ function setupPlayingState() {
             const tanks = placeTanksOnTerrain(currentTerrain);
             playerTank = tanks.player;
             enemyTank = tanks.enemy;
+
+            // Generate random wind for this round
+            // Wind value -10 to +10: negative = left, positive = right
+            Wind.generateRandomWind();
 
             // Initialize the turn system when entering playing state
             Turn.init();
