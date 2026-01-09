@@ -2542,7 +2542,9 @@ function renderPlaying(ctx) {
         money: Money.getMoney(),
         isPlayerTurn,
         phase,
-        shooter
+        shooter,
+        currentRound,
+        difficulty: AI.getDifficultyName(AI.getDifficulty())
     });
 
     // Render round and difficulty indicator (still uses existing function)

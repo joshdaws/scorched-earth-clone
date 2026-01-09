@@ -278,14 +278,14 @@ function drawGameStatePanel(ctx, contentHeight = 0) {
  * @param {string} [turnPhase='player_aim'] - Current turn phase
  * @param {string} [shooter='player'] - Who fired ('player' or 'ai')
  */
-export function renderGameStatePanel(ctx, turnPhase = null, shooter = 'player') {
+export function renderGameStatePanel(ctx, turnPhase = null, shooter = 'player', currentRound = 1, difficulty = 'medium') {
     if (!ctx) return;
 
     // Draw the panel container and get bounds for content placement
     const bounds = drawGameStatePanel(ctx);
 
     // Render turn indicator inside the panel
-    renderTurnIndicatorInPanel(ctx, bounds, turnPhase, shooter);
+    renderTurnIndicatorInPanel(ctx, bounds, turnPhase, shooter, currentRound, difficulty);
 }
 
 /**
@@ -296,7 +296,7 @@ export function renderGameStatePanel(ctx, turnPhase = null, shooter = 'player') 
  * @param {string} turnPhase - Current turn phase
  * @param {string} shooter - Who fired ('player' or 'ai')
  */
-function renderTurnIndicatorInPanel(ctx, bounds, turnPhase, shooter) {
+function renderTurnIndicatorInPanel(ctx, bounds, turnPhase, shooter, currentRound = 1, difficulty = 'medium') {
     // Determine text and color based on turn phase
     let text = '';
     let glowColor = COLORS.NEON_CYAN;
@@ -329,12 +329,13 @@ function renderTurnIndicatorInPanel(ctx, bounds, turnPhase, shooter) {
 
     // Calculate center position in panel
     const centerX = bounds.x + bounds.width / 2;
-    const centerY = bounds.y + bounds.height / 2;
+    // Shift turn indicator up slightly to make room for round/difficulty below
+    const turnY = bounds.y + bounds.height / 2 - 8;
 
     // Pulsing glow effect
     const pulse = Math.sin(animationTime * 3) * 0.2 + 0.8;
 
-    // Large, prominent font
+    // Large, prominent font for turn indicator
     ctx.font = `bold 24px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -344,16 +345,31 @@ function renderTurnIndicatorInPanel(ctx, bounds, turnPhase, shooter) {
     ctx.shadowColor = glowColor;
     ctx.shadowBlur = 20 * pulse;
     ctx.fillStyle = glowColor;
-    ctx.fillText(text, centerX, centerY);
+    ctx.fillText(text, centerX, turnY);
 
     // Middle glow layer
     ctx.shadowBlur = 10 * pulse;
-    ctx.fillText(text, centerX, centerY);
+    ctx.fillText(text, centerX, turnY);
 
     // Inner bright text
     ctx.shadowBlur = 4;
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(text, centerX, centerY);
+    ctx.fillText(text, centerX, turnY);
+
+    // Render round and difficulty info below turn indicator
+    const roundY = turnY + 22; // Position below turn text
+    const roundText = `ROUND ${currentRound} | ${difficulty.toUpperCase()}`;
+
+    // Smaller font for round/difficulty
+    ctx.font = `bold 12px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // Subtle glow for round info (less intense than turn indicator)
+    ctx.shadowColor = COLORS.NEON_CYAN;
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = COLORS.TEXT_MUTED;
+    ctx.fillText(roundText, centerX, roundY);
 
     ctx.restore();
 }
@@ -1465,7 +1481,9 @@ export function renderHUD(ctx, state) {
         isFiring = false,
         isPlayerTurn = true,
         phase = null,
-        shooter = 'player'
+        shooter = 'player',
+        currentRound = 1,
+        difficulty = 'medium'
     } = state;
 
     // Determine the effective phase for rendering
@@ -1487,8 +1505,8 @@ export function renderHUD(ctx, state) {
         }
     }
 
-    // Render game state panel with turn indicator inside
-    renderGameStatePanel(ctx, effectivePhase, effectiveShooter);
+    // Render game state panel with turn indicator and round/difficulty inside
+    renderGameStatePanel(ctx, effectivePhase, effectiveShooter, currentRound, difficulty);
 
     // Render consolidated player info panel (top-left)
     // Contains: health, currency, angle/power placeholder
