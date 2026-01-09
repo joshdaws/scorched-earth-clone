@@ -8,7 +8,7 @@
 **Status:** Completed
 **Changes:** QA validation of Economy & Shop system completed. Found 1 bug (HIT_BASE_REWARD=100 instead of 50). Created bug issue scorched-earth-f4n. All other criteria passed.
 **Files:** Reviewed js/money.js, js/shop.js, js/constants.js
-**Commit:** (pending)
+**Commit:** f19efd5
 ---
 ## scorched-earth-iug.12 - QA: AI System validation
 **Status:** Completed
@@ -20,4 +20,10 @@
 - Hard AI: ±3° angle, ±5% power, 85% wind compensation, strategic weapon selection, terrain awareness
 - AI Turn Execution: 1-2s thinking delay, proper phase transitions
 **Files:** js/ai.js (code review), docs/specs/game-spec.md (spec reference)
+---
+## scorched-earth-f4n - Bug: Hit reward base amount is $100 instead of $50 per spec
+**Status:** Completed
+**Changes:** Fixed HIT_BASE_REWARD from 100 to 50 in js/money.js to match the game spec. Also updated the JSDoc comment for awardHitReward() to show the correct formula.
+**Files:** js/money.js
+**Commit:** f19efd5
 ---

@@ -19,7 +19,7 @@ export const MONEY = {
     /** Starting money for new game */
     STARTING_AMOUNT: GAME.STARTING_MONEY,
     /** Base money earned per hit */
-    HIT_BASE_REWARD: 100,
+    HIT_BASE_REWARD: 50,
     /** Multiplier for damage dealt (damage × this value) */
     DAMAGE_MULTIPLIER: 2,
     /** Bonus for winning a round */
@@ -254,7 +254,7 @@ export function canAfford(amount) {
 
 /**
  * Award money for landing a hit on an enemy tank.
- * Formula: ($100 + (damage × 2)) × round multiplier
+ * Formula: ($50 + (damage × 2)) × round multiplier
  * @param {number} damage - Damage dealt to the enemy
  * @returns {number} Amount awarded
  */
