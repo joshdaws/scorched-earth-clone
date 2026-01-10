@@ -3542,11 +3542,17 @@ function updateRoundTransition(deltaTime) {
  * Round transition shows after winning a round, before going to shop.
  */
 function setupRoundTransitionState() {
-    // Register callback for Continue button
+    // Register callback for Continue button - skip shop, go directly to next round
     RoundTransition.onContinue(() => {
-        // Hide the transition screen
+        console.log('[Main] Continue from round transition - going directly to next round');
         RoundTransition.hide();
-        // Transition to shop for purchasing weapons
+        startNextRound();
+    });
+
+    // Register callback for Shop button - go to shop before next round
+    RoundTransition.onShop(() => {
+        console.log('[Main] Shop from round transition - going to shop');
+        RoundTransition.hide();
         Game.setState(GAME_STATES.SHOP);
     });
 

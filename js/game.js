@@ -106,10 +106,18 @@ const validTransitions = {
         GAME_STATES.MENU      // Can go back to menu
     ],
     [GAME_STATES.COLLECTION]: [
-        GAME_STATES.MENU      // Can go back to menu
+        GAME_STATES.MENU,           // Can go back to menu
+        GAME_STATES.ROUND_TRANSITION, // Return to round end screen
+        GAME_STATES.SHOP,           // Go to shop after viewing collection
+        GAME_STATES.PLAYING,        // Go directly to next round
+        GAME_STATES.AIMING          // Go directly to next round (aiming)
     ],
     [GAME_STATES.SUPPLY_DROP]: [
-        GAME_STATES.MENU      // Can go back to menu
+        GAME_STATES.MENU,           // Can go back to menu
+        GAME_STATES.ROUND_TRANSITION, // Return to round end screen
+        GAME_STATES.SHOP,           // Go to shop after supply drop
+        GAME_STATES.PLAYING,        // Go directly to next round
+        GAME_STATES.AIMING          // Go directly to next round (aiming)
     ],
     [GAME_STATES.PLAYING]: [
         GAME_STATES.AIMING,
@@ -157,6 +165,10 @@ const validTransitions = {
     ],
     [GAME_STATES.ROUND_TRANSITION]: [
         GAME_STATES.SHOP,       // Continue to shop after round transition
+        GAME_STATES.PLAYING,    // Skip shop and go directly to next round
+        GAME_STATES.AIMING,     // Skip shop and start aiming on next round
+        GAME_STATES.COLLECTION, // View tank collection from round end
+        GAME_STATES.SUPPLY_DROP,// Open supply drop from round end
         GAME_STATES.MENU        // Can quit to menu
     ],
     [GAME_STATES.VICTORY]: [

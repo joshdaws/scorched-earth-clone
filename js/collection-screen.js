@@ -123,6 +123,9 @@ let isScrapShopMode = false;
 /** Purchasable tanks list (filtered) */
 let shopTanks = [];
 
+/** State to return to when exiting (if came from round transition) */
+let returnToState = GAME_STATES.MENU;
+
 // =============================================================================
 // FILTER CATEGORIES
 // =============================================================================
@@ -224,7 +227,8 @@ function handleClick(pos) {
             scrollY = 0;
             updateFilteredList();
         } else {
-            Game.setState(GAME_STATES.MENU);
+            // Return to the state we came from (menu or round transition)
+            Game.setState(returnToState);
         }
         return;
     }
@@ -392,7 +396,8 @@ function handleKeyDown(keyCode) {
     switch (keyCode) {
         case KEY.ESCAPE:
             Sound.playClickSound();
-            Game.setState(GAME_STATES.MENU);
+            // Return to the state we came from (menu or round transition)
+            Game.setState(returnToState);
             break;
         case KEY.UP:
             scrollY = Math.max(0, scrollY - CONFIG.SCROLL_SPEED);
@@ -1105,7 +1110,12 @@ export function setup() {
     // Register state handlers
     Game.registerStateHandlers(GAME_STATES.COLLECTION, {
         onEnter: (fromState) => {
-            console.log('Entered COLLECTION state');
+            console.log('Entered COLLECTION state from', fromState);
+            // Track where we came from to return there on exit
+            // If we came from round transition, go back there; otherwise go to menu
+            returnToState = (fromState === GAME_STATES.ROUND_TRANSITION)
+                ? GAME_STATES.ROUND_TRANSITION
+                : GAME_STATES.MENU;
             init();
             // Play menu music (reuse)
             Music.playForState(GAME_STATES.MENU);

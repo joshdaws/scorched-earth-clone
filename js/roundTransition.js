@@ -77,10 +77,16 @@ let appearDelay = 0;
 let contentVisible = false;
 
 /**
- * Callback to execute when "Continue to Shop" is clicked.
+ * Callback to execute when "Continue" is clicked (skip shop, go to next round).
  * @type {Function|null}
  */
 let onContinueCallback = null;
+
+/**
+ * Callback to execute when "Shop" is clicked.
+ * @type {Function|null}
+ */
+let onShopCallback = null;
 
 /**
  * Callback to execute when "Collection" is clicked.
@@ -199,11 +205,19 @@ export function hide() {
 }
 
 /**
- * Register callback for "Continue to Shop" button.
+ * Register callback for "Continue" button (skip shop, go to next round).
  * @param {Function} callback - Function to call when button is clicked
  */
 export function onContinue(callback) {
     onContinueCallback = callback;
+}
+
+/**
+ * Register callback for "Shop" button.
+ * @param {Function} callback - Function to call when button is clicked
+ */
+export function onShop(callback) {
+    onShopCallback = callback;
 }
 
 /**
@@ -269,22 +283,26 @@ function isInsideButton(x, y, button) {
 export function handleClick(x, y) {
     if (!contentVisible) return false;
 
-    // Check Continue button (now goes to shop)
+    // Check Continue button (skip shop, go directly to next round)
     if (isInsideButton(x, y, buttons.continue)) {
         playClickSound();
-        console.log('[RoundTransition] Continue clicked');
+        console.log('[RoundTransition] Continue clicked - skip shop, go to next round');
         if (onContinueCallback) {
             onContinueCallback();
         }
         return true;
     }
 
-    // Check Shop button
+    // Check Shop button (go to shop before next round)
     if (isInsideButton(x, y, buttons.shop)) {
         playClickSound();
         console.log('[RoundTransition] Shop clicked');
-        if (onContinueCallback) {
-            onContinueCallback();
+        if (onShopCallback) {
+            onShopCallback();
+        } else {
+            // Default: go to shop
+            hide();
+            Game.setState(GAME_STATES.SHOP);
         }
         return true;
     }

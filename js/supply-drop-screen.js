@@ -103,6 +103,9 @@ let state = {
     lastDropResult: null
 };
 
+/** State to return to when exiting (if came from round transition) */
+let returnToState = GAME_STATES.MENU;
+
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
@@ -224,7 +227,8 @@ function handleClick(pos) {
     // Check back button
     const bb = CONFIG.BACK_BUTTON;
     if (isPointInRect(pos.x, pos.y, bb.x, bb.y, bb.width, bb.height)) {
-        Game.setState(GAME_STATES.MENU);
+        // Return to the state we came from (menu or round transition)
+        Game.setState(returnToState);
         return;
     }
 
@@ -280,9 +284,9 @@ function handleKeyDown(key) {
         return;
     }
 
-    // Escape to go back
+    // Escape to go back - return to the state we came from
     if (key === 'Escape') {
-        Game.setState(GAME_STATES.MENU);
+        Game.setState(returnToState);
     }
 
     // Number keys for quick purchase
@@ -693,7 +697,12 @@ export function setup() {
     // Register state handlers
     Game.registerStateHandlers(GAME_STATES.SUPPLY_DROP, {
         onEnter: (fromState) => {
-            console.log('Entered SUPPLY_DROP state');
+            console.log('Entered SUPPLY_DROP state from', fromState);
+            // Track where we came from to return there on exit
+            // If we came from round transition, go back there; otherwise go to menu
+            returnToState = (fromState === GAME_STATES.ROUND_TRANSITION)
+                ? GAME_STATES.ROUND_TRANSITION
+                : GAME_STATES.MENU;
             init();
             Music.playForState(GAME_STATES.MENU);
         },
