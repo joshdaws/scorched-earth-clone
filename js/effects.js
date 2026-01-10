@@ -1235,24 +1235,52 @@ export function clearBackground() {
 
 /**
  * CRT effect configuration.
- * Creates a retro monitor look with scanlines, vignette, and chromatic aberration.
+ * Creates a retro VHS/CRT monitor look inspired by Far Cry Blood Dragon.
+ * Enhanced from subtle to dramatic for full retro aesthetic.
  */
 export const CRT_CONFIG = {
-    // Scanlines
-    SCANLINE_SPACING: 2,         // Pixels between scanlines
-    SCANLINE_OPACITY: 0.10,      // Opacity of scanlines (0-1)
+    // Scanlines - more visible for that classic CRT look
+    SCANLINE_SPACING: 3,         // Pixels between scanlines (wider = more visible)
+    SCANLINE_OPACITY: 0.25,      // Opacity of scanlines - was 0.10, now 0.25 for visibility
     SCANLINE_COLOR: '#000000',   // Scanline color (black)
 
-    // Vignette (darker corners)
-    VIGNETTE_INTENSITY: 0.35,    // How dark the corners get (0-1)
-    VIGNETTE_RADIUS: 0.75,       // Size of the vignette (0-1, larger = smaller dark area)
+    // Vignette (darker corners) - enhanced for dramatic effect
+    VIGNETTE_INTENSITY: 0.55,    // How dark the corners get - was 0.35
+    VIGNETTE_RADIUS: 0.65,       // Size of the vignette - was 0.75
 
-    // Chromatic aberration (RGB color fringing)
+    // Chromatic aberration (RGB color fringing) - enhanced
     CHROMATIC_ABERRATION_ENABLED: true,
-    CHROMATIC_OFFSET: 2,         // Pixel offset for RGB channels
+    CHROMATIC_OFFSET: 3,         // Pixel offset - was 2
+    CHROMATIC_ALPHA: 0.08,       // Aberration intensity - was 0.03
+
+    // VHS noise/grain effect
+    VHS_NOISE_ENABLED: true,
+    VHS_NOISE_INTENSITY: 0.04,   // Noise grain opacity (0-1)
+    VHS_NOISE_SCALE: 2,          // Noise pixel size
+
+    // VHS tracking glitch effect
+    VHS_GLITCH_ENABLED: true,
+    VHS_GLITCH_CHANCE: 0.003,    // Chance per frame of glitch occurring
+    VHS_GLITCH_MAX_OFFSET: 8,    // Max horizontal displacement in pixels
+    VHS_GLITCH_HEIGHT: 4,        // Height of glitch band in pixels
+
+    // Phosphor glow (slight bloom on bright areas)
+    PHOSPHOR_GLOW_ENABLED: true,
+    PHOSPHOR_GLOW_INTENSITY: 0.1,
 
     // Subtle CRT curvature simulation (via vignette gradient)
     CURVATURE_ENABLED: true
+};
+
+/**
+ * VHS glitch state for animation
+ */
+let vhsGlitchState = {
+    active: false,
+    yOffset: 0,
+    xDisplacement: 0,
+    duration: 0,
+    elapsed: 0
 };
 
 /**
@@ -1393,26 +1421,27 @@ function renderChromaticAberration(ctx, width, height) {
     if (!CRT_CONFIG.CHROMATIC_ABERRATION_ENABLED) return;
 
     const offset = CRT_CONFIG.CHROMATIC_OFFSET;
+    const alpha = CRT_CONFIG.CHROMATIC_ALPHA;
 
     ctx.save();
     ctx.globalCompositeOperation = 'screen';
-    ctx.globalAlpha = 0.03;
+    ctx.globalAlpha = alpha;
 
     // Red channel offset (slight right/down shift at edges)
     const redGradient = ctx.createLinearGradient(0, 0, width, 0);
-    redGradient.addColorStop(0, 'rgba(255, 0, 0, 0.5)');
-    redGradient.addColorStop(0.1, 'rgba(255, 0, 0, 0)');
-    redGradient.addColorStop(0.9, 'rgba(255, 0, 0, 0)');
-    redGradient.addColorStop(1, 'rgba(255, 0, 0, 0.5)');
+    redGradient.addColorStop(0, 'rgba(255, 0, 0, 0.6)');
+    redGradient.addColorStop(0.15, 'rgba(255, 0, 0, 0)');
+    redGradient.addColorStop(0.85, 'rgba(255, 0, 0, 0)');
+    redGradient.addColorStop(1, 'rgba(255, 0, 0, 0.6)');
     ctx.fillStyle = redGradient;
     ctx.fillRect(offset, 0, width, height);
 
     // Blue channel offset (slight left/up shift at edges)
     const blueGradient = ctx.createLinearGradient(0, 0, width, 0);
-    blueGradient.addColorStop(0, 'rgba(0, 0, 255, 0.5)');
-    blueGradient.addColorStop(0.1, 'rgba(0, 0, 255, 0)');
-    blueGradient.addColorStop(0.9, 'rgba(0, 0, 255, 0)');
-    blueGradient.addColorStop(1, 'rgba(0, 0, 255, 0.5)');
+    blueGradient.addColorStop(0, 'rgba(0, 100, 255, 0.6)');
+    blueGradient.addColorStop(0.15, 'rgba(0, 100, 255, 0)');
+    blueGradient.addColorStop(0.85, 'rgba(0, 100, 255, 0)');
+    blueGradient.addColorStop(1, 'rgba(0, 100, 255, 0.6)');
     ctx.fillStyle = blueGradient;
     ctx.fillRect(-offset, 0, width, height);
 
@@ -1420,8 +1449,132 @@ function renderChromaticAberration(ctx, width, height) {
 }
 
 /**
+ * Render VHS noise/grain overlay.
+ * Creates a subtle static grain effect.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} width - Canvas width
+ * @param {number} height - Canvas height
+ */
+function renderVhsNoise(ctx, width, height) {
+    if (!CRT_CONFIG.VHS_NOISE_ENABLED) return;
+
+    const scale = CRT_CONFIG.VHS_NOISE_SCALE;
+    const intensity = CRT_CONFIG.VHS_NOISE_INTENSITY;
+
+    ctx.save();
+    ctx.globalAlpha = intensity;
+
+    // Create noise using random rectangles
+    // This is efficient and creates a grainy VHS look
+    const cols = Math.ceil(width / scale);
+    const rows = Math.ceil(height / scale);
+
+    for (let y = 0; y < rows; y += 2) { // Skip every other row for performance
+        for (let x = 0; x < cols; x += 2) { // Skip every other column
+            if (Math.random() > 0.7) { // Only draw ~30% of pixels for subtle effect
+                const gray = Math.floor(Math.random() * 80 + 40); // 40-120 gray values
+                ctx.fillStyle = `rgb(${gray}, ${gray}, ${gray})`;
+                ctx.fillRect(x * scale, y * scale, scale, scale);
+            }
+        }
+    }
+
+    ctx.restore();
+}
+
+/**
+ * Update VHS glitch state for animation.
+ * Called each frame to handle glitch timing.
+ * @param {number} deltaTime - Time since last frame in ms
+ */
+function updateVhsGlitch(deltaTime) {
+    if (!CRT_CONFIG.VHS_GLITCH_ENABLED) return;
+
+    if (vhsGlitchState.active) {
+        vhsGlitchState.elapsed += deltaTime;
+        if (vhsGlitchState.elapsed >= vhsGlitchState.duration) {
+            vhsGlitchState.active = false;
+        }
+    } else {
+        // Random chance to start a new glitch
+        if (Math.random() < CRT_CONFIG.VHS_GLITCH_CHANCE) {
+            vhsGlitchState = {
+                active: true,
+                yOffset: Math.random() * 600, // Random vertical position
+                xDisplacement: (Math.random() - 0.5) * 2 * CRT_CONFIG.VHS_GLITCH_MAX_OFFSET,
+                duration: 50 + Math.random() * 100, // 50-150ms glitch duration
+                elapsed: 0
+            };
+        }
+    }
+}
+
+/**
+ * Render VHS tracking glitch effect.
+ * Creates horizontal displacement bands like VHS tracking errors.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} width - Canvas width
+ * @param {number} height - Canvas height
+ */
+function renderVhsGlitch(ctx, width, height) {
+    if (!CRT_CONFIG.VHS_GLITCH_ENABLED || !vhsGlitchState.active) return;
+
+    const { yOffset, xDisplacement } = vhsGlitchState;
+    const glitchHeight = CRT_CONFIG.VHS_GLITCH_HEIGHT;
+
+    ctx.save();
+
+    // Draw glitch band (horizontal distortion)
+    // This creates a subtle horizontal shift in a small band
+    ctx.globalAlpha = 0.3;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, yOffset, width, 2); // Thin white line
+
+    // Additional chromatic shift in the glitch area
+    ctx.globalCompositeOperation = 'screen';
+    ctx.globalAlpha = 0.15;
+    ctx.fillStyle = '#ff0066';
+    ctx.fillRect(xDisplacement, yOffset - glitchHeight / 2, width, glitchHeight);
+    ctx.fillStyle = '#00ffff';
+    ctx.fillRect(-xDisplacement, yOffset + glitchHeight / 2, width, glitchHeight);
+
+    ctx.restore();
+}
+
+/**
+ * Render phosphor glow effect.
+ * Adds a subtle bloom/glow to simulate CRT phosphor persistence.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} width - Canvas width
+ * @param {number} height - Canvas height
+ */
+function renderPhosphorGlow(ctx, width, height) {
+    if (!CRT_CONFIG.PHOSPHOR_GLOW_ENABLED) return;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = CRT_CONFIG.PHOSPHOR_GLOW_INTENSITY;
+
+    // Create a subtle overall glow by applying a light overlay
+    // This simulates phosphor bleeding/persistence
+    const gradient = ctx.createRadialGradient(
+        width / 2, height / 2, 0,
+        width / 2, height / 2, Math.max(width, height) * 0.6
+    );
+    gradient.addColorStop(0, 'rgba(100, 200, 255, 0.05)');
+    gradient.addColorStop(0.5, 'rgba(100, 200, 255, 0.02)');
+    gradient.addColorStop(1, 'rgba(100, 200, 255, 0)');
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.restore();
+}
+
+/**
  * Render all CRT effects as a post-processing overlay.
  * Call this AFTER all other rendering is complete.
+ * Far Cry Blood Dragon / VHS inspired effects.
  * @param {CanvasRenderingContext2D} ctx - Canvas context
  * @param {number} width - Canvas width
  * @param {number} height - Canvas height
@@ -1429,14 +1582,26 @@ function renderChromaticAberration(ctx, width, height) {
 export function renderCrtEffects(ctx, width, height) {
     if (!crtEnabled) return;
 
+    // Update glitch animation state
+    updateVhsGlitch(16.67); // Assume ~60fps for delta time
+
     // Render effects in order (back to front)
-    // 1. Chromatic aberration (subtle color fringing)
+    // 1. Phosphor glow (subtle bloom)
+    renderPhosphorGlow(ctx, width, height);
+
+    // 2. Chromatic aberration (RGB color fringing)
     renderChromaticAberration(ctx, width, height);
 
-    // 2. Scanlines (horizontal lines)
+    // 3. VHS noise/grain
+    renderVhsNoise(ctx, width, height);
+
+    // 4. VHS tracking glitch
+    renderVhsGlitch(ctx, width, height);
+
+    // 5. Scanlines (horizontal lines)
     renderScanlines(ctx, width, height);
 
-    // 3. Vignette (darker corners) - on top
+    // 6. Vignette (darker corners) - on top
     renderVignette(ctx, width, height);
 }
 
