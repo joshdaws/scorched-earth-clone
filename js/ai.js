@@ -20,7 +20,8 @@ import { WEAPON_TYPES, WeaponRegistry } from './weapons.js';
 export const AI_DIFFICULTY = {
     EASY: 'easy',
     MEDIUM: 'medium',
-    HARD: 'hard'
+    HARD: 'hard',
+    HARD_PLUS: 'hard_plus'
 };
 
 /**
@@ -66,6 +67,18 @@ const DIFFICULTY_CONFIG = {
         onlyBasicWeapon: false,
         thinkingDelayMin: 500,
         thinkingDelayMax: 1000
+    },
+    [AI_DIFFICULTY.HARD_PLUS]: {
+        name: 'Hard+',
+        angleErrorMin: -2,
+        angleErrorMax: 2,
+        powerErrorMin: -3,
+        powerErrorMax: 3,
+        compensatesWind: true,
+        windCompensationAccuracy: 0.95, // 95% accurate wind compensation - nearly perfect
+        onlyBasicWeapon: false,
+        thinkingDelayMin: 300,
+        thinkingDelayMax: 600
     }
 };
 
@@ -1179,12 +1192,16 @@ export function getDifficultyName(difficulty) {
  * @returns {string} AI difficulty level from AI_DIFFICULTY enum
  */
 export function getAIDifficulty(roundNumber) {
+    // Round-based difficulty progression per roguelike spec:
+    // Rounds 1-2: Easy, 3-5: Medium, 6-9: Hard, 10+: Hard+
     if (roundNumber <= 2) {
         return AI_DIFFICULTY.EASY;
-    } else if (roundNumber <= 4) {
+    } else if (roundNumber <= 5) {
         return AI_DIFFICULTY.MEDIUM;
-    } else {
+    } else if (roundNumber <= 9) {
         return AI_DIFFICULTY.HARD;
+    } else {
+        return AI_DIFFICULTY.HARD_PLUS;
     }
 }
 
@@ -1217,7 +1234,8 @@ export function setDifficultyForRound(roundNumber) {
 const AI_PURCHASE_BUDGETS = {
     [AI_DIFFICULTY.EASY]: 0,        // Easy AI doesn't buy weapons
     [AI_DIFFICULTY.MEDIUM]: 2000,   // Medium AI has modest budget
-    [AI_DIFFICULTY.HARD]: 5000      // Hard AI has generous budget
+    [AI_DIFFICULTY.HARD]: 5000,     // Hard AI has generous budget
+    [AI_DIFFICULTY.HARD_PLUS]: 8000 // Hard+ AI has maximum budget
 };
 
 /**
@@ -1239,6 +1257,15 @@ const AI_PREFERRED_PURCHASES = {
         'missile',       // $500, 5 ammo - reliable
         'digger',        // $2000, 3 ammo - terrain penetration
         'roller',        // $1500, 3 ammo - rolling damage
+    ],
+    [AI_DIFFICULTY.HARD_PLUS]: [
+        'nuke',          // $8000, 1 ammo - devastating
+        'mini-nuke',     // $4000, 2 ammo - high damage
+        'mirv',          // $3000, 2 ammo - area denial
+        'heavy-digger',  // $3500, 2 ammo - terrain penetration
+        'heavy-roller',  // $2500, 2 ammo - heavy damage
+        'big-shot',      // $1000, 3 ammo - solid damage
+        'missile',       // $500, 5 ammo - reliable
     ]
 };
 
