@@ -73,6 +73,33 @@ let hoveredWeaponId = null;
 let activeTab = 'weapons';
 
 /**
+ * Horizontal scroll offsets per category (for horizontal scrolling).
+ * Keys are category types (e.g., 'standard', 'nuclear'), values are scroll X offset.
+ * @type {Object<string, number>}
+ */
+let categoryScrollOffsets = {};
+
+/**
+ * Scroll drag state for horizontal scrolling.
+ * @type {{active: boolean, categoryType: string|null, startX: number, startScrollX: number, lastX: number, velocity: number, potentialDrag: boolean}}
+ */
+let scrollDragState = {
+    active: false,
+    categoryType: null,
+    startX: 0,
+    startScrollX: 0,
+    lastX: 0,
+    velocity: 0,
+    potentialDrag: false
+};
+
+/**
+ * Category row hit areas (for detecting scroll interactions).
+ * @type {Array<{categoryType: string, x: number, y: number, width: number, height: number, maxScroll: number}>}
+ */
+let categoryRowAreas = [];
+
+/**
  * Tab definitions for the shop.
  */
 const SHOP_TABS = {
@@ -193,6 +220,9 @@ export function show(playerTank) {
     purchaseFeedback = null;
     weaponCardAreas = [];
     tabButtonAreas = [];
+    categoryRowAreas = [];
+    categoryScrollOffsets = {};
+    scrollDragState = { active: false, categoryType: null, startX: 0, startScrollX: 0, lastX: 0, velocity: 0, potentialDrag: false };
     activeTab = 'weapons';  // Always start on WEAPONS tab
 
     console.log('[Shop] Opened');
@@ -206,6 +236,9 @@ export function hide() {
     playerTankRef = null;
     weaponCardAreas = [];
     tabButtonAreas = [];
+    categoryRowAreas = [];
+    categoryScrollOffsets = {};
+    scrollDragState = { active: false, categoryType: null, startX: 0, startScrollX: 0, lastX: 0, velocity: 0, potentialDrag: false };
 
     console.log('[Shop] Closed');
 }
@@ -339,6 +372,27 @@ function getWeaponAtPoint(x, y) {
 }
 
 /**
+ * Check if a point is inside a category row area.
+ * @param {number} x - X coordinate
+ * @param {number} y - Y coordinate
+ * @returns {{categoryType: string, maxScroll: number}|null} Category info or null
+ */
+function getCategoryRowAtPoint(x, y) {
+    for (const area of categoryRowAreas) {
+        if (x >= area.x &&
+            x <= area.x + area.width &&
+            y >= area.y &&
+            y <= area.y + area.height) {
+            return {
+                categoryType: area.categoryType,
+                maxScroll: area.maxScroll
+            };
+        }
+    }
+    return null;
+}
+
+/**
  * Handle pointer down on the shop screen.
  * Sets pressed state for touch feedback.
  * @param {number} x - X coordinate in design space
@@ -359,6 +413,21 @@ export function handlePointerDown(x, y) {
     if (tabInfo) {
         pressedElementId = `tab_${tabInfo.tabId}`;
         return true;
+    }
+
+    // Check if touching a category row (for potential scroll dragging)
+    const categoryRow = getCategoryRowAtPoint(x, y);
+    if (categoryRow && categoryRow.maxScroll > 0) {
+        // Start potential scroll drag (will become active after movement threshold)
+        scrollDragState = {
+            active: false,  // Not active until we detect actual dragging
+            categoryType: categoryRow.categoryType,
+            startX: x,
+            startScrollX: categoryScrollOffsets[categoryRow.categoryType] || 0,
+            lastX: x,
+            velocity: 0,
+            potentialDrag: true  // Track that we're in a potential drag state
+        };
     }
 
     // Check weapon cards
@@ -382,6 +451,19 @@ export function handlePointerDown(x, y) {
  * @returns {boolean} True if an action was triggered
  */
 export function handlePointerUp(x, y) {
+    // End scroll drag if active
+    const wasScrollDragging = scrollDragState.active;
+    // Reset scroll drag state
+    scrollDragState = {
+        active: false,
+        categoryType: null,
+        startX: 0,
+        startScrollX: 0,
+        lastX: 0,
+        velocity: 0,
+        potentialDrag: false
+    };
+
     if (!isVisible) {
         pressedElementId = null;
         return false;
@@ -389,6 +471,9 @@ export function handlePointerUp(x, y) {
 
     const wasPressed = pressedElementId;
     pressedElementId = null;
+
+    // If we were scroll dragging, don't trigger any actions
+    if (wasScrollDragging) return false;
 
     if (!wasPressed) return false;
 
@@ -435,7 +520,7 @@ export function handlePointerUp(x, y) {
 }
 
 /**
- * Handle pointer move for hover effects.
+ * Handle pointer move for hover effects and scroll dragging.
  * Updates the hovered weapon ID for visual feedback.
  * @param {number} x - X coordinate in design space
  * @param {number} y - Y coordinate in design space
@@ -446,12 +531,63 @@ export function handlePointerMove(x, y) {
         return;
     }
 
+    // Handle scroll dragging (potential or active)
+    if (scrollDragState.potentialDrag || scrollDragState.active) {
+        const dragDistance = Math.abs(scrollDragState.startX - x);
+
+        // Activate dragging after threshold (10px horizontal movement)
+        if (!scrollDragState.active && dragDistance > 10) {
+            scrollDragState.active = true;
+            // Cancel any pressed element when we start actual dragging
+            pressedElementId = null;
+        }
+
+        if (scrollDragState.active) {
+            const deltaX = scrollDragState.lastX - x;  // Positive = scroll right
+            scrollDragState.velocity = deltaX;
+            scrollDragState.lastX = x;
+
+            // Update scroll offset (clamped to valid range)
+            const categoryRow = categoryRowAreas.find(r => r.categoryType === scrollDragState.categoryType);
+            if (categoryRow) {
+                const newScrollX = scrollDragState.startScrollX + (scrollDragState.startX - x);
+                categoryScrollOffsets[scrollDragState.categoryType] = Math.max(0, Math.min(categoryRow.maxScroll, newScrollX));
+            }
+            return;
+        }
+    }
+
     const weaponInfo = getWeaponAtPoint(x, y);
     if (weaponInfo) {
         hoveredWeaponId = weaponInfo.weaponId;
     } else {
         hoveredWeaponId = null;
     }
+}
+
+/**
+ * Handle mouse wheel scroll for category rows.
+ * Scrolls the category row under the pointer.
+ * @param {number} x - X coordinate in design space
+ * @param {number} y - Y coordinate in design space
+ * @param {number} deltaY - Wheel delta (positive = scroll down/right)
+ * @returns {boolean} True if scroll was handled
+ */
+export function handleWheel(x, y, deltaY) {
+    if (!isVisible) return false;
+
+    // Check if pointer is over a category row
+    const categoryRow = getCategoryRowAtPoint(x, y);
+    if (categoryRow && categoryRow.maxScroll > 0) {
+        // Scroll the category row (use deltaY as horizontal scroll amount)
+        const scrollAmount = deltaY * 0.5;  // Scale wheel delta for smoother scrolling
+        const currentScroll = categoryScrollOffsets[categoryRow.categoryType] || 0;
+        const newScroll = Math.max(0, Math.min(categoryRow.maxScroll, currentScroll + scrollAmount));
+        categoryScrollOffsets[categoryRow.categoryType] = newScroll;
+        return true;
+    }
+
+    return false;
 }
 
 /**
@@ -1068,12 +1204,18 @@ export function render(ctx) {
         }
     }
 
-    // Render weapons by category with proper containment
+    // Render weapons by category with horizontal scrolling
     // Each category section consists of:
     // 1. Category header (label + horizontal line)
     // 2. Padding below header
-    // 3. Weapon cards grid
+    // 3. Weapon cards in a single horizontal row (scrollable)
     // 4. Margin before next category (minimum 24px per spec)
+
+    // Clear category row areas for this frame
+    categoryRowAreas = [];
+
+    // Visible row width matches the 5-column grid width
+    const visibleRowWidth = totalCardWidth;
 
     let currentY = panel.Y + SHOP_LAYOUT.CATEGORY.Y_START;
     let isFirstCategory = true;
@@ -1088,8 +1230,15 @@ export function render(ctx) {
         }
         isFirstCategory = false;
 
-        // Calculate how many rows of cards this category needs
-        const numRows = Math.ceil(categoryWeapons.length / columns);
+        // Initialize scroll offset for this category if not already set
+        if (categoryScrollOffsets[category.type] === undefined) {
+            categoryScrollOffsets[category.type] = 0;
+        }
+
+        // Calculate total content width (all cards in a single row)
+        const totalContentWidth = categoryWeapons.length * cardWidth + (categoryWeapons.length - 1) * cardGap;
+        // Max scroll is the amount content extends beyond visible area (0 if fits)
+        const maxScroll = Math.max(0, totalContentWidth - visibleRowWidth);
 
         // === DRAW CATEGORY HEADER ===
         // Header text is vertically centered in the header area
@@ -1116,33 +1265,49 @@ export function render(ctx) {
         // Move past header area + padding to get card start position
         const cardStartY = currentY + categoryHeaderHeight + categoryLabelPadding;
 
-        // === DRAW WEAPON CARDS ===
-        let col = 0;
-        let row = 0;
-        for (const weapon of categoryWeapons) {
-            if (col >= columns) {
-                col = 0;
-                row++;
+        // Track category row area for scroll interactions
+        categoryRowAreas.push({
+            categoryType: category.type,
+            x: gridStartX,
+            y: cardStartY,
+            width: visibleRowWidth,
+            height: cardHeight,
+            maxScroll: maxScroll
+        });
+
+        // === DRAW WEAPON CARDS (single horizontal row with scroll) ===
+        // Apply clipping to only show cards within the visible area
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(gridStartX, cardStartY, visibleRowWidth, cardHeight);
+        ctx.clip();
+
+        const scrollOffset = categoryScrollOffsets[category.type] || 0;
+
+        for (let i = 0; i < categoryWeapons.length; i++) {
+            const weapon = categoryWeapons[i];
+            // All cards in a single row, offset by scroll position
+            const cardX = gridStartX + i * (cardWidth + cardGap) - scrollOffset;
+            const cardY = cardStartY;
+
+            // Only render cards that are at least partially visible
+            if (cardX + cardWidth >= gridStartX && cardX <= gridStartX + visibleRowWidth) {
+                const currentAmmo = playerTankRef ? playerTankRef.getAmmo(weapon.id) : 0;
+                const canAfford = Money.canAfford(weapon.cost);
+                const showFeedback = feedbackWeaponId === weapon.id;
+
+                renderWeaponCard(
+                    ctx, weapon, cardX, cardY, currentAmmo, canAfford,
+                    pulseIntensity, showFeedback, feedbackSuccess
+                );
             }
-
-            const cardX = gridStartX + col * (cardWidth + cardGap);
-            const cardY = cardStartY + row * (cardHeight + cardGap);
-
-            const currentAmmo = playerTankRef ? playerTankRef.getAmmo(weapon.id) : 0;
-            const canAfford = Money.canAfford(weapon.cost);
-            const showFeedback = feedbackWeaponId === weapon.id;
-
-            renderWeaponCard(
-                ctx, weapon, cardX, cardY, currentAmmo, canAfford,
-                pulseIntensity, showFeedback, feedbackSuccess
-            );
-
-            col++;
         }
 
+        ctx.restore(); // Remove clipping
+
         // === UPDATE Y FOR NEXT CATEGORY ===
-        // Move past: header + padding + all card rows
-        currentY = cardStartY + numRows * cardHeight + (numRows - 1) * cardGap;
+        // Only one row per category now
+        currentY = cardStartY + cardHeight;
     }
 
     // Render Done button

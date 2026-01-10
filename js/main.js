@@ -3150,25 +3150,63 @@ function setupShopState() {
         startNextRound();
     });
 
-    // Register click handlers for shop
+    // Register pointer handlers for shop (mouse and touch)
+    // Using pointer down/move/up pattern for proper swipe scroll support
     Input.onMouseDown((x, y, button) => {
         if (button === 0 && Game.getState() === GAME_STATES.SHOP) {
-            Shop.handleClick(x, y);
+            Shop.handlePointerDown(x, y);
         }
     });
 
-    Input.onTouchStart((x, y) => {
-        if (Game.getState() === GAME_STATES.SHOP) {
-            Shop.handleClick(x, y);
+    Input.onMouseUp((x, y, button) => {
+        if (button === 0 && Game.getState() === GAME_STATES.SHOP) {
+            Shop.handlePointerUp(x, y);
         }
     });
 
-    // Handle pointer move for shop hover effects
     Input.onMouseMove((x, y) => {
         if (Game.getState() === GAME_STATES.SHOP) {
             Shop.handlePointerMove(x, y);
         }
     });
+
+    Input.onTouchStart((x, y) => {
+        if (Game.getState() === GAME_STATES.SHOP) {
+            Shop.handlePointerDown(x, y);
+        }
+    });
+
+    Input.onTouchMove((x, y) => {
+        if (Game.getState() === GAME_STATES.SHOP) {
+            Shop.handlePointerMove(x, y);
+        }
+    });
+
+    Input.onTouchEnd((x, y) => {
+        if (Game.getState() === GAME_STATES.SHOP) {
+            Shop.handlePointerUp(x, y);
+        }
+    });
+
+    // Handle wheel scroll for shop category rows
+    // Need to add wheel listener directly since Input module doesn't support it
+    const canvas = document.getElementById('gameCanvas');
+    if (canvas) {
+        canvas.addEventListener('wheel', (e) => {
+            if (Game.getState() === GAME_STATES.SHOP) {
+                // Convert screen coordinates to design coordinates
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = CANVAS.DESIGN_WIDTH / rect.width;
+                const scaleY = CANVAS.DESIGN_HEIGHT / rect.height;
+                const x = (e.clientX - rect.left) * scaleX;
+                const y = (e.clientY - rect.top) * scaleY;
+
+                if (Shop.handleWheel(x, y, e.deltaY)) {
+                    e.preventDefault();
+                }
+            }
+        }, { passive: false });
+    }
 
     Game.registerStateHandlers(GAME_STATES.SHOP, {
         onEnter: (fromState) => {
