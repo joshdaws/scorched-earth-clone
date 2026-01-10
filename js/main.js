@@ -46,7 +46,7 @@ import * as PrecisionAchievements from './precision-achievements.js';
 import * as WeaponAchievements from './weapon-achievements.js';
 import * as ProgressionAchievements from './progression-achievements.js';
 import * as HiddenAchievements from './hidden-achievements.js';
-import { onAchievementUnlock, clearRoundAchievements, getRoundAchievements } from './achievements.js';
+import { onAchievementUnlock, clearRoundAchievements, getRoundAchievements, getUnviewedCount, markAllAchievementsViewed } from './achievements.js';
 import * as Tokens from './tokens.js';
 import * as TankCollection from './tank-collection.js';
 import * as PerformanceTracking from './performance-tracking.js';
@@ -344,11 +344,15 @@ function handleMenuClick(pos) {
     } else if (isInsideButton(pos.x, pos.y, menuButtons.achievements)) {
         // Play click sound
         Sound.playClickSound();
+        // Mark achievements as viewed when opening the screen
+        markAllAchievementsViewed();
         // Go to ACHIEVEMENTS state
         Game.setState(GAME_STATES.ACHIEVEMENTS);
     } else if (isInsideButton(pos.x, pos.y, menuButtons.collection)) {
         // Play click sound
         Sound.playClickSound();
+        // Mark new tanks as viewed when opening collection
+        TankCollection.markAllTanksViewed();
         // Go to COLLECTION state
         Game.setState(GAME_STATES.COLLECTION);
     } else if (isInsideButton(pos.x, pos.y, menuButtons.supplyDrop)) {
@@ -513,7 +517,7 @@ function renderMenuBackground(ctx) {
  * @param {Object} button - Button definition
  * @param {number} pulseIntensity - Glow pulse intensity (0-1)
  */
-function renderMenuButton(ctx, button, pulseIntensity) {
+function renderMenuButton(ctx, button, pulseIntensity, badgeCount = 0) {
     const halfWidth = button.width / 2;
     const halfHeight = button.height / 2;
     const btnX = button.x - halfWidth;
@@ -566,6 +570,37 @@ function renderMenuButton(ctx, button, pulseIntensity) {
         ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
         ctx.fillStyle = COLORS.TEXT_MUTED;
         ctx.fillText('(Coming Soon)', button.x, button.y + 35);
+    }
+
+    // Render badge if count > 0
+    if (badgeCount > 0 && !isDisabled) {
+        const badgeRadius = 12;
+        const badgeX = btnX + button.width - 8;
+        const badgeY = btnY + 8;
+
+        // Badge background (red circle with glow)
+        ctx.save();
+        ctx.shadowColor = '#ff4444';
+        ctx.shadowBlur = 10 + pulseIntensity * 5;
+        ctx.fillStyle = '#ff4444';
+        ctx.beginPath();
+        ctx.arc(badgeX, badgeY, badgeRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Badge border
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Badge text
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `bold ${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const badgeText = badgeCount > 9 ? '9+' : String(badgeCount);
+        ctx.fillText(badgeText, badgeX, badgeY);
+        ctx.restore();
     }
 
     ctx.restore();
@@ -657,13 +692,30 @@ function renderMenu(ctx) {
     ctx.fillText('SYNTHWAVE EDITION', CANVAS.DESIGN_WIDTH / 2, titleY + 55);
     ctx.restore();
 
-    // Render menu buttons
+    // Get badge counts for buttons
+    const unviewedAchievements = getUnviewedCount();
+    const newTanks = TankCollection.getNewTankCount();
+
+    // Render menu buttons with badge counts
     renderMenuButton(ctx, menuButtons.start, pulseIntensity);
     renderMenuButton(ctx, menuButtons.highScores, pulseIntensity);
-    renderMenuButton(ctx, menuButtons.achievements, pulseIntensity);
-    renderMenuButton(ctx, menuButtons.collection, pulseIntensity);
+    renderMenuButton(ctx, menuButtons.achievements, pulseIntensity, unviewedAchievements);
+    renderMenuButton(ctx, menuButtons.collection, pulseIntensity, newTanks);
     renderMenuButton(ctx, menuButtons.supplyDrop, pulseIntensity);
     renderMenuButton(ctx, menuButtons.options, pulseIntensity);
+
+    // Token balance display (above SUPPLY DROPS button)
+    const tokenBalance = Tokens.getTokenBalance();
+    ctx.save();
+    ctx.shadowColor = '#F59E0B';
+    ctx.shadowBlur = 8 + pulseIntensity * 4;
+    ctx.fillStyle = '#F59E0B';
+    ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`🪙 ${tokenBalance} TOKENS`, CANVAS.DESIGN_WIDTH / 2, menuButtons.supplyDrop.y - 32);
+    ctx.shadowBlur = 0;
+    ctx.restore();
 
     // Best run display (below OPTIONS button)
     const bestRound = HighScores.getBestRoundCount();

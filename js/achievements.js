@@ -761,7 +761,8 @@ const STORAGE_KEY = 'scorched_earth_achievements';
 const DEFAULT_ACHIEVEMENT_STATE = {
     unlocked: [],       // Array of unlocked achievement IDs
     progress: {},       // Map of achievement ID -> { current: number, required: number }
-    unlockDates: {}     // Map of achievement ID -> ISO date string
+    unlockDates: {},    // Map of achievement ID -> ISO date string
+    viewed: []          // Array of achievement IDs that have been viewed in the screen
 };
 
 /**
@@ -876,7 +877,8 @@ export function loadAchievementState() {
         achievementState = {
             unlocked: Array.isArray(stored.unlocked) ? stored.unlocked : [],
             progress: stored.progress && typeof stored.progress === 'object' ? stored.progress : {},
-            unlockDates: stored.unlockDates && typeof stored.unlockDates === 'object' ? stored.unlockDates : {}
+            unlockDates: stored.unlockDates && typeof stored.unlockDates === 'object' ? stored.unlockDates : {},
+            viewed: Array.isArray(stored.viewed) ? stored.viewed : []
         };
         debugLog('Achievement state loaded', {
             unlockedCount: achievementState.unlocked.length,
@@ -912,7 +914,8 @@ export function getAchievementState() {
     return {
         unlocked: [...achievementState.unlocked],
         progress: { ...achievementState.progress },
-        unlockDates: { ...achievementState.unlockDates }
+        unlockDates: { ...achievementState.unlockDates },
+        viewed: [...achievementState.viewed]
     };
 }
 
@@ -1179,6 +1182,32 @@ export function clearRoundAchievements() {
 }
 
 /**
+ * Get count of achievements unlocked but not yet viewed.
+ * @returns {number} Count of unviewed achievements
+ */
+export function getUnviewedCount() {
+    return achievementState.unlocked.filter(id => !achievementState.viewed.includes(id)).length;
+}
+
+/**
+ * Check if there are any unviewed achievements.
+ * @returns {boolean} True if there are unviewed achievements
+ */
+export function hasUnviewedAchievements() {
+    return getUnviewedCount() > 0;
+}
+
+/**
+ * Mark all unlocked achievements as viewed.
+ * Should be called when the user opens the achievements screen.
+ */
+export function markAllAchievementsViewed() {
+    achievementState.viewed = [...achievementState.unlocked];
+    saveAchievementState();
+    debugLog('All achievements marked as viewed');
+}
+
+/**
  * Reset all achievement state (for testing or user-requested reset).
  * @returns {boolean} True if reset succeeded
  */
@@ -1186,7 +1215,8 @@ export function resetAchievementState() {
     achievementState = {
         unlocked: [],
         progress: {},
-        unlockDates: {}
+        unlockDates: {},
+        viewed: []
     };
     const saved = saveAchievementState();
     debugLog('Achievement state reset');
