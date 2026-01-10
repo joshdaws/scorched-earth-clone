@@ -95,6 +95,81 @@ const VISUALS = {
     BANNER_HEIGHT: 50
 };
 
+/**
+ * Rarity-specific reveal effect configurations.
+ * Each rarity tier gets progressively more dramatic effects.
+ */
+const RARITY_EFFECTS = {
+    [RARITY.COMMON]: {
+        // Common: Simple panel open, minimal glow
+        sparkCount: 5,
+        sparkSpeed: 80,
+        glowIntensity: 0.3,
+        lightRayCount: 0,
+        screenShake: false,
+        screenFlash: false,
+        crateGlowColor: '#FFFFFF',
+        crateGlowIntensity: 0.2,
+        preRevealEffect: null
+    },
+    [RARITY.UNCOMMON]: {
+        // Uncommon: Glowing edges, cyan particles
+        sparkCount: 12,
+        sparkSpeed: 120,
+        glowIntensity: 0.5,
+        lightRayCount: 4,
+        screenShake: false,
+        screenFlash: false,
+        crateGlowColor: '#00FFFF',
+        crateGlowIntensity: 0.4,
+        preRevealEffect: 'cyanGlow'
+    },
+    [RARITY.RARE]: {
+        // Rare: Electric sparks, purple lightning
+        sparkCount: 18,
+        sparkSpeed: 160,
+        glowIntensity: 0.7,
+        lightRayCount: 6,
+        screenShake: false,
+        screenFlash: false,
+        crateGlowColor: '#8B5CF6',
+        crateGlowIntensity: 0.6,
+        preRevealEffect: 'lightning',
+        lightningColor: '#8B5CF6'
+    },
+    [RARITY.EPIC]: {
+        // Epic: Holographic shimmer, golden particles, strobing
+        sparkCount: 25,
+        sparkSpeed: 200,
+        glowIntensity: 0.9,
+        lightRayCount: 8,
+        screenShake: true,
+        shakeIntensity: 3,
+        shakeDuration: 200,
+        screenFlash: false,
+        crateGlowColor: '#FFD700',
+        crateGlowIntensity: 0.8,
+        preRevealEffect: 'holographic',
+        strobeColors: ['#FFD700', '#FF6B35', '#FF00FF']
+    },
+    [RARITY.LEGENDARY]: {
+        // Legendary: Maximum explosion, screen shake, flash, light rays
+        sparkCount: 40,
+        sparkSpeed: 250,
+        glowIntensity: 1.0,
+        lightRayCount: 12,
+        screenShake: true,
+        shakeIntensity: 8,
+        shakeDuration: 400,
+        screenFlash: true,
+        flashDuration: 150,
+        crateGlowColor: '#FF0066',
+        crateGlowIntensity: 1.0,
+        preRevealEffect: 'glitch',
+        glitchIntensity: 0.8
+    }
+};
+
 // =============================================================================
 // MODULE STATE
 // =============================================================================
@@ -138,6 +213,41 @@ let tankRiseProgress = 0;
 
 /** @type {boolean} Module initialized */
 let isInitialized = false;
+
+// --- Rarity effect state ---
+/** @type {number} Screen shake offset X */
+let shakeOffsetX = 0;
+/** @type {number} Screen shake offset Y */
+let shakeOffsetY = 0;
+/** @type {number} Screen shake remaining duration */
+let shakeDuration = 0;
+/** @type {number} Screen shake intensity */
+let shakeIntensity = 0;
+
+/** @type {number} Screen flash opacity (0-1) */
+let flashOpacity = 0;
+/** @type {number} Screen flash remaining duration */
+let flashDuration = 0;
+
+/** @type {number} Pre-reveal effect progress (0-1) */
+let preRevealProgress = 0;
+/** @type {boolean} Whether pre-reveal effect is active */
+let preRevealActive = false;
+
+/** @type {number} Strobe color index for epic rarity */
+let strobeIndex = 0;
+/** @type {number} Strobe timer */
+let strobeTimer = 0;
+
+/** @type {Array} Lightning bolt points for rare rarity */
+let lightningBolts = [];
+/** @type {number} Lightning update timer */
+let lightningTimer = 0;
+
+/** @type {number} Glitch effect intensity for legendary */
+let glitchIntensity = 0;
+/** @type {Array} Glitch slice offsets */
+let glitchSlices = [];
 
 // =============================================================================
 // DEBUG LOGGING
@@ -252,15 +362,20 @@ function spawnDustParticles(x, y) {
 }
 
 /**
- * Spawn spark particles for crate explosion.
+ * Spawn spark particles for crate explosion with rarity-based intensity.
  * @param {number} x - Center X position
  * @param {number} y - Center Y position
  * @param {string} color - Rarity color
+ * @param {string} rarity - Tank rarity for effect intensity
  */
-function spawnSparkParticles(x, y, color) {
-    for (let i = 0; i < VISUALS.SPARK_PARTICLE_COUNT; i++) {
+function spawnSparkParticles(x, y, color, rarity = RARITY.COMMON) {
+    const effects = RARITY_EFFECTS[rarity] || RARITY_EFFECTS[RARITY.COMMON];
+    const count = effects.sparkCount;
+    const baseSpeed = effects.sparkSpeed;
+
+    for (let i = 0; i < count; i++) {
         const angle = Math.random() * Math.PI * 2;
-        const speed = 100 + Math.random() * 200;
+        const speed = baseSpeed * (0.5 + Math.random());
         particles.push(createParticle({
             x: x,
             y: y,
@@ -273,6 +388,289 @@ function spawnSparkParticles(x, y, color) {
             friction: 0.95
         }));
     }
+}
+
+// =============================================================================
+// RARITY EFFECT HELPERS
+// =============================================================================
+
+/**
+ * Trigger screen shake effect.
+ * @param {number} intensity - Shake intensity in pixels
+ * @param {number} duration - Shake duration in ms
+ */
+function triggerScreenShake(intensity, duration) {
+    shakeIntensity = intensity;
+    shakeDuration = duration;
+    debugLog('Screen shake triggered', { intensity, duration });
+}
+
+/**
+ * Update screen shake effect.
+ * @param {number} deltaTime - Time since last update in ms
+ */
+function updateScreenShake(deltaTime) {
+    if (shakeDuration > 0) {
+        shakeDuration -= deltaTime;
+        const progress = shakeDuration > 0 ? 1 : 0;
+        const currentIntensity = shakeIntensity * progress;
+        shakeOffsetX = (Math.random() - 0.5) * 2 * currentIntensity;
+        shakeOffsetY = (Math.random() - 0.5) * 2 * currentIntensity;
+    } else {
+        shakeOffsetX = 0;
+        shakeOffsetY = 0;
+    }
+}
+
+/**
+ * Trigger screen flash effect.
+ * @param {number} duration - Flash duration in ms
+ */
+function triggerScreenFlash(duration) {
+    flashOpacity = 1;
+    flashDuration = duration;
+    debugLog('Screen flash triggered', { duration });
+}
+
+/**
+ * Update screen flash effect.
+ * @param {number} deltaTime - Time since last update in ms
+ */
+function updateScreenFlash(deltaTime) {
+    if (flashDuration > 0) {
+        flashDuration -= deltaTime;
+        flashOpacity = Math.max(0, flashDuration / 150); // Fade out
+    } else {
+        flashOpacity = 0;
+    }
+}
+
+/**
+ * Draw screen flash overlay.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ */
+function drawScreenFlash(ctx) {
+    if (flashOpacity > 0) {
+        ctx.save();
+        ctx.fillStyle = `rgba(255, 255, 255, ${flashOpacity * 0.8})`;
+        ctx.fillRect(0, 0, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+        ctx.restore();
+    }
+}
+
+/**
+ * Generate lightning bolt points.
+ * @param {number} startX - Start X position
+ * @param {number} startY - Start Y position
+ * @param {number} endX - End X position
+ * @param {number} endY - End Y position
+ * @returns {Array} Array of {x, y} points
+ */
+function generateLightningBolt(startX, startY, endX, endY) {
+    const points = [{ x: startX, y: startY }];
+    const segments = 8 + Math.floor(Math.random() * 4);
+    const dx = (endX - startX) / segments;
+    const dy = (endY - startY) / segments;
+
+    for (let i = 1; i < segments; i++) {
+        const x = startX + dx * i + (Math.random() - 0.5) * 40;
+        const y = startY + dy * i + (Math.random() - 0.5) * 20;
+        points.push({ x, y });
+    }
+
+    points.push({ x: endX, y: endY });
+    return points;
+}
+
+/**
+ * Update lightning bolts for rare rarity.
+ * @param {number} deltaTime - Time since last update in ms
+ * @param {number} crateX - Crate X position
+ * @param {number} crateY - Crate Y position
+ */
+function updateLightning(deltaTime, crateX, crateY) {
+    lightningTimer += deltaTime;
+
+    // Regenerate lightning every 100ms
+    if (lightningTimer > 100) {
+        lightningTimer = 0;
+        lightningBolts = [];
+
+        // Generate 2-4 lightning bolts around the crate
+        const boltCount = 2 + Math.floor(Math.random() * 3);
+        for (let i = 0; i < boltCount; i++) {
+            const startAngle = Math.random() * Math.PI * 2;
+            const startDist = 80 + Math.random() * 40;
+            const endAngle = startAngle + (Math.random() - 0.5) * Math.PI;
+            const endDist = 20 + Math.random() * 30;
+
+            lightningBolts.push(generateLightningBolt(
+                crateX + Math.cos(startAngle) * startDist,
+                crateY + Math.sin(startAngle) * startDist - 30,
+                crateX + Math.cos(endAngle) * endDist,
+                crateY + Math.sin(endAngle) * endDist - 30
+            ));
+        }
+    }
+}
+
+/**
+ * Draw lightning bolts.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {string} color - Lightning color
+ */
+function drawLightning(ctx, color) {
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 15;
+    ctx.lineWidth = 2;
+
+    for (const bolt of lightningBolts) {
+        if (bolt.length < 2) continue;
+
+        ctx.beginPath();
+        ctx.moveTo(bolt[0].x, bolt[0].y);
+        for (let i = 1; i < bolt.length; i++) {
+            ctx.lineTo(bolt[i].x, bolt[i].y);
+        }
+        ctx.stroke();
+
+        // Draw glow layer
+        ctx.lineWidth = 4;
+        ctx.globalAlpha = 0.3;
+        ctx.stroke();
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = 1;
+    }
+
+    ctx.restore();
+}
+
+/**
+ * Update strobe effect for epic rarity.
+ * @param {number} deltaTime - Time since last update in ms
+ */
+function updateStrobe(deltaTime) {
+    strobeTimer += deltaTime;
+    if (strobeTimer > 80) { // Change color every 80ms
+        strobeTimer = 0;
+        strobeIndex = (strobeIndex + 1) % 3;
+    }
+}
+
+/**
+ * Get current strobe color for epic rarity.
+ * @param {Array} colors - Array of strobe colors
+ * @returns {string} Current strobe color
+ */
+function getStrobeColor(colors) {
+    return colors[strobeIndex] || colors[0];
+}
+
+/**
+ * Update glitch effect for legendary rarity.
+ * @param {number} deltaTime - Time since last update in ms
+ * @param {number} intensity - Glitch intensity (0-1)
+ */
+function updateGlitch(deltaTime, intensity) {
+    glitchIntensity = intensity;
+
+    // Regenerate glitch slices randomly
+    if (Math.random() < 0.3) {
+        glitchSlices = [];
+        const sliceCount = 3 + Math.floor(Math.random() * 5);
+        for (let i = 0; i < sliceCount; i++) {
+            glitchSlices.push({
+                y: Math.random() * CANVAS.DESIGN_HEIGHT,
+                height: 5 + Math.random() * 30,
+                offsetX: (Math.random() - 0.5) * 40 * intensity,
+                color: Math.random() > 0.5 ? '#FF0066' : '#00FFFF'
+            });
+        }
+    }
+}
+
+/**
+ * Draw glitch effect overlay.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ */
+function drawGlitchEffect(ctx) {
+    if (glitchIntensity <= 0 || glitchSlices.length === 0) return;
+
+    ctx.save();
+    ctx.globalAlpha = glitchIntensity * 0.3;
+
+    for (const slice of glitchSlices) {
+        ctx.fillStyle = slice.color;
+        ctx.fillRect(slice.offsetX, slice.y, CANVAS.DESIGN_WIDTH, slice.height);
+    }
+
+    ctx.restore();
+}
+
+/**
+ * Draw holographic shimmer effect for epic rarity.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} x - Center X position
+ * @param {number} y - Center Y position
+ * @param {number} progress - Effect progress (0-1)
+ */
+function drawHolographicShimmer(ctx, x, y, progress) {
+    ctx.save();
+
+    const shimmerWidth = 80 + progress * 40;
+    const shimmerHeight = 80 + progress * 40;
+
+    // Create rainbow gradient
+    const gradient = ctx.createLinearGradient(
+        x - shimmerWidth / 2, y,
+        x + shimmerWidth / 2, y
+    );
+
+    const hueOffset = (Date.now() * 0.2) % 360;
+    gradient.addColorStop(0, `hsla(${hueOffset}, 100%, 60%, 0.3)`);
+    gradient.addColorStop(0.33, `hsla(${(hueOffset + 120) % 360}, 100%, 60%, 0.3)`);
+    gradient.addColorStop(0.66, `hsla(${(hueOffset + 240) % 360}, 100%, 60%, 0.3)`);
+    gradient.addColorStop(1, `hsla(${hueOffset}, 100%, 60%, 0.3)`);
+
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.ellipse(x, y - 30, shimmerWidth / 2, shimmerHeight / 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+}
+
+/**
+ * Draw crate glow effect based on rarity.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} x - Crate X position
+ * @param {number} y - Crate Y position
+ * @param {string} rarity - Tank rarity
+ * @param {number} progress - Glow progress (0-1)
+ */
+function drawCrateGlow(ctx, x, y, rarity, progress) {
+    const effects = RARITY_EFFECTS[rarity] || RARITY_EFFECTS[RARITY.COMMON];
+    const glowColor = effects.crateGlowColor;
+    const intensity = effects.crateGlowIntensity * progress;
+
+    if (intensity <= 0) return;
+
+    ctx.save();
+    ctx.globalAlpha = intensity;
+    ctx.shadowColor = glowColor;
+    ctx.shadowBlur = 30 + progress * 20;
+
+    // Pulsing glow
+    const pulse = 1 + Math.sin(Date.now() * 0.01) * 0.2;
+    const size = VISUALS.CRATE_SIZE * pulse;
+
+    ctx.strokeStyle = glowColor;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(x - size / 2, y - size / 2, size, size);
+
+    ctx.restore();
 }
 
 // =============================================================================
@@ -554,7 +952,7 @@ function drawSpotlight(ctx, x, targetY) {
 }
 
 /**
- * Draw the revealed tank.
+ * Draw the revealed tank with rarity-based effects.
  * @param {CanvasRenderingContext2D} ctx - Canvas context
  * @param {Object} tank - Tank to display
  * @param {number} riseProgress - Rise animation progress (0-1)
@@ -565,12 +963,15 @@ function drawRevealedTank(ctx, tank, riseProgress) {
     const tankY = baseY - (riseProgress * 80);
     const size = VISUALS.TANK_DISPLAY_SIZE;
 
+    // Get rarity-specific effects
+    const effects = RARITY_EFFECTS[tank.rarity] || RARITY_EFFECTS[RARITY.COMMON];
+
     ctx.save();
 
-    // Tank glow
+    // Tank glow - intensity based on rarity
     const glowColor = tank.glowColor || RARITY_COLORS[tank.rarity];
     ctx.shadowColor = glowColor;
-    ctx.shadowBlur = 30 * riseProgress;
+    ctx.shadowBlur = 30 * riseProgress * effects.glowIntensity;
 
     // Tank placeholder (rectangle with glow)
     ctx.fillStyle = '#1a1a2a';
@@ -595,14 +996,18 @@ function drawRevealedTank(ctx, tank, riseProgress) {
     ctx.lineWidth = 6;
     ctx.stroke();
 
-    // Light beams from tank (during reveal)
-    if (riseProgress > 0.3) {
-        const beamAlpha = (riseProgress - 0.3) * 0.5;
+    // Light beams from tank (during reveal) - count based on rarity
+    const rayCount = effects.lightRayCount;
+    if (riseProgress > 0.3 && rayCount > 0) {
+        const beamAlpha = (riseProgress - 0.3) * effects.glowIntensity;
         ctx.globalAlpha = beamAlpha;
 
-        for (let i = 0; i < 8; i++) {
-            const angle = (i / 8) * Math.PI * 2;
-            const beamLength = 100 + Math.sin(Date.now() * 0.005 + i) * 20;
+        // Longer beams for higher rarities
+        const baseBeamLength = 80 + rayCount * 10;
+
+        for (let i = 0; i < rayCount; i++) {
+            const angle = (i / rayCount) * Math.PI * 2;
+            const beamLength = baseBeamLength + Math.sin(Date.now() * 0.005 + i) * 20;
 
             ctx.beginPath();
             ctx.moveTo(centerX, tankY - tankHeight / 2);
@@ -719,16 +1124,41 @@ function updateLanding(phaseProgress) {
 }
 
 /**
- * Update reveal phase.
+ * Update reveal phase with rarity-specific effects.
  * @param {number} phaseProgress - Progress through phase (0-1)
+ * @param {number} deltaTime - Time since last update in ms
  */
-function updateReveal(phaseProgress) {
+function updateReveal(phaseProgress, deltaTime) {
     const centerX = CANVAS.DESIGN_WIDTH / 2;
+    const rarity = revealTank?.rarity || RARITY.COMMON;
+    const effects = RARITY_EFFECTS[rarity] || RARITY_EFFECTS[RARITY.COMMON];
 
-    // Spawn sparks at start
-    if (phaseProgress < 0.05 && particles.length < VISUALS.SPARK_PARTICLE_COUNT) {
-        const rarityColor = RARITY_COLORS[revealTank.rarity] || '#FFFFFF';
-        spawnSparkParticles(centerX, crateY, rarityColor);
+    // Spawn sparks at start - count based on rarity
+    if (phaseProgress < 0.05 && particles.length < effects.sparkCount) {
+        const rarityColor = RARITY_COLORS[rarity] || '#FFFFFF';
+        spawnSparkParticles(centerX, crateY, rarityColor, rarity);
+    }
+
+    // Trigger screen shake at reveal start for Epic and Legendary
+    if (phaseProgress < 0.1 && effects.screenShake && shakeDuration <= 0) {
+        triggerScreenShake(effects.shakeIntensity, effects.shakeDuration);
+    }
+
+    // Trigger screen flash for Legendary
+    if (phaseProgress < 0.05 && effects.screenFlash && flashDuration <= 0) {
+        triggerScreenFlash(effects.flashDuration);
+    }
+
+    // Update rarity-specific effects
+    if (effects.preRevealEffect === 'lightning') {
+        updateLightning(deltaTime, centerX, crateY);
+    }
+    if (effects.preRevealEffect === 'holographic' || effects.strobeColors) {
+        updateStrobe(deltaTime);
+    }
+    if (effects.preRevealEffect === 'glitch') {
+        // Glitch intensity decreases as reveal progresses
+        updateGlitch(deltaTime, effects.glitchIntensity * (1 - phaseProgress));
     }
 
     // Tank rises
@@ -754,6 +1184,10 @@ export function update(deltaTime) {
 
     // Update particles
     updateParticles(deltaTime);
+
+    // Update screen effects (shake and flash)
+    updateScreenShake(deltaTime);
+    updateScreenFlash(deltaTime);
 
     // Determine current phase based on elapsed time
     let accumulatedTime = 0;
@@ -782,10 +1216,29 @@ export function update(deltaTime) {
             currentPhase = PHASES.LANDING;
             phaseStartTime = now;
             debugLog('Phase: LANDING');
+            // Pre-reveal effects start during landing for Rare+
+            preRevealActive = true;
+            preRevealProgress = 0;
         }
         const phaseElapsed = now - phaseStartTime;
         const progress = Math.min(1, phaseElapsed / PHASE_TIMING.LANDING);
         updateLanding(progress);
+
+        // Update pre-reveal progress for rarity effects
+        if (preRevealActive) {
+            preRevealProgress = progress;
+            const rarity = revealTank?.rarity || RARITY.COMMON;
+            const effects = RARITY_EFFECTS[rarity] || RARITY_EFFECTS[RARITY.COMMON];
+
+            // Start lightning effect for rare
+            if (effects.preRevealEffect === 'lightning') {
+                updateLightning(deltaTime, crateX, crateY);
+            }
+            // Start glitch effect for legendary
+            if (effects.preRevealEffect === 'glitch') {
+                updateGlitch(deltaTime, effects.glitchIntensity * progress);
+            }
+        }
     } else if (elapsed < (accumulatedTime += PHASE_TIMING.REVEAL)) {
         if (currentPhase !== PHASES.REVEAL) {
             currentPhase = PHASES.REVEAL;
@@ -794,12 +1247,17 @@ export function update(deltaTime) {
         }
         const phaseElapsed = now - phaseStartTime;
         const progress = Math.min(1, phaseElapsed / PHASE_TIMING.REVEAL);
-        updateReveal(progress);
+        updateReveal(progress, deltaTime);
     } else if (elapsed < (accumulatedTime += PHASE_TIMING.HOLD)) {
         if (currentPhase !== PHASES.HOLD) {
             currentPhase = PHASES.HOLD;
             phaseStartTime = now;
             debugLog('Phase: HOLD');
+            // Clear effects during hold
+            preRevealActive = false;
+            lightningBolts = [];
+            glitchSlices = [];
+            glitchIntensity = 0;
         }
         // Hold on revealed tank - no update needed
     } else {
@@ -812,15 +1270,29 @@ export function update(deltaTime) {
 }
 
 /**
- * Render the supply drop animation.
+ * Render the supply drop animation with rarity-specific effects.
  * @param {CanvasRenderingContext2D} ctx - Canvas context
  */
 export function render(ctx) {
     if (!isPlaying && currentPhase !== PHASES.HOLD) return;
 
+    const rarity = revealTank?.rarity || RARITY.COMMON;
+    const effects = RARITY_EFFECTS[rarity] || RARITY_EFFECTS[RARITY.COMMON];
+
+    // Apply screen shake offset
+    ctx.save();
+    if (shakeOffsetX !== 0 || shakeOffsetY !== 0) {
+        ctx.translate(shakeOffsetX, shakeOffsetY);
+    }
+
     // Dark overlay
     const overlayOpacity = currentPhase === PHASES.APPROACH ? 0.7 : 0.85;
     drawOverlay(ctx, overlayOpacity);
+
+    // Draw glitch effect for legendary (before platform)
+    if (effects.preRevealEffect === 'glitch' && glitchIntensity > 0) {
+        drawGlitchEffect(ctx);
+    }
 
     // Draw platform
     drawPlatform(ctx);
@@ -848,12 +1320,46 @@ export function render(ctx) {
             if (parachuteDeployed && revealTank) {
                 drawParachute(ctx, crateX, crateY + VISUALS.PARACHUTE_OFFSET_Y - 50, revealTank.rarity);
             }
+
+            // Draw pre-reveal effects based on rarity
+            if (preRevealActive && revealTank) {
+                // Draw crate glow for uncommon+
+                if (effects.crateGlowIntensity > 0) {
+                    drawCrateGlow(ctx, crateX, crateY, rarity, preRevealProgress);
+                }
+
+                // Draw lightning for rare
+                if (effects.preRevealEffect === 'lightning') {
+                    drawLightning(ctx, effects.lightningColor || '#8B5CF6');
+                }
+
+                // Draw holographic shimmer for epic
+                if (effects.preRevealEffect === 'holographic') {
+                    drawHolographicShimmer(ctx, crateX, crateY, preRevealProgress);
+                }
+            }
+
             drawCrate(ctx, crateX, crateY);
             break;
 
         case PHASES.REVEAL:
         case PHASES.HOLD:
             if (revealTank) {
+                // Draw crate glow during reveal
+                if (currentPhase === PHASES.REVEAL && effects.crateGlowIntensity > 0) {
+                    drawCrateGlow(ctx, crateX, crateY, rarity, 1);
+                }
+
+                // Draw lightning during reveal for rare
+                if (currentPhase === PHASES.REVEAL && effects.preRevealEffect === 'lightning') {
+                    drawLightning(ctx, effects.lightningColor || '#8B5CF6');
+                }
+
+                // Draw holographic shimmer for epic during reveal
+                if (currentPhase === PHASES.REVEAL && effects.preRevealEffect === 'holographic') {
+                    drawHolographicShimmer(ctx, crateX, crateY, tankRiseProgress);
+                }
+
                 drawCrate(ctx, crateX, crateY, true);
                 drawRevealedTank(ctx, revealTank, tankRiseProgress);
 
@@ -865,6 +1371,12 @@ export function render(ctx) {
 
     // Always render particles on top
     renderParticles(ctx);
+
+    // Restore from screen shake offset
+    ctx.restore();
+
+    // Draw screen flash on top of everything (not affected by shake)
+    drawScreenFlash(ctx);
 }
 
 // =============================================================================
@@ -896,7 +1408,7 @@ export function play(tank, onComplete = null) {
     animationStartTime = performance.now();
     phaseStartTime = animationStartTime;
 
-    // Reset state
+    // Reset core state
     particles = [];
     planeX = CANVAS.DESIGN_WIDTH + VISUALS.PLANE_WIDTH;
     crateX = CANVAS.DESIGN_WIDTH / 2;
@@ -904,6 +1416,22 @@ export function play(tank, onComplete = null) {
     parachuteDeployed = false;
     rainbowHue = 0;
     tankRiseProgress = 0;
+
+    // Reset rarity effect state
+    shakeOffsetX = 0;
+    shakeOffsetY = 0;
+    shakeDuration = 0;
+    shakeIntensity = 0;
+    flashOpacity = 0;
+    flashDuration = 0;
+    preRevealProgress = 0;
+    preRevealActive = false;
+    strobeIndex = 0;
+    strobeTimer = 0;
+    lightningBolts = [];
+    lightningTimer = 0;
+    glitchIntensity = 0;
+    glitchSlices = [];
 }
 
 /**
