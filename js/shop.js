@@ -122,6 +122,28 @@ let scrollDragState = {
 let categoryRowAreas = [];
 
 /**
+ * Momentum scrolling state.
+ * @type {{active: boolean, direction: 'horizontal'|'vertical'|null, categoryType: string|null, velocityX: number, velocityY: number}}
+ */
+let momentumState = {
+    active: false,
+    direction: null,
+    categoryType: null,
+    velocityX: 0,
+    velocityY: 0
+};
+
+/**
+ * Friction coefficient for momentum deceleration (0-1, lower = more friction).
+ */
+const MOMENTUM_FRICTION = 0.92;
+
+/**
+ * Minimum velocity threshold below which momentum stops.
+ */
+const MOMENTUM_MIN_VELOCITY = 0.5;
+
+/**
  * Tab definitions for the shop.
  */
 const SHOP_TABS = {
@@ -248,6 +270,7 @@ export function show(playerTank) {
     maxVerticalScroll = 0;
     verticalScrollArea = null;
     scrollDragState = { active: false, direction: null, categoryType: null, startX: 0, startY: 0, startScrollX: 0, startScrollY: 0, lastX: 0, lastY: 0, velocity: 0, potentialDrag: false };
+    momentumState = { active: false, direction: null, categoryType: null, velocityX: 0, velocityY: 0 };
     activeTab = 'weapons';  // Always start on WEAPONS tab
 
     console.log('[Shop] Opened');
@@ -267,6 +290,7 @@ export function hide() {
     maxVerticalScroll = 0;
     verticalScrollArea = null;
     scrollDragState = { active: false, direction: null, categoryType: null, startX: 0, startY: 0, startScrollX: 0, startScrollY: 0, lastX: 0, lastY: 0, velocity: 0, potentialDrag: false };
+    momentumState = { active: false, direction: null, categoryType: null, velocityX: 0, velocityY: 0 };
 
     console.log('[Shop] Closed');
 }
@@ -444,6 +468,11 @@ function isInVerticalScrollArea(x, y) {
 export function handlePointerDown(x, y) {
     if (!isVisible) return false;
 
+    // Stop any active momentum scrolling when user touches
+    if (momentumState.active) {
+        momentumState = { active: false, direction: null, categoryType: null, velocityX: 0, velocityY: 0 };
+    }
+
     // Check done button
     if (isInsideButton(x, y, doneButton)) {
         pressedElementId = 'done';
@@ -499,8 +528,23 @@ export function handlePointerDown(x, y) {
  * @returns {boolean} True if an action was triggered
  */
 export function handlePointerUp(x, y) {
-    // End scroll drag if active
+    // End scroll drag if active and start momentum if velocity is sufficient
     const wasScrollDragging = scrollDragState.active;
+    const dragDirection = scrollDragState.direction;
+    const dragCategoryType = scrollDragState.categoryType;
+    const dragVelocity = scrollDragState.velocity;
+
+    // Start momentum scrolling if velocity is above threshold
+    if (wasScrollDragging && Math.abs(dragVelocity) > MOMENTUM_MIN_VELOCITY) {
+        momentumState = {
+            active: true,
+            direction: dragDirection,
+            categoryType: dragCategoryType,
+            velocityX: dragDirection === 'horizontal' ? dragVelocity : 0,
+            velocityY: dragDirection === 'vertical' ? dragVelocity : 0
+        };
+    }
+
     // Reset scroll drag state
     scrollDragState = {
         active: false,
@@ -610,6 +654,13 @@ export function handlePointerMove(x, y) {
         }
 
         if (scrollDragState.active) {
+            // Calculate velocity for momentum scrolling
+            const velocityX = scrollDragState.lastX - x;  // Positive = scroll right
+            const velocityY = scrollDragState.lastY - y;  // Positive = scroll down
+
+            // Store velocity (will be used to start momentum on release)
+            scrollDragState.velocity = scrollDragState.direction === 'horizontal' ? velocityX : velocityY;
+
             scrollDragState.lastX = x;
             scrollDragState.lastY = y;
 
@@ -1612,5 +1663,58 @@ export function render(ctx) {
 export function update(deltaTime) {
     if (isVisible) {
         animationTime += deltaTime;
+
+        // Update momentum scrolling
+        if (momentumState.active) {
+            // Apply horizontal momentum
+            if (momentumState.direction === 'horizontal' && momentumState.categoryType) {
+                const categoryRow = categoryRowAreas.find(r => r.categoryType === momentumState.categoryType);
+                if (categoryRow && categoryRow.maxScroll > 0) {
+                    const currentScroll = categoryScrollOffsets[momentumState.categoryType] || 0;
+                    const newScroll = currentScroll + momentumState.velocityX;
+                    categoryScrollOffsets[momentumState.categoryType] = Math.max(0, Math.min(categoryRow.maxScroll, newScroll));
+
+                    // Stop momentum if we hit the edge
+                    if (newScroll <= 0 || newScroll >= categoryRow.maxScroll) {
+                        momentumState.velocityX = 0;
+                    }
+                }
+
+                // Apply friction
+                momentumState.velocityX *= MOMENTUM_FRICTION;
+
+                // Stop when velocity is too low
+                if (Math.abs(momentumState.velocityX) < MOMENTUM_MIN_VELOCITY) {
+                    momentumState.velocityX = 0;
+                }
+            }
+
+            // Apply vertical momentum
+            if (momentumState.direction === 'vertical') {
+                if (maxVerticalScroll > 0) {
+                    const newScroll = verticalScrollOffset + momentumState.velocityY;
+                    verticalScrollOffset = Math.max(0, Math.min(maxVerticalScroll, newScroll));
+
+                    // Stop momentum if we hit the edge
+                    if (newScroll <= 0 || newScroll >= maxVerticalScroll) {
+                        momentumState.velocityY = 0;
+                    }
+                }
+
+                // Apply friction
+                momentumState.velocityY *= MOMENTUM_FRICTION;
+
+                // Stop when velocity is too low
+                if (Math.abs(momentumState.velocityY) < MOMENTUM_MIN_VELOCITY) {
+                    momentumState.velocityY = 0;
+                }
+            }
+
+            // Deactivate momentum when both velocities are zero
+            if (Math.abs(momentumState.velocityX) < MOMENTUM_MIN_VELOCITY &&
+                Math.abs(momentumState.velocityY) < MOMENTUM_MIN_VELOCITY) {
+                momentumState.active = false;
+            }
+        }
     }
 }
