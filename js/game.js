@@ -262,6 +262,18 @@ export function isState(state) {
 // GAME LOOP
 // =============================================================================
 
+/** @type {Function|null} Post-render callback for overlay elements */
+let postRenderCallback = null;
+
+/**
+ * Register a post-render callback that runs after all state rendering.
+ * Useful for overlay elements like achievement popups that should appear on top.
+ * @param {Function} callback - Function to call with ctx after state render
+ */
+export function setPostRenderCallback(callback) {
+    postRenderCallback = callback;
+}
+
 /**
  * Start the game loop.
  * Uses a fixed timestep for physics updates to ensure consistent behavior
@@ -287,13 +299,6 @@ export function startLoop(updateFn, renderFn, ctx) {
     accumulator = 0;
 
     function loop(currentTime) {
-        // Debug: log every 60 frames to see if loop is running
-        if (!window._loopFrameCount) window._loopFrameCount = 0;
-        window._loopFrameCount++;
-        if (window._loopFrameCount % 60 === 1) {
-            console.log('[GameLoop] Frame', window._loopFrameCount, 'isRunning:', isRunning, 'isPaused:', isPaused);
-        }
-
         if (!isRunning) return;
 
         // Skip updates while paused but keep rendering for pause menu overlay
@@ -306,13 +311,13 @@ export function startLoop(updateFn, renderFn, ctx) {
                 renderFn(ctx);
             }
             const handlers = getHandlers(currentState);
-            // Only log once per pause to avoid flooding console
-            if (!window._pauseLoggedOnce) {
-                window._pauseLoggedOnce = true;
-                console.log('[GameLoop] Paused render ONCE, state:', currentState, 'hasRender:', !!handlers.render);
-            }
             if (handlers.render) {
                 handlers.render(ctx);
+            }
+
+            // Call post-render callback for overlays (even when paused)
+            if (postRenderCallback) {
+                postRenderCallback(ctx);
             }
 
             requestAnimationFrame(loop);
@@ -370,6 +375,11 @@ export function startLoop(updateFn, renderFn, ctx) {
         const handlers = getHandlers(currentState);
         if (handlers.render) {
             handlers.render(ctx);
+        }
+
+        // Call post-render callback for overlays
+        if (postRenderCallback) {
+            postRenderCallback(ctx);
         }
 
         requestAnimationFrame(loop);

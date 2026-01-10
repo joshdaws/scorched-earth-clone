@@ -35,6 +35,7 @@ import * as GameOver from './gameOver.js';
 import * as RoundTransition from './roundTransition.js';
 import { getEnemyHealthForRound, recordStat, startNewRun as startNewRunState, endRun as endRunState, advanceRound as advanceRunRound } from './runState.js';
 import * as HighScores from './highScores.js';
+import * as AchievementPopup from './achievement-popup.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -4005,6 +4006,12 @@ async function init() {
         DebugTools.handleKeyDown(event);
     });
 
+    // Initialize achievement popup system
+    AchievementPopup.init();
+
+    // Register post-render callback for achievement popups (renders on top of all game content)
+    Game.setPostRenderCallback(postRender);
+
     console.log('Scorched Earth initialized');
 
     // Expose modules for debugging/testing
@@ -4015,6 +4022,7 @@ async function init() {
     window.VictoryDefeat = VictoryDefeat;
     window.RoundTransition = RoundTransition;
     window.DebugTools = DebugTools;
+    window.AchievementPopup = AchievementPopup;
     // Expose DebugTools as 'Debug' for convenience (e.g., Debug.skipToShop())
     // This creates a merged object with both Debug module and DebugTools functions
     window.Debug = { ...Debug, ...DebugTools };
@@ -4057,6 +4065,9 @@ function update(deltaTime) {
     // Update background animation (star twinkle)
     updateBackground(deltaTime);
 
+    // Update achievement popup animations
+    AchievementPopup.update(deltaTime);
+
     // Clear single-fire input state at end of frame
     // This must be done after all game logic that checks wasKeyPressed()
     Input.clearFrameState();
@@ -4071,9 +4082,20 @@ function render(ctx) {
     Renderer.clear();
 
     // Render game elements will go here
+    // Note: Achievement popups are rendered in postRender() which is called after state-specific renders
 
     // Render debug overlay last (on top of everything)
     Debug.render(ctx);
+}
+
+/**
+ * Post-render function called after state-specific renders.
+ * Used for overlay elements that should appear on top of all game content.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D rendering context
+ */
+function postRender(ctx) {
+    // Render achievement popup notifications (on top of all game content)
+    AchievementPopup.render(ctx);
 }
 
 // Initialize when DOM is ready
