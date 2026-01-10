@@ -506,6 +506,7 @@ export function render(ctx) {
     ctx.shadowBlur = 0;
     ctx.strokeStyle = COLORS.TEXT_LIGHT;
     ctx.lineWidth = 2;
+    ctx.lineJoin = 'round'; // Prevent miter artifacts on letters like 'A' and 'M'
     ctx.strokeText('GAME OVER', CANVAS.DESIGN_WIDTH / 2, titleY);
     ctx.restore();
 
