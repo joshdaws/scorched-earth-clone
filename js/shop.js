@@ -61,6 +61,12 @@ let purchaseFeedback = null;
 let pressedElementId = null;
 
 /**
+ * Currently hovered weapon card for visual feedback.
+ * @type {string|null}
+ */
+let hoveredWeaponId = null;
+
+/**
  * Currently active tab: 'weapons' or 'items'.
  * @type {'weapons'|'items'}
  */
@@ -429,6 +435,26 @@ export function handlePointerUp(x, y) {
 }
 
 /**
+ * Handle pointer move for hover effects.
+ * Updates the hovered weapon ID for visual feedback.
+ * @param {number} x - X coordinate in design space
+ * @param {number} y - Y coordinate in design space
+ */
+export function handlePointerMove(x, y) {
+    if (!isVisible) {
+        hoveredWeaponId = null;
+        return;
+    }
+
+    const weaponInfo = getWeaponAtPoint(x, y);
+    if (weaponInfo) {
+        hoveredWeaponId = weaponInfo.weaponId;
+    } else {
+        hoveredWeaponId = null;
+    }
+}
+
+/**
  * Handle click/tap on the shop screen (legacy - immediate action).
  * Prefer using handlePointerDown/handlePointerUp for touch feedback.
  * @param {number} x - X coordinate in design space
@@ -642,8 +668,15 @@ function getTabAtPoint(x, y) {
 }
 
 /**
- * Draw a compact weapon card with touch feedback.
+ * Draw a compact weapon card with visual states for availability.
  * Cards are 110x80px to fit more weapons per row while staying touch-friendly.
+ *
+ * Visual States:
+ * - Available: Normal appearance with subtle cyan glow
+ * - Owned (x > 0): Subtle green glow with checkmark badge
+ * - Can't Afford: Grayed out with NO FUNDS indicator
+ * - Hover/Selected: Bright glow border (cyan/pink neon)
+ *
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  * @param {Object} weapon - Weapon definition
  * @param {number} x - Card X position
@@ -658,6 +691,7 @@ function renderWeaponCard(ctx, weapon, x, y, currentAmmo, canAfford, pulseIntens
     const cardWidth = SHOP_LAYOUT.CARD.WIDTH;
     const cardHeight = SHOP_LAYOUT.CARD.HEIGHT;
     const isPressed = pressedElementId === `weapon_${weapon.id}`;
+    const isHovered = hoveredWeaponId === weapon.id;
 
     // Determine card color based on weapon type
     let borderColor = COLORS.NEON_CYAN;
@@ -666,17 +700,28 @@ function renderWeaponCard(ctx, weapon, x, y, currentAmmo, canAfford, pulseIntens
         borderColor = category.color;
     }
 
-    // Dim if can't afford
-    const dimmed = !canAfford && weapon.cost > 0;
+    // Determine card state
+    const isUnaffordable = !canAfford && weapon.cost > 0;
+    const isOwned = currentAmmo > 0 || currentAmmo === Infinity;
+    const isSelected = isPressed || isHovered;
 
     ctx.save();
 
     // Pressed offset for tactile feedback
     const pressOffset = isPressed ? 1 : 0;
 
-    // Card background - brighter when pressed
-    const bgColor = isPressed ? 'rgba(40, 40, 70, 0.95)' :
-                    (dimmed ? 'rgba(20, 20, 40, 0.85)' : 'rgba(26, 26, 46, 0.9)');
+    // === CARD BACKGROUND ===
+    // State-based background colors
+    let bgColor;
+    if (isPressed) {
+        bgColor = 'rgba(40, 40, 70, 0.95)';  // Brighter when pressed
+    } else if (isHovered && !isUnaffordable) {
+        bgColor = 'rgba(35, 35, 60, 0.95)';  // Slightly lighter on hover
+    } else if (isUnaffordable) {
+        bgColor = 'rgba(15, 15, 30, 0.85)';  // Darker for unaffordable
+    } else {
+        bgColor = 'rgba(26, 26, 46, 0.9)';   // Normal
+    }
     ctx.fillStyle = bgColor;
     ctx.beginPath();
     ctx.roundRect(x, y + pressOffset, cardWidth, cardHeight, 4);
@@ -689,26 +734,75 @@ function renderWeaponCard(ctx, weapon, x, y, currentAmmo, canAfford, pulseIntens
         ctx.fill();
     }
 
-    // Pressed highlight
-    if (isPressed && !dimmed) {
+    // Pressed/hover highlight overlay
+    if (isSelected && !isUnaffordable) {
         ctx.fillStyle = `${borderColor}20`;  // 12% opacity highlight
         ctx.fill();
     }
 
-    // Border with glow - stronger when pressed
-    ctx.strokeStyle = dimmed ? COLORS.TEXT_MUTED : borderColor;
-    ctx.lineWidth = isPressed ? 2 : 1;
-    if (!dimmed) {
-        ctx.shadowColor = borderColor;
-        ctx.shadowBlur = isPressed ? 8 : (showFeedback && feedbackSuccess ? 10 : 3);
+    // === BORDER WITH STATE-BASED GLOW ===
+    let glowBlur = 3;  // Default subtle glow
+    let strokeColor = borderColor;
+    let lineWidth = 1;
+
+    if (isUnaffordable) {
+        // Can't afford: dim gray border, no glow
+        strokeColor = COLORS.TEXT_MUTED;
+        glowBlur = 0;
+    } else if (isSelected) {
+        // Hover/selected: bright glow
+        glowBlur = 12 + pulseIntensity * 6;
+        lineWidth = 2;
+    } else if (isOwned) {
+        // Owned: subtle green glow
+        strokeColor = '#00ff88';
+        glowBlur = 5 + pulseIntensity * 3;
+    } else if (showFeedback && feedbackSuccess) {
+        // Success feedback: strong glow
+        glowBlur = 10;
+    }
+
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = lineWidth;
+    if (glowBlur > 0) {
+        ctx.shadowColor = strokeColor;
+        ctx.shadowBlur = glowBlur;
     }
     ctx.stroke();
-
     ctx.shadowBlur = 0;
 
     // Apply press offset to all positions
     const textY = y + pressOffset;
     const centerX = x + cardWidth / 2;
+
+    // === OWNED CHECKMARK BADGE (top-right corner) ===
+    if (isOwned && !isUnaffordable) {
+        const badgeSize = 14;
+        const badgeX = x + cardWidth - badgeSize - 3;
+        const badgeY = textY + 3;
+
+        // Badge background circle
+        ctx.fillStyle = '#00ff88';
+        ctx.shadowColor = '#00ff88';
+        ctx.shadowBlur = 4;
+        ctx.beginPath();
+        ctx.arc(badgeX + badgeSize / 2, badgeY + badgeSize / 2, badgeSize / 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Checkmark
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        const checkX = badgeX + badgeSize / 2;
+        const checkY = badgeY + badgeSize / 2;
+        ctx.moveTo(checkX - 3, checkY);
+        ctx.lineTo(checkX - 1, checkY + 2);
+        ctx.lineTo(checkX + 3, checkY - 2);
+        ctx.stroke();
+    }
 
     // === WEAPON ICON ===
     // Icon size and position (centered at top of card)
@@ -727,7 +821,7 @@ function renderWeaponCard(ctx, weapon, x, y, currentAmmo, canAfford, pulseIntens
         const imgY = textY + 4;
 
         // Dim if can't afford
-        if (dimmed) {
+        if (isUnaffordable) {
             ctx.globalAlpha = 0.4;
             ctx.filter = 'grayscale(80%)';
         }
@@ -742,7 +836,7 @@ function renderWeaponCard(ctx, weapon, x, y, currentAmmo, canAfford, pulseIntens
 
     // Fallback: draw a simple colored circle if icon not available
     if (!usedImage) {
-        ctx.fillStyle = dimmed ? COLORS.TEXT_MUTED : borderColor;
+        ctx.fillStyle = isUnaffordable ? COLORS.TEXT_MUTED : borderColor;
         ctx.beginPath();
         ctx.arc(iconX, iconY, iconSize * 0.4, 0, Math.PI * 2);
         ctx.fill();
@@ -751,7 +845,7 @@ function renderWeaponCard(ctx, weapon, x, y, currentAmmo, canAfford, pulseIntens
     // === TEXT CONTENT (below icon) ===
     // Compact layout: stacked vertically, centered
     // Row 1: Weapon name (centered, truncated if needed)
-    ctx.fillStyle = dimmed ? COLORS.TEXT_MUTED : COLORS.TEXT_LIGHT;
+    ctx.fillStyle = isUnaffordable ? COLORS.TEXT_MUTED : COLORS.TEXT_LIGHT;
     ctx.font = `bold 10px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
@@ -767,15 +861,21 @@ function renderWeaponCard(ctx, weapon, x, y, currentAmmo, canAfford, pulseIntens
     }
     ctx.fillText(displayName, centerX, textY + 40);
 
-    // Row 2: Price (centered)
+    // Row 2: Price OR "NO FUNDS" indicator
     ctx.font = `bold 11px ${UI.FONT_FAMILY}`;
-    ctx.fillStyle = weapon.cost === 0 ? '#00ff88' : (canAfford ? COLORS.NEON_YELLOW : COLORS.NEON_PINK);
-    const costText = weapon.cost === 0 ? 'FREE' : `$${weapon.cost.toLocaleString()}`;
-    ctx.fillText(costText, centerX, textY + 52);
+    if (isUnaffordable) {
+        // Show "NO FUNDS" in red for unaffordable weapons
+        ctx.fillStyle = COLORS.NEON_PINK;
+        ctx.fillText('NO FUNDS', centerX, textY + 52);
+    } else {
+        ctx.fillStyle = weapon.cost === 0 ? '#00ff88' : COLORS.NEON_YELLOW;
+        const costText = weapon.cost === 0 ? 'FREE' : `$${weapon.cost.toLocaleString()}`;
+        ctx.fillText(costText, centerX, textY + 52);
+    }
 
     // Row 3: Owned count (centered)
     ctx.font = `10px ${UI.FONT_FAMILY}`;
-    ctx.fillStyle = currentAmmo > 0 || currentAmmo === Infinity ? '#00ff88' : COLORS.TEXT_MUTED;
+    ctx.fillStyle = isOwned ? '#00ff88' : COLORS.TEXT_MUTED;
     const ownedAmmo = currentAmmo === Infinity ? '∞' : currentAmmo;
     ctx.fillText(`x${ownedAmmo}`, centerX, textY + 64);
 

@@ -3163,6 +3163,13 @@ function setupShopState() {
         }
     });
 
+    // Handle pointer move for shop hover effects
+    Input.onMouseMove((x, y) => {
+        if (Game.getState() === GAME_STATES.SHOP) {
+            Shop.handlePointerMove(x, y);
+        }
+    });
+
     Game.registerStateHandlers(GAME_STATES.SHOP, {
         onEnter: (fromState) => {
             console.log('Entered SHOP state');
