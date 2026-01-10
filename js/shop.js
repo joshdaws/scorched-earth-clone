@@ -11,6 +11,7 @@ import { CANVAS, COLORS, UI, GAME_STATES, DEBUG } from './constants.js';
 import { WeaponRegistry, WEAPON_TYPES } from './weapons.js';
 import * as Money from './money.js';
 import * as Game from './game.js';
+import * as Assets from './assets.js';
 import { playPurchaseSound, playErrorSound, playClickSound } from './sound.js';
 
 // =============================================================================
@@ -535,10 +536,49 @@ function renderWeaponCard(ctx, weapon, x, y, currentAmmo, canAfford, pulseIntens
 
     ctx.shadowBlur = 0;
 
-    // Apply press offset to all text positions
+    // Apply press offset to all positions
     const textY = y + pressOffset;
     const centerX = x + cardWidth / 2;
 
+    // === WEAPON ICON ===
+    // Icon size and position (centered at top of card)
+    const iconSize = 32; // Target icon display size
+    const iconX = centerX;
+    const iconY = textY + 4 + iconSize / 2; // 4px padding from top
+
+    // Try to load weapon icon from assets
+    const iconAssetKey = `weaponIcons.${weapon.id}`;
+    const iconImage = Assets.get(iconAssetKey);
+    let usedImage = false;
+
+    if (iconImage && iconImage.complete && iconImage.naturalWidth > 0) {
+        // Draw loaded icon image
+        const imgX = iconX - iconSize / 2;
+        const imgY = textY + 4;
+
+        // Dim if can't afford
+        if (dimmed) {
+            ctx.globalAlpha = 0.4;
+            ctx.filter = 'grayscale(80%)';
+        }
+
+        ctx.drawImage(iconImage, imgX, imgY, iconSize, iconSize);
+
+        // Reset filters
+        ctx.globalAlpha = 1.0;
+        ctx.filter = 'none';
+        usedImage = true;
+    }
+
+    // Fallback: draw a simple colored circle if icon not available
+    if (!usedImage) {
+        ctx.fillStyle = dimmed ? COLORS.TEXT_MUTED : borderColor;
+        ctx.beginPath();
+        ctx.arc(iconX, iconY, iconSize * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // === TEXT CONTENT (below icon) ===
     // Compact layout: stacked vertically, centered
     // Row 1: Weapon name (centered, truncated if needed)
     ctx.fillStyle = dimmed ? COLORS.TEXT_MUTED : COLORS.TEXT_LIGHT;
@@ -555,19 +595,19 @@ function renderWeaponCard(ctx, weapon, x, y, currentAmmo, canAfford, pulseIntens
     if (displayName !== weapon.name) {
         displayName = displayName.slice(0, -1) + '…';
     }
-    ctx.fillText(displayName, centerX, textY + 6);
+    ctx.fillText(displayName, centerX, textY + 40);
 
     // Row 2: Price (centered)
     ctx.font = `bold 11px ${UI.FONT_FAMILY}`;
     ctx.fillStyle = weapon.cost === 0 ? '#00ff88' : (canAfford ? COLORS.NEON_YELLOW : COLORS.NEON_PINK);
     const costText = weapon.cost === 0 ? 'FREE' : `$${weapon.cost.toLocaleString()}`;
-    ctx.fillText(costText, centerX, textY + 22);
+    ctx.fillText(costText, centerX, textY + 52);
 
     // Row 3: Owned count (centered)
     ctx.font = `10px ${UI.FONT_FAMILY}`;
     ctx.fillStyle = currentAmmo > 0 || currentAmmo === Infinity ? '#00ff88' : COLORS.TEXT_MUTED;
     const ownedAmmo = currentAmmo === Infinity ? '∞' : currentAmmo;
-    ctx.fillText(`x${ownedAmmo}`, centerX, textY + 38);
+    ctx.fillText(`x${ownedAmmo}`, centerX, textY + 64);
 
     ctx.restore();
 
