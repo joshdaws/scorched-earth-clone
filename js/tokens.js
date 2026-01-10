@@ -9,6 +9,7 @@
 
 import { DEBUG } from './constants.js';
 import { DIFFICULTY_TOKEN_REWARDS, onAchievementUnlock, getAchievement } from './achievements.js';
+import { playTokenEarnSound } from './sound.js';
 
 // =============================================================================
 // CONSTANTS
@@ -165,6 +166,9 @@ export function addTokens(amount, source) {
     state.balance += amount;
     state.lifetimeEarned += amount;
     saveState();
+
+    // Play token earn sound for feedback
+    playTokenEarnSound();
 
     debugLog(`Tokens earned: +${amount}`, {
         source,

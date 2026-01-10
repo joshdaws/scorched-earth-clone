@@ -8,6 +8,14 @@
 
 import { CANVAS, COLORS, DEBUG } from './constants.js';
 import { RARITY, RARITY_COLORS, RARITY_NAMES } from './tank-skins.js';
+import {
+    playPlaneApproachSound,
+    playPlaneFlyoverSound,
+    playCrateDropSound,
+    playParachuteDeploySound,
+    playCrateLandSound,
+    playRevealSound
+} from './sound.js';
 
 // =============================================================================
 // ANIMATION CONSTANTS
@@ -1522,6 +1530,8 @@ export function update(deltaTime) {
             currentPhase = PHASES.APPROACH;
             phaseStartTime = now;
             debugLog('Phase: APPROACH');
+            // Play plane approach sound
+            playPlaneApproachSound();
         }
         // Calculate phase progress AFTER potentially setting phaseStartTime
         const phaseElapsed = now - phaseStartTime;
@@ -1532,6 +1542,10 @@ export function update(deltaTime) {
             currentPhase = PHASES.DROP;
             phaseStartTime = now;
             debugLog('Phase: DROP');
+            // Play plane flyover and crate/parachute sounds
+            playPlaneFlyoverSound();
+            playCrateDropSound();
+            playParachuteDeploySound();
         }
         const phaseElapsed = now - phaseStartTime;
         const progress = Math.min(1, phaseElapsed / PHASE_TIMING.DROP);
@@ -1541,6 +1555,8 @@ export function update(deltaTime) {
             currentPhase = PHASES.LANDING;
             phaseStartTime = now;
             debugLog('Phase: LANDING');
+            // Play crate landing sound
+            playCrateLandSound();
             // Pre-reveal effects start during landing for Rare+
             preRevealActive = true;
             preRevealProgress = 0;
@@ -1569,6 +1585,10 @@ export function update(deltaTime) {
             currentPhase = PHASES.REVEAL;
             phaseStartTime = now;
             debugLog('Phase: REVEAL');
+            // Play rarity-specific reveal sound
+            if (revealTank?.rarity) {
+                playRevealSound(revealTank.rarity);
+            }
         }
         const phaseElapsed = now - phaseStartTime;
         const progress = Math.min(1, phaseElapsed / PHASE_TIMING.REVEAL);

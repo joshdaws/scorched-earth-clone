@@ -14,6 +14,13 @@
 
 import { CANVAS, COLORS, DEBUG } from './constants.js';
 import { RARITY, RARITY_COLORS, RARITY_NAMES } from './tank-skins.js';
+import {
+    playRadioStaticSound,
+    playHelicopterRotorSound,
+    playRotorWashSound,
+    playCableReleaseSound,
+    playExtractionFanfareSound
+} from './sound.js';
 
 // =============================================================================
 // ANIMATION CONSTANTS
@@ -844,6 +851,8 @@ export function update(deltaTime) {
             currentPhase = PHASES.INTERFERENCE;
             phaseStartTime = now;
             debugLog('Phase: INTERFERENCE');
+            // Play radio static sound for "INCOMING TRANSMISSION" effect
+            playRadioStaticSound(0.3, PHASE_TIMING.INTERFERENCE / 1000);
         }
         const phaseElapsed = now - phaseStartTime;
         const progress = Math.min(1, phaseElapsed / PHASE_TIMING.INTERFERENCE);
@@ -853,6 +862,9 @@ export function update(deltaTime) {
             currentPhase = PHASES.APPROACH;
             phaseStartTime = now;
             debugLog('Phase: APPROACH');
+            // Play helicopter rotor sound (lasts through approach + delivery)
+            const heliDuration = (PHASE_TIMING.APPROACH + PHASE_TIMING.DELIVERY + PHASE_TIMING.REVEAL) / 1000;
+            playHelicopterRotorSound(0.4, heliDuration);
         }
         const phaseElapsed = now - phaseStartTime;
         const progress = Math.min(1, phaseElapsed / PHASE_TIMING.APPROACH);
@@ -862,6 +874,8 @@ export function update(deltaTime) {
             currentPhase = PHASES.DELIVERY;
             phaseStartTime = now;
             debugLog('Phase: DELIVERY');
+            // Play rotor wash sound as helicopter hovers
+            playRotorWashSound(0.35, PHASE_TIMING.DELIVERY / 1000);
         }
         const phaseElapsed = now - phaseStartTime;
         const progress = Math.min(1, phaseElapsed / PHASE_TIMING.DELIVERY);
@@ -873,6 +887,9 @@ export function update(deltaTime) {
             debugLog('Phase: REVEAL');
             // Trigger flash at reveal start
             flashOpacity = 1;
+            // Play cable release and legendary fanfare
+            playCableReleaseSound();
+            playExtractionFanfareSound();
         }
         const phaseElapsed = now - phaseStartTime;
         const progress = Math.min(1, phaseElapsed / PHASE_TIMING.REVEAL);
