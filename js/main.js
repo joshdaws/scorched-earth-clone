@@ -2795,8 +2795,9 @@ function setupPlayingState() {
             console.log(`Round ${currentRound}: AI difficulty is ${difficultyName} (player selected: ${selectedDifficulty ? 'yes' : 'no'})`);
 
             // Generate random wind for this round
-            // Wind value -10 to +10: negative = left, positive = right
-            Wind.generateRandomWind();
+            // Wind range scales with round number for roguelike difficulty progression
+            const windRange = Wind.getWindRangeForRound(currentRound);
+            Wind.generateRandomWind(windRange);
 
             // Initialize the turn system when entering playing state
             Turn.init();
