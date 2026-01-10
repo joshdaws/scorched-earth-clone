@@ -35,9 +35,11 @@
     "@capacitor/core": "^8.0.0",
     "@capacitor/haptics": "^8.0.0",
     "@capacitor/ios": "^8.0.0",
+    "convex": "^1.31.3",
     "sharp": "^0.34.5"
   },
   "devDependencies": {
-    "canvas": "^3.2.0"
+    "canvas": "^3.2.0",
+    "typescript": "^5.9.3"
   }
 }
