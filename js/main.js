@@ -33,7 +33,7 @@ import * as Haptics from './haptics.js';
 import * as DebugTools from './debugTools.js';
 import * as GameOver from './gameOver.js';
 import * as RoundTransition from './roundTransition.js';
-import { getEnemyHealthForRound } from './runState.js';
+import { getEnemyHealthForRound, recordStat, startNewRun as startNewRunState, endRun as endRunState, advanceRound as advanceRunRound } from './runState.js';
 import * as HighScores from './highScores.js';
 
 // =============================================================================
@@ -1152,6 +1152,17 @@ function fireProjectile(tank) {
 
     activeProjectiles = [projectile]; // Clear and set new projectile
 
+    // Record stats for player shots only
+    if (tank === playerTank) {
+        recordStat('shotFired');
+        recordStat('weaponUsed', firedWeaponId);
+
+        // Track nuclear weapon launches specifically
+        if (weapon && weapon.type === WEAPON_TYPES.NUCLEAR) {
+            recordStat('nukeLaunched');
+        }
+    }
+
     // Play fire sound
     Sound.playFireSound();
 
@@ -1186,25 +1197,44 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
     // Track who fired this projectile for money awards
     const isPlayerShot = projectile.owner === 'player';
 
+    // Track if player shot hit enemy for shotHit stat
+    let playerHitEnemy = false;
+
     if (directHitTank) {
         // Apply explosion damage to the directly hit tank
         const damageResult = applyExplosionDamage(explosion, directHitTank, weapon);
 
-        // Award money if player hit the enemy tank
+        // Award money and record stats if player hit the enemy tank
         if (isPlayerShot && directHitTank.team === 'enemy' && damageResult.actualDamage > 0) {
             Money.awardHitReward(damageResult.actualDamage);
+            recordStat('damageDealt', damageResult.actualDamage);
+            playerHitEnemy = true;
+        }
+
+        // Track damage taken by player
+        if (directHitTank.team === 'player' && damageResult.actualDamage > 0) {
+            recordStat('damageTaken', damageResult.actualDamage);
         }
 
         // Also check for splash damage to other tanks
         const allTanks = [playerTank, enemyTank].filter(t => t !== null && t !== directHitTank);
         const splashResults = applyExplosionToAllTanks(explosion, allTanks, weapon);
 
-        // Award money for splash damage on enemy if player shot
+        // Award money and record stats for splash damage
         if (isPlayerShot) {
             for (const result of splashResults) {
                 if (result.tank.team === 'enemy' && result.actualDamage > 0) {
                     Money.awardHitReward(result.actualDamage);
+                    recordStat('damageDealt', result.actualDamage);
+                    playerHitEnemy = true;
                 }
+            }
+        }
+
+        // Track splash damage taken by player
+        for (const result of splashResults) {
+            if (result.tank.team === 'player' && result.actualDamage > 0) {
+                recordStat('damageTaken', result.actualDamage);
             }
         }
 
@@ -1214,18 +1244,29 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
         const allTanks = [playerTank, enemyTank].filter(t => t !== null);
         const damageResults = applyExplosionToAllTanks(explosion, allTanks, weapon);
 
-        // Award money for any damage on enemy if player shot
+        // Award money and record stats for any damage on enemy if player shot
         if (isPlayerShot) {
             for (const result of damageResults) {
                 if (result.tank.team === 'enemy' && result.actualDamage > 0) {
                     Money.awardHitReward(result.actualDamage);
+                    recordStat('damageDealt', result.actualDamage);
+                    playerHitEnemy = true;
                 }
             }
         }
 
+        // Track damage taken by player
         for (const result of damageResults) {
+            if (result.tank.team === 'player' && result.actualDamage > 0) {
+                recordStat('damageTaken', result.actualDamage);
+            }
             console.log(`Splash damage: ${result.tank.team} tank took ${result.actualDamage} damage, health: ${result.tank.health}`);
         }
+    }
+
+    // Record shotHit if player shot hit the enemy (only once per projectile)
+    if (isPlayerShot && playerHitEnemy) {
+        recordStat('shotHit');
     }
 
     // Trigger explosion visual effect for all weapons (before terrain destruction)
@@ -1506,6 +1547,9 @@ function checkRoundEnd() {
     if (playerDestroyed && enemyDestroyed) {
         console.log('[Main] Both tanks destroyed - MUTUAL DESTRUCTION (GAME OVER)!');
 
+        // End the run and finalize stats (draw counts as loss)
+        endRunState(true);
+
         // Show game over screen with draw indicator
         // Stats are fetched from runState module automatically
         GameOver.show({
@@ -1525,6 +1569,9 @@ function checkRoundEnd() {
     if (enemyDestroyed) {
         // Player wins this round!
         console.log('[Main] Enemy destroyed - VICTORY!');
+
+        // Record enemy destroyed stat
+        recordStat('enemyDestroyed');
 
         // Award victory bonus (hit rewards already given during combat)
         Money.awardVictoryBonus();
@@ -1552,6 +1599,9 @@ function checkRoundEnd() {
     if (playerDestroyed) {
         // Player loses - GAME OVER (permadeath)
         console.log('[Main] Player destroyed - GAME OVER!');
+
+        // End the run and finalize stats
+        endRunState(false);
 
         // Show game over screen
         // Stats are fetched from runState module automatically
@@ -2772,8 +2822,9 @@ function setupPlayingState() {
             // New game comes from MENU or DIFFICULTY_SELECT (since difficulty selection is part of new game flow)
             const isNewGame = fromState === GAME_STATES.MENU || fromState === GAME_STATES.DIFFICULTY_SELECT;
 
-            // Initialize money system if this is a new game
+            // Initialize game systems if this is a new game
             if (isNewGame) {
+                startNewRunState(); // Reset run state and stats for new run
                 Money.init();
             }
             // Start round earnings tracking with round number for multiplier
@@ -2911,6 +2962,7 @@ function updateVictoryDefeat(deltaTime) {
  */
 function startNextRound() {
     currentRound++;
+    advanceRunRound(); // Track round progression in run state
     // Note: Money.startRound(currentRound) is called in PLAYING state's onEnter handler
     // after the round counter is already incremented
     console.log(`[Main] Starting round ${currentRound}`);
@@ -3142,8 +3194,8 @@ function startNewRun() {
     console.log('[Main] Starting new run');
     // Reset round counter
     currentRound = 1;
-    // Reset money system
-    Money.reset();
+    // Reset money system (init resets to starting amount)
+    Money.init();
     // Hide game over screen
     GameOver.hide();
     // Return to menu for now (later this will start directly into a new run)

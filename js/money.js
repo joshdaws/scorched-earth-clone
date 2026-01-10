@@ -7,6 +7,7 @@
  */
 
 import { GAME, DEBUG } from './constants.js';
+import { recordStat } from './runState.js';
 
 // =============================================================================
 // MONEY CONSTANTS
@@ -266,6 +267,10 @@ export function spendMoney(amount, reason = 'Generic expense') {
 
     if (currentMoney >= amount) {
         currentMoney -= amount;
+
+        // Track money spent in run stats
+        recordStat('moneySpent', amount);
+
         logMoneyChange(reason, -amount, currentMoney);
         return true;
     } else {
@@ -303,6 +308,9 @@ export function awardHitReward(damage) {
     roundEarnings += reward;
     roundDamage += damage;
 
+    // Track money earned in run stats
+    recordStat('moneyEarned', reward);
+
     const multiplierInfo = currentMultiplier > 1 ? ` (${currentMultiplier}x)` : '';
     logMoneyChange(`Hit reward (${damage} damage)${multiplierInfo}`, reward, currentMoney);
 
@@ -320,6 +328,9 @@ export function awardVictoryBonus() {
 
     currentMoney += reward;
     roundEarnings += reward;
+
+    // Track money earned in run stats
+    recordStat('moneyEarned', reward);
 
     logMoneyChange(`Victory bonus (Round ${currentRoundNumber})`, reward, currentMoney);
 

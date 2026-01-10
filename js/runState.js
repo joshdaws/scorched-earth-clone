@@ -43,7 +43,8 @@ const runState = {
         moneyEarned: 0,
         moneySpent: 0,
         biggestHit: 0,
-        weaponsUsed: new Set()
+        weaponsUsed: new Set(),
+        nukesLaunched: 0
     }
 };
 
@@ -61,7 +62,8 @@ const INITIAL_STATS = {
     moneyEarned: 0,
     moneySpent: 0,
     biggestHit: 0,
-    weaponsUsed: new Set()
+    weaponsUsed: new Set(),
+    nukesLaunched: 0
 };
 
 // =============================================================================
@@ -108,6 +110,7 @@ export function startNewRun() {
     runState.stats.moneySpent = 0;
     runState.stats.biggestHit = 0;
     runState.stats.weaponsUsed = new Set();
+    runState.stats.nukesLaunched = 0;
 
     debugLog('New run started', { roundNumber: 1, startTime: runState.startTime });
 }
@@ -235,6 +238,11 @@ export function recordStat(statName, value) {
             }
             break;
 
+        case 'nukeLaunched':
+            runState.stats.nukesLaunched++;
+            debugLog('Nuclear weapon launched');
+            break;
+
         default:
             debugLog(`Unknown stat: ${statName}`, { value });
     }
@@ -281,7 +289,8 @@ export function getRunStats() {
         moneySpent: runState.stats.moneySpent,
         biggestHit: runState.stats.biggestHit,
         weaponsUsed: Array.from(runState.stats.weaponsUsed),
-        uniqueWeaponsCount: runState.stats.weaponsUsed.size
+        uniqueWeaponsCount: runState.stats.weaponsUsed.size,
+        nukesLaunched: runState.stats.nukesLaunched
     };
 }
 
