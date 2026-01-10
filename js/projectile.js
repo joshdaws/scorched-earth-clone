@@ -214,6 +214,20 @@ export class Projectile {
          */
         this.digEntryPoint = null;
 
+        /**
+         * Distance traveled since spawn (in pixels).
+         * Used to prevent immediate self-collision at low angles.
+         * @type {number}
+         */
+        this.distanceTraveled = 0;
+
+        /**
+         * Minimum distance before self-collision is possible.
+         * Projectile must travel this far before it can hit the tank that fired it.
+         * @type {number}
+         */
+        this.safeDistance = PROJECTILE.SELF_COLLISION_SAFE_DISTANCE || 50;
+
         // Calculate initial velocity from power and angle
         this._calculateInitialVelocity(angle, power);
 
@@ -285,9 +299,18 @@ export class Projectile {
         // Gravity is a constant acceleration downward (positive Y in canvas)
         this.vy += PHYSICS.GRAVITY;
 
+        // Store previous position for distance calculation
+        const prevX = this.x;
+        const prevY = this.y;
+
         // Update position based on velocity
         this.x += this.vx;
         this.y += this.vy;
+
+        // Track distance traveled (for self-collision prevention)
+        const dx = this.x - prevX;
+        const dy = this.y - prevY;
+        this.distanceTraveled += Math.sqrt(dx * dx + dy * dy);
 
         // Check if projectile has left the playable area
         this._checkBounds();
@@ -338,6 +361,17 @@ export class Projectile {
      */
     isActive() {
         return this.active;
+    }
+
+    /**
+     * Check if the projectile can hit its owner tank.
+     * Returns false until the projectile has traveled a safe distance,
+     * preventing immediate self-collision at low firing angles.
+     *
+     * @returns {boolean} True if projectile can collide with owner tank
+     */
+    canHitOwner() {
+        return this.distanceTraveled >= this.safeDistance;
     }
 
     /**
@@ -964,23 +998,34 @@ const DIRECT_HIT_DISTANCE = 5;
  *
  * Important edge cases handled:
  * - Destroyed tanks are skipped (no collision with dead tanks)
+ * - Owner tank is skipped if projectile hasn't traveled safe distance
  * - When tanks overlap, returns the first hit tank in array order
  * - Returns null if no collision detected
  *
  * @param {number} x - X coordinate of projectile position
  * @param {number} y - Y coordinate of projectile position
  * @param {import('./tank.js').Tank[]} tanks - Array of tanks to check collision against
+ * @param {Object} [options] - Optional collision options
+ * @param {string} [options.owner] - Team name of the tank that fired (e.g., 'player', 'enemy')
+ * @param {boolean} [options.canHitOwner=true] - Whether the projectile can hit its owner
  * @returns {{tank: import('./tank.js').Tank, directHit: boolean}|null} Hit info or null if no collision
  */
-export function checkTankCollision(x, y, tanks) {
+export function checkTankCollision(x, y, tanks, options = {}) {
     if (!tanks || tanks.length === 0) {
         return null;
     }
+
+    const { owner, canHitOwner = true } = options;
 
     // Check each tank in order (handles overlapping tanks by returning first hit)
     for (const tank of tanks) {
         // Skip destroyed tanks - no collision with dead tanks
         if (tank.isDestroyed()) {
+            continue;
+        }
+
+        // Skip owner tank if projectile hasn't traveled safe distance yet
+        if (owner && tank.team === owner && !canHitOwner) {
             continue;
         }
 

@@ -12,7 +12,7 @@ A comprehensive system adding achievements, collectible tank skins, and a dramat
 
 1. **Skill Rewards Skill** - Better performance = better unlock odds, not just more attempts
 2. **Collection is Fun** - Building a tank collection should feel rewarding, not grindy
-3. **No Pay-to-Win** - All unlocks are purely cosmetic
+3. **No Real-Money Advantage** - No microtransactions; all unlocks earned through gameplay
 4. **Dramatic Reveals** - Every unlock feels like an 80s action movie moment
 5. **Clear Progression** - Players always know what they're working toward
 
@@ -598,6 +598,38 @@ Add new buttons:
 ---
 
 ## Technical Notes
+
+### Swappable Asset Architecture
+
+**IMPORTANT:** All visual assets in this system must be designed for easy swapping without code changes. This allows placeholder graphics to be used during development and replaced with custom art later (via Nano Banana or other tools).
+
+**Requirements:**
+- All tank skins, achievement icons, supply drop animations, and UI elements must be referenced through the asset manifest (`assets/manifest.json`)
+- No hardcoded paths or dimensions in code - all asset metadata comes from the manifest
+- Use consistent naming conventions (e.g., `tank-{rarity}-{name}.png`, `achievement-{id}.png`)
+- Placeholder assets should use simple geometric shapes with clear labels
+- When custom art is ready, simply drop new files in `assets/images/` and update manifest dimensions if needed
+
+**Manifest Structure for This System:**
+```json
+{
+  "tanks": {
+    "common-standard": { "path": "images/tanks/tank-common-standard.png", "width": 64, "height": 32 },
+    "rare-delorean": { "path": "images/tanks/tank-rare-delorean.png", "width": 64, "height": 32, "glow": true },
+    "legendary-blood-dragon": { "path": "images/tanks/tank-legendary-blood-dragon.png", "width": 64, "height": 32, "animated": true, "frames": 4 }
+  },
+  "achievements": {
+    "first-blood": { "path": "images/achievements/achievement-first-blood.png", "width": 48, "height": 48 },
+    "sharpshooter": { "path": "images/achievements/achievement-sharpshooter.png", "width": 48, "height": 48 }
+  },
+  "supply-drop": {
+    "plane": { "path": "images/supply-drop/plane.png", "width": 128, "height": 48 },
+    "crate": { "path": "images/supply-drop/crate.png", "width": 64, "height": 64 },
+    "parachute-common": { "path": "images/supply-drop/parachute-white.png", "width": 80, "height": 64 },
+    "parachute-legendary": { "path": "images/supply-drop/parachute-rainbow.png", "width": 80, "height": 64, "animated": true }
+  }
+}
+```
 
 ### Asset Requirements
 

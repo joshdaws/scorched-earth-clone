@@ -33,6 +33,7 @@ import * as Haptics from './haptics.js';
 import * as DebugTools from './debugTools.js';
 import * as GameOver from './gameOver.js';
 import { getEnemyHealthForRound } from './runState.js';
+import * as HighScores from './highScores.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -195,16 +196,25 @@ const menuTransition = {
 const menuButtons = {
     start: {
         x: CANVAS.DESIGN_WIDTH / 2,
-        y: CANVAS.DESIGN_HEIGHT / 2 + 60,
+        y: CANVAS.DESIGN_HEIGHT / 2 + 40,
         width: 280,
         height: 60,
-        text: 'START GAME',
+        text: 'NEW RUN',
         color: COLORS.NEON_CYAN,
+        enabled: true
+    },
+    highScores: {
+        x: CANVAS.DESIGN_WIDTH / 2,
+        y: CANVAS.DESIGN_HEIGHT / 2 + 115,
+        width: 280,
+        height: 60,
+        text: 'HIGH SCORES',
+        color: COLORS.NEON_YELLOW,
         enabled: true
     },
     options: {
         x: CANVAS.DESIGN_WIDTH / 2,
-        y: CANVAS.DESIGN_HEIGHT / 2 + 140,
+        y: CANVAS.DESIGN_HEIGHT / 2 + 190,
         width: 280,
         height: 60,
         text: 'OPTIONS',
@@ -282,6 +292,11 @@ function handleMenuClick(pos) {
         Sound.playClickSound();
         // Start fade-out transition, then go to DIFFICULTY_SELECT state
         startMenuTransition(GAME_STATES.DIFFICULTY_SELECT);
+    } else if (isInsideButton(pos.x, pos.y, menuButtons.highScores)) {
+        // Play click sound
+        Sound.playClickSound();
+        // Go to HIGH_SCORES state
+        Game.setState(GAME_STATES.HIGH_SCORES);
     } else if (isInsideButton(pos.x, pos.y, menuButtons.options) && menuButtons.options.enabled) {
         // Play click sound
         Sound.playClickSound();
@@ -585,6 +600,7 @@ function renderMenu(ctx) {
 
     // Render menu buttons
     renderMenuButton(ctx, menuButtons.start, pulseIntensity);
+    renderMenuButton(ctx, menuButtons.highScores, pulseIntensity);
     renderMenuButton(ctx, menuButtons.options, pulseIntensity);
 
     // Instructions text at bottom
@@ -592,7 +608,7 @@ function renderMenu(ctx) {
     ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('Click or tap START GAME to begin', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT - 80);
+    ctx.fillText('Click or tap NEW RUN to begin', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT - 80);
     ctx.fillText('Press D to toggle debug mode', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT - 55);
 
     // Decorative line under title
@@ -3087,6 +3103,361 @@ function setupGameOverState() {
 }
 
 // =============================================================================
+// HIGH SCORES STATE
+// =============================================================================
+
+/**
+ * High scores screen button definition.
+ */
+const highScoresBackButton = {
+    x: CANVAS.DESIGN_WIDTH / 2,
+    y: CANVAS.DESIGN_HEIGHT - 100,
+    width: 180,
+    height: 50,
+    text: 'BACK',
+    color: COLORS.NEON_CYAN
+};
+
+/**
+ * Animation time for high scores screen.
+ * @type {number}
+ */
+let highScoresAnimationTime = 0;
+
+/**
+ * Render the high scores screen.
+ * Shows top 10 high scores and lifetime statistics.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ */
+function renderHighScores(ctx) {
+    // Update animation time
+    highScoresAnimationTime += 16;
+
+    // Calculate pulse intensity for glowing effects (0-1, oscillating)
+    const pulseIntensity = (Math.sin(highScoresAnimationTime * 0.003) + 1) / 2;
+
+    ctx.save();
+
+    // Render synthwave background (reuse menu background)
+    renderMenuBackground(ctx);
+
+    // Semi-transparent overlay for content area
+    ctx.fillStyle = 'rgba(10, 10, 26, 0.85)';
+    ctx.fillRect(0, 0, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+
+    // Title
+    ctx.save();
+    ctx.shadowColor = COLORS.NEON_YELLOW;
+    ctx.shadowBlur = 20 + pulseIntensity * 10;
+    ctx.font = `bold 48px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = COLORS.NEON_YELLOW;
+    ctx.fillText('HIGH SCORES', CANVAS.DESIGN_WIDTH / 2, 70);
+    ctx.restore();
+
+    // Get high scores and lifetime stats
+    const scores = HighScores.getHighScores();
+    const lifetimeStats = HighScores.getFormattedLifetimeStats();
+
+    // Table layout
+    const tableX = CANVAS.DESIGN_WIDTH / 2 - 280;
+    const tableWidth = 560;
+    const tableY = 130;
+    const headerHeight = 40;
+    const rowHeight = 38;
+
+    // Table background
+    ctx.fillStyle = 'rgba(20, 20, 40, 0.7)';
+    ctx.beginPath();
+    ctx.roundRect(tableX - 20, tableY - 10, tableWidth + 40, headerHeight + rowHeight * 10 + 30, 12);
+    ctx.fill();
+
+    // Table border
+    ctx.strokeStyle = COLORS.NEON_CYAN;
+    ctx.lineWidth = 2;
+    ctx.shadowColor = COLORS.NEON_CYAN;
+    ctx.shadowBlur = 8;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Table header
+    ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+    ctx.fillStyle = COLORS.NEON_CYAN;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+
+    const colRank = tableX;
+    const colRounds = tableX + 70;
+    const colDamage = tableX + 200;
+    const colDate = tableX + 350;
+
+    const headerY = tableY + headerHeight / 2;
+    ctx.fillText('#', colRank, headerY);
+    ctx.fillText('ROUNDS', colRounds, headerY);
+    ctx.fillText('DAMAGE', colDamage, headerY);
+    ctx.fillText('DATE', colDate, headerY);
+
+    // Header separator line
+    ctx.strokeStyle = `${COLORS.NEON_CYAN}60`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(tableX - 10, tableY + headerHeight);
+    ctx.lineTo(tableX + tableWidth + 10, tableY + headerHeight);
+    ctx.stroke();
+
+    // Table rows
+    ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+
+    for (let i = 0; i < 10; i++) {
+        const rowY = tableY + headerHeight + rowHeight * i + rowHeight / 2;
+        const score = scores[i];
+
+        if (score) {
+            // Rank with special styling for top 3
+            ctx.fillStyle = i === 0 ? COLORS.NEON_YELLOW :
+                           i === 1 ? '#c0c0c0' :
+                           i === 2 ? '#cd7f32' :
+                           COLORS.TEXT_LIGHT;
+            ctx.fillText(`${i + 1}`, colRank, rowY);
+
+            // Rounds
+            ctx.fillStyle = COLORS.TEXT_LIGHT;
+            ctx.fillText(`${score.roundsSurvived}`, colRounds, rowY);
+
+            // Damage
+            ctx.fillText(score.totalDamage ? score.totalDamage.toLocaleString() : '0', colDamage, rowY);
+
+            // Date
+            const date = new Date(score.timestamp);
+            const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            ctx.fillStyle = COLORS.TEXT_MUTED;
+            ctx.fillText(dateStr, colDate, rowY);
+        } else {
+            // Empty row
+            ctx.fillStyle = COLORS.TEXT_MUTED;
+            ctx.fillText(`${i + 1}`, colRank, rowY);
+            ctx.fillText('-', colRounds, rowY);
+            ctx.fillText('-', colDamage, rowY);
+            ctx.fillText('-', colDate, rowY);
+        }
+    }
+
+    // Lifetime stats section
+    const statsY = tableY + headerHeight + rowHeight * 10 + 60;
+
+    // Stats background
+    ctx.fillStyle = 'rgba(20, 20, 40, 0.7)';
+    ctx.beginPath();
+    ctx.roundRect(tableX - 20, statsY - 10, tableWidth + 40, 70, 12);
+    ctx.fill();
+
+    // Stats border
+    ctx.strokeStyle = COLORS.NEON_PURPLE;
+    ctx.lineWidth = 2;
+    ctx.shadowColor = COLORS.NEON_PURPLE;
+    ctx.shadowBlur = 8;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Stats label
+    ctx.font = `bold ${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+    ctx.fillStyle = COLORS.TEXT_MUTED;
+    ctx.textAlign = 'left';
+    ctx.fillText('LIFETIME STATS', tableX, statsY + 15);
+
+    // Stats values
+    ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+
+    const stat1X = tableX;
+    const stat2X = tableX + 180;
+    const stat3X = tableX + 360;
+    const statValueY = statsY + 42;
+
+    // Total Runs
+    ctx.fillText(`Total Runs: `, stat1X, statValueY);
+    ctx.fillStyle = COLORS.NEON_CYAN;
+    ctx.fillText(`${lifetimeStats.totalRuns}`, stat1X + 90, statValueY);
+
+    // Avg Rounds
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.fillText(`Avg Rounds: `, stat2X, statValueY);
+    ctx.fillStyle = COLORS.NEON_CYAN;
+    ctx.fillText(`${lifetimeStats.averageRoundsPerRun.toFixed(1)}`, stat2X + 95, statValueY);
+
+    // Best
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.fillText(`Best: `, stat3X, statValueY);
+    ctx.fillStyle = COLORS.NEON_YELLOW;
+    ctx.fillText(`${lifetimeStats.bestRound}`, stat3X + 45, statValueY);
+
+    // Back button
+    renderHighScoresButton(ctx, highScoresBackButton, pulseIntensity);
+
+    // Neon frame around the screen (reuse from menu)
+    ctx.save();
+    ctx.strokeStyle = COLORS.NEON_CYAN;
+    ctx.shadowColor = COLORS.NEON_CYAN;
+    ctx.shadowBlur = 15;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(20, 20, CANVAS.DESIGN_WIDTH - 40, CANVAS.DESIGN_HEIGHT - 40);
+
+    // Corner accents
+    const cornerSize = 30;
+    ctx.strokeStyle = COLORS.NEON_YELLOW;
+    ctx.shadowColor = COLORS.NEON_YELLOW;
+    ctx.lineWidth = 4;
+
+    // Top-left corner
+    ctx.beginPath();
+    ctx.moveTo(20, 20 + cornerSize);
+    ctx.lineTo(20, 20);
+    ctx.lineTo(20 + cornerSize, 20);
+    ctx.stroke();
+
+    // Top-right corner
+    ctx.beginPath();
+    ctx.moveTo(CANVAS.DESIGN_WIDTH - 20 - cornerSize, 20);
+    ctx.lineTo(CANVAS.DESIGN_WIDTH - 20, 20);
+    ctx.lineTo(CANVAS.DESIGN_WIDTH - 20, 20 + cornerSize);
+    ctx.stroke();
+
+    // Bottom-left corner
+    ctx.beginPath();
+    ctx.moveTo(20, CANVAS.DESIGN_HEIGHT - 20 - cornerSize);
+    ctx.lineTo(20, CANVAS.DESIGN_HEIGHT - 20);
+    ctx.lineTo(20 + cornerSize, CANVAS.DESIGN_HEIGHT - 20);
+    ctx.stroke();
+
+    // Bottom-right corner
+    ctx.beginPath();
+    ctx.moveTo(CANVAS.DESIGN_WIDTH - 20 - cornerSize, CANVAS.DESIGN_HEIGHT - 20);
+    ctx.lineTo(CANVAS.DESIGN_WIDTH - 20, CANVAS.DESIGN_HEIGHT - 20);
+    ctx.lineTo(CANVAS.DESIGN_WIDTH - 20, CANVAS.DESIGN_HEIGHT - 20 - cornerSize);
+    ctx.stroke();
+
+    ctx.restore();
+
+    ctx.restore();
+
+    // Render CRT effects as final post-processing overlay
+    renderCrtEffects(ctx, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+}
+
+/**
+ * Render a button for the high scores screen.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {Object} button - Button definition
+ * @param {number} pulseIntensity - Glow pulse intensity (0-1)
+ */
+function renderHighScoresButton(ctx, button, pulseIntensity) {
+    const halfWidth = button.width / 2;
+    const halfHeight = button.height / 2;
+    const btnX = button.x - halfWidth;
+    const btnY = button.y - halfHeight;
+
+    ctx.save();
+
+    // Button background with rounded corners
+    ctx.fillStyle = 'rgba(26, 26, 46, 0.8)';
+    ctx.beginPath();
+    ctx.roundRect(btnX, btnY, button.width, button.height, 8);
+    ctx.fill();
+
+    // Neon glow effect (pulsing)
+    ctx.shadowColor = button.color;
+    ctx.shadowBlur = 15 + pulseIntensity * 10;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+
+    // Button border (neon outline)
+    ctx.strokeStyle = button.color;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.roundRect(btnX, btnY, button.width, button.height, 8);
+    ctx.stroke();
+
+    // Reset shadow for text
+    ctx.shadowBlur = 0;
+
+    // Button text with glow
+    ctx.shadowColor = button.color;
+    ctx.shadowBlur = 8 + pulseIntensity * 5;
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.font = `bold ${UI.FONT_SIZE_LARGE}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(button.text, button.x, button.y);
+
+    ctx.restore();
+}
+
+/**
+ * Handle click on the high scores screen.
+ * @param {{x: number, y: number}} pos - Click position in design coordinates
+ */
+function handleHighScoresClick(pos) {
+    if (Game.getState() !== GAME_STATES.HIGH_SCORES) return;
+
+    if (isInsideButton(pos.x, pos.y, highScoresBackButton)) {
+        Sound.playClickSound();
+        Game.setState(GAME_STATES.MENU);
+    }
+}
+
+/**
+ * Handle keyboard input on the high scores screen.
+ * @param {string} keyCode - Key code from KeyboardEvent
+ */
+function handleHighScoresKeyDown(keyCode) {
+    if (Game.getState() !== GAME_STATES.HIGH_SCORES) return;
+
+    if (keyCode === 'Escape') {
+        Sound.playClickSound();
+        Game.setState(GAME_STATES.MENU);
+    }
+}
+
+/**
+ * Set up high scores state handlers.
+ */
+function setupHighScoresState() {
+    // Register click handlers
+    Input.onMouseDown((x, y, button) => {
+        if (button === 0 && Game.getState() === GAME_STATES.HIGH_SCORES) {
+            handleHighScoresClick({ x, y });
+        }
+    });
+
+    Input.onTouchStart((x, y) => {
+        if (Game.getState() === GAME_STATES.HIGH_SCORES) {
+            handleHighScoresClick({ x, y });
+        }
+    });
+
+    Input.onKeyDown((keyCode) => {
+        if (Game.getState() === GAME_STATES.HIGH_SCORES) {
+            handleHighScoresKeyDown(keyCode);
+        }
+    });
+
+    // Register state handlers
+    Game.registerStateHandlers(GAME_STATES.HIGH_SCORES, {
+        onEnter: (fromState) => {
+            console.log('Entered HIGH_SCORES state');
+            highScoresAnimationTime = 0;
+            // Play menu music (reuse)
+            Music.playForState(GAME_STATES.MENU);
+        },
+        onExit: (toState) => {
+            console.log('Exiting HIGH_SCORES state');
+        },
+        render: renderHighScores
+    });
+}
+
+// =============================================================================
 // PAUSED STATE
 // =============================================================================
 
@@ -3456,6 +3827,7 @@ async function init() {
     // These register the update/render functions for each state
     setupMenuState();
     setupDifficultySelectState();
+    setupHighScoresState();
     setupPlayingState();
     setupPausedState();
     setupVictoryState();

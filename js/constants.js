@@ -104,6 +104,7 @@ export const GAME = {
 export const GAME_STATES = {
     MENU: 'menu',
     DIFFICULTY_SELECT: 'difficulty_select',
+    HIGH_SCORES: 'high_scores',
     PLAYING: 'playing',
     AIMING: 'aiming',
     FIRING: 'firing',
@@ -234,7 +235,9 @@ export const PROJECTILE = {
     DEFAULT_RADIUS: 4,
     DEFAULT_DAMAGE: 25,
     TRAIL_LENGTH: 10,
-    TRAIL_FADE: 0.9
+    TRAIL_FADE: 0.9,
+    /** Minimum distance projectile must travel before it can hit its owner tank */
+    SELF_COLLISION_SAFE_DISTANCE: 60
 };
 
 // =============================================================================
