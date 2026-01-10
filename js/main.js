@@ -39,6 +39,7 @@ import * as AchievementPopup from './achievement-popup.js';
 import * as SupplyDrop from './supply-drop.js';
 import * as AchievementScreen from './achievement-screen.js';
 import * as CollectionScreen from './collection-screen.js';
+import * as SupplyDropScreen from './supply-drop-screen.js';
 import * as CombatAchievements from './combat-achievements.js';
 import * as PrecisionAchievements from './precision-achievements.js';
 import * as WeaponAchievements from './weapon-achievements.js';
@@ -207,45 +208,54 @@ const menuTransition = {
 const menuButtons = {
     start: {
         x: CANVAS.DESIGN_WIDTH / 2,
-        y: CANVAS.DESIGN_HEIGHT / 2 + 20,
+        y: CANVAS.DESIGN_HEIGHT / 2 - 30,
         width: 280,
-        height: 55,
+        height: 50,
         text: 'NEW RUN',
         color: COLORS.NEON_CYAN,
         enabled: true
     },
     highScores: {
         x: CANVAS.DESIGN_WIDTH / 2,
-        y: CANVAS.DESIGN_HEIGHT / 2 + 85,
+        y: CANVAS.DESIGN_HEIGHT / 2 + 30,
         width: 280,
-        height: 55,
+        height: 50,
         text: 'HIGH SCORES',
         color: COLORS.NEON_YELLOW,
         enabled: true
     },
     achievements: {
         x: CANVAS.DESIGN_WIDTH / 2,
-        y: CANVAS.DESIGN_HEIGHT / 2 + 150,
+        y: CANVAS.DESIGN_HEIGHT / 2 + 90,
         width: 280,
-        height: 55,
+        height: 50,
         text: 'ACHIEVEMENTS',
         color: COLORS.NEON_ORANGE,
         enabled: true
     },
     collection: {
         x: CANVAS.DESIGN_WIDTH / 2,
-        y: CANVAS.DESIGN_HEIGHT / 2 + 215,
+        y: CANVAS.DESIGN_HEIGHT / 2 + 150,
         width: 280,
-        height: 55,
+        height: 50,
         text: 'COLLECTION',
         color: COLORS.NEON_PINK,
         enabled: true
     },
+    supplyDrop: {
+        x: CANVAS.DESIGN_WIDTH / 2,
+        y: CANVAS.DESIGN_HEIGHT / 2 + 210,
+        width: 280,
+        height: 50,
+        text: 'SUPPLY DROPS',
+        color: '#F59E0B',  // Gold/orange for token theme
+        enabled: true
+    },
     options: {
         x: CANVAS.DESIGN_WIDTH / 2,
-        y: CANVAS.DESIGN_HEIGHT / 2 + 280,
+        y: CANVAS.DESIGN_HEIGHT / 2 + 270,
         width: 280,
-        height: 55,
+        height: 50,
         text: 'OPTIONS',
         color: COLORS.NEON_PURPLE,
         enabled: true  // Enabled for volume controls
@@ -336,6 +346,11 @@ function handleMenuClick(pos) {
         Sound.playClickSound();
         // Go to COLLECTION state
         Game.setState(GAME_STATES.COLLECTION);
+    } else if (isInsideButton(pos.x, pos.y, menuButtons.supplyDrop)) {
+        // Play click sound
+        Sound.playClickSound();
+        // Go to SUPPLY_DROP state
+        Game.setState(GAME_STATES.SUPPLY_DROP);
     } else if (isInsideButton(pos.x, pos.y, menuButtons.options) && menuButtons.options.enabled) {
         // Play click sound
         Sound.playClickSound();
@@ -642,6 +657,7 @@ function renderMenu(ctx) {
     renderMenuButton(ctx, menuButtons.highScores, pulseIntensity);
     renderMenuButton(ctx, menuButtons.achievements, pulseIntensity);
     renderMenuButton(ctx, menuButtons.collection, pulseIntensity);
+    renderMenuButton(ctx, menuButtons.supplyDrop, pulseIntensity);
     renderMenuButton(ctx, menuButtons.options, pulseIntensity);
 
     // Best run display (below OPTIONS button)
@@ -653,7 +669,7 @@ function renderMenu(ctx) {
     ctx.textBaseline = 'middle';
     ctx.shadowColor = COLORS.NEON_YELLOW;
     ctx.shadowBlur = 8;
-    ctx.fillText(bestRunText, CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 340);
+    ctx.fillText(bestRunText, CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 320);
     ctx.shadowBlur = 0;
 
     // Instructions text at bottom
@@ -661,8 +677,8 @@ function renderMenu(ctx) {
     ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('Click or tap NEW RUN to begin', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT - 80);
-    ctx.fillText('Press D to toggle debug mode', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT - 55);
+    ctx.fillText('Click or tap NEW RUN to begin', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT - 50);
+    ctx.fillText('Press D to toggle debug mode', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT - 25);
 
     // Decorative line under title
     ctx.save();
@@ -4221,6 +4237,7 @@ async function init() {
     setupHighScoresState();
     AchievementScreen.setup();
     CollectionScreen.setup();
+    SupplyDropScreen.setup();
     setupPlayingState();
     setupPausedState();
     setupVictoryState();
