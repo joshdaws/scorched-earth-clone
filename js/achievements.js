@@ -1,10 +1,13 @@
 /**
  * Scorched Earth: Synthwave Edition
- * Achievement System - Data Structure and Registry
+ * Achievement System - Data Structure, Registry, and State Tracking
  *
  * Defines all achievements with their properties matching the game spec.
  * Provides the AchievementRegistry for accessing achievement definitions.
+ * Manages achievement state tracking and localStorage persistence.
  */
+
+import { DEBUG } from './constants.js';
 
 // =============================================================================
 // ACHIEVEMENT CATEGORIES
@@ -740,3 +743,456 @@ export {
     AGAINST_ALL_ODDS,
     MINIMALIST
 };
+
+// =============================================================================
+// ACHIEVEMENT STATE TRACKING AND PERSISTENCE
+// =============================================================================
+
+/**
+ * localStorage key for achievement state.
+ * @type {string}
+ */
+const STORAGE_KEY = 'scorched_earth_achievements';
+
+/**
+ * Default achievement state structure for new players.
+ * @type {Object}
+ */
+const DEFAULT_ACHIEVEMENT_STATE = {
+    unlocked: [],       // Array of unlocked achievement IDs
+    progress: {},       // Map of achievement ID -> { current: number, required: number }
+    unlockDates: {}     // Map of achievement ID -> ISO date string
+};
+
+/**
+ * In-memory achievement state (loaded from localStorage).
+ * @type {Object}
+ */
+let achievementState = { ...DEFAULT_ACHIEVEMENT_STATE };
+
+/**
+ * Registered callback functions for achievement unlocks.
+ * @type {Function[]}
+ */
+const unlockCallbacks = [];
+
+// =============================================================================
+// DEBUG LOGGING
+// =============================================================================
+
+/**
+ * Log a debug message if debug mode is enabled.
+ * @param {string} message - Message to log
+ * @param {Object} [data] - Optional data to log
+ */
+function debugLog(message, data = null) {
+    if (DEBUG.ENABLED) {
+        if (data !== null) {
+            console.log(`[Achievements] ${message}`, data);
+        } else {
+            console.log(`[Achievements] ${message}`);
+        }
+    }
+}
+
+// =============================================================================
+// STORAGE HELPERS
+// =============================================================================
+
+/**
+ * Check if localStorage is available.
+ * @returns {boolean} True if localStorage can be used
+ */
+function isStorageAvailable() {
+    try {
+        return typeof localStorage !== 'undefined';
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Safely parse JSON from localStorage.
+ * @param {string} key - Storage key
+ * @param {*} defaultValue - Default value if parsing fails
+ * @returns {*} Parsed value or default
+ */
+function safeGetItem(key, defaultValue) {
+    if (!isStorageAvailable()) {
+        return defaultValue;
+    }
+    try {
+        const item = localStorage.getItem(key);
+        if (item === null) {
+            return defaultValue;
+        }
+        return JSON.parse(item);
+    } catch (error) {
+        console.warn(`[Achievements] Failed to parse ${key}, using default:`, error);
+        return defaultValue;
+    }
+}
+
+/**
+ * Safely stringify and save to localStorage.
+ * @param {string} key - Storage key
+ * @param {*} value - Value to store
+ * @returns {boolean} True if save succeeded
+ */
+function safeSetItem(key, value) {
+    if (!isStorageAvailable()) {
+        return false;
+    }
+    try {
+        localStorage.setItem(key, JSON.stringify(value));
+        return true;
+    } catch (error) {
+        console.error(`[Achievements] Failed to save ${key}:`, error);
+        return false;
+    }
+}
+
+// =============================================================================
+// STATE PERSISTENCE
+// =============================================================================
+
+/**
+ * Load achievement state from localStorage.
+ * Called on module initialization.
+ * @returns {Object} The loaded or default achievement state
+ */
+export function loadAchievementState() {
+    const stored = safeGetItem(STORAGE_KEY, null);
+
+    if (stored) {
+        // Merge with defaults to ensure all fields exist
+        achievementState = {
+            unlocked: Array.isArray(stored.unlocked) ? stored.unlocked : [],
+            progress: stored.progress && typeof stored.progress === 'object' ? stored.progress : {},
+            unlockDates: stored.unlockDates && typeof stored.unlockDates === 'object' ? stored.unlockDates : {}
+        };
+        debugLog('Achievement state loaded', {
+            unlockedCount: achievementState.unlocked.length,
+            progressCount: Object.keys(achievementState.progress).length
+        });
+    } else {
+        // Initialize clean state for new players
+        achievementState = { ...DEFAULT_ACHIEVEMENT_STATE, progress: {}, unlockDates: {} };
+        debugLog('New achievement state initialized');
+    }
+
+    return achievementState;
+}
+
+/**
+ * Save achievement state to localStorage.
+ * Called automatically when state changes.
+ * @returns {boolean} True if save succeeded
+ */
+export function saveAchievementState() {
+    const saved = safeSetItem(STORAGE_KEY, achievementState);
+    if (saved) {
+        debugLog('Achievement state saved');
+    }
+    return saved;
+}
+
+/**
+ * Get the current achievement state (for export/debug).
+ * @returns {Object} Copy of current achievement state
+ */
+export function getAchievementState() {
+    return {
+        unlocked: [...achievementState.unlocked],
+        progress: { ...achievementState.progress },
+        unlockDates: { ...achievementState.unlockDates }
+    };
+}
+
+// =============================================================================
+// ACHIEVEMENT TRACKING FUNCTIONS
+// =============================================================================
+
+/**
+ * Check if an achievement is unlocked.
+ * @param {string} id - Achievement ID
+ * @returns {boolean} True if achievement is unlocked
+ */
+export function isAchievementUnlocked(id) {
+    return achievementState.unlocked.includes(id);
+}
+
+/**
+ * Get progress for a counter-type achievement.
+ * @param {string} id - Achievement ID
+ * @returns {Object|null} Progress object { current, required } or null if no progress tracked
+ */
+export function getAchievementProgress(id) {
+    const progress = achievementState.progress[id];
+    if (progress) {
+        return { ...progress };
+    }
+
+    // Check if this is a counter achievement and return initial state
+    const achievement = getAchievement(id);
+    if (achievement && achievement.trackingType === ACHIEVEMENT_TRACKING_TYPES.COUNTER) {
+        return { current: 0, required: achievement.target };
+    }
+
+    return null;
+}
+
+/**
+ * Update progress for a counter-type achievement.
+ * Automatically unlocks if target is reached.
+ * @param {string} id - Achievement ID
+ * @param {number} value - New value to set (absolute) or increment by (if increment=true)
+ * @param {boolean} [increment=false] - If true, add value to current; if false, set value
+ * @returns {Object} Result { updated: boolean, progress: Object|null, unlocked: boolean, reward: number }
+ */
+export function updateAchievementProgress(id, value, increment = false) {
+    const achievement = getAchievement(id);
+
+    // Validate achievement exists
+    if (!achievement) {
+        console.warn(`[Achievements] Unknown achievement ID: ${id}`);
+        return { updated: false, progress: null, unlocked: false, reward: 0 };
+    }
+
+    // Already unlocked - no need to track progress
+    if (isAchievementUnlocked(id)) {
+        return {
+            updated: false,
+            progress: { current: achievement.target, required: achievement.target },
+            unlocked: true,
+            reward: 0
+        };
+    }
+
+    // Initialize progress if not exists
+    if (!achievementState.progress[id]) {
+        achievementState.progress[id] = {
+            current: 0,
+            required: achievement.target
+        };
+    }
+
+    // Update progress
+    const progress = achievementState.progress[id];
+    if (increment) {
+        progress.current = Math.min(progress.current + value, progress.required);
+    } else {
+        progress.current = Math.min(value, progress.required);
+    }
+
+    // Check if achievement should unlock
+    let unlocked = false;
+    let reward = 0;
+    if (progress.current >= progress.required) {
+        const unlockResult = unlockAchievement(id);
+        unlocked = unlockResult.unlocked;
+        reward = unlockResult.reward;
+    } else {
+        // Save state on progress update
+        saveAchievementState();
+    }
+
+    debugLog(`Progress updated: ${id}`, {
+        current: progress.current,
+        required: progress.required,
+        unlocked
+    });
+
+    return {
+        updated: true,
+        progress: { ...progress },
+        unlocked,
+        reward
+    };
+}
+
+/**
+ * Unlock an achievement, trigger callbacks, and save state.
+ * @param {string} id - Achievement ID
+ * @returns {Object} Result { unlocked: boolean, reward: number, specialReward: string|null }
+ */
+export function unlockAchievement(id) {
+    const achievement = getAchievement(id);
+
+    // Validate achievement exists
+    if (!achievement) {
+        console.warn(`[Achievements] Cannot unlock unknown achievement: ${id}`);
+        return { unlocked: false, reward: 0, specialReward: null };
+    }
+
+    // Already unlocked
+    if (isAchievementUnlocked(id)) {
+        debugLog(`Achievement already unlocked: ${id}`);
+        return { unlocked: false, reward: 0, specialReward: null };
+    }
+
+    // Mark as unlocked
+    achievementState.unlocked.push(id);
+    achievementState.unlockDates[id] = new Date().toISOString();
+
+    // Update progress to show complete (for counter achievements)
+    if (achievement.trackingType === ACHIEVEMENT_TRACKING_TYPES.COUNTER) {
+        achievementState.progress[id] = {
+            current: achievement.target,
+            required: achievement.target
+        };
+    }
+
+    // Save state
+    saveAchievementState();
+
+    debugLog(`Achievement unlocked: ${achievement.name}`, {
+        id,
+        tokenReward: achievement.tokenReward,
+        specialReward: achievement.specialReward
+    });
+
+    // Trigger callbacks
+    const callbackData = {
+        achievement,
+        reward: achievement.tokenReward,
+        specialReward: achievement.specialReward,
+        timestamp: achievementState.unlockDates[id]
+    };
+
+    unlockCallbacks.forEach(callback => {
+        try {
+            callback(callbackData);
+        } catch (error) {
+            console.error('[Achievements] Callback error:', error);
+        }
+    });
+
+    return {
+        unlocked: true,
+        reward: achievement.tokenReward,
+        specialReward: achievement.specialReward
+    };
+}
+
+/**
+ * Register a callback function for achievement unlocks.
+ * @param {Function} callback - Function to call when achievement unlocks.
+ *                              Receives { achievement, reward, specialReward, timestamp }
+ * @returns {Function} Unsubscribe function
+ */
+export function onAchievementUnlock(callback) {
+    if (typeof callback !== 'function') {
+        console.warn('[Achievements] Invalid callback provided to onAchievementUnlock');
+        return () => {};
+    }
+
+    unlockCallbacks.push(callback);
+    debugLog('Achievement unlock callback registered', { total: unlockCallbacks.length });
+
+    // Return unsubscribe function
+    return () => {
+        const index = unlockCallbacks.indexOf(callback);
+        if (index > -1) {
+            unlockCallbacks.splice(index, 1);
+            debugLog('Achievement unlock callback removed', { total: unlockCallbacks.length });
+        }
+    };
+}
+
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
+
+/**
+ * Get count of unlocked achievements.
+ * @returns {number} Number of unlocked achievements
+ */
+export function getUnlockedCount() {
+    return achievementState.unlocked.length;
+}
+
+/**
+ * Get all unlocked achievement IDs.
+ * @returns {string[]} Array of unlocked achievement IDs
+ */
+export function getUnlockedAchievementIds() {
+    return [...achievementState.unlocked];
+}
+
+/**
+ * Get total tokens earned from achievements.
+ * @returns {number} Total token reward from all unlocked achievements
+ */
+export function getTotalTokensEarned() {
+    return achievementState.unlocked.reduce((total, id) => {
+        const achievement = getAchievement(id);
+        return total + (achievement ? achievement.tokenReward : 0);
+    }, 0);
+}
+
+/**
+ * Get unlock date for an achievement.
+ * @param {string} id - Achievement ID
+ * @returns {Date|null} Unlock date or null if not unlocked
+ */
+export function getUnlockDate(id) {
+    const dateStr = achievementState.unlockDates[id];
+    return dateStr ? new Date(dateStr) : null;
+}
+
+/**
+ * Reset all achievement state (for testing or user-requested reset).
+ * @returns {boolean} True if reset succeeded
+ */
+export function resetAchievementState() {
+    achievementState = {
+        unlocked: [],
+        progress: {},
+        unlockDates: {}
+    };
+    const saved = saveAchievementState();
+    debugLog('Achievement state reset');
+    return saved;
+}
+
+/**
+ * Get achievement statistics.
+ * @returns {Object} Statistics about achievement progress
+ */
+export function getAchievementStats() {
+    const total = getAchievementCount();
+    const unlocked = getUnlockedCount();
+    const visible = getVisibleAchievements().length;
+    const visibleUnlocked = achievementState.unlocked.filter(id => {
+        const ach = getAchievement(id);
+        return ach && !ach.hidden;
+    }).length;
+
+    return {
+        total,
+        unlocked,
+        remaining: total - unlocked,
+        percentComplete: total > 0 ? Math.round((unlocked / total) * 100) : 0,
+        visible,
+        visibleUnlocked,
+        hiddenUnlocked: unlocked - visibleUnlocked,
+        tokensEarned: getTotalTokensEarned()
+    };
+}
+
+// =============================================================================
+// INITIALIZATION
+// =============================================================================
+
+/**
+ * Initialize the achievement state module.
+ * Loads state from localStorage.
+ */
+export function initAchievementState() {
+    loadAchievementState();
+    debugLog('Achievement state module initialized', getAchievementStats());
+}
+
+// Auto-initialize on module load
+initAchievementState();
