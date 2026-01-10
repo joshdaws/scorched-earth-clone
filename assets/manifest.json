@@ -178,6 +178,73 @@
       "height": 32
     }
   },
+  "supplyDrop": {
+    "plane": {
+      "path": "images/supply-drop/plane.png",
+      "width": 128,
+      "height": 48
+    },
+    "crate": {
+      "path": "images/supply-drop/crate.png",
+      "width": 64,
+      "height": 64
+    },
+    "helicopter": {
+      "path": "images/supply-drop/helicopter.png",
+      "width": 96,
+      "height": 48
+    },
+    "parachute-common": {
+      "path": "images/supply-drop/parachute-common.png",
+      "width": 80,
+      "height": 64
+    },
+    "parachute-uncommon": {
+      "path": "images/supply-drop/parachute-uncommon.png",
+      "width": 80,
+      "height": 64
+    },
+    "parachute-rare": {
+      "path": "images/supply-drop/parachute-rare.png",
+      "width": 80,
+      "height": 64
+    },
+    "parachute-epic": {
+      "path": "images/supply-drop/parachute-epic.png",
+      "width": 80,
+      "height": 64
+    },
+    "parachute-legendary": {
+      "path": "images/supply-drop/parachute-legendary.png",
+      "width": 80,
+      "height": 64
+    },
+    "banner-common": {
+      "path": "images/supply-drop/banner-common.png",
+      "width": 200,
+      "height": 40
+    },
+    "banner-uncommon": {
+      "path": "images/supply-drop/banner-uncommon.png",
+      "width": 200,
+      "height": 40
+    },
+    "banner-rare": {
+      "path": "images/supply-drop/banner-rare.png",
+      "width": 200,
+      "height": 40
+    },
+    "banner-epic": {
+      "path": "images/supply-drop/banner-epic.png",
+      "width": 200,
+      "height": 40
+    },
+    "banner-legendary": {
+      "path": "images/supply-drop/banner-legendary.png",
+      "width": 200,
+      "height": 40
+    }
+  },
   "projectiles": {
     "basic": {
       "path": "images/weapons/shot-basic.png",
