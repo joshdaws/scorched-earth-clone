@@ -60,6 +60,20 @@ let purchaseFeedback = null;
  */
 let pressedElementId = null;
 
+/**
+ * Currently active tab: 'weapons' or 'items'.
+ * @type {'weapons'|'items'}
+ */
+let activeTab = 'weapons';
+
+/**
+ * Tab definitions for the shop.
+ */
+const SHOP_TABS = {
+    WEAPONS: { id: 'weapons', label: 'WEAPONS', enabled: true },
+    ITEMS: { id: 'items', label: 'ITEMS', enabled: false }  // Disabled for now - Coming Soon
+};
+
 // =============================================================================
 // SHOP LAYOUT CONSTANTS
 // =============================================================================
@@ -88,9 +102,17 @@ const SHOP_LAYOUT = {
         Y_OFFSET: -315,
         HEIGHT: 30
     },
+    // Tab navigation bar - below balance
+    TABS: {
+        Y_OFFSET: -270,        // Position below balance display
+        HEIGHT: 48,            // Touch-friendly: exceeds 44px minimum
+        TAB_WIDTH: 140,        // Width per tab
+        TAB_GAP: 16,           // Gap between tabs
+        UNDERLINE_HEIGHT: 3    // Active tab underline thickness
+    },
     // Weapon categories - proper containment with adequate spacing
     CATEGORY: {
-        Y_START: -265,
+        Y_START: -210,         // Adjusted to be below tabs (tab Y_OFFSET -270 + HEIGHT 48 + margin 12)
         HEADER_HEIGHT: 28,     // Height reserved for category header (name + line)
         SECTION_MARGIN: 24,    // Minimum margin between category sections (>20px per spec)
         LABEL_PADDING: 8       // Padding below category label before cards
@@ -143,6 +165,12 @@ const doneButton = {
  */
 let weaponCardAreas = [];
 
+/**
+ * Tab button hit areas (populated during render).
+ * @type {Array<{x: number, y: number, width: number, height: number, tabId: string}>}
+ */
+let tabButtonAreas = [];
+
 // =============================================================================
 // INITIALIZATION
 // =============================================================================
@@ -158,6 +186,8 @@ export function show(playerTank) {
     playerTankRef = playerTank;
     purchaseFeedback = null;
     weaponCardAreas = [];
+    tabButtonAreas = [];
+    activeTab = 'weapons';  // Always start on WEAPONS tab
 
     console.log('[Shop] Opened');
 }
@@ -169,6 +199,7 @@ export function hide() {
     isVisible = false;
     playerTankRef = null;
     weaponCardAreas = [];
+    tabButtonAreas = [];
 
     console.log('[Shop] Closed');
 }
@@ -317,6 +348,13 @@ export function handlePointerDown(x, y) {
         return true;
     }
 
+    // Check tab buttons
+    const tabInfo = getTabAtPoint(x, y);
+    if (tabInfo) {
+        pressedElementId = `tab_${tabInfo.tabId}`;
+        return true;
+    }
+
     // Check weapon cards
     const weaponInfo = getWeaponAtPoint(x, y);
     if (weaponInfo) {
@@ -359,6 +397,20 @@ export function handlePointerUp(x, y) {
         return true;
     }
 
+    // Check tab button release
+    if (wasPressed.startsWith('tab_')) {
+        const tabId = wasPressed.replace('tab_', '');
+        const tabInfo = getTabAtPoint(x, y);
+
+        if (tabInfo && tabInfo.tabId === tabId) {
+            // Switch to the clicked tab
+            playClickSound();
+            activeTab = tabId;
+            console.log(`[Shop] Switched to ${tabId} tab`);
+            return true;
+        }
+    }
+
     // Check weapon card release
     if (wasPressed.startsWith('weapon_')) {
         const weaponId = wasPressed.replace('weapon_', '');
@@ -394,6 +446,15 @@ export function handleClick(x, y) {
             onDoneCallback();
         }
         hide();
+        return true;
+    }
+
+    // Check tab buttons
+    const tabInfo = getTabAtPoint(x, y);
+    if (tabInfo) {
+        playClickSound();
+        activeTab = tabInfo.tabId;
+        console.log(`[Shop] Switched to ${tabInfo.tabId} tab`);
         return true;
     }
 
@@ -469,6 +530,115 @@ function renderButton(ctx, button, pulseIntensity) {
     ctx.fillText(button.text, button.x, button.y + pressOffset);
 
     ctx.restore();
+}
+
+/**
+ * Draw the tab navigation bar with WEAPONS and ITEMS tabs.
+ * Active tab has glowing underline (cyan), inactive tabs are subtle.
+ * ITEMS tab is disabled and shows "Coming Soon" state.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {number} centerX - Center X position for the tab bar
+ * @param {number} y - Y position for the tab bar
+ * @param {number} pulseIntensity - Glow pulse intensity (0-1)
+ */
+function renderTabBar(ctx, centerX, y, pulseIntensity) {
+    const tabLayout = SHOP_LAYOUT.TABS;
+    const tabs = [SHOP_TABS.WEAPONS, SHOP_TABS.ITEMS];
+    const totalWidth = tabs.length * tabLayout.TAB_WIDTH + (tabs.length - 1) * tabLayout.TAB_GAP;
+    const startX = centerX - totalWidth / 2;
+
+    // Clear tab hit areas for this frame (will be populated as we render)
+    tabButtonAreas = [];
+
+    ctx.save();
+
+    for (let i = 0; i < tabs.length; i++) {
+        const tab = tabs[i];
+        const tabX = startX + i * (tabLayout.TAB_WIDTH + tabLayout.TAB_GAP);
+        const tabY = y - tabLayout.HEIGHT / 2;
+        const isActive = activeTab === tab.id;
+        const isPressed = pressedElementId === `tab_${tab.id}`;
+        const isDisabled = !tab.enabled;
+
+        // Tab background (subtle, darkens on press)
+        ctx.fillStyle = isPressed ? 'rgba(40, 40, 70, 0.6)' : 'rgba(26, 26, 46, 0.4)';
+        ctx.beginPath();
+        ctx.roundRect(tabX, tabY, tabLayout.TAB_WIDTH, tabLayout.HEIGHT, 6);
+        ctx.fill();
+
+        // Tab label
+        ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const labelX = tabX + tabLayout.TAB_WIDTH / 2;
+        const labelY = y;
+
+        if (isDisabled) {
+            // Disabled state: grayed out text, no glow
+            ctx.fillStyle = COLORS.TEXT_MUTED;
+            ctx.fillText(tab.label, labelX, labelY - 6);
+
+            // "Coming Soon" subtitle
+            ctx.font = `${UI.FONT_SIZE_SMALL - 2}px ${UI.FONT_FAMILY}`;
+            ctx.fillStyle = 'rgba(100, 100, 120, 0.8)';
+            ctx.fillText('COMING SOON', labelX, labelY + 10);
+        } else if (isActive) {
+            // Active state: bright text with cyan glow and underline
+            ctx.shadowColor = COLORS.NEON_CYAN;
+            ctx.shadowBlur = 8 + pulseIntensity * 6;
+            ctx.fillStyle = COLORS.NEON_CYAN;
+            ctx.fillText(tab.label, labelX, labelY);
+
+            // Glowing underline
+            ctx.shadowBlur = 10 + pulseIntensity * 5;
+            ctx.strokeStyle = COLORS.NEON_CYAN;
+            ctx.lineWidth = tabLayout.UNDERLINE_HEIGHT;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            const underlineY = tabY + tabLayout.HEIGHT - 4;
+            const underlinePadding = 20;
+            ctx.moveTo(tabX + underlinePadding, underlineY);
+            ctx.lineTo(tabX + tabLayout.TAB_WIDTH - underlinePadding, underlineY);
+            ctx.stroke();
+
+            ctx.shadowBlur = 0;
+        } else {
+            // Inactive state: subtle text, no underline
+            ctx.fillStyle = COLORS.TEXT_MUTED;
+            ctx.fillText(tab.label, labelX, labelY);
+        }
+
+        // Register hit area (only for enabled tabs)
+        if (tab.enabled) {
+            tabButtonAreas.push({
+                x: tabX,
+                y: tabY,
+                width: tabLayout.TAB_WIDTH,
+                height: tabLayout.HEIGHT,
+                tabId: tab.id
+            });
+        }
+    }
+
+    ctx.restore();
+}
+
+/**
+ * Check if a point is inside a tab button.
+ * @param {number} x - X coordinate
+ * @param {number} y - Y coordinate
+ * @returns {{tabId: string}|null} Tab info or null
+ */
+function getTabAtPoint(x, y) {
+    for (const area of tabButtonAreas) {
+        if (x >= area.x &&
+            x <= area.x + area.width &&
+            y >= area.y &&
+            y <= area.y + area.height) {
+            return { tabId: area.tabId };
+        }
+    }
+    return null;
 }
 
 /**
@@ -708,6 +878,66 @@ export function render(ctx) {
     ctx.fillStyle = COLORS.NEON_YELLOW;
     ctx.fillText(`$${currentMoney.toLocaleString()}`, panel.X, panel.Y + SHOP_LAYOUT.BALANCE.Y_OFFSET + 15);
     ctx.restore();
+
+    // Tab navigation bar
+    renderTabBar(ctx, panel.X, panel.Y + SHOP_LAYOUT.TABS.Y_OFFSET, pulseIntensity);
+
+    // Only render weapons content if on WEAPONS tab
+    if (activeTab !== 'weapons') {
+        // Render "Coming Soon" placeholder for ITEMS tab
+        ctx.save();
+        ctx.font = `bold 28px ${UI.FONT_FAMILY}`;
+        ctx.fillStyle = COLORS.TEXT_MUTED;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('ITEMS COMING SOON', panel.X, panel.Y);
+        ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+        ctx.fillText('Check back in future updates!', panel.X, panel.Y + 35);
+        ctx.restore();
+
+        // Render Done button only (skip weapons rendering)
+        renderButton(ctx, doneButton, pulseIntensity);
+
+        // Corner accents
+        ctx.save();
+        const cornerSize = 40;
+        ctx.strokeStyle = COLORS.NEON_PURPLE;
+        ctx.shadowColor = COLORS.NEON_PURPLE;
+        ctx.shadowBlur = 10;
+        ctx.lineWidth = 4;
+
+        // Top-left corner
+        ctx.beginPath();
+        ctx.moveTo(panelLeft + 10, panelTop + 10 + cornerSize);
+        ctx.lineTo(panelLeft + 10, panelTop + 10);
+        ctx.lineTo(panelLeft + 10 + cornerSize, panelTop + 10);
+        ctx.stroke();
+
+        // Top-right corner
+        ctx.beginPath();
+        ctx.moveTo(panelLeft + panel.WIDTH - 10 - cornerSize, panelTop + 10);
+        ctx.lineTo(panelLeft + panel.WIDTH - 10, panelTop + 10);
+        ctx.lineTo(panelLeft + panel.WIDTH - 10, panelTop + 10 + cornerSize);
+        ctx.stroke();
+
+        // Bottom-left corner
+        ctx.beginPath();
+        ctx.moveTo(panelLeft + 10, panelTop + panel.HEIGHT - 10 - cornerSize);
+        ctx.lineTo(panelLeft + 10, panelTop + panel.HEIGHT - 10);
+        ctx.lineTo(panelLeft + 10 + cornerSize, panelTop + panel.HEIGHT - 10);
+        ctx.stroke();
+
+        // Bottom-right corner
+        ctx.beginPath();
+        ctx.moveTo(panelLeft + panel.WIDTH - 10 - cornerSize, panelTop + panel.HEIGHT - 10);
+        ctx.lineTo(panelLeft + panel.WIDTH - 10, panelTop + panel.HEIGHT - 10);
+        ctx.lineTo(panelLeft + panel.WIDTH - 10, panelTop + panel.HEIGHT - 10 - cornerSize);
+        ctx.stroke();
+
+        ctx.restore();
+        ctx.restore();
+        return;  // Early exit - don't render weapons
+    }
 
     // Get all purchasable weapons (excluding Basic Shot which is free/unlimited)
     const allWeapons = WeaponRegistry.getAllWeapons();
