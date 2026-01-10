@@ -1476,14 +1476,9 @@ function checkRoundEnd() {
     if (playerDestroyed && enemyDestroyed) {
         console.log('[Main] Both tanks destroyed - MUTUAL DESTRUCTION (GAME OVER)!');
 
-        // Get round stats for display
-        const earnings = Money.getRoundEarnings();
-        const damage = Money.getRoundDamage();
-
         // Show game over screen with draw indicator
+        // Stats are fetched from runState module automatically
         GameOver.show({
-            earnings,
-            damage,
             rounds: currentRound,
             draw: true,
             delay: 1200
@@ -1523,14 +1518,9 @@ function checkRoundEnd() {
         // Player loses - GAME OVER (permadeath)
         console.log('[Main] Player destroyed - GAME OVER!');
 
-        // Get round stats for display (no consolation prize in permadeath)
-        const earnings = Money.getRoundEarnings();
-        const damage = Money.getRoundDamage();
-
         // Show game over screen
+        // Stats are fetched from runState module automatically
         GameOver.show({
-            earnings,
-            damage,
             rounds: currentRound,
             draw: false,
             delay: 1200
