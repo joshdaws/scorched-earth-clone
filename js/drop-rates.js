@@ -19,7 +19,10 @@ import {
 import {
     ownsTank,
     addTank as addTankToCollection,
-    DUPLICATE_SCRAP_REWARDS
+    DUPLICATE_SCRAP_REWARDS,
+    isGuaranteedNewTank,
+    getConsecutiveDuplicates,
+    resetConsecutiveDuplicates
 } from './tank-collection.js';
 import {
     getPerformanceBonus
@@ -416,7 +419,7 @@ export function rollRarity(rates) {
  * @returns {Object|null} Selected tank definition, or null if no tanks available
  */
 export function selectTank(rarity, options = {}) {
-    const { exclusions = [] } = options;
+    const { exclusions = [], forceNew = false } = options;
 
     // Get all tanks of this rarity
     let candidates = getTanksByRarity(rarity);
@@ -444,9 +447,38 @@ export function selectTank(rarity, options = {}) {
         filtered = candidates;
     }
 
-    // Random selection
-    const selectedIndex = Math.floor(Math.random() * filtered.length);
-    const selected = filtered[selectedIndex];
+    // If forceNew is true (from duplicate pity), only select unowned tanks
+    if (forceNew) {
+        const unowned = filtered.filter(tank => !ownsTank(tank.id));
+        if (unowned.length > 0) {
+            filtered = unowned;
+            debugLog(`Forcing new tank: ${unowned.length} unowned candidates`);
+        } else {
+            debugLog('Force new requested but all tanks in rarity owned, proceeding with any');
+        }
+    }
+
+    // First selection attempt
+    let selectedIndex = Math.floor(Math.random() * filtered.length);
+    let selected = filtered[selectedIndex];
+
+    // Duplicate reroll: if selected is owned, try once more within same rarity
+    if (ownsTank(selected.id) && !forceNew) {
+        debugLog(`Duplicate rolled (${selected.name}), attempting reroll...`);
+
+        // Try to find unowned tanks
+        const unownedCandidates = filtered.filter(tank => !ownsTank(tank.id));
+
+        if (unownedCandidates.length > 0) {
+            // Reroll to an unowned tank
+            const rerollIndex = Math.floor(Math.random() * unownedCandidates.length);
+            selected = unownedCandidates[rerollIndex];
+            debugLog(`Reroll successful: selected ${selected.name} (new)`);
+        } else {
+            // No unowned tanks in this rarity, accept the duplicate
+            debugLog(`Reroll failed: all ${rarity} tanks owned, accepting duplicate`);
+        }
+    }
 
     debugLog(`Selected ${selected.name} from ${filtered.length} ${rarity} candidates`);
 
@@ -470,6 +502,12 @@ export function processDrop(dropType) {
     // Step 1: Check for pity-guaranteed rarity override
     const minimumRarity = getMinimumRarity();
     let pityTriggered = false;
+
+    // Step 1b: Check for guaranteed new tank (duplicate pity system)
+    const forceNewTank = isGuaranteedNewTank();
+    if (forceNewTank) {
+        debugLog(`Duplicate pity active: ${getConsecutiveDuplicates()} consecutive duplicates, forcing new tank`);
+    }
 
     // Step 2: Calculate rates based on drop type (includes performance AND pity bonus)
     const rates = calculateDropRates({
@@ -500,7 +538,8 @@ export function processDrop(dropType) {
     }
 
     // Step 5: Select tank from rarity tier
-    const tank = selectTank(rarity);
+    // Pass forceNew flag if duplicate pity is active
+    const tank = selectTank(rarity, { forceNew: forceNewTank });
 
     if (!tank) {
         console.error('[DropRates] Failed to select tank');
@@ -511,7 +550,8 @@ export function processDrop(dropType) {
             isDuplicate: false,
             scrapAwarded: 0,
             duplicateCount: 0,
-            pityTriggered: false
+            pityTriggered: false,
+            duplicatePityTriggered: false
         };
     }
 
@@ -521,6 +561,10 @@ export function processDrop(dropType) {
     // Step 7: Add to collection and get result
     // The addTank function handles duplicate detection and scrap awarding
     const addResult = addTankToCollection(tank.id);
+
+    // Step 7b: If duplicate pity was used and we got a new tank, reset the counter
+    // (addTank already resets on new tank, but we track if pity was the reason)
+    const duplicatePityTriggered = forceNewTank && addResult.isNew;
 
     // Step 8: Update pity counters based on drop result
     updatePityCounters(rarity);
@@ -532,7 +576,8 @@ export function processDrop(dropType) {
         isDuplicate: addResult.isDuplicate,
         scrapAwarded: addResult.scrapAwarded,
         duplicateCount: addResult.duplicateCount,
-        pityTriggered: pityTriggered
+        pityTriggered: pityTriggered,
+        duplicatePityTriggered: duplicatePityTriggered
     };
 
     debugLog('Drop result:', {
@@ -542,7 +587,8 @@ export function processDrop(dropType) {
         isNew: result.isNew,
         isDuplicate: result.isDuplicate,
         scrapAwarded: result.scrapAwarded,
-        pityTriggered: pityTriggered
+        pityTriggered: pityTriggered,
+        duplicatePityTriggered: duplicatePityTriggered
     });
 
     return result;

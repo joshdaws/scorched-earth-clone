@@ -11,6 +11,7 @@ import { CANVAS, COLORS, UI, TANK, TURN_PHASES } from './constants.js';
 import { WeaponRegistry } from './weapons.js';
 import * as Wind from './wind.js';
 import * as Assets from './assets.js';
+import * as Tokens from './tokens.js';
 
 // =============================================================================
 // HUD LAYOUT CONSTANTS
@@ -45,6 +46,14 @@ const HUD = {
         X: CANVAS.DESIGN_WIDTH - 20,
         Y: CANVAS.DESIGN_HEIGHT - 50,
         WIDTH: 140,
+        HEIGHT: 35,
+        PADDING: 10
+    },
+    // Token display at bottom right (left of money panel)
+    TOKEN_PANEL: {
+        X: CANVAS.DESIGN_WIDTH - 170,  // 20 + 140 (money width) + 10 gap
+        Y: CANVAS.DESIGN_HEIGHT - 50,
+        WIDTH: 100,
         HEIGHT: 35,
         PADDING: 10
     },
@@ -1653,6 +1662,42 @@ export function renderMoneyPanel(ctx, money) {
 }
 
 // =============================================================================
+// TOKEN DISPLAY
+// =============================================================================
+
+/**
+ * Render the token display panel.
+ * Shows supply drop currency balance with a distinct purple/pink color.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ */
+export function renderTokenPanel(ctx) {
+    if (!ctx) return;
+
+    const panel = HUD.TOKEN_PANEL;
+    const tokens = Tokens.getTokenBalance();
+
+    // Draw panel background (right-aligned, purple accent)
+    const panelX = drawPanel(ctx, panel.X, panel.Y, panel.WIDTH, panel.HEIGHT, COLORS.NEON_PINK, true);
+
+    ctx.save();
+
+    // Token icon (diamond/crystal shape represented by unicode or text)
+    ctx.fillStyle = COLORS.NEON_PINK;
+    ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('◆', panelX + panel.PADDING, panel.Y + panel.HEIGHT / 2);
+
+    // Token amount
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'right';
+    ctx.fillText(tokens.toLocaleString(), panel.X - panel.PADDING, panel.Y + panel.HEIGHT / 2);
+
+    ctx.restore();
+}
+
+// =============================================================================
 // TURN INDICATOR
 // =============================================================================
 
@@ -1889,6 +1934,9 @@ export function renderHUD(ctx, state) {
 
     // Render weapon bar at bottom-center (left of fire button)
     renderWeaponBar(ctx, playerTank);
+
+    // Render token panel at bottom-right (for supply drop currency)
+    renderTokenPanel(ctx);
 }
 
 // =============================================================================
