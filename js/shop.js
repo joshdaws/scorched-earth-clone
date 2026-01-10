@@ -790,6 +790,93 @@ function renderButton(ctx, button, pulseIntensity) {
 }
 
 /**
+ * Draw horizontal scroll fade indicators for a category row.
+ * Shows gradient fades at edges when more content is available.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {number} x - Left edge X position
+ * @param {number} y - Top edge Y position
+ * @param {number} width - Width of the scrollable area
+ * @param {number} height - Height of the scrollable area
+ * @param {number} scrollOffset - Current scroll position
+ * @param {number} maxScroll - Maximum scroll value
+ * @param {string} color - Neon color for the gradient
+ */
+function renderHorizontalScrollIndicators(ctx, x, y, width, height, scrollOffset, maxScroll, color) {
+    if (maxScroll <= 0) return;  // No scrolling needed
+
+    const fadeWidth = 30;  // Width of the fade gradient
+    const canScrollLeft = scrollOffset > 0;
+    const canScrollRight = scrollOffset < maxScroll;
+
+    ctx.save();
+
+    // Left fade indicator (shows more content on left)
+    if (canScrollLeft) {
+        const fadeIntensity = Math.min(1, scrollOffset / 50);  // Fade in as you scroll
+        const gradient = ctx.createLinearGradient(x, 0, x + fadeWidth, 0);
+        gradient.addColorStop(0, `${color}${Math.floor(fadeIntensity * 40).toString(16).padStart(2, '0')}`);  // Max 25% opacity
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(x, y, fadeWidth, height);
+    }
+
+    // Right fade indicator (shows more content on right)
+    if (canScrollRight) {
+        const fadeIntensity = Math.min(1, (maxScroll - scrollOffset) / 50);
+        const gradient = ctx.createLinearGradient(x + width - fadeWidth, 0, x + width, 0);
+        gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        gradient.addColorStop(1, `${color}${Math.floor(fadeIntensity * 40).toString(16).padStart(2, '0')}`);
+        ctx.fillStyle = gradient;
+        ctx.fillRect(x + width - fadeWidth, y, fadeWidth, height);
+    }
+
+    ctx.restore();
+}
+
+/**
+ * Draw vertical scroll fade indicators for the category list.
+ * Shows gradient fades at top/bottom when more content is available.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {number} x - Left edge X position
+ * @param {number} y - Top edge Y position
+ * @param {number} width - Width of the scrollable area
+ * @param {number} height - Height of the scrollable area
+ * @param {number} scrollOffset - Current scroll position
+ * @param {number} maxScroll - Maximum scroll value
+ */
+function renderVerticalScrollIndicators(ctx, x, y, width, height, scrollOffset, maxScroll) {
+    if (maxScroll <= 0) return;  // No scrolling needed
+
+    const fadeHeight = 40;  // Height of the fade gradient
+    const canScrollUp = scrollOffset > 0;
+    const canScrollDown = scrollOffset < maxScroll;
+
+    ctx.save();
+
+    // Top fade indicator (shows more content above)
+    if (canScrollUp) {
+        const fadeIntensity = Math.min(1, scrollOffset / 50);
+        const gradient = ctx.createLinearGradient(0, y, 0, y + fadeHeight);
+        gradient.addColorStop(0, `rgba(10, 10, 26, ${fadeIntensity * 0.9})`);  // Dark fade
+        gradient.addColorStop(1, 'rgba(10, 10, 26, 0)');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(x, y, width, fadeHeight);
+    }
+
+    // Bottom fade indicator (shows more content below)
+    if (canScrollDown) {
+        const fadeIntensity = Math.min(1, (maxScroll - scrollOffset) / 50);
+        const gradient = ctx.createLinearGradient(0, y + height - fadeHeight, 0, y + height);
+        gradient.addColorStop(0, 'rgba(10, 10, 26, 0)');
+        gradient.addColorStop(1, `rgba(10, 10, 26, ${fadeIntensity * 0.9})`);
+        ctx.fillStyle = gradient;
+        ctx.fillRect(x, y + height - fadeHeight, width, fadeHeight);
+    }
+
+    ctx.restore();
+}
+
+/**
  * Draw the tab navigation bar with WEAPONS and ITEMS tabs.
  * Active tab has glowing underline (cyan), inactive tabs are subtle.
  * ITEMS tab is disabled and shows "Coming Soon" state.
@@ -1454,6 +1541,12 @@ export function render(ctx) {
 
         ctx.restore(); // Remove clipping
 
+        // Draw horizontal scroll indicators for this category row
+        renderHorizontalScrollIndicators(
+            ctx, gridStartX, cardStartY, visibleRowWidth, cardHeight,
+            scrollOffset, maxScroll, category.color
+        );
+
         // === UPDATE Y FOR NEXT CATEGORY ===
         // Only one row per category now
         currentY = cardStartY + cardHeight;
@@ -1461,6 +1554,12 @@ export function render(ctx) {
 
     // Remove vertical clipping
     ctx.restore();
+
+    // Draw vertical scroll indicators
+    renderVerticalScrollIndicators(
+        ctx, gridStartX, scrollAreaTop, visibleRowWidth, scrollAreaHeight,
+        verticalScrollOffset, maxVerticalScroll
+    );
 
     // Render Done button
     renderButton(ctx, doneButton, pulseIntensity);
