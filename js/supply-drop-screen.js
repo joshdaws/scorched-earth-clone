@@ -11,6 +11,7 @@ import * as Game from './game.js';
 import * as Input from './input.js';
 import * as Music from './music.js';
 import * as SupplyDrop from './supply-drop.js';
+import * as ExtractionReveal from './extraction-reveal.js';
 import { getTokenBalance, spendTokens, canAfford } from './tokens.js';
 import {
     RARITY,
@@ -169,7 +170,8 @@ function attemptPurchase(optionIndex) {
     state.selectedOption = option;
     state.lastDropResult = dropResult;
 
-    SupplyDrop.play(dropResult.tank, () => {
+    // Use Extraction reveal for Legendary tanks, standard supply drop for others
+    const onAnimationComplete = () => {
         // Animation complete - tank was already added by processDrop
         if (dropResult.isNew) {
             console.log(`Added NEW tank to collection: ${dropResult.tank.name}`);
@@ -180,7 +182,14 @@ function attemptPurchase(optionIndex) {
         state.isAnimating = false;
         state.selectedOption = null;
         state.lastDropResult = null;
-    });
+    };
+
+    if (dropResult.rarity === RARITY.LEGENDARY) {
+        console.log('Triggering EXTRACTION reveal for Legendary tank!');
+        ExtractionReveal.play(dropResult.tank, onAnimationComplete);
+    } else {
+        SupplyDrop.play(dropResult.tank, onAnimationComplete);
+    }
 }
 
 // =============================================================================
@@ -264,9 +273,9 @@ function handleKeyDown(key) {
     }
 
     // Number keys for quick purchase
-    if (key === '1') attemptPurchase(0);
-    if (key === '2') attemptPurchase(1);
-    if (key === '3') attemptPurchase(2);
+    if (key === 'Digit1') attemptPurchase(0);
+    if (key === 'Digit2') attemptPurchase(1);
+    if (key === 'Digit3') attemptPurchase(2);
 }
 
 /**
@@ -453,14 +462,18 @@ function drawHints(ctx) {
  * Main render function
  */
 function render(ctx) {
-    // If animation is playing, let supply drop render
+    // If animation is playing, let supply drop or extraction reveal render
     if (state.isAnimating) {
         // Draw dark background
         ctx.fillStyle = CONFIG.COLORS.BACKGROUND;
         ctx.fillRect(0, 0, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
 
-        // Supply drop renders on top via its own system
-        SupplyDrop.render(ctx);
+        // Check which animation system is active and render it
+        if (ExtractionReveal.isAnimating()) {
+            ExtractionReveal.render(ctx);
+        } else {
+            SupplyDrop.render(ctx);
+        }
         return;
     }
 
@@ -512,7 +525,12 @@ function drawGrid(ctx) {
  */
 function update(deltaTime) {
     if (state.isAnimating) {
-        SupplyDrop.update(deltaTime);
+        // Update whichever animation system is active
+        if (ExtractionReveal.isAnimating()) {
+            ExtractionReveal.update(deltaTime);
+        } else {
+            SupplyDrop.update(deltaTime);
+        }
     }
 }
 

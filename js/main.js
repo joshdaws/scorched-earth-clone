@@ -37,6 +37,7 @@ import { getEnemyHealthForRound, recordStat, startNewRun as startNewRunState, en
 import * as HighScores from './highScores.js';
 import * as AchievementPopup from './achievement-popup.js';
 import * as SupplyDrop from './supply-drop.js';
+import * as ExtractionReveal from './extraction-reveal.js';
 import * as AchievementScreen from './achievement-screen.js';
 import * as CollectionScreen from './collection-screen.js';
 import * as SupplyDropScreen from './supply-drop-screen.js';
@@ -4303,6 +4304,9 @@ async function init() {
     // Initialize supply drop animation system
     SupplyDrop.init();
 
+    // Initialize extraction reveal animation system (for Legendary tanks)
+    ExtractionReveal.init();
+
     // Initialize combat achievement detection
     CombatAchievements.init();
 
@@ -4340,6 +4344,7 @@ async function init() {
     window.AchievementPopup = AchievementPopup;
     window.TankCollection = TankCollection;
     window.SupplyDrop = SupplyDrop;
+    window.ExtractionReveal = ExtractionReveal;
     // Expose DebugTools as 'Debug' for convenience (e.g., Debug.skipToShop())
     // This creates a merged object with both Debug module and DebugTools functions
     window.Debug = { ...Debug, ...DebugTools };
