@@ -68,8 +68,16 @@ let balanceAnimation = null;
 const ANIMATION_DURATION = {
     PURCHASE_FEEDBACK: 400,    // Card flash/shake duration
     BALANCE_TRANSITION: 300,   // Balance count-up/down duration
-    SHAKE_DURATION: 300        // Card shake for failed purchase
+    SHAKE_DURATION: 300,       // Card shake for failed purchase
+    TAB_TRANSITION: 200        // Tab switch crossfade duration
 };
+
+/**
+ * Tab transition animation state.
+ * Animates crossfade when switching between tabs.
+ * @type {{active: boolean, fromTab: string, toTab: string, startTime: number}|null}
+ */
+let tabTransition = null;
 
 /**
  * Currently pressed button/card for touch feedback.
@@ -280,6 +288,7 @@ export function show(playerTank) {
     playerTankRef = playerTank;
     purchaseFeedback = null;
     balanceAnimation = null;
+    tabTransition = null;
     weaponCardAreas = [];
     tabButtonAreas = [];
     categoryRowAreas = [];
@@ -302,6 +311,7 @@ export function hide() {
     playerTankRef = null;
     purchaseFeedback = null;
     balanceAnimation = null;
+    tabTransition = null;
     weaponCardAreas = [];
     tabButtonAreas = [];
     categoryRowAreas = [];
@@ -622,10 +632,24 @@ export function handlePointerUp(x, y) {
         const tabId = wasPressed.replace('tab_', '');
         const tabInfo = getTabAtPoint(x, y);
 
-        if (tabInfo && tabInfo.tabId === tabId) {
-            // Switch to the clicked tab
+        if (tabInfo && tabInfo.tabId === tabId && tabId !== activeTab) {
+            // Switch to the clicked tab with transition animation
             playClickSound();
+
+            // Start tab transition animation
+            tabTransition = {
+                active: true,
+                fromTab: activeTab,
+                toTab: tabId,
+                startTime: Date.now()
+            };
+
             activeTab = tabId;
+
+            // Reset scroll positions when switching tabs
+            verticalScrollOffset = 0;
+            categoryScrollOffsets = {};
+
             console.log(`[Shop] Switched to ${tabId} tab`);
             return true;
         }
@@ -1438,10 +1462,26 @@ export function render(ctx) {
     // Tab navigation bar
     renderTabBar(ctx, panel.X, panel.Y + SHOP_LAYOUT.TABS.Y_OFFSET, pulseIntensity);
 
+    // Calculate tab transition opacity for crossfade effect
+    let contentOpacity = 1;
+    if (tabTransition && tabTransition.active) {
+        const elapsed = Date.now() - tabTransition.startTime;
+        if (elapsed < ANIMATION_DURATION.TAB_TRANSITION) {
+            // Crossfade: fade out old content, fade in new content
+            // Progress 0-1 over transition duration
+            const progress = elapsed / ANIMATION_DURATION.TAB_TRANSITION;
+            // Ease-out for smooth appearance
+            contentOpacity = progress;
+        } else {
+            tabTransition = null;
+        }
+    }
+
     // Only render weapons content if on WEAPONS tab
     if (activeTab !== 'weapons') {
         // Render "Coming Soon" placeholder for ITEMS tab
         ctx.save();
+        ctx.globalAlpha = contentOpacity;  // Apply crossfade opacity
         ctx.font = `bold 28px ${UI.FONT_FAMILY}`;
         ctx.fillStyle = COLORS.TEXT_MUTED;
         ctx.textAlign = 'center';
@@ -1494,6 +1534,10 @@ export function render(ctx) {
         ctx.restore();
         return;  // Early exit - don't render weapons
     }
+
+    // Apply crossfade opacity to weapons content
+    ctx.save();
+    ctx.globalAlpha = contentOpacity;
 
     // Get all purchasable weapons (excluding Basic Shot which is free/unlimited)
     const allWeapons = WeaponRegistry.getAllWeapons();
@@ -1700,6 +1744,9 @@ export function render(ctx) {
         ctx, gridStartX, scrollAreaTop, visibleRowWidth, scrollAreaHeight,
         verticalScrollOffset, maxVerticalScroll
     );
+
+    // Restore from crossfade opacity (so Done button and corners render at full opacity)
+    ctx.restore();
 
     // Render Done button
     renderButton(ctx, doneButton, pulseIntensity);
