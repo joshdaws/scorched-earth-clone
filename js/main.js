@@ -1729,6 +1729,9 @@ function renderTerrain(ctx) {
 function renderTank(ctx, tank) {
     if (!tank) return;
 
+    // Don't render destroyed tanks (explosion will be visible instead)
+    if (tank.isDestroyed()) return;
+
     const { x, y, team, angle } = tank;
 
     // Try to use sprite asset if available

@@ -7,6 +7,8 @@
  */
 
 import { TANK, PHYSICS, CANVAS } from './constants.js';
+import { spawnTankDestructionExplosion } from './effects.js';
+import { playExplosionSound } from './sound.js';
 
 /**
  * Team identifiers for tanks.
@@ -161,12 +163,16 @@ export class Tank {
     /**
      * Apply damage to the tank.
      * Health cannot go below 0.
+     * Triggers destruction explosion when tank transitions from alive to destroyed.
      * @param {number} amount - Amount of damage to apply (positive value)
      * @returns {number} The actual damage dealt (after clamping)
      */
     takeDamage(amount) {
         // Ensure amount is positive
         const damage = Math.max(0, amount);
+
+        // Track if tank was alive before damage
+        const wasAlive = this.health > 0;
 
         // Calculate actual damage dealt (can't deal more than remaining health)
         const actualDamage = Math.min(damage, this.health);
@@ -176,7 +182,28 @@ export class Tank {
 
         console.log(`Tank (${this.team}) took ${actualDamage} damage, health: ${this.health}`);
 
+        // Trigger destruction explosion if tank was just destroyed
+        if (wasAlive && this.health <= 0) {
+            this.onDestroyed();
+        }
+
         return actualDamage;
+    }
+
+    /**
+     * Called when the tank is destroyed (health reaches 0).
+     * Triggers visual and audio effects for tank destruction.
+     */
+    onDestroyed() {
+        console.log(`Tank (${this.team}) DESTROYED!`);
+
+        // Spawn dramatic destruction explosion at tank position
+        // Use the center of the tank body for the explosion
+        const tankCenterY = this.y - TANK.BODY.HEIGHT / 2;
+        spawnTankDestructionExplosion(this.x, tankCenterY, this.team);
+
+        // Play explosion sound (larger than normal)
+        playExplosionSound(120); // Use a large blast radius for dramatic sound
     }
 
     /**

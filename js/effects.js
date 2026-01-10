@@ -451,6 +451,60 @@ export function getParticleCount() {
 }
 
 // =============================================================================
+// TANK DESTRUCTION EXPLOSION
+// =============================================================================
+
+/**
+ * Tank destruction explosion configuration.
+ * Larger and more dramatic than weapon explosions.
+ */
+export const TANK_DESTRUCTION_CONFIG = {
+    /** Blast radius equivalent for the destruction explosion */
+    BLAST_RADIUS: 100,
+    /** Screen shake intensity multiplier (compared to regular explosions) */
+    SHAKE_MULTIPLIER: 1.5,
+    /** Particle count multiplier (more particles than regular explosions) */
+    PARTICLE_MULTIPLIER: 2.0,
+    /** Flash duration in milliseconds */
+    FLASH_DURATION: 200,
+    /** Player tank destruction color (cyan) */
+    PLAYER_COLOR: '#00fff7',
+    /** Enemy tank destruction color (pink/magenta) */
+    ENEMY_COLOR: '#ff00ff'
+};
+
+/**
+ * Spawn a dramatic tank destruction explosion at the tank's position.
+ * Includes particles, screen shake, and screen flash.
+ *
+ * @param {number} x - Tank X position (center)
+ * @param {number} y - Tank Y position (center)
+ * @param {'player'|'enemy'} team - Tank team for color selection
+ */
+export function spawnTankDestructionExplosion(x, y, team) {
+    const color = team === 'player' ? TANK_DESTRUCTION_CONFIG.PLAYER_COLOR : TANK_DESTRUCTION_CONFIG.ENEMY_COLOR;
+
+    // Spawn extra particles for dramatic effect
+    // Use a larger blast radius and spawn multiple waves
+    const baseRadius = TANK_DESTRUCTION_CONFIG.BLAST_RADIUS;
+
+    // Main explosion particles (larger, more intense)
+    particleSystem.spawnExplosion(x, y, baseRadius * TANK_DESTRUCTION_CONFIG.PARTICLE_MULTIPLIER, false);
+
+    // Secondary inner explosion for added drama
+    particleSystem.spawnExplosion(x, y, baseRadius * 0.5, false);
+
+    // Strong screen shake
+    const shakeRadius = baseRadius * TANK_DESTRUCTION_CONFIG.SHAKE_MULTIPLIER;
+    screenShakeForBlastRadius(shakeRadius);
+
+    // Screen flash with team color
+    screenFlash(color, TANK_DESTRUCTION_CONFIG.FLASH_DURATION);
+
+    console.log(`Tank destruction explosion at (${x.toFixed(1)}, ${y.toFixed(1)}) for ${team} team`);
+}
+
+// =============================================================================
 // SCREEN SHAKE SYSTEM
 // =============================================================================
 
