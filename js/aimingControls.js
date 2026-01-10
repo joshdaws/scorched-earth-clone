@@ -506,6 +506,27 @@ export function renderTrajectoryPreview(ctx, tank, angle, power, terrain) {
 
     // No impact point shown - player must estimate the full trajectory
 
+    // Draw floating power percentage near trajectory start
+    if (previewPoints.length > 0) {
+        const startPoint = previewPoints[0];
+        const angleRad = (angle * Math.PI) / 180;
+
+        // Position the label perpendicular to the trajectory direction, offset above
+        const offsetDistance = 25;
+        const labelX = startPoint.x + Math.cos(angleRad) * offsetDistance;
+        const labelY = startPoint.y - Math.sin(angleRad) * offsetDistance - 15;
+
+        // Synthwave styled power text
+        ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = COLORS.NEON_CYAN;
+        ctx.shadowColor = COLORS.NEON_CYAN;
+        ctx.shadowBlur = 6;
+        ctx.fillText(`${Math.round(power)}%`, labelX, labelY);
+        ctx.shadowBlur = 0;
+    }
+
     ctx.restore();
 }
 
