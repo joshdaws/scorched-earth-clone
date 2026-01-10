@@ -1,0 +1,399 @@
+/**
+ * Scorched Earth: Synthwave Edition
+ * Tank Drop Rate Calculation
+ *
+ * Calculates which tank to drop based on rarity rates and modifiers.
+ * Handles premium drops, guaranteed rare+, duplicate protection,
+ * and scrap conversion for duplicates.
+ */
+
+import { DEBUG } from './constants.js';
+import {
+    RARITY,
+    DROP_RATES,
+    getTanksByRarity,
+    getAllTanks,
+    getTank,
+    RARITY_ORDER
+} from './tank-skins.js';
+import {
+    ownsTank,
+    addTank as addTankToCollection,
+    DUPLICATE_SCRAP_REWARDS
+} from './tank-collection.js';
+
+// =============================================================================
+// CONSTANTS
+// =============================================================================
+
+/**
+ * Base drop rates for each rarity tier (percentage).
+ * Must sum to 100.
+ */
+const BASE_DROP_RATES = {
+    [RARITY.COMMON]: 55,
+    [RARITY.UNCOMMON]: 28,
+    [RARITY.RARE]: 12,
+    [RARITY.EPIC]: 4,
+    [RARITY.LEGENDARY]: 1
+};
+
+/**
+ * Premium drop modifier: shifts +10% to rare+ (redistributed from common).
+ * Actual distribution: +5% rare, +3% epic, +2% legendary, -10% common.
+ */
+const PREMIUM_MODIFIER = {
+    [RARITY.COMMON]: -10,
+    [RARITY.UNCOMMON]: 0,
+    [RARITY.RARE]: 5,
+    [RARITY.EPIC]: 3,
+    [RARITY.LEGENDARY]: 2
+};
+
+/**
+ * Guaranteed Rare+ rates: 0% common/uncommon, redistributed to rare+.
+ */
+const GUARANTEED_RARE_RATES = {
+    [RARITY.COMMON]: 0,
+    [RARITY.UNCOMMON]: 0,
+    [RARITY.RARE]: 70,
+    [RARITY.EPIC]: 22,
+    [RARITY.LEGENDARY]: 8
+};
+
+/**
+ * Drop types for supply drop purchases.
+ */
+export const DROP_TYPES = {
+    STANDARD: 'standard',
+    PREMIUM: 'premium',
+    GUARANTEED_RARE: 'guaranteed'
+};
+
+// =============================================================================
+// MODULE STATE
+// =============================================================================
+
+/**
+ * Last dropped tank ID for consecutive duplicate protection.
+ * Cannot receive the same tank twice in a row.
+ */
+let lastDroppedTankId = null;
+
+// =============================================================================
+// DEBUG LOGGING
+// =============================================================================
+
+/**
+ * Log debug message if debug mode is enabled.
+ * @param {string} message - Message to log
+ * @param {Object} [data] - Optional data to log
+ */
+function debugLog(message, data = null) {
+    if (DEBUG.ENABLED) {
+        if (data) {
+            console.log(`[DropRates] ${message}`, data);
+        } else {
+            console.log(`[DropRates] ${message}`);
+        }
+    }
+}
+
+// =============================================================================
+// DROP RATE CALCULATION
+// =============================================================================
+
+/**
+ * Calculate adjusted drop rates based on modifiers.
+ *
+ * @param {Object} options - Modifier options
+ * @param {boolean} options.isPremium - Apply premium modifier (+10% to rare+)
+ * @param {boolean} options.isGuaranteedRare - Use guaranteed rare+ rates
+ * @param {Object} [options.performanceBonus] - Future: performance-based bonus rates
+ * @param {Object} [options.pityBonus] - Future: pity system bonus rates
+ * @returns {Object} Adjusted drop rate table
+ */
+export function calculateDropRates(options = {}) {
+    const { isPremium = false, isGuaranteedRare = false } = options;
+
+    // Start with base rates or guaranteed rates
+    let rates;
+    if (isGuaranteedRare) {
+        rates = { ...GUARANTEED_RARE_RATES };
+        // Only log once during actual drop processing, not during display
+        // debugLog('Using guaranteed rare+ rates', rates);
+        return rates;
+    }
+
+    rates = { ...BASE_DROP_RATES };
+
+    // Apply premium modifier
+    if (isPremium) {
+        for (const rarity of RARITY_ORDER) {
+            rates[rarity] += PREMIUM_MODIFIER[rarity];
+        }
+        // Only log once during actual drop processing, not during display
+        // debugLog('Applied premium modifier', rates);
+    }
+
+    // Future: Apply performance bonus from options.performanceBonus
+    // Future: Apply pity bonus from options.pityBonus
+
+    // Validate rates sum to 100
+    const total = Object.values(rates).reduce((sum, rate) => sum + rate, 0);
+    if (Math.abs(total - 100) > 0.01) {
+        console.warn(`[DropRates] Rates sum to ${total}%, expected 100%`);
+    }
+
+    return rates;
+}
+
+/**
+ * Roll for a rarity tier based on drop rates.
+ *
+ * @param {Object} rates - Drop rate table (rarity -> percentage)
+ * @returns {string} Selected rarity tier (RARITY constant)
+ */
+export function rollRarity(rates) {
+    // Generate random value 0-100
+    const roll = Math.random() * 100;
+
+    // Compare against cumulative rates
+    let cumulative = 0;
+    for (const rarity of RARITY_ORDER) {
+        cumulative += rates[rarity];
+        if (roll < cumulative) {
+            debugLog(`Rolled ${roll.toFixed(2)} -> ${rarity} (cumulative: ${cumulative})`);
+            return rarity;
+        }
+    }
+
+    // Fallback (shouldn't happen if rates sum to 100)
+    debugLog('Roll fallback to legendary');
+    return RARITY.LEGENDARY;
+}
+
+/**
+ * Select a random tank from a rarity tier.
+ * Applies consecutive duplicate protection: cannot receive same tank twice in a row.
+ *
+ * @param {string} rarity - Rarity tier to select from
+ * @param {Object} [options] - Selection options
+ * @param {string[]} [options.exclusions] - Tank IDs to exclude from selection
+ * @returns {Object|null} Selected tank definition, or null if no tanks available
+ */
+export function selectTank(rarity, options = {}) {
+    const { exclusions = [] } = options;
+
+    // Get all tanks of this rarity
+    let candidates = getTanksByRarity(rarity);
+
+    if (candidates.length === 0) {
+        console.warn(`[DropRates] No tanks available for rarity: ${rarity}`);
+        return null;
+    }
+
+    // Create exclusion set for fast lookup
+    const excludeSet = new Set(exclusions);
+
+    // Always exclude the last dropped tank (consecutive duplicate protection)
+    if (lastDroppedTankId) {
+        excludeSet.add(lastDroppedTankId);
+    }
+
+    // Filter out excluded tanks
+    let filtered = candidates.filter(tank => !excludeSet.has(tank.id));
+
+    // If all tanks are excluded, fall back to original candidates
+    // (this can happen if there's only one tank of a rarity and it was last dropped)
+    if (filtered.length === 0) {
+        debugLog(`All ${rarity} tanks excluded, falling back to original candidates`);
+        filtered = candidates;
+    }
+
+    // Random selection
+    const selectedIndex = Math.floor(Math.random() * filtered.length);
+    const selected = filtered[selectedIndex];
+
+    debugLog(`Selected ${selected.name} from ${filtered.length} ${rarity} candidates`);
+
+    return selected;
+}
+
+/**
+ * Process a full supply drop: roll rarity, select tank, handle duplicates.
+ *
+ * @param {string} dropType - Type of drop (DROP_TYPES.STANDARD, PREMIUM, or GUARANTEED_RARE)
+ * @returns {Object} Drop result
+ * @property {Object} tank - The dropped tank definition
+ * @property {string} rarity - The rolled rarity tier
+ * @property {boolean} isNew - True if this is a new tank for the collection
+ * @property {boolean} isDuplicate - True if player already owns this tank
+ * @property {number} scrapAwarded - Scrap awarded (only for duplicates)
+ * @property {number} duplicateCount - How many times player has received this tank
+ */
+export function processDrop(dropType) {
+    // Step 1: Calculate rates based on drop type
+    const rates = calculateDropRates({
+        isPremium: dropType === DROP_TYPES.PREMIUM,
+        isGuaranteedRare: dropType === DROP_TYPES.GUARANTEED_RARE
+    });
+
+    debugLog(`Processing ${dropType} drop with rates:`, rates);
+
+    // Step 2: Roll for rarity
+    const rarity = rollRarity(rates);
+
+    // Step 3: Select tank from rarity tier
+    const tank = selectTank(rarity);
+
+    if (!tank) {
+        console.error('[DropRates] Failed to select tank');
+        return {
+            tank: null,
+            rarity: null,
+            isNew: false,
+            isDuplicate: false,
+            scrapAwarded: 0,
+            duplicateCount: 0
+        };
+    }
+
+    // Step 4: Update last dropped tank for consecutive protection
+    lastDroppedTankId = tank.id;
+
+    // Step 5: Add to collection and get result
+    // The addTank function handles duplicate detection and scrap awarding
+    const addResult = addTankToCollection(tank.id);
+
+    const result = {
+        tank: tank,
+        rarity: rarity,
+        isNew: addResult.isNew,
+        isDuplicate: addResult.isDuplicate,
+        scrapAwarded: addResult.scrapAwarded,
+        duplicateCount: addResult.duplicateCount
+    };
+
+    debugLog('Drop result:', {
+        tankId: tank.id,
+        tankName: tank.name,
+        rarity: rarity,
+        isNew: result.isNew,
+        isDuplicate: result.isDuplicate,
+        scrapAwarded: result.scrapAwarded
+    });
+
+    return result;
+}
+
+/**
+ * Get the last dropped tank ID.
+ * Used for testing and debugging.
+ *
+ * @returns {string|null} Last dropped tank ID
+ */
+export function getLastDroppedTankId() {
+    return lastDroppedTankId;
+}
+
+/**
+ * Reset the last dropped tank ID.
+ * Useful for testing or session resets.
+ */
+export function resetLastDropped() {
+    lastDroppedTankId = null;
+    debugLog('Last dropped tank reset');
+}
+
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
+
+/**
+ * Get drop rates for display purposes.
+ *
+ * @param {string} dropType - Type of drop
+ * @returns {Object} Drop rate table
+ */
+export function getDropRatesForDisplay(dropType) {
+    return calculateDropRates({
+        isPremium: dropType === DROP_TYPES.PREMIUM,
+        isGuaranteedRare: dropType === DROP_TYPES.GUARANTEED_RARE
+    });
+}
+
+/**
+ * Calculate the probability of getting a specific rarity or better.
+ *
+ * @param {string} dropType - Type of drop
+ * @param {string} minRarity - Minimum rarity (inclusive)
+ * @returns {number} Probability as percentage (0-100)
+ */
+export function getRarityPlusProbability(dropType, minRarity) {
+    const rates = getDropRatesForDisplay(dropType);
+    const minIndex = RARITY_ORDER.indexOf(minRarity);
+
+    if (minIndex === -1) return 0;
+
+    let probability = 0;
+    for (let i = minIndex; i < RARITY_ORDER.length; i++) {
+        probability += rates[RARITY_ORDER[i]];
+    }
+
+    return probability;
+}
+
+/**
+ * Validate that the drop rate system is working correctly.
+ * Runs self-tests on module load.
+ */
+function validateDropRates() {
+    // Validate base rates sum to 100
+    const baseTotal = Object.values(BASE_DROP_RATES).reduce((sum, rate) => sum + rate, 0);
+    if (baseTotal !== 100) {
+        console.error(`[DropRates] Base rates sum to ${baseTotal}%, expected 100%`);
+    }
+
+    // Validate guaranteed rare rates sum to 100
+    const guaranteedTotal = Object.values(GUARANTEED_RARE_RATES).reduce((sum, rate) => sum + rate, 0);
+    if (guaranteedTotal !== 100) {
+        console.error(`[DropRates] Guaranteed rare rates sum to ${guaranteedTotal}%, expected 100%`);
+    }
+
+    // Validate premium modifier sums to 0 (just redistributes)
+    const premiumSum = Object.values(PREMIUM_MODIFIER).reduce((sum, mod) => sum + mod, 0);
+    if (premiumSum !== 0) {
+        console.error(`[DropRates] Premium modifier sum is ${premiumSum}, expected 0 (pure redistribution)`);
+    }
+
+    // Validate premium rates sum to 100
+    const premiumRates = calculateDropRates({ isPremium: true });
+    const premiumTotal = Object.values(premiumRates).reduce((sum, rate) => sum + rate, 0);
+    if (premiumTotal !== 100) {
+        console.error(`[DropRates] Premium rates sum to ${premiumTotal}%, expected 100%`);
+    }
+
+    if (DEBUG.ENABLED) {
+        console.log('[DropRates] Validation complete', {
+            base: BASE_DROP_RATES,
+            premium: premiumRates,
+            guaranteed: GUARANTEED_RARE_RATES
+        });
+    }
+}
+
+// Run validation on module load
+validateDropRates();
+
+console.log('[DropRates] Module loaded');
+
+// =============================================================================
+// EXPORTS
+// =============================================================================
+
+export {
+    BASE_DROP_RATES,
+    PREMIUM_MODIFIER,
+    GUARANTEED_RARE_RATES
+};

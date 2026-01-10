@@ -11,15 +11,17 @@ import * as Game from './game.js';
 import * as Input from './input.js';
 import * as Music from './music.js';
 import * as SupplyDrop from './supply-drop.js';
-import * as TankCollection from './tank-collection.js';
 import { getTokenBalance, spendTokens, canAfford } from './tokens.js';
 import {
     RARITY,
     DROP_RATES,
-    RARITY_COLORS,
-    getTanksByRarity,
-    getAllTanks
+    RARITY_COLORS
 } from './tank-skins.js';
+import {
+    processDrop,
+    DROP_TYPES,
+    getDropRatesForDisplay
+} from './drop-rates.js';
 
 // =============================================================================
 // CONFIGURATION
@@ -33,42 +35,30 @@ const CONFIG = {
     CARD_GAP: 40,
     CARD_Y: 180,
 
-    // Purchase options
+    // Purchase options - now linked to DROP_TYPES from drop-rates.js
     PURCHASE_OPTIONS: [
         {
             id: 'standard',
+            dropType: DROP_TYPES.STANDARD,
             name: 'STANDARD DROP',
             cost: 50,
             description: 'Standard drop rates',
-            dropRates: { ...DROP_RATES },
             glowColor: '#00FFFF'
         },
         {
             id: 'premium',
+            dropType: DROP_TYPES.PREMIUM,
             name: 'PREMIUM DROP',
             cost: 100,
             description: '+10% Rare or better',
-            dropRates: {
-                [RARITY.COMMON]: 45,
-                [RARITY.UNCOMMON]: 28,
-                [RARITY.RARE]: 17,      // +5%
-                [RARITY.EPIC]: 7,        // +3%
-                [RARITY.LEGENDARY]: 3    // +2%
-            },
             glowColor: '#FF00FF'
         },
         {
             id: 'guaranteed',
+            dropType: DROP_TYPES.GUARANTEED_RARE,
             name: 'RARE+ DROP',
             cost: 250,
             description: 'Guaranteed Rare or better',
-            dropRates: {
-                [RARITY.COMMON]: 0,
-                [RARITY.UNCOMMON]: 0,
-                [RARITY.RARE]: 70,
-                [RARITY.EPIC]: 22,
-                [RARITY.LEGENDARY]: 8
-            },
             glowColor: '#F59E0B'
         }
     ],
@@ -106,7 +96,8 @@ const CONFIG = {
 let state = {
     hoveredCard: -1,
     isAnimating: false,
-    selectedOption: null
+    selectedOption: null,
+    lastDropResult: null
 };
 
 // =============================================================================
@@ -132,33 +123,10 @@ function isPointInRect(px, py, rx, ry, rw, rh) {
     return px >= rx && px <= rx + rw && py >= ry && py <= ry + rh;
 }
 
-/**
- * Roll for a tank based on drop rates
- */
-function rollTank(dropRates) {
-    // Roll for rarity
-    const roll = Math.random() * 100;
-    let cumulative = 0;
-    let selectedRarity = RARITY.COMMON;
-
-    for (const rarity of [RARITY.COMMON, RARITY.UNCOMMON, RARITY.RARE, RARITY.EPIC, RARITY.LEGENDARY]) {
-        cumulative += dropRates[rarity];
-        if (roll < cumulative) {
-            selectedRarity = rarity;
-            break;
-        }
-    }
-
-    // Get tanks of selected rarity
-    const tanksOfRarity = getTanksByRarity(selectedRarity);
-
-    // Pick random tank from that rarity
-    const randomIndex = Math.floor(Math.random() * tanksOfRarity.length);
-    return tanksOfRarity[randomIndex];
-}
 
 /**
- * Attempt to purchase a supply drop
+ * Attempt to purchase a supply drop.
+ * Uses the drop-rates module for proper rate calculation and duplicate handling.
  */
 function attemptPurchase(optionIndex) {
     if (state.isAnimating) return;
@@ -180,26 +148,38 @@ function attemptPurchase(optionIndex) {
 
     console.log(`Purchased ${option.name} for ${option.cost} tokens`);
 
-    // Roll for tank
-    const tank = rollTank(option.dropRates);
-    console.log(`Rolled: ${tank.name} (${tank.rarity})`);
+    // Process the drop using the drop-rates module
+    // This handles: rate calculation, rarity roll, tank selection,
+    // consecutive duplicate protection, and collection/scrap management
+    const dropResult = processDrop(option.dropType);
+
+    if (!dropResult.tank) {
+        console.error('Drop failed - no tank returned');
+        return;
+    }
+
+    console.log(`Rolled: ${dropResult.tank.name} (${dropResult.rarity})`, {
+        isNew: dropResult.isNew,
+        isDuplicate: dropResult.isDuplicate,
+        scrapAwarded: dropResult.scrapAwarded
+    });
 
     // Start animation
     state.isAnimating = true;
     state.selectedOption = option;
+    state.lastDropResult = dropResult;
 
-    SupplyDrop.play(tank, () => {
-        // Animation complete - add tank to collection
-        const isNew = TankCollection.addTank(tank.id);
-        if (isNew) {
-            console.log(`Added NEW tank to collection: ${tank.name}`);
-        } else {
-            console.log(`Duplicate tank: ${tank.name}`);
-            // TODO: Could give token refund for duplicates in future
+    SupplyDrop.play(dropResult.tank, () => {
+        // Animation complete - tank was already added by processDrop
+        if (dropResult.isNew) {
+            console.log(`Added NEW tank to collection: ${dropResult.tank.name}`);
+        } else if (dropResult.isDuplicate) {
+            console.log(`Duplicate tank: ${dropResult.tank.name} (+${dropResult.scrapAwarded} scrap)`);
         }
 
         state.isAnimating = false;
         state.selectedOption = null;
+        state.lastDropResult = null;
     });
 }
 
@@ -408,7 +388,8 @@ function drawPurchaseCard(ctx, index) {
     ctx.fillStyle = CONFIG.COLORS.TEXT_SECONDARY;
     ctx.fillText(option.description, pos.x + CONFIG.CARD_WIDTH / 2, pos.y + 170);
 
-    // Drop rates breakdown
+    // Drop rates breakdown - get rates from drop-rates module
+    const dropRates = getDropRatesForDisplay(option.dropType);
     const rateY = pos.y + 200;
     ctx.font = '12px "Orbitron", monospace';
     ctx.textAlign = 'left';
@@ -417,7 +398,7 @@ function drawPurchaseCard(ctx, index) {
     const rarityNames = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
 
     rarities.forEach((rarity, i) => {
-        const rate = option.dropRates[rarity];
+        const rate = dropRates[rarity];
         if (rate > 0) {
             ctx.fillStyle = RARITY_COLORS[rarity];
             ctx.fillText(`${rarityNames[i]}:`, pos.x + 30, rateY + (i * 20));
@@ -602,4 +583,4 @@ export function setup() {
 }
 
 // Export for testing
-export { attemptPurchase, rollTank };
+export { attemptPurchase };
