@@ -50,9 +50,26 @@ let onDoneCallback = null;
 
 /**
  * Purchase feedback animation state.
+ * Tracks active purchase animations for visual feedback.
  * @type {{active: boolean, weaponId: string, startTime: number, success: boolean}|null}
  */
 let purchaseFeedback = null;
+
+/**
+ * Balance display animation state.
+ * Animates the balance from old to new value on purchase.
+ * @type {{active: boolean, startValue: number, endValue: number, startTime: number, duration: number}|null}
+ */
+let balanceAnimation = null;
+
+/**
+ * Duration constants for animations (in milliseconds).
+ */
+const ANIMATION_DURATION = {
+    PURCHASE_FEEDBACK: 400,    // Card flash/shake duration
+    BALANCE_TRANSITION: 300,   // Balance count-up/down duration
+    SHAKE_DURATION: 300        // Card shake for failed purchase
+};
 
 /**
  * Currently pressed button/card for touch feedback.
@@ -262,6 +279,7 @@ export function show(playerTank) {
     selectedIndex = -1;
     playerTankRef = playerTank;
     purchaseFeedback = null;
+    balanceAnimation = null;
     weaponCardAreas = [];
     tabButtonAreas = [];
     categoryRowAreas = [];
@@ -282,6 +300,8 @@ export function show(playerTank) {
 export function hide() {
     isVisible = false;
     playerTankRef = null;
+    purchaseFeedback = null;
+    balanceAnimation = null;
     weaponCardAreas = [];
     tabButtonAreas = [];
     categoryRowAreas = [];
@@ -352,8 +372,21 @@ export function purchaseWeapon(weaponId) {
         return false;
     }
 
+    // Store old balance for animation
+    const oldBalance = Money.getMoney();
+
     // Deduct money
     Money.spendMoney(weapon.cost, `Purchased ${weapon.name}`);
+
+    // Start balance animation
+    const newBalance = Money.getMoney();
+    balanceAnimation = {
+        active: true,
+        startValue: oldBalance,
+        endValue: newBalance,
+        startTime: Date.now(),
+        duration: ANIMATION_DURATION.BALANCE_TRANSITION
+    };
 
     // Add ammo to player's inventory
     playerTankRef.addAmmo(weaponId, weapon.ammo);
@@ -1045,6 +1078,8 @@ function getTabAtPoint(x, y) {
  * - Owned (x > 0): Subtle green glow with checkmark badge
  * - Can't Afford: Grayed out with NO FUNDS indicator
  * - Hover/Selected: Bright glow border (cyan/pink neon)
+ * - Purchase Success: Green flash with stronger glow
+ * - Purchase Failed: Red flash with shake animation
  *
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  * @param {Object} weapon - Weapon definition
@@ -1055,12 +1090,25 @@ function getTabAtPoint(x, y) {
  * @param {number} pulseIntensity - Glow pulse intensity (0-1)
  * @param {boolean} showFeedback - Whether to show purchase feedback
  * @param {boolean} feedbackSuccess - Whether the feedback is for success or failure
+ * @param {number} feedbackProgress - Feedback animation progress (0-1)
  */
-function renderWeaponCard(ctx, weapon, x, y, currentAmmo, canAfford, pulseIntensity, showFeedback = false, feedbackSuccess = false) {
+function renderWeaponCard(ctx, weapon, x, y, currentAmmo, canAfford, pulseIntensity, showFeedback = false, feedbackSuccess = false, feedbackProgress = 0) {
     const cardWidth = SHOP_LAYOUT.CARD.WIDTH;
     const cardHeight = SHOP_LAYOUT.CARD.HEIGHT;
     const isPressed = pressedElementId === `weapon_${weapon.id}`;
     const isHovered = hoveredWeaponId === weapon.id;
+
+    // Apply shake offset for failed purchase animation
+    let shakeOffsetX = 0;
+    if (showFeedback && !feedbackSuccess) {
+        // Shake animation: rapid horizontal oscillation that diminishes over time
+        const shakeIntensity = (1 - feedbackProgress) * 6; // Starts at 6px, diminishes to 0
+        const shakeFrequency = feedbackProgress * 30; // Rapid shake
+        shakeOffsetX = Math.sin(shakeFrequency * Math.PI * 2) * shakeIntensity;
+    }
+
+    // Apply shake offset to position
+    x += shakeOffsetX;
 
     // Determine card color based on weapon type
     let borderColor = COLORS.NEON_CYAN;
@@ -1096,9 +1144,14 @@ function renderWeaponCard(ctx, weapon, x, y, currentAmmo, canAfford, pulseIntens
     ctx.roundRect(x, y + pressOffset, cardWidth, cardHeight, 4);
     ctx.fill();
 
-    // Feedback flash
+    // Feedback flash with animated intensity
     if (showFeedback) {
-        const flashColor = feedbackSuccess ? 'rgba(0, 255, 100, 0.3)' : 'rgba(255, 50, 50, 0.3)';
+        // Flash intensity fades out over animation duration
+        const flashIntensity = 1 - feedbackProgress;
+        const flashAlpha = flashIntensity * 0.4;  // Max 40% opacity at start
+        const flashColor = feedbackSuccess
+            ? `rgba(0, 255, 100, ${flashAlpha})`
+            : `rgba(255, 50, 100, ${flashAlpha})`;
         ctx.fillStyle = flashColor;
         ctx.fill();
     }
@@ -1114,7 +1167,20 @@ function renderWeaponCard(ctx, weapon, x, y, currentAmmo, canAfford, pulseIntens
     let strokeColor = borderColor;
     let lineWidth = 1;
 
-    if (isUnaffordable) {
+    if (showFeedback) {
+        // Feedback animations override normal states
+        if (feedbackSuccess) {
+            // Success: bright green glow that fades out
+            strokeColor = '#00ff88';
+            glowBlur = 20 * (1 - feedbackProgress) + 5;  // 25 -> 5
+            lineWidth = 2;
+        } else {
+            // Failure: red/pink glow that fades out
+            strokeColor = COLORS.NEON_PINK;
+            glowBlur = 15 * (1 - feedbackProgress) + 3;  // 18 -> 3
+            lineWidth = 2;
+        }
+    } else if (isUnaffordable) {
         // Can't afford: dim gray border, no glow
         strokeColor = COLORS.TEXT_MUTED;
         glowBlur = 0;
@@ -1126,9 +1192,6 @@ function renderWeaponCard(ctx, weapon, x, y, currentAmmo, canAfford, pulseIntens
         // Owned: subtle green glow
         strokeColor = '#00ff88';
         glowBlur = 5 + pulseIntensity * 3;
-    } else if (showFeedback && feedbackSuccess) {
-        // Success feedback: strong glow
-        glowBlur = 10;
     }
 
     ctx.strokeStyle = strokeColor;
@@ -1332,8 +1395,31 @@ export function render(ctx) {
     ctx.stroke();
     ctx.restore();
 
-    // Balance display
-    const currentMoney = Money.getMoney();
+    // Balance display with animation
+    let displayMoney = Money.getMoney();
+    let balanceGlowIntensity = 0;
+
+    // Animate balance if transition is active
+    if (balanceAnimation && balanceAnimation.active) {
+        const elapsed = Date.now() - balanceAnimation.startTime;
+        if (elapsed < balanceAnimation.duration) {
+            // Ease-out animation progress
+            const progress = elapsed / balanceAnimation.duration;
+            const easeOutProgress = 1 - Math.pow(1 - progress, 3);  // Cubic ease-out
+
+            // Interpolate display value
+            displayMoney = Math.round(
+                balanceAnimation.startValue +
+                (balanceAnimation.endValue - balanceAnimation.startValue) * easeOutProgress
+            );
+
+            // Extra glow during animation
+            balanceGlowIntensity = 1 - progress;
+        } else {
+            balanceAnimation = null;
+        }
+    }
+
     ctx.save();
     ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
     ctx.fillStyle = COLORS.TEXT_MUTED;
@@ -1341,11 +1427,12 @@ export function render(ctx) {
     ctx.textBaseline = 'middle';
     ctx.fillText('YOUR BALANCE', panel.X, panel.Y + SHOP_LAYOUT.BALANCE.Y_OFFSET - 15);
 
+    // Enhanced glow during balance animation
     ctx.shadowColor = COLORS.NEON_YELLOW;
-    ctx.shadowBlur = 10 + pulseIntensity * 5;
+    ctx.shadowBlur = 10 + pulseIntensity * 5 + balanceGlowIntensity * 15;
     ctx.font = `bold ${UI.FONT_SIZE_TITLE - 8}px ${UI.FONT_FAMILY}`;
     ctx.fillStyle = COLORS.NEON_YELLOW;
-    ctx.fillText(`$${currentMoney.toLocaleString()}`, panel.X, panel.Y + SHOP_LAYOUT.BALANCE.Y_OFFSET + 15);
+    ctx.fillText(`$${displayMoney.toLocaleString()}`, panel.X, panel.Y + SHOP_LAYOUT.BALANCE.Y_OFFSET + 15);
     ctx.restore();
 
     // Tab navigation bar
@@ -1427,11 +1514,13 @@ export function render(ctx) {
     // Check feedback state
     let feedbackWeaponId = null;
     let feedbackSuccess = false;
+    let feedbackProgress = 0;
     if (purchaseFeedback && purchaseFeedback.active) {
         const elapsed = Date.now() - purchaseFeedback.startTime;
-        if (elapsed < 500) {
+        if (elapsed < ANIMATION_DURATION.PURCHASE_FEEDBACK) {
             feedbackWeaponId = purchaseFeedback.weaponId;
             feedbackSuccess = purchaseFeedback.success;
+            feedbackProgress = elapsed / ANIMATION_DURATION.PURCHASE_FEEDBACK;
         } else {
             purchaseFeedback = null;
         }
@@ -1585,7 +1674,7 @@ export function render(ctx) {
 
                 renderWeaponCard(
                     ctx, weapon, cardX, cardY, currentAmmo, canAfford,
-                    pulseIntensity, showFeedback, feedbackSuccess
+                    pulseIntensity, showFeedback, feedbackSuccess, feedbackProgress
                 );
             }
         }
