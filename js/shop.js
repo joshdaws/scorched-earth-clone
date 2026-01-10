@@ -1317,16 +1317,37 @@ function renderWeaponCard(ctx, weapon, x, y, currentAmmo, canAfford, pulseIntens
     }
     ctx.fillText(displayName, centerX, textY + 40);
 
-    // Row 2: Price OR "NO FUNDS" indicator
+    // Row 2: Price with quantity indicator, OR "NO FUNDS"
     ctx.font = `bold 11px ${UI.FONT_FAMILY}`;
     if (isUnaffordable) {
         // Show "NO FUNDS" in red for unaffordable weapons
         ctx.fillStyle = COLORS.NEON_PINK;
         ctx.fillText('NO FUNDS', centerX, textY + 52);
     } else {
+        // Price display
         ctx.fillStyle = weapon.cost === 0 ? '#00ff88' : COLORS.NEON_YELLOW;
         const costText = weapon.cost === 0 ? 'FREE' : `$${weapon.cost.toLocaleString()}`;
-        ctx.fillText(costText, centerX, textY + 52);
+        const costWidth = ctx.measureText(costText).width;
+
+        // Calculate total width for price + quantity badge
+        const qtyText = weapon.ammo === Infinity ? '' : `+${weapon.ammo}`;
+        ctx.font = `bold 9px ${UI.FONT_FAMILY}`;
+        const qtyWidth = qtyText ? ctx.measureText(qtyText).width : 0;
+        const spacing = qtyText ? 3 : 0;
+        const totalWidth = costWidth + spacing + qtyWidth;
+
+        // Draw price (left of center)
+        ctx.font = `bold 11px ${UI.FONT_FAMILY}`;
+        const priceX = centerX - totalWidth / 2 + costWidth / 2;
+        ctx.fillText(costText, priceX, textY + 52);
+
+        // Draw quantity badge (right of price) if not infinite ammo
+        if (qtyText) {
+            ctx.font = `bold 9px ${UI.FONT_FAMILY}`;
+            ctx.fillStyle = '#00ff88';  // Green for quantity bonus
+            const qtyX = priceX + costWidth / 2 + spacing + qtyWidth / 2;
+            ctx.fillText(qtyText, qtyX, textY + 52);
+        }
     }
 
     // Row 3: Owned count (centered)
