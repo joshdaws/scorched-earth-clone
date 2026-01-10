@@ -31,6 +31,7 @@ import * as PauseMenu from './pauseMenu.js';
 import * as TouchAiming from './touchAiming.js';
 import * as Haptics from './haptics.js';
 import * as DebugTools from './debugTools.js';
+import * as GameOver from './gameOver.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -1312,7 +1313,10 @@ function updateProjectile() {
         if (projectile.isRolling) {
             // Check for tank collision while rolling
             const pos = projectile.getPosition();
-            const tankHit = checkTankCollision(pos.x, pos.y, tanks);
+            const tankHit = checkTankCollision(pos.x, pos.y, tanks, {
+                owner: projectile.owner,
+                canHitOwner: projectile.canHitOwner()
+            });
             if (tankHit) {
                 const { tank } = tankHit;
                 console.log(`Roller hit ${tank.team} tank!`);
@@ -1336,7 +1340,10 @@ function updateProjectile() {
 
             // Check for tank collision again after moving
             const newPos = projectile.getPosition();
-            const tankHitAfterMove = checkTankCollision(newPos.x, newPos.y, tanks);
+            const tankHitAfterMove = checkTankCollision(newPos.x, newPos.y, tanks, {
+                owner: projectile.owner,
+                canHitOwner: projectile.canHitOwner()
+            });
             if (tankHitAfterMove) {
                 const { tank } = tankHitAfterMove;
                 console.log(`Roller hit ${tank.team} tank after moving!`);
@@ -1389,7 +1396,11 @@ function updateProjectile() {
         const pos = projectile.getPosition();
 
         // Check for tank collision
-        const tankHit = checkTankCollision(pos.x, pos.y, tanks);
+        // Pass owner info to prevent immediate self-collision at low angles
+        const tankHit = checkTankCollision(pos.x, pos.y, tanks, {
+            owner: projectile.owner,
+            canHitOwner: projectile.canHitOwner()
+        });
         if (tankHit) {
             const { tank } = tankHit;
             handleProjectileExplosion(projectile, pos, tank);
@@ -1450,15 +1461,44 @@ function updateProjectile() {
 }
 
 /**
- * Check if the round has ended (one tank destroyed).
- * Transitions to VICTORY or DEFEAT state if so, otherwise continues to next turn.
+ * Check if the round has ended (one or both tanks destroyed).
+ * Implements permadeath: player destruction ends the run immediately.
+ * - Draw (both destroyed): GAME_OVER (player tank destroyed = run ends)
+ * - Player only destroyed: GAME_OVER (run ends)
+ * - Enemy only destroyed: VICTORY (continue to next round)
  */
 function checkRoundEnd() {
     const playerDestroyed = playerTank && playerTank.health <= 0;
     const enemyDestroyed = enemyTank && enemyTank.health <= 0;
 
+    // Check for draw condition first (both tanks destroyed)
+    // In roguelike mode, draw counts as player loss since player tank is destroyed
+    if (playerDestroyed && enemyDestroyed) {
+        console.log('[Main] Both tanks destroyed - MUTUAL DESTRUCTION (GAME OVER)!');
+
+        // Get round stats for display
+        const earnings = Money.getRoundEarnings();
+        const damage = Money.getRoundDamage();
+
+        // Show game over screen with draw indicator
+        GameOver.show({
+            earnings,
+            damage,
+            rounds: currentRound,
+            draw: true,
+            delay: 1200
+        });
+
+        // Haptic feedback for defeat (mobile devices)
+        Haptics.hapticDefeat();
+
+        // Transition to game over state (terminal - run has ended)
+        Game.setState(GAME_STATES.GAME_OVER);
+        return;
+    }
+
     if (enemyDestroyed) {
-        // Player wins!
+        // Player wins this round!
         console.log('[Main] Enemy destroyed - VICTORY!');
 
         // Award victory bonus (hit rewards already given during combat)
@@ -1480,24 +1520,27 @@ function checkRoundEnd() {
     }
 
     if (playerDestroyed) {
-        // Player loses
-        console.log('[Main] Player destroyed - DEFEAT!');
+        // Player loses - GAME OVER (permadeath)
+        console.log('[Main] Player destroyed - GAME OVER!');
 
-        // Award consolation prize
-        Money.awardDefeatConsolation();
+        // Get round stats for display (no consolation prize in permadeath)
+        const earnings = Money.getRoundEarnings();
+        const damage = Money.getRoundDamage();
 
-        // Get total round earnings for display
-        const roundEarnings = Money.getRoundEarnings();
-        const roundDamage = Money.getRoundDamage();
-
-        // Show defeat screen after short delay
-        VictoryDefeat.showDefeat(roundEarnings, roundDamage, 1200);
+        // Show game over screen
+        GameOver.show({
+            earnings,
+            damage,
+            rounds: currentRound,
+            draw: false,
+            delay: 1200
+        });
 
         // Haptic feedback for defeat (mobile devices)
         Haptics.hapticDefeat();
 
-        // Transition to defeat state
-        Game.setState(GAME_STATES.DEFEAT);
+        // Transition to game over state (terminal - run has ended)
+        Game.setState(GAME_STATES.GAME_OVER);
         return;
     }
 
@@ -2946,6 +2989,105 @@ function setupDefeatState() {
 }
 
 // =============================================================================
+// GAME OVER STATE (PERMADEATH)
+// =============================================================================
+
+/**
+ * Handle click on the game over screen.
+ * @param {{x: number, y: number}} pos - Click position in design coordinates
+ */
+function handleGameOverClick(pos) {
+    if (Game.getState() !== GAME_STATES.GAME_OVER) return;
+    GameOver.handleClick(pos.x, pos.y);
+}
+
+/**
+ * Render the game over screen overlay.
+ * Shows the current game state underneath with the overlay on top.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ */
+function renderGameOverState(ctx) {
+    // First render the game state underneath (terrain, tanks, etc.)
+    renderPlaying(ctx);
+
+    // Then render the game over overlay on top
+    GameOver.render(ctx);
+}
+
+/**
+ * Update game over screen animations.
+ * @param {number} deltaTime - Time since last frame in ms
+ */
+function updateGameOver(deltaTime) {
+    GameOver.update(deltaTime);
+}
+
+/**
+ * Start a completely new run (reset everything).
+ * Called when "New Run" is clicked on game over screen.
+ */
+function startNewRun() {
+    console.log('[Main] Starting new run');
+    // Reset round counter
+    currentRound = 1;
+    // Reset money system
+    Money.reset();
+    // Hide game over screen
+    GameOver.hide();
+    // Return to menu for now (later this will start directly into a new run)
+    Game.setState(GAME_STATES.MENU);
+}
+
+/**
+ * Set up game over state handlers.
+ * Game Over is a terminal state - the run has ended (permadeath).
+ */
+function setupGameOverState() {
+    // Register click handlers
+    Input.onMouseDown((x, y, button) => {
+        if (button === 0 && Game.getState() === GAME_STATES.GAME_OVER) {
+            handleGameOverClick({ x, y });
+        }
+    });
+
+    Input.onTouchStart((x, y) => {
+        if (Game.getState() === GAME_STATES.GAME_OVER) {
+            handleGameOverClick({ x, y });
+        }
+    });
+
+    // Register callback for "New Run" button
+    GameOver.onNewRun(() => {
+        startNewRun();
+    });
+
+    // Register callback for "Main Menu" button
+    GameOver.onMainMenu(() => {
+        GameOver.hide();
+        Game.setState(GAME_STATES.MENU);
+    });
+
+    // Register state handlers
+    Game.registerStateHandlers(GAME_STATES.GAME_OVER, {
+        onEnter: (fromState) => {
+            console.log('Entered GAME_OVER state (run ended)');
+            // Cancel any pending AI turn
+            AI.cancelTurn();
+            // Disable game input
+            Input.disableGameInput();
+            // Play defeat music/stinger
+            Music.playForState(GAME_STATES.DEFEAT); // Reuse defeat music for now
+        },
+        onExit: (toState) => {
+            console.log('Exiting GAME_OVER state');
+            GameOver.hide();
+        },
+        update: updateGameOver,
+        render: renderGameOverState
+    });
+}
+
+// =============================================================================
 // PAUSED STATE
 // =============================================================================
 
@@ -3319,6 +3461,7 @@ async function init() {
     setupPausedState();
     setupVictoryState();
     setupDefeatState();
+    setupGameOverState();
     setupShopState();
 
     // Register 'D' key to toggle debug mode
