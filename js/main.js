@@ -50,6 +50,7 @@ import { onAchievementUnlock } from './achievements.js';
 import * as Tokens from './tokens.js';
 import * as TankCollection from './tank-collection.js';
 import * as PerformanceTracking from './performance-tracking.js';
+import * as PitySystem from './pity-system.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -4360,6 +4361,9 @@ async function init() {
     // Initialize performance tracking system (for supply drop odds)
     PerformanceTracking.init();
 
+    // Initialize pity system (bad luck protection for supply drops)
+    PitySystem.init();
+
     // Register performance tracking callback for achievement unlocks (grants +15% bonus)
     onAchievementUnlock(() => {
         PerformanceTracking.onAchievementUnlocked();
@@ -4381,6 +4385,7 @@ async function init() {
     window.AchievementPopup = AchievementPopup;
     window.TankCollection = TankCollection;
     window.PerformanceTracking = PerformanceTracking;
+    window.PitySystem = PitySystem;
     window.SupplyDrop = SupplyDrop;
     window.ExtractionReveal = ExtractionReveal;
     // Expose DebugTools as 'Debug' for convenience (e.g., Debug.skipToShop())

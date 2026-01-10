@@ -24,6 +24,12 @@ import {
 import {
     getPerformanceBonus
 } from './performance-tracking.js';
+import {
+    getPityBonus,
+    getMinimumRarity,
+    onDropResult as updatePityCounters,
+    init as initPitySystem
+} from './pity-system.js';
 
 // =============================================================================
 // CONSTANTS
@@ -225,11 +231,11 @@ export function calculateModifiedRates(baseRates, performanceBonus) {
  * @param {boolean} options.isPremium - Apply premium modifier (+10% to rare+)
  * @param {boolean} options.isGuaranteedRare - Use guaranteed rare+ rates
  * @param {boolean} [options.includePerformance=false] - Whether to include performance bonus
- * @param {Object} [options.pityBonus] - Future: pity system bonus rates
+ * @param {boolean} [options.includePity=false] - Whether to include pity bonus
  * @returns {Object} Adjusted drop rate table
  */
 export function calculateDropRates(options = {}) {
-    const { isPremium = false, isGuaranteedRare = false, includePerformance = false } = options;
+    const { isPremium = false, isGuaranteedRare = false, includePerformance = false, includePity = false } = options;
 
     // Start with base rates or guaranteed rates
     let rates;
@@ -280,11 +286,97 @@ export function calculateDropRates(options = {}) {
         }
     }
 
+    // Apply pity bonus (stacks with performance bonus)
+    if (includePity) {
+        const pityBonus = getPityBonus();
+
+        // Apply rare+ pity bonus (shifts from common/uncommon to rare)
+        if (pityBonus.rarePlus > 0) {
+            rates = applyPityBonus(rates, pityBonus.rarePlus, 'rare');
+        }
+
+        // Apply epic+ pity bonus (shifts from common/uncommon/rare to epic)
+        if (pityBonus.epicPlus > 0) {
+            rates = applyPityBonus(rates, pityBonus.epicPlus, 'epic');
+        }
+    }
+
     // Validate rates sum to 100
     const total = Object.values(rates).reduce((sum, rate) => sum + rate, 0);
     if (Math.abs(total - 100) > 0.01) {
         console.warn(`[DropRates] Rates sum to ${total}%, expected 100%`);
     }
+
+    return rates;
+}
+
+/**
+ * Apply pity bonus by shifting probability from lower rarities to target rarity+.
+ *
+ * @param {Object} baseRates - Current drop rate table
+ * @param {number} bonus - Pity bonus percentage to apply
+ * @param {string} targetRarity - Minimum rarity to boost ('rare' or 'epic')
+ * @returns {Object} Modified drop rate table
+ */
+function applyPityBonus(baseRates, bonus, targetRarity) {
+    const rates = { ...baseRates };
+
+    // Determine which rarities to take from and give to
+    let sourceRarities, targetRarities;
+    if (targetRarity === 'rare') {
+        sourceRarities = [RARITY.COMMON, RARITY.UNCOMMON];
+        targetRarities = [RARITY.RARE, RARITY.EPIC, RARITY.LEGENDARY];
+    } else if (targetRarity === 'epic') {
+        sourceRarities = [RARITY.COMMON, RARITY.UNCOMMON, RARITY.RARE];
+        targetRarities = [RARITY.EPIC, RARITY.LEGENDARY];
+    } else {
+        return rates; // Unknown target
+    }
+
+    // Calculate how much we can take from source rarities
+    // Keep at least 5% combined in source rarities to avoid extreme distributions
+    const sourceTotal = sourceRarities.reduce((sum, r) => sum + rates[r], 0);
+    const maxToTake = Math.max(0, sourceTotal - 5);
+    const actualBonus = Math.min(bonus, maxToTake);
+
+    if (actualBonus <= 0) return rates;
+
+    // Take proportionally from source rarities
+    const sourceSum = sourceRarities.reduce((sum, r) => sum + rates[r], 0);
+    for (const rarity of sourceRarities) {
+        const proportion = rates[rarity] / sourceSum;
+        rates[rarity] -= actualBonus * proportion;
+        rates[rarity] = Math.max(0, rates[rarity]);
+    }
+
+    // Give primarily to the target rarity (60%), with some to higher (40%)
+    const targetIndex = targetRarities.indexOf(targetRarity === 'rare' ? RARITY.RARE : RARITY.EPIC);
+    const primaryTarget = targetRarities[0];
+
+    if (targetRarities.length === 1) {
+        rates[primaryTarget] += actualBonus;
+    } else {
+        // 60% to primary target, 30% to next, 10% to highest
+        rates[targetRarities[0]] += actualBonus * 0.6;
+        rates[targetRarities[1]] += actualBonus * 0.3;
+        if (targetRarities.length > 2) {
+            rates[targetRarities[2]] += actualBonus * 0.1;
+        } else {
+            rates[targetRarities[1]] += actualBonus * 0.1;
+        }
+    }
+
+    // Round and validate
+    for (const rarity of RARITY_ORDER) {
+        rates[rarity] = Math.round(rates[rarity] * 100) / 100;
+    }
+
+    debugLog('Applied pity bonus', {
+        targetRarity,
+        bonus,
+        actualBonus,
+        resultingRates: rates
+    });
 
     return rates;
 }
@@ -372,21 +464,42 @@ export function selectTank(rarity, options = {}) {
  * @property {boolean} isDuplicate - True if player already owns this tank
  * @property {number} scrapAwarded - Scrap awarded (only for duplicates)
  * @property {number} duplicateCount - How many times player has received this tank
+ * @property {boolean} pityTriggered - True if pity system forced a guaranteed rarity
  */
 export function processDrop(dropType) {
-    // Step 1: Calculate rates based on drop type (includes performance bonus)
+    // Step 1: Check for pity-guaranteed rarity override
+    const minimumRarity = getMinimumRarity();
+    let pityTriggered = false;
+
+    // Step 2: Calculate rates based on drop type (includes performance AND pity bonus)
     const rates = calculateDropRates({
         isPremium: dropType === DROP_TYPES.PREMIUM,
         isGuaranteedRare: dropType === DROP_TYPES.GUARANTEED_RARE,
-        includePerformance: true
+        includePerformance: true,
+        includePity: true
     });
 
     debugLog(`Processing ${dropType} drop with rates:`, rates);
+    if (minimumRarity) {
+        debugLog(`Pity system minimum rarity: ${minimumRarity}`);
+    }
 
-    // Step 2: Roll for rarity
-    const rarity = rollRarity(rates);
+    // Step 3: Roll for rarity
+    let rarity = rollRarity(rates);
 
-    // Step 3: Select tank from rarity tier
+    // Step 4: Apply pity-guaranteed rarity override if needed
+    if (minimumRarity) {
+        const rarityIndex = RARITY_ORDER.indexOf(rarity);
+        const minimumIndex = RARITY_ORDER.indexOf(minimumRarity);
+
+        if (rarityIndex < minimumIndex) {
+            debugLog(`Pity override: ${rarity} -> ${minimumRarity} (forced minimum)`);
+            rarity = minimumRarity;
+            pityTriggered = true;
+        }
+    }
+
+    // Step 5: Select tank from rarity tier
     const tank = selectTank(rarity);
 
     if (!tank) {
@@ -397,16 +510,20 @@ export function processDrop(dropType) {
             isNew: false,
             isDuplicate: false,
             scrapAwarded: 0,
-            duplicateCount: 0
+            duplicateCount: 0,
+            pityTriggered: false
         };
     }
 
-    // Step 4: Update last dropped tank for consecutive protection
+    // Step 6: Update last dropped tank for consecutive protection
     lastDroppedTankId = tank.id;
 
-    // Step 5: Add to collection and get result
+    // Step 7: Add to collection and get result
     // The addTank function handles duplicate detection and scrap awarding
     const addResult = addTankToCollection(tank.id);
+
+    // Step 8: Update pity counters based on drop result
+    updatePityCounters(rarity);
 
     const result = {
         tank: tank,
@@ -414,7 +531,8 @@ export function processDrop(dropType) {
         isNew: addResult.isNew,
         isDuplicate: addResult.isDuplicate,
         scrapAwarded: addResult.scrapAwarded,
-        duplicateCount: addResult.duplicateCount
+        duplicateCount: addResult.duplicateCount,
+        pityTriggered: pityTriggered
     };
 
     debugLog('Drop result:', {
@@ -423,7 +541,8 @@ export function processDrop(dropType) {
         rarity: rarity,
         isNew: result.isNew,
         isDuplicate: result.isDuplicate,
-        scrapAwarded: result.scrapAwarded
+        scrapAwarded: result.scrapAwarded,
+        pityTriggered: pityTriggered
     });
 
     return result;
@@ -457,14 +576,29 @@ export function resetLastDropped() {
  *
  * @param {string} dropType - Type of drop
  * @param {boolean} [includePerformance=false] - Whether to include performance bonus in displayed rates
+ * @param {boolean} [includePity=false] - Whether to include pity bonus in displayed rates
  * @returns {Object} Drop rate table
  */
-export function getDropRatesForDisplay(dropType, includePerformance = false) {
+export function getDropRatesForDisplay(dropType, includePerformance = false, includePity = false) {
     return calculateDropRates({
         isPremium: dropType === DROP_TYPES.PREMIUM,
         isGuaranteedRare: dropType === DROP_TYPES.GUARANTEED_RARE,
-        includePerformance
+        includePerformance,
+        includePity
     });
+}
+
+/**
+ * Get the current pity bonus information for display.
+ *
+ * @returns {Object} Pity bonus info
+ * @property {number} rarePlus - Bonus for rare+ chance
+ * @property {number} epicPlus - Bonus for epic+ chance
+ * @property {boolean} guaranteedRare - Whether next drop is guaranteed rare+
+ * @property {boolean} guaranteedEpic - Whether next drop is guaranteed epic+
+ */
+export function getCurrentPityBonus() {
+    return getPityBonus();
 }
 
 /**
