@@ -896,8 +896,10 @@ export function renderHealthBars(ctx, playerTank, enemyTank) {
     const y = HUD.HEALTH_BAR.Y;
 
     // Player health bar (left side)
+    // Player always uses standard MAX_HEALTH (100)
     if (playerTank) {
-        const playerPercent = (playerTank.health / TANK.MAX_HEALTH) * 100;
+        const playerMaxHealth = playerTank.maxHealth || TANK.MAX_HEALTH;
+        const playerPercent = (playerTank.health / playerMaxHealth) * 100;
         drawHealthBar(
             ctx,
             padding,
@@ -911,8 +913,10 @@ export function renderHealthBars(ctx, playerTank, enemyTank) {
     }
 
     // Enemy health bar (right side)
+    // Use tank's maxHealth for proper scaling with roguelike health progression
     if (enemyTank) {
-        const enemyPercent = (enemyTank.health / TANK.MAX_HEALTH) * 100;
+        const enemyMaxHealth = enemyTank.maxHealth || TANK.MAX_HEALTH;
+        const enemyPercent = (enemyTank.health / enemyMaxHealth) * 100;
         drawHealthBar(
             ctx,
             CANVAS.DESIGN_WIDTH - padding - barWidth,
@@ -940,7 +944,9 @@ export function renderEnemyHealthBar(ctx, enemyTank) {
     const padding = HUD.HEALTH_BAR.PADDING;
     const y = HUD.HEALTH_BAR.Y;
 
-    const enemyPercent = (enemyTank.health / TANK.MAX_HEALTH) * 100;
+    // Use tank's maxHealth for proper scaling with roguelike health progression
+    const maxHealth = enemyTank.maxHealth || TANK.MAX_HEALTH;
+    const enemyPercent = (enemyTank.health / maxHealth) * 100;
     drawHealthBar(
         ctx,
         CANVAS.DESIGN_WIDTH - padding - barWidth,

@@ -331,6 +331,34 @@ export function getFormattedDuration() {
 }
 
 // =============================================================================
+// DIFFICULTY SCALING
+// =============================================================================
+
+/**
+ * Get the enemy health for a given round number.
+ * Enemy tanks become more durable in later rounds.
+ *
+ * Health Scaling Table:
+ * - Rounds 1-3:  100 HP (1.0x)
+ * - Rounds 4-6:  120 HP (1.2x)
+ * - Rounds 7-9:  140 HP (1.4x)
+ * - Rounds 10-12: 160 HP (1.6x)
+ * - Rounds 13+:  180 HP (1.8x cap)
+ *
+ * @param {number} roundNumber - Current round (1-based)
+ * @returns {number} Enemy health for this round
+ */
+export function getEnemyHealthForRound(roundNumber) {
+    const BASE_HEALTH = 100;
+
+    if (roundNumber <= 3) return BASE_HEALTH;
+    if (roundNumber <= 6) return Math.floor(BASE_HEALTH * 1.2);
+    if (roundNumber <= 9) return Math.floor(BASE_HEALTH * 1.4);
+    if (roundNumber <= 12) return Math.floor(BASE_HEALTH * 1.6);
+    return Math.floor(BASE_HEALTH * 1.8); // Cap at 180 HP
+}
+
+// =============================================================================
 // INITIALIZATION
 // =============================================================================
 

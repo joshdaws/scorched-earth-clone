@@ -59,6 +59,14 @@ export class Tank {
         this.health = TANK.START_HEALTH;
 
         /**
+         * Maximum health points for this tank.
+         * Used for health bar rendering. May differ from TANK.MAX_HEALTH
+         * for scaled enemies in roguelike mode.
+         * @type {number}
+         */
+        this.maxHealth = TANK.MAX_HEALTH;
+
+        /**
          * Turret angle in degrees.
          * 0° = pointing right, 90° = pointing up, 180° = pointing left.
          * Player tanks typically aim 0-90°, enemy tanks 90-180°.
@@ -208,7 +216,7 @@ export class Tank {
 
     /**
      * Heal the tank by a specified amount.
-     * Health cannot exceed MAX_HEALTH.
+     * Health cannot exceed tank's maxHealth.
      * @param {number} amount - Amount to heal
      * @returns {number} The actual amount healed
      */
@@ -216,7 +224,7 @@ export class Tank {
         const healAmount = Math.max(0, amount);
         const previousHealth = this.health;
 
-        this.health = Math.min(TANK.MAX_HEALTH, this.health + healAmount);
+        this.health = Math.min(this.maxHealth, this.health + healAmount);
 
         return this.health - previousHealth;
     }
@@ -453,6 +461,7 @@ export class Tank {
             x: this.x,
             y: this.y,
             health: this.health,
+            maxHealth: this.maxHealth,
             angle: this.angle,
             power: this.power,
             team: this.team,
@@ -474,6 +483,7 @@ export class Tank {
         });
 
         tank.health = data.health;
+        tank.maxHealth = data.maxHealth || TANK.MAX_HEALTH; // Fallback for old save data
         tank.angle = data.angle;
         tank.power = data.power;
         tank.currentWeapon = data.currentWeapon;

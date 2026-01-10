@@ -32,6 +32,7 @@ import * as TouchAiming from './touchAiming.js';
 import * as Haptics from './haptics.js';
 import * as DebugTools from './debugTools.js';
 import * as GameOver from './gameOver.js';
+import { getEnemyHealthForRound } from './runState.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -2767,6 +2768,13 @@ function setupPlayingState() {
             const tanks = placeTanksOnTerrain(currentTerrain);
             playerTank = tanks.player;
             enemyTank = tanks.enemy;
+
+            // Apply enemy health scaling based on round number (roguelike progression)
+            // Enemy tanks become more durable in later rounds: 100 HP → up to 180 HP
+            const scaledEnemyHealth = getEnemyHealthForRound(currentRound);
+            enemyTank.health = scaledEnemyHealth;
+            enemyTank.maxHealth = scaledEnemyHealth; // Set max for proper health bar display
+            console.log(`Round ${currentRound}: Enemy health scaled to ${scaledEnemyHealth} HP`);
 
             // Restore player inventory from previous round (if continuing)
             // For new games, tank starts with default inventory (basic-shot only)
