@@ -46,8 +46,10 @@ import * as PrecisionAchievements from './precision-achievements.js';
 import * as WeaponAchievements from './weapon-achievements.js';
 import * as ProgressionAchievements from './progression-achievements.js';
 import * as HiddenAchievements from './hidden-achievements.js';
+import { onAchievementUnlock } from './achievements.js';
 import * as Tokens from './tokens.js';
 import * as TankCollection from './tank-collection.js';
+import * as PerformanceTracking from './performance-tracking.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -1291,6 +1293,9 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
         if (directHitTank.team === 'player' && damageResult.actualDamage > 0) {
             recordStat('damageTaken', damageResult.actualDamage);
 
+            // Performance tracking: player took damage (affects flawless status and heavy damage penalty)
+            PerformanceTracking.onDamageTaken(damageResult.actualDamage, TANK.START_HEALTH);
+
             // Combat achievement detection: player took damage
             CombatAchievements.onPlayerDamageTaken(damageResult.actualDamage, directHitTank.health);
 
@@ -1376,6 +1381,9 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
             if (result.tank.team === 'player' && result.actualDamage > 0) {
                 recordStat('damageTaken', result.actualDamage);
 
+                // Performance tracking: player took splash damage
+                PerformanceTracking.onDamageTaken(result.actualDamage, TANK.START_HEALTH);
+
                 // Combat achievement detection: player took damage
                 CombatAchievements.onPlayerDamageTaken(result.actualDamage, result.tank.health);
 
@@ -1390,6 +1398,9 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
     if (isPlayerShot && playerHitEnemy) {
         recordStat('shotHit');
 
+        // Performance tracking: player hit enemy
+        PerformanceTracking.updateAccuracy(true);
+
         // Precision achievement detection: player hit enemy
         PrecisionAchievements.onPlayerHitEnemy({
             isDirectHit: wasDirectHit,
@@ -1400,6 +1411,9 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
         // Hidden achievement detection: player hit enemy (resets consecutive misses)
         HiddenAchievements.onPlayerHitEnemy();
     } else if (isPlayerShot) {
+        // Performance tracking: player missed
+        PerformanceTracking.updateAccuracy(false);
+
         // Precision achievement detection: player missed
         PrecisionAchievements.onPlayerMissed();
 
@@ -1700,6 +1714,9 @@ function checkRoundEnd() {
         // Token system: round loss resets win streak
         Tokens.onRoundLoss();
 
+        // Performance tracking: round lost (draw counts as loss)
+        PerformanceTracking.onRoundEnd(false);
+
         // End the run and finalize stats (draw counts as loss)
         endRunState(true);
 
@@ -1741,6 +1758,9 @@ function checkRoundEnd() {
         const isFlawless = combatState.roundState.damageTakenThisRound === 0;
         Tokens.onRoundWin({ isFlawless, roundNumber: currentRound });
 
+        // Performance tracking: round won (updates win streak)
+        PerformanceTracking.onRoundEnd(true);
+
         // Record enemy destroyed stat
         recordStat('enemyDestroyed');
 
@@ -1777,6 +1797,9 @@ function checkRoundEnd() {
 
         // Token system: round loss resets win streak
         Tokens.onRoundLoss();
+
+        // Performance tracking: round lost (resets win streak)
+        PerformanceTracking.onRoundEnd(false);
 
         // End the run and finalize stats
         endRunState(false);
@@ -3098,6 +3121,9 @@ function setupPlayingState() {
 
                 // Token system: notify new run started
                 Tokens.onRunStart();
+
+                // Performance tracking: reset stats for new run
+                PerformanceTracking.resetPerformanceOnNewRun();
             }
             // Start round earnings tracking with round number for multiplier
             // Rounds 1-2: 1.0x, Rounds 3-4: 1.2x, Rounds 5+: 1.5x
@@ -3114,6 +3140,9 @@ function setupPlayingState() {
 
             // Reset hidden achievement round state for new round
             HiddenAchievements.resetRoundState();
+
+            // Performance tracking: start new round
+            PerformanceTracking.onRoundStart(currentRound);
 
             // Progression achievement: check for round milestone achievements
             ProgressionAchievements.onRoundReached(currentRound);
@@ -4328,6 +4357,14 @@ async function init() {
     // Initialize tank collection system
     TankCollection.init();
 
+    // Initialize performance tracking system (for supply drop odds)
+    PerformanceTracking.init();
+
+    // Register performance tracking callback for achievement unlocks (grants +15% bonus)
+    onAchievementUnlock(() => {
+        PerformanceTracking.onAchievementUnlocked();
+    });
+
     // Register post-render callback for achievement popups (renders on top of all game content)
     Game.setPostRenderCallback(postRender);
 
@@ -4343,6 +4380,7 @@ async function init() {
     window.DebugTools = DebugTools;
     window.AchievementPopup = AchievementPopup;
     window.TankCollection = TankCollection;
+    window.PerformanceTracking = PerformanceTracking;
     window.SupplyDrop = SupplyDrop;
     window.ExtractionReveal = ExtractionReveal;
     // Expose DebugTools as 'Debug' for convenience (e.g., Debug.skipToShop())
