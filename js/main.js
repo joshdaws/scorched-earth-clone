@@ -44,6 +44,7 @@ import * as CombatAchievements from './combat-achievements.js';
 import * as PrecisionAchievements from './precision-achievements.js';
 import * as WeaponAchievements from './weapon-achievements.js';
 import * as ProgressionAchievements from './progression-achievements.js';
+import * as HiddenAchievements from './hidden-achievements.js';
 import * as Tokens from './tokens.js';
 import * as TankCollection from './tank-collection.js';
 
@@ -1291,6 +1292,9 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
 
             // Combat achievement detection: player took damage
             CombatAchievements.onPlayerDamageTaken(damageResult.actualDamage, directHitTank.health);
+
+            // Hidden achievement detection: check for self-inflicted damage
+            HiddenAchievements.onPlayerSelfDamage(isPlayerShot, directHitTank.health, damageResult.actualDamage);
         }
 
         // Also check for splash damage to other tanks
@@ -1329,6 +1333,9 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
 
                 // Combat achievement detection: player took splash damage
                 CombatAchievements.onPlayerDamageTaken(result.actualDamage, result.tank.health);
+
+                // Hidden achievement detection: check for self-inflicted splash damage
+                HiddenAchievements.onPlayerSelfDamage(isPlayerShot, result.tank.health, result.actualDamage);
             }
         }
 
@@ -1370,6 +1377,9 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
 
                 // Combat achievement detection: player took damage
                 CombatAchievements.onPlayerDamageTaken(result.actualDamage, result.tank.health);
+
+                // Hidden achievement detection: check for self-inflicted damage
+                HiddenAchievements.onPlayerSelfDamage(isPlayerShot, result.tank.health, result.actualDamage);
             }
             console.log(`Splash damage: ${result.tank.team} tank took ${result.actualDamage} damage, health: ${result.tank.health}`);
         }
@@ -1385,9 +1395,15 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
             playerTank: playerTank,
             enemyTank: enemyTank
         });
+
+        // Hidden achievement detection: player hit enemy (resets consecutive misses)
+        HiddenAchievements.onPlayerHitEnemy();
     } else if (isPlayerShot) {
         // Precision achievement detection: player missed
         PrecisionAchievements.onPlayerMissed();
+
+        // Hidden achievement detection: player missed (tracks consecutive misses)
+        HiddenAchievements.onPlayerMissed();
     }
 
     // Trigger explosion visual effect for all weapons (before terrain destruction)
@@ -1674,6 +1690,9 @@ function checkRoundEnd() {
     if (playerDestroyed && enemyDestroyed) {
         console.log('[Main] Both tanks destroyed - MUTUAL DESTRUCTION (GAME OVER)!');
 
+        // Hidden achievement detection: both tanks destroyed (Mutual Destruction)
+        HiddenAchievements.onRoundEndCheck(playerDestroyed, enemyDestroyed);
+
         // Combat achievement detection: round lost (draw counts as loss)
         CombatAchievements.onRoundLost();
 
@@ -1712,6 +1731,9 @@ function checkRoundEnd() {
 
         // Weapon achievement: round won (for Basic Training detection)
         WeaponAchievements.onRoundWon();
+
+        // Hidden achievement: round won (Patient Zero, Against All Odds, Minimalist)
+        HiddenAchievements.onRoundWon(currentRound, playerTank ? playerTank.inventory : null);
 
         // Token system: award tokens for round win
         const combatState = CombatAchievements.getState();
@@ -3070,6 +3092,9 @@ function setupPlayingState() {
                 // Weapon achievement: notify new run started
                 WeaponAchievements.onRunStart();
 
+                // Hidden achievement: notify new run started
+                HiddenAchievements.onRunStart();
+
                 // Token system: notify new run started
                 Tokens.onRunStart();
             }
@@ -3085,6 +3110,9 @@ function setupPlayingState() {
 
             // Reset weapon achievement round state for new round
             WeaponAchievements.resetRoundState();
+
+            // Reset hidden achievement round state for new round
+            HiddenAchievements.resetRoundState();
 
             // Progression achievement: check for round milestone achievements
             ProgressionAchievements.onRoundReached(currentRound);
@@ -3127,6 +3155,9 @@ function setupPlayingState() {
             }
             // Note: New games start with only basic-shot (default tank inventory)
             // Additional weapons must be purchased from the shop
+
+            // Hidden achievement: track initial inventory for Minimalist detection
+            HiddenAchievements.onInventoryChanged(playerTank.inventory);
 
             // Set up AI for this round with player-selected difficulty
             // If player selected a difficulty, use that; otherwise fall back to round-based progression
@@ -4283,6 +4314,9 @@ async function init() {
 
     // Initialize progression and economy achievement detection
     ProgressionAchievements.init();
+
+    // Initialize hidden achievement detection
+    HiddenAchievements.init();
 
     // Initialize token system (for supply drop currency)
     Tokens.init();

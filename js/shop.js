@@ -13,6 +13,8 @@ import * as Money from './money.js';
 import * as Game from './game.js';
 import * as Assets from './assets.js';
 import { playPurchaseSound, playErrorSound, playClickSound } from './sound.js';
+import * as ProgressionAchievements from './progression-achievements.js';
+import * as HiddenAchievements from './hidden-achievements.js';
 
 // =============================================================================
 // SHOP STATE
@@ -400,6 +402,12 @@ export function purchaseWeapon(weaponId) {
 
     // Add ammo to player's inventory
     playerTankRef.addAmmo(weaponId, weapon.ammo);
+
+    // Progression achievement: check inventory for Fully Loaded / Stockpile
+    ProgressionAchievements.onInventoryChanged(playerTankRef.inventory);
+
+    // Hidden achievement: track inventory for Minimalist
+    HiddenAchievements.onInventoryChanged(playerTankRef.inventory);
 
     // Play purchase sound effect
     playPurchaseSound();
