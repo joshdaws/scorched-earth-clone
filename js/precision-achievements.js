@@ -177,8 +177,8 @@ export function onPlayerHitEnemy(hitInfo) {
     // --- Sniper Elite Achievement ---
     // Hit enemy from > 80% map width distance
     if (playerTank && enemyTank && !isAchievementUnlocked('sniper_elite')) {
-        const playerPos = playerTank.getPosition();
-        const enemyPos = enemyTank.getPosition();
+        const playerPos = playerTank.getCenter();
+        const enemyPos = enemyTank.getCenter();
         const distance = Math.abs(playerPos.x - enemyPos.x);
         const threshold = CANVAS.DESIGN_WIDTH * PRECISION_THRESHOLDS.SNIPER_DISTANCE_PERCENT;
 
