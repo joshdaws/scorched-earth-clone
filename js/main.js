@@ -603,6 +603,18 @@ function renderMenu(ctx) {
     renderMenuButton(ctx, menuButtons.highScores, pulseIntensity);
     renderMenuButton(ctx, menuButtons.options, pulseIntensity);
 
+    // Best run display
+    const bestRound = HighScores.getBestRoundCount();
+    const bestRunText = bestRound > 0 ? `Best Run: ${bestRound} rounds` : 'Best Run: --';
+    ctx.fillStyle = COLORS.NEON_YELLOW;
+    ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = COLORS.NEON_YELLOW;
+    ctx.shadowBlur = 8;
+    ctx.fillText(bestRunText, CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 270);
+    ctx.shadowBlur = 0;
+
     // Instructions text at bottom
     ctx.fillStyle = COLORS.TEXT_MUTED;
     ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
