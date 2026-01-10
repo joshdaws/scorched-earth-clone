@@ -36,6 +36,15 @@ import * as RoundTransition from './roundTransition.js';
 import { getEnemyHealthForRound, recordStat, startNewRun as startNewRunState, endRun as endRunState, advanceRound as advanceRunRound } from './runState.js';
 import * as HighScores from './highScores.js';
 import * as AchievementPopup from './achievement-popup.js';
+import * as SupplyDrop from './supply-drop.js';
+import * as AchievementScreen from './achievement-screen.js';
+import * as CollectionScreen from './collection-screen.js';
+import * as CombatAchievements from './combat-achievements.js';
+import * as PrecisionAchievements from './precision-achievements.js';
+import * as WeaponAchievements from './weapon-achievements.js';
+import * as ProgressionAchievements from './progression-achievements.js';
+import * as Tokens from './tokens.js';
+import * as TankCollection from './tank-collection.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -198,27 +207,45 @@ const menuTransition = {
 const menuButtons = {
     start: {
         x: CANVAS.DESIGN_WIDTH / 2,
-        y: CANVAS.DESIGN_HEIGHT / 2 + 40,
+        y: CANVAS.DESIGN_HEIGHT / 2 + 20,
         width: 280,
-        height: 60,
+        height: 55,
         text: 'NEW RUN',
         color: COLORS.NEON_CYAN,
         enabled: true
     },
     highScores: {
         x: CANVAS.DESIGN_WIDTH / 2,
-        y: CANVAS.DESIGN_HEIGHT / 2 + 115,
+        y: CANVAS.DESIGN_HEIGHT / 2 + 85,
         width: 280,
-        height: 60,
+        height: 55,
         text: 'HIGH SCORES',
         color: COLORS.NEON_YELLOW,
         enabled: true
     },
+    achievements: {
+        x: CANVAS.DESIGN_WIDTH / 2,
+        y: CANVAS.DESIGN_HEIGHT / 2 + 150,
+        width: 280,
+        height: 55,
+        text: 'ACHIEVEMENTS',
+        color: COLORS.NEON_ORANGE,
+        enabled: true
+    },
+    collection: {
+        x: CANVAS.DESIGN_WIDTH / 2,
+        y: CANVAS.DESIGN_HEIGHT / 2 + 215,
+        width: 280,
+        height: 55,
+        text: 'COLLECTION',
+        color: COLORS.NEON_PINK,
+        enabled: true
+    },
     options: {
         x: CANVAS.DESIGN_WIDTH / 2,
-        y: CANVAS.DESIGN_HEIGHT / 2 + 190,
+        y: CANVAS.DESIGN_HEIGHT / 2 + 280,
         width: 280,
-        height: 60,
+        height: 55,
         text: 'OPTIONS',
         color: COLORS.NEON_PURPLE,
         enabled: true  // Enabled for volume controls
@@ -299,6 +326,16 @@ function handleMenuClick(pos) {
         Sound.playClickSound();
         // Go to HIGH_SCORES state
         Game.setState(GAME_STATES.HIGH_SCORES);
+    } else if (isInsideButton(pos.x, pos.y, menuButtons.achievements)) {
+        // Play click sound
+        Sound.playClickSound();
+        // Go to ACHIEVEMENTS state
+        Game.setState(GAME_STATES.ACHIEVEMENTS);
+    } else if (isInsideButton(pos.x, pos.y, menuButtons.collection)) {
+        // Play click sound
+        Sound.playClickSound();
+        // Go to COLLECTION state
+        Game.setState(GAME_STATES.COLLECTION);
     } else if (isInsideButton(pos.x, pos.y, menuButtons.options) && menuButtons.options.enabled) {
         // Play click sound
         Sound.playClickSound();
@@ -603,9 +640,11 @@ function renderMenu(ctx) {
     // Render menu buttons
     renderMenuButton(ctx, menuButtons.start, pulseIntensity);
     renderMenuButton(ctx, menuButtons.highScores, pulseIntensity);
+    renderMenuButton(ctx, menuButtons.achievements, pulseIntensity);
+    renderMenuButton(ctx, menuButtons.collection, pulseIntensity);
     renderMenuButton(ctx, menuButtons.options, pulseIntensity);
 
-    // Best run display
+    // Best run display (below OPTIONS button)
     const bestRound = HighScores.getBestRoundCount();
     const bestRunText = bestRound > 0 ? `Best Run: ${bestRound} rounds` : 'Best Run: --';
     ctx.fillStyle = COLORS.NEON_YELLOW;
@@ -614,7 +653,7 @@ function renderMenu(ctx) {
     ctx.textBaseline = 'middle';
     ctx.shadowColor = COLORS.NEON_YELLOW;
     ctx.shadowBlur = 8;
-    ctx.fillText(bestRunText, CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 270);
+    ctx.fillText(bestRunText, CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 340);
     ctx.shadowBlur = 0;
 
     // Instructions text at bottom
@@ -1162,6 +1201,12 @@ function fireProjectile(tank) {
         if (weapon && weapon.type === WEAPON_TYPES.NUCLEAR) {
             recordStat('nukeLaunched');
         }
+
+        // Precision achievement: track shot fired
+        PrecisionAchievements.onPlayerShotFired();
+
+        // Weapon achievement: track weapon used
+        WeaponAchievements.onWeaponFired(firedWeaponId);
     }
 
     // Play fire sound
@@ -1200,34 +1245,63 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
 
     // Track if player shot hit enemy for shotHit stat
     let playerHitEnemy = false;
+    let wasDirectHit = false; // For precision achievement detection
 
     if (directHitTank) {
+        // Store health before damage for achievement detection (Overkill)
+        const healthBeforeDamage = directHitTank.health;
+
         // Apply explosion damage to the directly hit tank
         const damageResult = applyExplosionDamage(explosion, directHitTank, weapon);
 
         // Award money and record stats if player hit the enemy tank
         if (isPlayerShot && directHitTank.team === 'enemy' && damageResult.actualDamage > 0) {
-            Money.awardHitReward(damageResult.actualDamage);
+            const hitReward = Money.awardHitReward(damageResult.actualDamage);
+            ProgressionAchievements.onMoneyEarned(hitReward);
             recordStat('damageDealt', damageResult.actualDamage);
             playerHitEnemy = true;
+            wasDirectHit = damageResult.isDirectHit;
+
+            // Combat achievement detection: damage dealt to enemy
+            CombatAchievements.onDamageDealt(damageResult, directHitTank, healthBeforeDamage);
+
+            // Weapon achievement: track damage dealt by weapon (for kill credit)
+            WeaponAchievements.onDamageDealtToEnemy(weaponId, damageResult.actualDamage, directHitTank.health);
         }
 
         // Track damage taken by player
         if (directHitTank.team === 'player' && damageResult.actualDamage > 0) {
             recordStat('damageTaken', damageResult.actualDamage);
+
+            // Combat achievement detection: player took damage
+            CombatAchievements.onPlayerDamageTaken(damageResult.actualDamage, directHitTank.health);
         }
 
         // Also check for splash damage to other tanks
         const allTanks = [playerTank, enemyTank].filter(t => t !== null && t !== directHitTank);
+
+        // Store health before splash damage for achievement detection
+        const splashHealthBefore = {};
+        for (const tank of allTanks) {
+            splashHealthBefore[tank.team] = tank.health;
+        }
+
         const splashResults = applyExplosionToAllTanks(explosion, allTanks, weapon);
 
         // Award money and record stats for splash damage
         if (isPlayerShot) {
             for (const result of splashResults) {
                 if (result.tank.team === 'enemy' && result.actualDamage > 0) {
-                    Money.awardHitReward(result.actualDamage);
+                    const splashReward = Money.awardHitReward(result.actualDamage);
+                    ProgressionAchievements.onMoneyEarned(splashReward);
                     recordStat('damageDealt', result.actualDamage);
                     playerHitEnemy = true;
+
+                    // Combat achievement detection: splash damage dealt to enemy
+                    CombatAchievements.onDamageDealt(result, result.tank, splashHealthBefore[result.tank.team]);
+
+                    // Weapon achievement: track splash damage dealt by weapon (for kill credit)
+                    WeaponAchievements.onDamageDealtToEnemy(weaponId, result.actualDamage, result.tank.health);
                 }
             }
         }
@@ -1236,6 +1310,9 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
         for (const result of splashResults) {
             if (result.tank.team === 'player' && result.actualDamage > 0) {
                 recordStat('damageTaken', result.actualDamage);
+
+                // Combat achievement detection: player took splash damage
+                CombatAchievements.onPlayerDamageTaken(result.actualDamage, result.tank.health);
             }
         }
 
@@ -1243,15 +1320,29 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
     } else {
         // Apply splash damage to all tanks near the explosion
         const allTanks = [playerTank, enemyTank].filter(t => t !== null);
+
+        // Store health before damage for achievement detection
+        const healthBefore = {};
+        for (const tank of allTanks) {
+            healthBefore[tank.team] = tank.health;
+        }
+
         const damageResults = applyExplosionToAllTanks(explosion, allTanks, weapon);
 
         // Award money and record stats for any damage on enemy if player shot
         if (isPlayerShot) {
             for (const result of damageResults) {
                 if (result.tank.team === 'enemy' && result.actualDamage > 0) {
-                    Money.awardHitReward(result.actualDamage);
+                    const terrainHitReward = Money.awardHitReward(result.actualDamage);
+                    ProgressionAchievements.onMoneyEarned(terrainHitReward);
                     recordStat('damageDealt', result.actualDamage);
                     playerHitEnemy = true;
+
+                    // Combat achievement detection: damage dealt to enemy
+                    CombatAchievements.onDamageDealt(result, result.tank, healthBefore[result.tank.team]);
+
+                    // Weapon achievement: track damage dealt by weapon (for kill credit)
+                    WeaponAchievements.onDamageDealtToEnemy(weaponId, result.actualDamage, result.tank.health);
                 }
             }
         }
@@ -1260,6 +1351,9 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
         for (const result of damageResults) {
             if (result.tank.team === 'player' && result.actualDamage > 0) {
                 recordStat('damageTaken', result.actualDamage);
+
+                // Combat achievement detection: player took damage
+                CombatAchievements.onPlayerDamageTaken(result.actualDamage, result.tank.health);
             }
             console.log(`Splash damage: ${result.tank.team} tank took ${result.actualDamage} damage, health: ${result.tank.health}`);
         }
@@ -1268,6 +1362,16 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
     // Record shotHit if player shot hit the enemy (only once per projectile)
     if (isPlayerShot && playerHitEnemy) {
         recordStat('shotHit');
+
+        // Precision achievement detection: player hit enemy
+        PrecisionAchievements.onPlayerHitEnemy({
+            isDirectHit: wasDirectHit,
+            playerTank: playerTank,
+            enemyTank: enemyTank
+        });
+    } else if (isPlayerShot) {
+        // Precision achievement detection: player missed
+        PrecisionAchievements.onPlayerMissed();
     }
 
     // Trigger explosion visual effect for all weapons (before terrain destruction)
@@ -1492,6 +1596,12 @@ function updateProjectile() {
                 if (projectile.shouldRoll()) {
                     console.log(`Roller hit terrain at (${collision.x}, ${collision.y.toFixed(1)}) - starting roll!`);
                     projectile.startRolling(collision.y);
+
+                    // Precision achievement: projectile touched terrain (for Trick Shot)
+                    if (projectile.owner === 'player') {
+                        PrecisionAchievements.onProjectileTouchedTerrain();
+                    }
+
                     continue; // Continue to next frame, don't explode yet
                 }
 
@@ -1548,6 +1658,12 @@ function checkRoundEnd() {
     if (playerDestroyed && enemyDestroyed) {
         console.log('[Main] Both tanks destroyed - MUTUAL DESTRUCTION (GAME OVER)!');
 
+        // Combat achievement detection: round lost (draw counts as loss)
+        CombatAchievements.onRoundLost();
+
+        // Token system: round loss resets win streak
+        Tokens.onRoundLoss();
+
         // End the run and finalize stats (draw counts as loss)
         endRunState(true);
 
@@ -1571,11 +1687,27 @@ function checkRoundEnd() {
         // Player wins this round!
         console.log('[Main] Enemy destroyed - VICTORY!');
 
+        // Combat achievement detection: enemy destroyed and round won
+        CombatAchievements.onEnemyDestroyed(enemyTank);
+        CombatAchievements.onRoundWon(playerTank ? playerTank.health : 0);
+
+        // Weapon achievement: enemy killed (for weapon kill credit)
+        WeaponAchievements.onEnemyKilled(enemyTank);
+
+        // Weapon achievement: round won (for Basic Training detection)
+        WeaponAchievements.onRoundWon();
+
+        // Token system: award tokens for round win
+        const combatState = CombatAchievements.getState();
+        const isFlawless = combatState.roundState.damageTakenThisRound === 0;
+        Tokens.onRoundWin({ isFlawless, roundNumber: currentRound });
+
         // Record enemy destroyed stat
         recordStat('enemyDestroyed');
 
         // Award victory bonus (hit rewards already given during combat)
-        Money.awardVictoryBonus();
+        const victoryBonus = Money.awardVictoryBonus();
+        ProgressionAchievements.onMoneyEarned(victoryBonus);
 
         // Get total round earnings for display
         const roundEarnings = Money.getRoundEarnings();
@@ -1600,6 +1732,12 @@ function checkRoundEnd() {
     if (playerDestroyed) {
         // Player loses - GAME OVER (permadeath)
         console.log('[Main] Player destroyed - GAME OVER!');
+
+        // Combat achievement detection: round lost
+        CombatAchievements.onRoundLost();
+
+        // Token system: round loss resets win streak
+        Tokens.onRoundLoss();
 
         // End the run and finalize stats
         endRunState(false);
@@ -1833,9 +1971,43 @@ function renderTerrain(ctx) {
 // =============================================================================
 
 /**
+ * Darken a hex color by a given factor.
+ * Used to create tank body colors from glow colors.
+ *
+ * @param {string} hex - Hex color string (e.g., '#FF00FF' or '#F0F')
+ * @param {number} factor - Darkening factor (0-1, where 0.15 = 15% brightness)
+ * @returns {string} Darkened hex color
+ */
+function darkenColor(hex, factor) {
+    // Remove # if present
+    hex = hex.replace(/^#/, '');
+
+    // Handle shorthand hex (e.g., #F0F -> #FF00FF)
+    if (hex.length === 3) {
+        hex = hex.split('').map(c => c + c).join('');
+    }
+
+    // Parse RGB values
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+
+    // Apply darkening factor
+    const newR = Math.round(r * factor);
+    const newG = Math.round(g * factor);
+    const newB = Math.round(b * factor);
+
+    // Convert back to hex
+    return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
+}
+
+/**
  * Render a single tank.
  * First attempts to render sprite assets if available.
  * Falls back to geometric placeholder (64x24 body with rotating turret).
+ *
+ * For player tanks, uses the equipped skin's glow color.
+ * For enemy tanks, uses the default pink color.
  *
  * Placeholder consists of:
  * - A rectangular body (dark fill with neon outline, 64x24)
@@ -1853,6 +2025,15 @@ function renderTank(ctx, tank) {
 
     const { x, y, team, angle } = tank;
 
+    // Get equipped skin glow color for player tank
+    let glowColor = null;
+    if (team === 'player') {
+        const equippedSkin = TankCollection.getEquippedTank();
+        if (equippedSkin && equippedSkin.glowColor) {
+            glowColor = equippedSkin.glowColor;
+        }
+    }
+
     // Try to use sprite asset if available
     const spriteKey = team === 'player' ? 'tanks.player' : 'tanks.enemy';
     const sprite = Assets.get(spriteKey);
@@ -1869,13 +2050,13 @@ function renderTank(ctx, tank) {
         const isRealSprite = !sprite.src.startsWith('data:'); // Placeholders use data URLs
 
         if (isRealSprite) {
-            renderTankSprite(ctx, tank, sprite);
+            renderTankSprite(ctx, tank, sprite, glowColor);
             return;
         }
     }
 
     // Fall back to geometric placeholder rendering
-    renderTankPlaceholder(ctx, tank);
+    renderTankPlaceholder(ctx, tank, glowColor);
 }
 
 /**
@@ -1886,8 +2067,9 @@ function renderTank(ctx, tank) {
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  * @param {import('./tank.js').Tank} tank - The tank to render
  * @param {HTMLImageElement} sprite - The tank sprite image
+ * @param {string|null} skinGlowColor - Optional glow color override from equipped skin
  */
-function renderTankSprite(ctx, tank, sprite) {
+function renderTankSprite(ctx, tank, sprite, skinGlowColor = null) {
     const { x, y, team, angle } = tank;
 
     ctx.save();
@@ -1897,11 +2079,35 @@ function renderTankSprite(ctx, tank, sprite) {
     const spriteX = x - sprite.width / 2;
     const spriteY = y - sprite.height;
 
+    // Use skin glow color for player if provided, otherwise default team colors
+    const outlineColor = skinGlowColor || (team === 'player' ? COLORS.NEON_CYAN : COLORS.NEON_PINK);
+
+    // Apply glow effect around the sprite
+    ctx.shadowColor = outlineColor;
+    ctx.shadowBlur = 12;
+
+    // Draw the sprite
     ctx.drawImage(sprite, spriteX, spriteY);
+
+    // If player has a non-default skin equipped, apply color tint overlay
+    // This uses globalCompositeOperation to colorize the sprite
+    if (skinGlowColor && team === 'player') {
+        // Save current state again for tint operation
+        ctx.save();
+
+        // Draw the sprite again as a mask
+        ctx.globalCompositeOperation = 'source-atop';
+
+        // Create a semi-transparent color overlay
+        ctx.fillStyle = skinGlowColor;
+        ctx.globalAlpha = 0.35;  // Subtle tint, not full recolor
+        ctx.fillRect(spriteX, spriteY, sprite.width, sprite.height);
+
+        ctx.restore();
+    }
 
     // Draw turret barrel on top of sprite
     // Turret pivot point is at center-top of tank
-    const outlineColor = team === 'player' ? COLORS.NEON_CYAN : COLORS.NEON_PINK;
     const turretPivotX = x;
     const turretPivotY = y - sprite.height;
 
@@ -1928,19 +2134,30 @@ function renderTankSprite(ctx, tank, sprite) {
 /**
  * Render tank as geometric placeholder.
  * Body is 64x24 rectangle with neon outline.
- * Player tank is cyan (#05d9e8), enemy is pink (#ff2a6d).
+ * Player tank uses equipped skin glow color (default cyan), enemy is pink.
  *
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  * @param {import('./tank.js').Tank} tank - The tank to render
+ * @param {string|null} skinGlowColor - Optional glow color override from equipped skin
  */
-function renderTankPlaceholder(ctx, tank) {
+function renderTankPlaceholder(ctx, tank, skinGlowColor = null) {
     const { x, y, team, angle } = tank;
 
     // Choose colors based on team
+    // Use skin glow color for player if provided, otherwise default team colors
     // Body fill is dark with team-tinted hue
     // Outline is full neon color for visibility
-    const bodyColor = team === 'player' ? '#0a1a2a' : '#2a0a1a';
-    const outlineColor = team === 'player' ? COLORS.NEON_CYAN : COLORS.NEON_PINK;
+    const outlineColor = skinGlowColor || (team === 'player' ? COLORS.NEON_CYAN : COLORS.NEON_PINK);
+
+    // Generate body color from outline color (darkened version)
+    // For player with skin, derive body color from glow color
+    let bodyColor;
+    if (skinGlowColor && team === 'player') {
+        // Parse the hex color and create a dark version
+        bodyColor = darkenColor(skinGlowColor, 0.15);
+    } else {
+        bodyColor = team === 'player' ? '#0a1a2a' : '#2a0a1a';
+    }
 
     ctx.save();
 
@@ -2827,10 +3044,34 @@ function setupPlayingState() {
             if (isNewGame) {
                 startNewRunState(); // Reset run state and stats for new run
                 Money.init();
+
+                // Combat achievement: notify new run started
+                CombatAchievements.onRunStart();
+
+                // Precision achievement: notify new run started
+                PrecisionAchievements.onRunStart();
+
+                // Weapon achievement: notify new run started
+                WeaponAchievements.onRunStart();
+
+                // Token system: notify new run started
+                Tokens.onRunStart();
             }
             // Start round earnings tracking with round number for multiplier
             // Rounds 1-2: 1.0x, Rounds 3-4: 1.2x, Rounds 5+: 1.5x
             Money.startRound(currentRound);
+
+            // Reset combat achievement round state for new round
+            CombatAchievements.resetRoundState();
+
+            // Reset precision achievement round state for new round
+            PrecisionAchievements.resetRoundState();
+
+            // Reset weapon achievement round state for new round
+            WeaponAchievements.resetRoundState();
+
+            // Progression achievement: check for round milestone achievements
+            ProgressionAchievements.onRoundReached(currentRound);
 
             // Save player inventory before creating new tanks (for round continuation)
             // Inventory persists across rounds when transitioning from SHOP or DEFEAT
@@ -3978,6 +4219,8 @@ async function init() {
     setupMenuState();
     setupDifficultySelectState();
     setupHighScoresState();
+    AchievementScreen.setup();
+    CollectionScreen.setup();
     setupPlayingState();
     setupPausedState();
     setupVictoryState();
@@ -4009,6 +4252,27 @@ async function init() {
     // Initialize achievement popup system
     AchievementPopup.init();
 
+    // Initialize supply drop animation system
+    SupplyDrop.init();
+
+    // Initialize combat achievement detection
+    CombatAchievements.init();
+
+    // Initialize precision achievement detection
+    PrecisionAchievements.init();
+
+    // Initialize weapon mastery achievement detection
+    WeaponAchievements.init();
+
+    // Initialize progression and economy achievement detection
+    ProgressionAchievements.init();
+
+    // Initialize token system (for supply drop currency)
+    Tokens.init();
+
+    // Initialize tank collection system
+    TankCollection.init();
+
     // Register post-render callback for achievement popups (renders on top of all game content)
     Game.setPostRenderCallback(postRender);
 
@@ -4023,6 +4287,8 @@ async function init() {
     window.RoundTransition = RoundTransition;
     window.DebugTools = DebugTools;
     window.AchievementPopup = AchievementPopup;
+    window.TankCollection = TankCollection;
+    window.SupplyDrop = SupplyDrop;
     // Expose DebugTools as 'Debug' for convenience (e.g., Debug.skipToShop())
     // This creates a merged object with both Debug module and DebugTools functions
     window.Debug = { ...Debug, ...DebugTools };
@@ -4068,6 +4334,9 @@ function update(deltaTime) {
     // Update achievement popup animations
     AchievementPopup.update(deltaTime);
 
+    // Update supply drop animation
+    SupplyDrop.update(deltaTime);
+
     // Clear single-fire input state at end of frame
     // This must be done after all game logic that checks wasKeyPressed()
     Input.clearFrameState();
@@ -4096,6 +4365,11 @@ function render(ctx) {
 function postRender(ctx) {
     // Render achievement popup notifications (on top of all game content)
     AchievementPopup.render(ctx);
+
+    // Render supply drop animation (covers everything when active)
+    if (SupplyDrop.isAnimating()) {
+        SupplyDrop.render(ctx);
+    }
 }
 
 // Initialize when DOM is ready

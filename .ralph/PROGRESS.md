@@ -97,3 +97,55 @@ Enhanced `js/gameOver.js` to display comprehensive run statistics:
 **Files:** js/ai.js
 **Commit:** 9df6100
 ---
+
+## 2026-01-10: scorched-earth-8s1.14 - Render player tank based on equipped skin
+**Status:** Completed ✓
+
+**Implementation:**
+- Updated `renderTankSprite()` in `js/main.js` to apply color tint overlay using `globalCompositeOperation = 'source-atop'` with 35% opacity
+- Tank glow color now comes from the equipped skin's `glowColor` property
+- Works with both sprite rendering and placeholder rendering paths
+
+**Testing:**
+- Verified player tank shows correct glow color when skin is changed
+- Standard Issue = cyan, Neon Pink = magenta, etc.
+
+---
+
+## 2026-01-10: scorched-earth-8s1.15 - Implement supply drop animation sequence
+**Status:** Completed ✓
+
+**Implementation:**
+Created `js/supply-drop.js` (~970 lines) with full animation system:
+
+**Animation Phases (6.5s total):**
+- APPROACH (1.5s): Cargo plane flies across screen with contrail
+- DROP (1s): Crate falls with parachute, swaying motion
+- LANDING (0.5s): Dust particle effect on impact
+- REVEAL (2s): Crate opens, tank rises with spark particles, light beams
+- HOLD (1.5s): Display revealed tank with rarity banner
+
+**Features:**
+- Particle system for dust and sparks
+- Rarity-based colors for parachute and banner
+- Rainbow cycling hue for legendary tanks
+- Dark overlay with synthwave grid platform
+- Spotlight beam effect
+- Skip functionality for impatient users
+
+**Integration in main.js:**
+- `SupplyDrop.init()` on startup
+- `SupplyDrop.update(deltaTime)` in game loop
+- `SupplyDrop.render(ctx)` in post-render
+- Exposed on `window.SupplyDrop` for testing
+
+**Bug Fix:**
+Fixed timing bug where phases cycled instantly - moved `phaseElapsed` calculation inside each phase block after setting `phaseStartTime`
+
+**Testing:**
+- Verified all animation phases render correctly
+- Tested LEGENDARY (Blood Dragon), UNCOMMON (Neon Pink), RARE (Outrun) tanks
+- Rarity banners display correct colors (gold, green, blue)
+- Callback fires correctly on completion
+
+---
