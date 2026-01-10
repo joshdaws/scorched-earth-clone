@@ -56,7 +56,8 @@ const CONTROLS = {
         STEP_TIME: 0.03,      // Time step for simulation (seconds)
         DOT_SPACING: 8,       // Pixels between dots
         DOT_RADIUS: 3,        // Radius of trajectory dots
-        FADE_START: 0.5       // Start fading at 50% of trajectory
+        FADE_START: 0.5,      // Start fading at 50% of visible trajectory
+        PREVIEW_PERCENT: 0.25 // Only show 25% of trajectory (for skill-based aiming)
     }
 };
 
@@ -442,7 +443,8 @@ function simulateTrajectory(tank, angle, power, windForce, terrain) {
 
 /**
  * Render the trajectory preview line.
- * Shows a dotted line representing the projected path.
+ * Shows a dotted line representing only the initial portion of the projected path.
+ * The full trajectory is calculated but only ~25% is displayed for skill-based aiming.
  *
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  * @param {import('./tank.js').Tank} tank - Player tank
@@ -459,23 +461,27 @@ export function renderTrajectoryPreview(ctx, tank, angle, power, terrain) {
     const points = simulateTrajectory(tank, angle, power, windForce, terrain);
     if (points.length < 2) return;
 
+    // Only show a portion of the trajectory for skill-based aiming
+    const previewPointCount = Math.max(2, Math.floor(points.length * traj.PREVIEW_PERCENT));
+    const previewPoints = points.slice(0, previewPointCount);
+
+
     ctx.save();
 
     // Draw trajectory as dotted line with fading opacity
     let distanceTraveled = 0;
-    let lastPoint = points[0];
+    let lastPoint = previewPoints[0];
 
-    for (let i = 1; i < points.length; i++) {
-        const point = points[i];
+    for (let i = 1; i < previewPoints.length; i++) {
+        const point = previewPoints[i];
         const segmentLength = Math.sqrt(
             Math.pow(point.x - lastPoint.x, 2) +
             Math.pow(point.y - lastPoint.y, 2)
         );
         distanceTraveled += segmentLength;
 
-        // Calculate fade based on distance
-        const maxDistance = points.length * 10;
-        const fadeProgress = Math.min(distanceTraveled / maxDistance, 1);
+        // Calculate fade based on progress through the visible portion
+        const fadeProgress = i / previewPoints.length;
         const alpha = fadeProgress < traj.FADE_START ?
             0.8 :
             0.8 * (1 - (fadeProgress - traj.FADE_START) / (1 - traj.FADE_START));
@@ -493,25 +499,7 @@ export function renderTrajectoryPreview(ctx, tank, angle, power, terrain) {
         lastPoint = point;
     }
 
-    // Draw impact point (larger circle at end)
-    const endPoint = points[points.length - 1];
-    ctx.beginPath();
-    ctx.arc(endPoint.x, endPoint.y, 6, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255, 42, 109, 0.8)';
-    ctx.shadowColor = COLORS.NEON_PINK;
-    ctx.shadowBlur = 8;
-    ctx.fill();
-
-    // Cross at impact point
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
-    ctx.lineWidth = 2;
-    ctx.shadowBlur = 0;
-    ctx.beginPath();
-    ctx.moveTo(endPoint.x - 6, endPoint.y);
-    ctx.lineTo(endPoint.x + 6, endPoint.y);
-    ctx.moveTo(endPoint.x, endPoint.y - 6);
-    ctx.lineTo(endPoint.x, endPoint.y + 6);
-    ctx.stroke();
+    // No impact point shown - player must estimate the full trajectory
 
     ctx.restore();
 }
