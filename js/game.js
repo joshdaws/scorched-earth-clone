@@ -89,7 +89,8 @@ const validTransitions = {
         GAME_STATES.DIFFICULTY_SELECT,  // Go to difficulty selection first
         GAME_STATES.HIGH_SCORES,        // View high scores
         GAME_STATES.PLAYING,
-        GAME_STATES.AIMING  // Can also start directly into aiming
+        GAME_STATES.AIMING,  // Can also start directly into aiming
+        GAME_STATES.ROUND_TRANSITION  // For debug/testing
     ],
     [GAME_STATES.DIFFICULTY_SELECT]: [
         GAME_STATES.PLAYING,  // Start game after selecting difficulty
@@ -101,6 +102,7 @@ const validTransitions = {
     [GAME_STATES.PLAYING]: [
         GAME_STATES.AIMING,
         GAME_STATES.PAUSED,
+        GAME_STATES.ROUND_TRANSITION,  // After winning a round
         GAME_STATES.VICTORY,
         GAME_STATES.DEFEAT,
         GAME_STATES.GAME_OVER,
@@ -116,6 +118,7 @@ const validTransitions = {
         GAME_STATES.AIMING,     // Next player's turn
         GAME_STATES.PLAYING,    // Back to playing state
         GAME_STATES.ROUND_END,  // Round finished
+        GAME_STATES.ROUND_TRANSITION,  // After winning a round
         GAME_STATES.VICTORY,
         GAME_STATES.DEFEAT,
         GAME_STATES.PAUSED,
@@ -140,8 +143,13 @@ const validTransitions = {
         GAME_STATES.AIMING,
         GAME_STATES.MENU
     ],
+    [GAME_STATES.ROUND_TRANSITION]: [
+        GAME_STATES.SHOP,       // Continue to shop after round transition
+        GAME_STATES.MENU        // Can quit to menu
+    ],
     [GAME_STATES.VICTORY]: [
         GAME_STATES.MENU,
+        GAME_STATES.ROUND_TRANSITION, // Go to round transition screen
         GAME_STATES.SHOP,       // Could allow shop after victory
         GAME_STATES.GAME_OVER
     ],

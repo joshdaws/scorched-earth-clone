@@ -32,6 +32,7 @@ import * as TouchAiming from './touchAiming.js';
 import * as Haptics from './haptics.js';
 import * as DebugTools from './debugTools.js';
 import * as GameOver from './gameOver.js';
+import * as RoundTransition from './roundTransition.js';
 import { getEnemyHealthForRound } from './runState.js';
 import * as HighScores from './highScores.js';
 
@@ -1532,14 +1533,19 @@ function checkRoundEnd() {
         const roundEarnings = Money.getRoundEarnings();
         const roundDamage = Money.getRoundDamage();
 
-        // Show victory screen after short delay
-        VictoryDefeat.showVictory(roundEarnings, roundDamage, 1200);
+        // Show round transition screen (replaces victory screen)
+        RoundTransition.show({
+            round: currentRound,
+            damage: roundDamage,
+            money: roundEarnings,
+            delay: 1200
+        });
 
         // Haptic feedback for victory (mobile devices)
         Haptics.hapticVictory();
 
-        // Transition to victory state
-        Game.setState(GAME_STATES.VICTORY);
+        // Transition to round transition state
+        Game.setState(GAME_STATES.ROUND_TRANSITION);
         return;
     }
 
@@ -3016,6 +3022,85 @@ function setupDefeatState() {
 }
 
 // =============================================================================
+// ROUND TRANSITION STATE
+// =============================================================================
+
+/**
+ * Handle click on the round transition screen.
+ * @param {{x: number, y: number}} pos - Click position in design coordinates
+ */
+function handleRoundTransitionClick(pos) {
+    if (Game.getState() !== GAME_STATES.ROUND_TRANSITION) return;
+    RoundTransition.handleClick(pos.x, pos.y);
+}
+
+/**
+ * Render the round transition screen overlay.
+ * Shows the current game state underneath with the overlay on top.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ */
+function renderRoundTransitionState(ctx) {
+    // First render the game state underneath (terrain, tanks, etc.)
+    renderPlaying(ctx);
+
+    // Then render the round transition overlay on top
+    RoundTransition.render(ctx);
+}
+
+/**
+ * Update round transition screen animations.
+ * @param {number} deltaTime - Time since last frame in ms
+ */
+function updateRoundTransition(deltaTime) {
+    RoundTransition.update(deltaTime);
+}
+
+/**
+ * Set up round transition state handlers.
+ * Round transition shows after winning a round, before going to shop.
+ */
+function setupRoundTransitionState() {
+    // Register callback for Continue button
+    RoundTransition.onContinue(() => {
+        // Hide the transition screen
+        RoundTransition.hide();
+        // Transition to shop for purchasing weapons
+        Game.setState(GAME_STATES.SHOP);
+    });
+
+    // Register click handlers
+    Input.onMouseDown((x, y, button) => {
+        if (button === 0 && Game.getState() === GAME_STATES.ROUND_TRANSITION) {
+            handleRoundTransitionClick({ x, y });
+        }
+    });
+
+    Input.onTouchStart((x, y) => {
+        if (Game.getState() === GAME_STATES.ROUND_TRANSITION) {
+            handleRoundTransitionClick({ x, y });
+        }
+    });
+
+    Game.registerStateHandlers(GAME_STATES.ROUND_TRANSITION, {
+        onEnter: (fromState) => {
+            console.log('Entered ROUND_TRANSITION state');
+            // Cancel any pending AI turn
+            AI.cancelTurn();
+            // Disable game input
+            Input.disableGameInput();
+            // Play victory music/stinger (reuse victory music)
+            Music.playForState(GAME_STATES.VICTORY);
+        },
+        onExit: (toState) => {
+            console.log('Exiting ROUND_TRANSITION state');
+            RoundTransition.hide();
+        },
+        update: updateRoundTransition,
+        render: renderRoundTransitionState
+    });
+}
+
+// =============================================================================
 // GAME OVER STATE (PERMADEATH)
 // =============================================================================
 
@@ -3844,6 +3929,7 @@ async function init() {
     setupPausedState();
     setupVictoryState();
     setupDefeatState();
+    setupRoundTransitionState();
     setupGameOverState();
     setupShopState();
 
@@ -3875,6 +3961,7 @@ async function init() {
     window.Shop = Shop;
     window.Money = Money;
     window.VictoryDefeat = VictoryDefeat;
+    window.RoundTransition = RoundTransition;
     window.DebugTools = DebugTools;
     // Expose DebugTools as 'Debug' for convenience (e.g., Debug.skipToShop())
     // This creates a merged object with both Debug module and DebugTools functions
