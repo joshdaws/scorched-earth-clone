@@ -39,7 +39,20 @@ const PHASES = {
     LANDING: 'landing',
     REVEAL: 'reveal',
     HOLD: 'hold',
+    SKIPPED: 'skipped',   // Shows result card after skip
     COMPLETE: 'complete'
+};
+
+/**
+ * Skip functionality constants.
+ */
+const SKIP_CONFIG = {
+    /** Delay before skip prompt appears (ms) */
+    PROMPT_DELAY: 1000,
+    /** Duration player must hold to skip (ms) */
+    HOLD_DURATION: 500,
+    /** LocalStorage key for tracking seen rarities */
+    STORAGE_KEY: 'scorched_seen_rarities'
 };
 
 /**
@@ -249,6 +262,18 @@ let glitchIntensity = 0;
 /** @type {Array} Glitch slice offsets */
 let glitchSlices = [];
 
+// --- Skip functionality state ---
+/** @type {Set<string>} Set of rarity tiers player has seen */
+let seenRarities = new Set();
+/** @type {boolean} Whether skip is being held */
+let skipHoldActive = false;
+/** @type {number} How long skip has been held (ms) */
+let skipHoldDuration = 0;
+/** @type {boolean} Whether skip prompt should be shown */
+let showSkipPrompt = false;
+/** @type {boolean} Whether current reveal can be skipped */
+let canSkipCurrent = false;
+
 // =============================================================================
 // DEBUG LOGGING
 // =============================================================================
@@ -266,6 +291,287 @@ function debugLog(message, data = null) {
             console.log(`[SupplyDrop] ${message}`);
         }
     }
+}
+
+// =============================================================================
+// SKIP FUNCTIONALITY
+// =============================================================================
+
+/**
+ * Load seen rarities from localStorage.
+ */
+function loadSeenRarities() {
+    try {
+        const stored = localStorage.getItem(SKIP_CONFIG.STORAGE_KEY);
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            seenRarities = new Set(parsed);
+            debugLog('Loaded seen rarities', { rarities: Array.from(seenRarities) });
+        }
+    } catch (e) {
+        console.error('[SupplyDrop] Failed to load seen rarities:', e);
+        seenRarities = new Set();
+    }
+}
+
+/**
+ * Save seen rarities to localStorage.
+ */
+function saveSeenRarities() {
+    try {
+        localStorage.setItem(SKIP_CONFIG.STORAGE_KEY, JSON.stringify(Array.from(seenRarities)));
+        debugLog('Saved seen rarities', { rarities: Array.from(seenRarities) });
+    } catch (e) {
+        console.error('[SupplyDrop] Failed to save seen rarities:', e);
+    }
+}
+
+/**
+ * Mark a rarity as seen.
+ * @param {string} rarity - Rarity tier to mark as seen
+ */
+function markRaritySeen(rarity) {
+    if (!seenRarities.has(rarity)) {
+        seenRarities.add(rarity);
+        saveSeenRarities();
+        debugLog('Marked rarity as seen', { rarity });
+    }
+}
+
+/**
+ * Check if a rarity has been seen before.
+ * @param {string} rarity - Rarity tier to check
+ * @returns {boolean} True if seen before
+ */
+function hasSeenRarity(rarity) {
+    return seenRarities.has(rarity);
+}
+
+/**
+ * Start holding to skip.
+ */
+export function startSkipHold() {
+    if (!isPlaying || !canSkipCurrent) return;
+    skipHoldActive = true;
+    skipHoldDuration = 0;
+    debugLog('Skip hold started');
+}
+
+/**
+ * Stop holding to skip.
+ */
+export function stopSkipHold() {
+    skipHoldActive = false;
+    skipHoldDuration = 0;
+}
+
+/**
+ * Update skip hold progress.
+ * @param {number} deltaTime - Time since last update in ms
+ */
+function updateSkipHold(deltaTime) {
+    if (!skipHoldActive || !canSkipCurrent) return;
+
+    skipHoldDuration += deltaTime;
+
+    if (skipHoldDuration >= SKIP_CONFIG.HOLD_DURATION) {
+        debugLog('Skip hold completed');
+        performSkip();
+    }
+}
+
+/**
+ * Perform the skip action - jump to result card.
+ */
+function performSkip() {
+    if (!isPlaying) return;
+
+    debugLog('Animation skipped to result card');
+
+    // Reset effects
+    preRevealActive = false;
+    lightningBolts = [];
+    glitchSlices = [];
+    glitchIntensity = 0;
+    particles = [];
+
+    // Set tank rise to complete
+    tankRiseProgress = 1;
+
+    // Jump to skipped phase (shows result card)
+    currentPhase = PHASES.SKIPPED;
+    phaseStartTime = performance.now();
+
+    // Reset skip hold state
+    skipHoldActive = false;
+    skipHoldDuration = 0;
+}
+
+/**
+ * Get skip hold progress (0-1).
+ * @returns {number} Progress from 0 to 1
+ */
+export function getSkipProgress() {
+    if (!skipHoldActive) return 0;
+    return Math.min(1, skipHoldDuration / SKIP_CONFIG.HOLD_DURATION);
+}
+
+/**
+ * Check if skip prompt should be shown.
+ * @returns {boolean} True if prompt should display
+ */
+export function shouldShowSkipPrompt() {
+    return showSkipPrompt && canSkipCurrent;
+}
+
+/**
+ * Draw the skip prompt UI.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ */
+function drawSkipPrompt(ctx) {
+    if (!showSkipPrompt || !canSkipCurrent) return;
+
+    const centerX = CANVAS.DESIGN_WIDTH / 2;
+    const promptY = CANVAS.DESIGN_HEIGHT - 60;
+
+    ctx.save();
+
+    // Background pill
+    const pillWidth = 200;
+    const pillHeight = 36;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.beginPath();
+    ctx.roundRect(centerX - pillWidth / 2, promptY - pillHeight / 2, pillWidth, pillHeight, 18);
+    ctx.fill();
+
+    // Progress bar fill
+    if (skipHoldActive && skipHoldDuration > 0) {
+        const progress = getSkipProgress();
+        ctx.fillStyle = COLORS.NEON_CYAN;
+        ctx.globalAlpha = 0.5;
+        ctx.beginPath();
+        ctx.roundRect(
+            centerX - pillWidth / 2,
+            promptY - pillHeight / 2,
+            pillWidth * progress,
+            pillHeight,
+            18
+        );
+        ctx.fill();
+        ctx.globalAlpha = 1;
+    }
+
+    // Border
+    ctx.strokeStyle = COLORS.NEON_CYAN;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(centerX - pillWidth / 2, promptY - pillHeight / 2, pillWidth, pillHeight, 18);
+    ctx.stroke();
+
+    // Text
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '14px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Hold SPACE to skip', centerX, promptY);
+
+    ctx.restore();
+}
+
+/**
+ * Draw the result card when animation is skipped.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ */
+function drawResultCard(ctx) {
+    if (!revealTank) return;
+
+    const centerX = CANVAS.DESIGN_WIDTH / 2;
+    const centerY = CANVAS.DESIGN_HEIGHT / 2;
+    const rarity = revealTank.rarity;
+    const rarityColor = RARITY_COLORS[rarity] || '#FFFFFF';
+    const rarityName = RARITY_NAMES[rarity] || 'Unknown';
+
+    ctx.save();
+
+    // Card background
+    const cardWidth = 400;
+    const cardHeight = 450;
+    ctx.fillStyle = 'rgba(26, 26, 46, 0.95)';
+    ctx.strokeStyle = rarityColor;
+    ctx.shadowColor = rarityColor;
+    ctx.shadowBlur = 30;
+    ctx.lineWidth = 3;
+
+    ctx.beginPath();
+    ctx.roundRect(centerX - cardWidth / 2, centerY - cardHeight / 2, cardWidth, cardHeight, 20);
+    ctx.fill();
+    ctx.stroke();
+
+    // Rarity banner at top
+    const bannerY = centerY - cardHeight / 2 + 40;
+    ctx.fillStyle = rarityColor;
+    ctx.font = 'bold 20px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(rarityName.toUpperCase(), centerX, bannerY);
+
+    // Tank display area (placeholder rectangle)
+    const tankY = centerY - 40;
+    const tankSize = 160;
+    const glowColor = revealTank.glowColor || rarityColor;
+
+    ctx.fillStyle = '#0a0a1a';
+    ctx.strokeStyle = glowColor;
+    ctx.shadowColor = glowColor;
+    ctx.shadowBlur = 20;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(centerX - tankSize / 2, tankY - tankSize / 2, tankSize, tankSize * 0.6, 10);
+    ctx.fill();
+    ctx.stroke();
+
+    // Simple tank shape inside
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#1a1a2a';
+    ctx.strokeStyle = glowColor;
+    ctx.lineWidth = 2;
+    ctx.fillRect(centerX - 50, tankY - 15, 100, 30);
+    ctx.strokeRect(centerX - 50, tankY - 15, 100, 30);
+
+    // Turret
+    ctx.beginPath();
+    ctx.arc(centerX, tankY - 15, 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(centerX, tankY - 15);
+    ctx.lineTo(centerX + 35, tankY - 30);
+    ctx.lineWidth = 5;
+    ctx.stroke();
+
+    // Tank name
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 28px Arial';
+    ctx.fillText(revealTank.name, centerX, tankY + 70);
+
+    // Description
+    ctx.fillStyle = '#888899';
+    ctx.font = '14px Arial';
+    ctx.fillText(revealTank.description, centerX, tankY + 100);
+
+    // "Added to Collection" text
+    ctx.fillStyle = COLORS.NEON_CYAN;
+    ctx.font = 'bold 16px Arial';
+    ctx.fillText('ADDED TO COLLECTION', centerX, tankY + 150);
+
+    // Continue prompt at bottom
+    const continueY = centerY + cardHeight / 2 - 40;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '14px Arial';
+    ctx.fillText('Press SPACE or click to continue', centerX, continueY);
+
+    ctx.restore();
 }
 
 // =============================================================================
@@ -1176,6 +1482,11 @@ function updateReveal(phaseProgress, deltaTime) {
 export function update(deltaTime) {
     if (!isPlaying) return;
 
+    // If in SKIPPED phase, don't process normal animation - wait for user to continue
+    if (currentPhase === PHASES.SKIPPED) {
+        return;
+    }
+
     const now = performance.now();
     const elapsed = now - animationStartTime;
 
@@ -1188,6 +1499,20 @@ export function update(deltaTime) {
     // Update screen effects (shake and flash)
     updateScreenShake(deltaTime);
     updateScreenFlash(deltaTime);
+
+    // Update skip functionality
+    updateSkipHold(deltaTime);
+
+    // If skip was performed, return early (don't let time-based phases overwrite SKIPPED)
+    if (currentPhase === PHASES.SKIPPED) {
+        return;
+    }
+
+    // Show skip prompt after 1 second of animation (if skippable)
+    if (canSkipCurrent && elapsed >= SKIP_CONFIG.PROMPT_DELAY && !showSkipPrompt) {
+        showSkipPrompt = true;
+        debugLog('Skip prompt now available');
+    }
 
     // Determine current phase based on elapsed time
     let accumulatedTime = 0;
@@ -1274,7 +1599,7 @@ export function update(deltaTime) {
  * @param {CanvasRenderingContext2D} ctx - Canvas context
  */
 export function render(ctx) {
-    if (!isPlaying && currentPhase !== PHASES.HOLD) return;
+    if (!isPlaying && currentPhase !== PHASES.HOLD && currentPhase !== PHASES.SKIPPED) return;
 
     const rarity = revealTank?.rarity || RARITY.COMMON;
     const effects = RARITY_EFFECTS[rarity] || RARITY_EFFECTS[RARITY.COMMON];
@@ -1367,6 +1692,11 @@ export function render(ctx) {
                 drawRarityBanner(ctx, revealTank, bannerAlpha);
             }
             break;
+
+        case PHASES.SKIPPED:
+            // Show result card when animation was skipped
+            drawResultCard(ctx);
+            break;
     }
 
     // Always render particles on top
@@ -1377,6 +1707,11 @@ export function render(ctx) {
 
     // Draw screen flash on top of everything (not affected by shake)
     drawScreenFlash(ctx);
+
+    // Draw skip prompt on top of everything (outside shake context)
+    if (showSkipPrompt && currentPhase !== PHASES.SKIPPED) {
+        drawSkipPrompt(ctx);
+    }
 }
 
 // =============================================================================
@@ -1432,16 +1767,44 @@ export function play(tank, onComplete = null) {
     lightningTimer = 0;
     glitchIntensity = 0;
     glitchSlices = [];
+
+    // Reset skip state - can only skip if we've seen this rarity before
+    canSkipCurrent = hasSeenRarity(tank.rarity);
+    showSkipPrompt = false;
+    skipHoldActive = false;
+    skipHoldDuration = 0;
+
+    debugLog('Skip available', { canSkip: canSkipCurrent, rarity: tank.rarity });
 }
 
 /**
  * Skip the animation and complete immediately.
+ * @deprecated Use startSkipHold/stopSkipHold for hold-to-skip behavior
  */
 export function skip() {
     if (!isPlaying) return;
 
     debugLog('Animation skipped');
     complete();
+}
+
+/**
+ * Continue from the SKIPPED phase (result card) to complete the animation.
+ * Called when user clicks or presses space on the result card.
+ */
+export function continueFromSkip() {
+    if (currentPhase !== PHASES.SKIPPED) return;
+
+    debugLog('Continuing from skip result card');
+    complete();
+}
+
+/**
+ * Check if we're currently showing the result card (SKIPPED phase).
+ * @returns {boolean} True if showing result card
+ */
+export function isShowingResultCard() {
+    return currentPhase === PHASES.SKIPPED;
 }
 
 /**
@@ -1454,10 +1817,21 @@ function complete() {
     const callback = onCompleteCallback;
     const tank = revealTank;
 
+    // Mark this rarity as seen for future skip capability
+    if (tank?.rarity) {
+        markRaritySeen(tank.rarity);
+    }
+
     // Reset state
     revealTank = null;
     onCompleteCallback = null;
     particles = [];
+
+    // Reset skip state
+    canSkipCurrent = false;
+    showSkipPrompt = false;
+    skipHoldActive = false;
+    skipHoldDuration = 0;
 
     debugLog('Animation complete', { tank: tank?.name });
 
@@ -1500,6 +1874,12 @@ export function init() {
         return;
     }
 
+    // Load previously seen rarities from localStorage
+    loadSeenRarities();
+
     isInitialized = true;
-    console.log('[SupplyDrop] System initialized', { duration: TOTAL_DURATION + 'ms' });
+    console.log('[SupplyDrop] System initialized', {
+        duration: TOTAL_DURATION + 'ms',
+        seenRarities: Array.from(seenRarities)
+    });
 }

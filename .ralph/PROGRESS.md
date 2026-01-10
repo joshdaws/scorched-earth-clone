@@ -149,3 +149,88 @@ Fixed timing bug where phases cycled instantly - moved `phaseElapsed` calculatio
 - Callback fires correctly on completion
 
 ---
+
+## 2026-01-10: scorched-earth-8s1.16 - Implement rarity-based reveal variations
+**Status:** Completed ✓
+
+**Implementation:**
+Added distinct visual effects for each rarity tier in `js/supply-drop.js`:
+
+**Effect Configurations by Rarity:**
+| Rarity | Sparks | Speed | Light Rays | Shake | Flash | Special Effect |
+|--------|--------|-------|------------|-------|-------|----------------|
+| Common | 5 | 80 | 0 | No | No | None |
+| Uncommon | 12 | 120 | 4 | No | No | Cyan glow |
+| Rare | 18 | 160 | 6 | No | No | Lightning |
+| Epic | 25 | 200 | 8 | 3/200ms | No | Holographic |
+| Legendary | 40 | 250 | 12 | 8/400ms | Yes | Glitch |
+
+**New Effect Functions:**
+- `triggerScreenShake()` / `updateScreenShake()` - Camera shake effect
+- `triggerScreenFlash()` / `updateScreenFlash()` / `drawScreenFlash()` - White flash
+- `generateLightningBolt()` / `updateLightning()` / `drawLightning()` - Purple lightning
+- `updateStrobe()` / `getStrobeColor()` - Color cycling for epic
+- `updateGlitch()` / `drawGlitchEffect()` - Scan line glitch overlay
+- `drawHolographicShimmer()` - Rainbow gradient shimmer
+- `drawCrateGlow()` - Rarity-colored pulsing glow
+
+**Testing:**
+- Verified all 5 rarity tiers display appropriate effects
+- Screen shake triggers for Epic (3, 200ms) and Legendary (8, 400ms)
+- Screen flash triggers only for Legendary
+- Common has minimal effects as designed
+
+---
+
+## 2026-01-10: scorched-earth-8s1.18 - Implement supply drop skip functionality
+**Status:** Completed ✓
+
+**Implementation:**
+Added hold-to-skip functionality for previously seen rarity tiers in `js/supply-drop.js`:
+
+**Skip System:**
+- Tracks seen rarities in localStorage (`scorched_seen_rarities`)
+- First time seeing a rarity tier = must watch full animation
+- Subsequent reveals of same rarity = can hold SPACE to skip
+- 0.5s hold duration to trigger skip
+- Skip prompt appears after 1s of animation
+
+**New Constants:**
+```javascript
+const SKIP_CONFIG = {
+    PROMPT_DELAY: 1000,      // Delay before skip prompt appears
+    HOLD_DURATION: 500,      // Duration player must hold to skip
+    STORAGE_KEY: 'scorched_seen_rarities'
+};
+```
+
+**New Functions:**
+- `loadSeenRarities()` / `saveSeenRarities()` - localStorage persistence
+- `markRaritySeen()` / `hasSeenRarity()` - track seen rarities
+- `startSkipHold()` / `stopSkipHold()` - hold-to-skip input
+- `updateSkipHold()` / `performSkip()` - skip logic
+- `getSkipProgress()` / `shouldShowSkipPrompt()` - UI state
+- `drawSkipPrompt()` - cyan pill with progress bar
+- `drawResultCard()` - shows tank info when skipped
+- `continueFromSkip()` / `isShowingResultCard()` - result card interaction
+
+**Result Card UI:**
+- Dark card with rarity-colored border and glow
+- Rarity banner at top
+- Tank placeholder with glow
+- Tank name and description
+- "ADDED TO COLLECTION" text
+- "Press SPACE or click to continue" prompt
+
+**Bug Fix:**
+Fixed issue where time-based phase logic overwrote SKIPPED phase - added early return after `updateSkipHold()` when `currentPhase === PHASES.SKIPPED`
+
+**Testing:**
+- Verified first reveal of rarity = no skip available
+- Verified second reveal of same rarity = skip available after 1s
+- Verified hold-to-skip completes after 0.5s
+- Verified result card displays correctly with rarity colors
+- Verified continueFromSkip completes animation and fires callback
+- Tested common and legendary rarities
+
+---
