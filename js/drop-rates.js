@@ -21,6 +21,9 @@ import {
     addTank as addTankToCollection,
     DUPLICATE_SCRAP_REWARDS
 } from './tank-collection.js';
+import {
+    getPerformanceBonus
+} from './performance-tracking.js';
 
 // =============================================================================
 // CONSTANTS
@@ -59,6 +62,31 @@ const GUARANTEED_RARE_RATES = {
     [RARITY.RARE]: 70,
     [RARITY.EPIC]: 22,
     [RARITY.LEGENDARY]: 8
+};
+
+/**
+ * Performance bonus distribution percentages.
+ * Describes how the performance bonus is redistributed from Common to higher rarities.
+ */
+const PERFORMANCE_BONUS_DISTRIBUTION = {
+    /** 60% of bonus goes to Rare */
+    RARE: 0.60,
+    /** 30% of bonus goes to Epic */
+    EPIC: 0.30,
+    /** 10% of bonus goes to Legendary (subject to cap) */
+    LEGENDARY: 0.10
+};
+
+/**
+ * Rate caps to prevent extreme distributions.
+ */
+const RATE_CAPS = {
+    /** Legendary cannot exceed 5% base rate */
+    LEGENDARY_MAX: 5,
+    /** Common cannot go below 20% */
+    COMMON_MIN: 20,
+    /** Maximum additional legendary bonus from performance (+4% max) */
+    LEGENDARY_PERFORMANCE_BONUS_MAX: 4
 };
 
 /**
@@ -104,40 +132,153 @@ function debugLog(message, data = null) {
 // =============================================================================
 
 /**
+ * Apply performance bonus to modify drop rates.
+ *
+ * Performance bonus shifts probability from Common toward higher rarities:
+ * - 60% of bonus goes to Rare
+ * - 30% of bonus goes to Epic
+ * - 10% of bonus goes to Legendary (capped at +4%)
+ *
+ * Caps enforced:
+ * - Legendary cannot exceed 5% total
+ * - Common cannot go below 20%
+ * - Any overflow from Legendary cap goes to Rare
+ *
+ * @param {Object} baseRates - Starting drop rate table (rarity -> percentage)
+ * @param {number} performanceBonus - Performance bonus percentage (0-50)
+ * @returns {Object} Modified drop rate table
+ */
+export function calculateModifiedRates(baseRates, performanceBonus) {
+    // If no bonus, return base rates unchanged
+    if (!performanceBonus || performanceBonus <= 0) {
+        return { ...baseRates };
+    }
+
+    const rates = { ...baseRates };
+
+    // Calculate how much we can take from Common (respecting minimum)
+    const maxFromCommon = rates[RARITY.COMMON] - RATE_CAPS.COMMON_MIN;
+    const actualBonus = Math.min(performanceBonus, maxFromCommon);
+
+    if (actualBonus <= 0) {
+        debugLog('Common already at minimum, no performance bonus applied');
+        return rates;
+    }
+
+    // Calculate distribution
+    let rareBonus = actualBonus * PERFORMANCE_BONUS_DISTRIBUTION.RARE;
+    let epicBonus = actualBonus * PERFORMANCE_BONUS_DISTRIBUTION.EPIC;
+    let legendaryBonus = actualBonus * PERFORMANCE_BONUS_DISTRIBUTION.LEGENDARY;
+
+    // Cap legendary bonus at +4% from performance
+    const legendaryBonusCap = RATE_CAPS.LEGENDARY_PERFORMANCE_BONUS_MAX;
+    if (legendaryBonus > legendaryBonusCap) {
+        const overflow = legendaryBonus - legendaryBonusCap;
+        legendaryBonus = legendaryBonusCap;
+        // Overflow goes to Rare
+        rareBonus += overflow;
+    }
+
+    // Cap legendary total at 5%
+    const legendaryMax = RATE_CAPS.LEGENDARY_MAX;
+    const currentLegendary = rates[RARITY.LEGENDARY];
+    if (currentLegendary + legendaryBonus > legendaryMax) {
+        const overflow = (currentLegendary + legendaryBonus) - legendaryMax;
+        legendaryBonus = legendaryMax - currentLegendary;
+        // Overflow goes to Rare
+        rareBonus += overflow;
+    }
+
+    // Apply bonuses
+    rates[RARITY.COMMON] -= actualBonus;
+    rates[RARITY.RARE] += rareBonus;
+    rates[RARITY.EPIC] += epicBonus;
+    rates[RARITY.LEGENDARY] += legendaryBonus;
+
+    // Round to 2 decimal places for cleaner display
+    for (const rarity of RARITY_ORDER) {
+        rates[rarity] = Math.round(rates[rarity] * 100) / 100;
+    }
+
+    // Validate and fix any rounding errors
+    const total = Object.values(rates).reduce((sum, rate) => sum + rate, 0);
+    if (Math.abs(total - 100) > 0.01) {
+        // Adjust Common to compensate for rounding errors
+        rates[RARITY.COMMON] += (100 - total);
+        rates[RARITY.COMMON] = Math.round(rates[RARITY.COMMON] * 100) / 100;
+    }
+
+    debugLog('Applied performance bonus', {
+        originalBonus: performanceBonus,
+        actualBonus,
+        distribution: { rareBonus, epicBonus, legendaryBonus },
+        resultingRates: rates
+    });
+
+    return rates;
+}
+
+/**
  * Calculate adjusted drop rates based on modifiers.
  *
  * @param {Object} options - Modifier options
  * @param {boolean} options.isPremium - Apply premium modifier (+10% to rare+)
  * @param {boolean} options.isGuaranteedRare - Use guaranteed rare+ rates
- * @param {Object} [options.performanceBonus] - Future: performance-based bonus rates
+ * @param {boolean} [options.includePerformance=false] - Whether to include performance bonus
  * @param {Object} [options.pityBonus] - Future: pity system bonus rates
  * @returns {Object} Adjusted drop rate table
  */
 export function calculateDropRates(options = {}) {
-    const { isPremium = false, isGuaranteedRare = false } = options;
+    const { isPremium = false, isGuaranteedRare = false, includePerformance = false } = options;
 
     // Start with base rates or guaranteed rates
     let rates;
     if (isGuaranteedRare) {
         rates = { ...GUARANTEED_RARE_RATES };
-        // Only log once during actual drop processing, not during display
-        // debugLog('Using guaranteed rare+ rates', rates);
+        // Performance bonus still applies to guaranteed rare drops
+        if (includePerformance) {
+            const { total: performanceBonus } = getPerformanceBonus();
+            if (performanceBonus > 0) {
+                // For guaranteed rare+, performance bonus shifts within rare+ tiers
+                // Take from Rare and give to Epic/Legendary
+                const maxFromRare = rates[RARITY.RARE] - 50; // Keep at least 50% Rare
+                const bonusToApply = Math.min(performanceBonus, maxFromRare);
+                if (bonusToApply > 0) {
+                    const epicBonus = bonusToApply * 0.75;
+                    let legendaryBonus = bonusToApply * 0.25;
+
+                    // Cap legendary at 12% for guaranteed drops
+                    if (rates[RARITY.LEGENDARY] + legendaryBonus > 12) {
+                        const overflow = (rates[RARITY.LEGENDARY] + legendaryBonus) - 12;
+                        legendaryBonus = 12 - rates[RARITY.LEGENDARY];
+                        rates[RARITY.EPIC] += overflow;
+                    }
+
+                    rates[RARITY.RARE] -= bonusToApply;
+                    rates[RARITY.EPIC] += epicBonus;
+                    rates[RARITY.LEGENDARY] += legendaryBonus;
+                }
+            }
+        }
         return rates;
     }
 
     rates = { ...BASE_DROP_RATES };
 
-    // Apply premium modifier
+    // Apply premium modifier first
     if (isPremium) {
         for (const rarity of RARITY_ORDER) {
             rates[rarity] += PREMIUM_MODIFIER[rarity];
         }
-        // Only log once during actual drop processing, not during display
-        // debugLog('Applied premium modifier', rates);
     }
 
-    // Future: Apply performance bonus from options.performanceBonus
-    // Future: Apply pity bonus from options.pityBonus
+    // Apply performance bonus (stacks with premium)
+    if (includePerformance) {
+        const { total: performanceBonus } = getPerformanceBonus();
+        if (performanceBonus > 0) {
+            rates = calculateModifiedRates(rates, performanceBonus);
+        }
+    }
 
     // Validate rates sum to 100
     const total = Object.values(rates).reduce((sum, rate) => sum + rate, 0);
@@ -233,10 +374,11 @@ export function selectTank(rarity, options = {}) {
  * @property {number} duplicateCount - How many times player has received this tank
  */
 export function processDrop(dropType) {
-    // Step 1: Calculate rates based on drop type
+    // Step 1: Calculate rates based on drop type (includes performance bonus)
     const rates = calculateDropRates({
         isPremium: dropType === DROP_TYPES.PREMIUM,
-        isGuaranteedRare: dropType === DROP_TYPES.GUARANTEED_RARE
+        isGuaranteedRare: dropType === DROP_TYPES.GUARANTEED_RARE,
+        includePerformance: true
     });
 
     debugLog(`Processing ${dropType} drop with rates:`, rates);
@@ -314,13 +456,26 @@ export function resetLastDropped() {
  * Get drop rates for display purposes.
  *
  * @param {string} dropType - Type of drop
+ * @param {boolean} [includePerformance=false] - Whether to include performance bonus in displayed rates
  * @returns {Object} Drop rate table
  */
-export function getDropRatesForDisplay(dropType) {
+export function getDropRatesForDisplay(dropType, includePerformance = false) {
     return calculateDropRates({
         isPremium: dropType === DROP_TYPES.PREMIUM,
-        isGuaranteedRare: dropType === DROP_TYPES.GUARANTEED_RARE
+        isGuaranteedRare: dropType === DROP_TYPES.GUARANTEED_RARE,
+        includePerformance
     });
+}
+
+/**
+ * Get the current performance bonus information for display.
+ *
+ * @returns {Object} Performance bonus info
+ * @property {number} total - Total bonus percentage
+ * @property {Object} breakdown - Individual bonus sources
+ */
+export function getCurrentPerformanceBonus() {
+    return getPerformanceBonus();
 }
 
 /**
@@ -328,10 +483,11 @@ export function getDropRatesForDisplay(dropType) {
  *
  * @param {string} dropType - Type of drop
  * @param {string} minRarity - Minimum rarity (inclusive)
+ * @param {boolean} [includePerformance=true] - Whether to include performance bonus
  * @returns {number} Probability as percentage (0-100)
  */
-export function getRarityPlusProbability(dropType, minRarity) {
-    const rates = getDropRatesForDisplay(dropType);
+export function getRarityPlusProbability(dropType, minRarity, includePerformance = true) {
+    const rates = getDropRatesForDisplay(dropType, includePerformance);
     const minIndex = RARITY_ORDER.indexOf(minRarity);
 
     if (minIndex === -1) return 0;
@@ -395,5 +551,7 @@ console.log('[DropRates] Module loaded');
 export {
     BASE_DROP_RATES,
     PREMIUM_MODIFIER,
-    GUARANTEED_RARE_RATES
+    GUARANTEED_RARE_RATES,
+    PERFORMANCE_BONUS_DISTRIBUTION,
+    RATE_CAPS
 };

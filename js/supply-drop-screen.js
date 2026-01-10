@@ -21,7 +21,8 @@ import {
 import {
     processDrop,
     DROP_TYPES,
-    getDropRatesForDisplay
+    getDropRatesForDisplay,
+    getCurrentPerformanceBonus
 } from './drop-rates.js';
 
 // =============================================================================
@@ -292,7 +293,22 @@ function handleKeyUp(key) {
 // =============================================================================
 
 /**
- * Draw the header with token balance
+ * Convert performance bonus to star rating (0-5 stars).
+ * @param {number} bonus - Performance bonus percentage (0-50)
+ * @returns {number} Star count (0-5)
+ */
+function getPerformanceStars(bonus) {
+    // 0-10%: 1 star, 10-20%: 2 stars, 20-30%: 3 stars, 30-40%: 4 stars, 40%+: 5 stars
+    if (bonus <= 0) return 0;
+    if (bonus < 10) return 1;
+    if (bonus < 20) return 2;
+    if (bonus < 30) return 3;
+    if (bonus < 40) return 4;
+    return 5;
+}
+
+/**
+ * Draw the header with token balance and performance rating
  */
 function drawHeader(ctx) {
     // Title
@@ -318,6 +334,64 @@ function drawHeader(ctx) {
     ctx.font = 'bold 14px "Orbitron", monospace';
     ctx.textAlign = 'center';
     ctx.fillText('T', CANVAS.DESIGN_WIDTH - 60 - ctx.measureText(`${balance}`).width, 49);
+}
+
+/**
+ * Draw performance rating display below header
+ */
+function drawPerformanceRating(ctx) {
+    const performanceData = getCurrentPerformanceBonus();
+    const bonus = performanceData.total;
+
+    // Performance rating label
+    ctx.font = '14px "Orbitron", monospace';
+    ctx.fillStyle = CONFIG.COLORS.TEXT_SECONDARY;
+    ctx.textAlign = 'center';
+    ctx.fillText('PERFORMANCE RATING', CANVAS.DESIGN_WIDTH / 2, 95);
+
+    // Star rating display
+    const stars = getPerformanceStars(bonus);
+    const starWidth = 24;
+    const totalStarsWidth = 5 * starWidth;
+    const startX = (CANVAS.DESIGN_WIDTH - totalStarsWidth) / 2;
+    const starY = 115;
+
+    ctx.font = '20px "Orbitron", monospace';
+    for (let i = 0; i < 5; i++) {
+        if (i < stars) {
+            // Filled star - cyan glow
+            ctx.fillStyle = '#00FFFF';
+            ctx.shadowColor = '#00FFFF';
+            ctx.shadowBlur = 8;
+        } else {
+            // Empty star - dim
+            ctx.fillStyle = '#333366';
+            ctx.shadowBlur = 0;
+        }
+        ctx.textAlign = 'center';
+        ctx.fillText('★', startX + i * starWidth + starWidth / 2, starY);
+    }
+    ctx.shadowBlur = 0;
+
+    // Bonus percentage
+    if (bonus > 0) {
+        ctx.font = '12px "Orbitron", monospace';
+        ctx.fillStyle = '#00FF88';
+        ctx.textAlign = 'center';
+        ctx.fillText(`+${bonus}% RARE+ CHANCE`, CANVAS.DESIGN_WIDTH / 2, 138);
+    } else {
+        ctx.font = '12px "Orbitron", monospace';
+        ctx.fillStyle = CONFIG.COLORS.TEXT_SECONDARY;
+        ctx.textAlign = 'center';
+        ctx.fillText('Win rounds to boost odds!', CANVAS.DESIGN_WIDTH / 2, 138);
+    }
+
+    // Tooltip hint - show breakdown on hover (simplified for now)
+    if (bonus > 0 && Object.keys(performanceData.breakdown).length > 0) {
+        ctx.font = '10px "Orbitron", monospace';
+        ctx.fillStyle = '#666699';
+        ctx.fillText('(Win streaks, accuracy, flawless rounds boost chances)', CANVAS.DESIGN_WIDTH / 2, 155);
+    }
 }
 
 /**
@@ -397,8 +471,9 @@ function drawPurchaseCard(ctx, index) {
     ctx.fillStyle = CONFIG.COLORS.TEXT_SECONDARY;
     ctx.fillText(option.description, pos.x + CONFIG.CARD_WIDTH / 2, pos.y + 170);
 
-    // Drop rates breakdown - get rates from drop-rates module
-    const dropRates = getDropRatesForDisplay(option.dropType);
+    // Drop rates breakdown - get rates from drop-rates module (including performance bonus)
+    const baseRates = getDropRatesForDisplay(option.dropType, false);
+    const modifiedRates = getDropRatesForDisplay(option.dropType, true);
     const rateY = pos.y + 200;
     ctx.font = '12px "Orbitron", monospace';
     ctx.textAlign = 'left';
@@ -407,12 +482,32 @@ function drawPurchaseCard(ctx, index) {
     const rarityNames = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
 
     rarities.forEach((rarity, i) => {
-        const rate = dropRates[rarity];
-        if (rate > 0) {
+        const baseRate = baseRates[rarity];
+        const modifiedRate = modifiedRates[rarity];
+        const hasBonus = Math.abs(modifiedRate - baseRate) > 0.01;
+
+        if (modifiedRate > 0 || baseRate > 0) {
             ctx.fillStyle = RARITY_COLORS[rarity];
             ctx.fillText(`${rarityNames[i]}:`, pos.x + 30, rateY + (i * 20));
             ctx.textAlign = 'right';
-            ctx.fillText(`${rate}%`, pos.x + CONFIG.CARD_WIDTH - 30, rateY + (i * 20));
+
+            // Show modified rate with bonus indicator if different from base
+            if (hasBonus && modifiedRate > baseRate) {
+                // Bonus - show in green with glow
+                ctx.fillStyle = '#00FF88';
+                ctx.shadowColor = '#00FF88';
+                ctx.shadowBlur = 4;
+                ctx.fillText(`${modifiedRate.toFixed(1)}%`, pos.x + CONFIG.CARD_WIDTH - 30, rateY + (i * 20));
+                ctx.shadowBlur = 0;
+            } else if (hasBonus && modifiedRate < baseRate) {
+                // Reduced (common gets reduced) - show in dimmer color
+                ctx.fillStyle = CONFIG.COLORS.TEXT_SECONDARY;
+                ctx.fillText(`${modifiedRate.toFixed(1)}%`, pos.x + CONFIG.CARD_WIDTH - 30, rateY + (i * 20));
+            } else {
+                // No change
+                ctx.fillStyle = RARITY_COLORS[rarity];
+                ctx.fillText(`${modifiedRate}%`, pos.x + CONFIG.CARD_WIDTH - 30, rateY + (i * 20));
+            }
             ctx.textAlign = 'left';
         } else {
             ctx.fillStyle = CONFIG.COLORS.TEXT_DISABLED;
@@ -486,6 +581,7 @@ function render(ctx) {
 
     // Draw UI elements
     drawHeader(ctx);
+    drawPerformanceRating(ctx);
     drawBackButton(ctx);
 
     // Draw purchase cards
