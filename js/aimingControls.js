@@ -240,13 +240,18 @@ function renderAngleArc(ctx, tank, angle) {
         ctx.lineWidth = tickAngle === 90 ? 3 : 2;
         ctx.stroke();
 
-        // Draw angle label
+        // Draw angle label (faded to reduce visual noise)
         if (tickAngle % 45 === 0) {
             const labelR = arc.RADIUS + arc.TICK_LENGTH + 12;
             const labelX = centerX + Math.cos(Math.PI - rad) * labelR;
             const labelY = centerY - Math.sin(rad) * labelR;
 
-            ctx.fillStyle = 'rgba(150, 150, 180, 0.8)';
+            // Highlight the label nearest to current angle, fade others
+            const angleDiff = Math.abs(tickAngle - angle);
+            const isNearest = angleDiff <= 22.5; // Within half of 45° tick spacing
+            const labelOpacity = isNearest ? 0.9 : 0.35;
+
+            ctx.fillStyle = `rgba(150, 150, 180, ${labelOpacity})`;
             ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
