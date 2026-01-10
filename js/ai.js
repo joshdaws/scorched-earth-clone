@@ -92,6 +92,9 @@ let currentDifficulty = AI_DIFFICULTY.EASY;
 /** @type {boolean} Whether debug mode is enabled for AI decisions */
 let debugMode = false;
 
+/** @type {string[]} Current weapon pool available to AI (based on round) */
+let currentWeaponPool = ['basic-shot'];
+
 // =============================================================================
 // DIFFICULTY MANAGEMENT
 // =============================================================================
@@ -791,10 +794,36 @@ const MEDIUM_AI_PREFERRED_WEAPONS = ['missile', 'roller'];
 const HARD_AI_PREFERRED_WEAPONS = ['nuke', 'mini-nuke', 'mirv', 'deaths-head', 'big-shot', 'heavy-roller', 'missile', 'roller'];
 
 /**
+ * Check if a weapon is in the current weapon pool.
+ * @param {string} weaponId - Weapon ID to check
+ * @returns {boolean} True if weapon is allowed in current pool
+ */
+function isWeaponInPool(weaponId) {
+    return currentWeaponPool.includes(weaponId);
+}
+
+/**
+ * Check if AI can use a weapon (has ammo AND weapon is in current pool).
+ * @param {import('./tank.js').Tank} aiTank - AI's tank
+ * @param {string} weaponId - Weapon ID to check
+ * @returns {boolean} True if weapon can be used
+ */
+function canUseWeapon(aiTank, weaponId) {
+    if (!isWeaponInPool(weaponId)) {
+        return false;
+    }
+    const ammo = aiTank.getAmmo(weaponId);
+    return ammo > 0 || ammo === Infinity;
+}
+
+/**
  * Select which weapon the AI should use.
  * - Easy AI: Always uses basic-shot
  * - Medium AI: 50% chance to use Missiles or Rollers if available
  * - Hard AI: Strategic selection based on terrain and player position
+ *
+ * NOTE: Weapon selection is filtered by currentWeaponPool to enforce
+ * round-based weapon progression. AI can only use weapons in their pool.
  *
  * @param {import('./tank.js').Tank} aiTank - The AI's tank
  * @param {import('./tank.js').Tank} [playerTank=null] - Player's tank (for Hard AI strategic selection)
@@ -816,11 +845,11 @@ export function selectWeapon(aiTank, playerTank = null, terrain = null) {
     if (currentDifficulty === AI_DIFFICULTY.MEDIUM) {
         if (Math.random() < 0.5) {
             // Check inventory for preferred weapons (in priority order)
+            // Only consider weapons in current pool
             for (const weaponId of MEDIUM_AI_PREFERRED_WEAPONS) {
-                const ammo = aiTank.getAmmo(weaponId);
-                if (ammo > 0) {
+                if (canUseWeapon(aiTank, weaponId)) {
                     if (debugMode) {
-                        console.log(`[AI] Medium AI selected ${weaponId} (${ammo} ammo remaining)`);
+                        console.log(`[AI] Medium AI selected ${weaponId} (in pool, has ammo)`);
                     }
                     return weaponId;
                 }
@@ -853,14 +882,14 @@ export function selectWeapon(aiTank, playerTank = null, terrain = null) {
 
     // Priority 1: If terrain is blocking shot, consider Digger
     if (obstructed) {
-        // Try Heavy Digger first, then regular Digger
-        if (aiTank.getAmmo('heavy-digger') > 0) {
+        // Try Heavy Digger first, then regular Digger (only if in pool)
+        if (canUseWeapon(aiTank, 'heavy-digger')) {
             if (debugMode) {
                 console.log('[AI] Hard AI selected heavy-digger (terrain blocking shot)');
             }
             return 'heavy-digger';
         }
-        if (aiTank.getAmmo('digger') > 0) {
+        if (canUseWeapon(aiTank, 'digger')) {
             if (debugMode) {
                 console.log('[AI] Hard AI selected digger (terrain blocking shot)');
             }
@@ -870,13 +899,13 @@ export function selectWeapon(aiTank, playerTank = null, terrain = null) {
 
     // Priority 2: If player is in a valley, Roller weapons are very effective
     if (inValley) {
-        if (aiTank.getAmmo('heavy-roller') > 0) {
+        if (canUseWeapon(aiTank, 'heavy-roller')) {
             if (debugMode) {
                 console.log('[AI] Hard AI selected heavy-roller (player in valley)');
             }
             return 'heavy-roller';
         }
-        if (aiTank.getAmmo('roller') > 0) {
+        if (canUseWeapon(aiTank, 'roller')) {
             if (debugMode) {
                 console.log('[AI] Hard AI selected roller (player in valley)');
             }
@@ -885,16 +914,16 @@ export function selectWeapon(aiTank, playerTank = null, terrain = null) {
     }
 
     // Priority 3: Area damage weapons for high-value shots
-    // Use these 60% of the time when available
+    // Use these 60% of the time when available (and in pool)
     if (Math.random() < 0.6) {
         // Nuclear weapons - devastating but rare
-        if (aiTank.getAmmo('nuke') > 0) {
+        if (canUseWeapon(aiTank, 'nuke')) {
             if (debugMode) {
                 console.log('[AI] Hard AI selected nuke (maximum damage)');
             }
             return 'nuke';
         }
-        if (aiTank.getAmmo('mini-nuke') > 0) {
+        if (canUseWeapon(aiTank, 'mini-nuke')) {
             if (debugMode) {
                 console.log('[AI] Hard AI selected mini-nuke (high damage)');
             }
@@ -902,13 +931,13 @@ export function selectWeapon(aiTank, playerTank = null, terrain = null) {
         }
 
         // Splitting weapons for area damage
-        if (aiTank.getAmmo('deaths-head') > 0) {
+        if (canUseWeapon(aiTank, 'deaths-head')) {
             if (debugMode) {
                 console.log('[AI] Hard AI selected deaths-head (area denial)');
             }
             return 'deaths-head';
         }
-        if (aiTank.getAmmo('mirv') > 0) {
+        if (canUseWeapon(aiTank, 'mirv')) {
             if (debugMode) {
                 console.log('[AI] Hard AI selected mirv (multi-warhead)');
             }
@@ -916,28 +945,28 @@ export function selectWeapon(aiTank, playerTank = null, terrain = null) {
         }
     }
 
-    // Priority 4: Standard upgrade weapons
-    if (aiTank.getAmmo('big-shot') > 0) {
+    // Priority 4: Standard upgrade weapons (only if in pool)
+    if (canUseWeapon(aiTank, 'big-shot')) {
         if (debugMode) {
             console.log('[AI] Hard AI selected big-shot (high damage)');
         }
         return 'big-shot';
     }
-    if (aiTank.getAmmo('missile') > 0) {
+    if (canUseWeapon(aiTank, 'missile')) {
         if (debugMode) {
             console.log('[AI] Hard AI selected missile (standard upgrade)');
         }
         return 'missile';
     }
 
-    // Fallback: Roller weapons even if not in valley (still useful)
-    if (aiTank.getAmmo('heavy-roller') > 0) {
+    // Fallback: Roller weapons even if not in valley (still useful, if in pool)
+    if (canUseWeapon(aiTank, 'heavy-roller')) {
         if (debugMode) {
             console.log('[AI] Hard AI selected heavy-roller (fallback)');
         }
         return 'heavy-roller';
     }
-    if (aiTank.getAmmo('roller') > 0) {
+    if (canUseWeapon(aiTank, 'roller')) {
         if (debugMode) {
             console.log('[AI] Hard AI selected roller (fallback)');
         }
@@ -946,7 +975,7 @@ export function selectWeapon(aiTank, playerTank = null, terrain = null) {
 
     // Default to basic-shot
     if (debugMode) {
-        console.log('[AI] Hard AI using basic-shot (no special weapons available)');
+        console.log('[AI] Hard AI using basic-shot (no special weapons available or in pool)');
     }
     return 'basic-shot';
 }
@@ -1224,6 +1253,57 @@ export function setDifficultyForRound(roundNumber) {
 }
 
 // =============================================================================
+// AI WEAPON POOL PROGRESSION
+// =============================================================================
+
+/**
+ * Weapon pools available to AI at different round thresholds.
+ * AI can only use weapons from their current round's pool.
+ * Uses weapon IDs matching those in weapons.js.
+ */
+const AI_WEAPON_POOLS = {
+    1: ['basic-shot'],                                          // Rounds 1-2
+    3: ['basic-shot', 'missile'],                               // Rounds 3-4
+    5: ['basic-shot', 'missile', 'roller'],                     // Rounds 5-6
+    7: ['basic-shot', 'missile', 'roller', 'digger'],           // Rounds 7-8
+    9: ['basic-shot', 'missile', 'roller', 'digger', 'mirv', 'mini-nuke', 'nuke']  // Rounds 9+
+};
+
+/**
+ * Get the weapon pool available to AI for a given round number.
+ * The AI can only select weapons from this pool during gameplay.
+ *
+ * Weapon Pool Progression:
+ * - Rounds 1-2: Basic Shot only
+ * - Rounds 3-4: Basic, Missile
+ * - Rounds 5-6: Basic, Missile, Roller
+ * - Rounds 7-8: Basic, Missile, Roller, Digger
+ * - Rounds 9+: All weapons (including MIRV, Nukes)
+ *
+ * @param {number} roundNumber - Current round (1-based)
+ * @returns {string[]} Array of weapon IDs available to AI
+ */
+export function getAIWeaponPoolForRound(roundNumber) {
+    // Find the highest threshold that the round meets or exceeds
+    const thresholds = Object.keys(AI_WEAPON_POOLS)
+        .map(Number)
+        .sort((a, b) => b - a); // Sort descending
+
+    for (const threshold of thresholds) {
+        if (roundNumber >= threshold) {
+            const pool = AI_WEAPON_POOLS[threshold];
+            if (debugMode) {
+                console.log(`[AI] Round ${roundNumber}: Weapon pool = [${pool.join(', ')}]`);
+            }
+            return [...pool]; // Return a copy
+        }
+    }
+
+    // Fallback to basic only
+    return ['basic-shot'];
+}
+
+// =============================================================================
 // AI WEAPON PURCHASING
 // =============================================================================
 
@@ -1342,31 +1422,104 @@ export function purchaseWeaponsForAI(aiTank, difficulty = currentDifficulty) {
 }
 
 /**
- * Set up AI for a new round with appropriate difficulty and weapons.
+ * Ammo amounts given to AI for each weapon in their pool.
+ * AI gets generous ammo to make them challenging.
+ */
+const AI_POOL_AMMO = {
+    'basic-shot': Infinity,  // Always unlimited
+    'missile': 10,
+    'roller': 5,
+    'digger': 5,
+    'mirv': 3,
+    'mini-nuke': 2,
+    'nuke': 1
+};
+
+/**
+ * Set the current weapon pool for AI based on round number.
+ * This updates the module-level currentWeaponPool variable.
+ *
+ * @param {number} roundNumber - Current round (1-based)
+ * @returns {string[]} The weapon pool that was set
+ */
+export function setWeaponPoolForRound(roundNumber) {
+    currentWeaponPool = getAIWeaponPoolForRound(roundNumber);
+
+    if (debugMode) {
+        console.log(`[AI] Weapon pool set for round ${roundNumber}: [${currentWeaponPool.join(', ')}]`);
+    }
+
+    return currentWeaponPool;
+}
+
+/**
+ * Get the current weapon pool (for external queries).
+ * @returns {string[]} Current weapon pool
+ */
+export function getCurrentWeaponPool() {
+    return [...currentWeaponPool];
+}
+
+/**
+ * Give AI ammo for all weapons in their current pool.
+ * AI gets generous ammo amounts to be challenging opponents.
+ *
+ * @param {import('./tank.js').Tank} aiTank - AI's tank
+ * @param {string[]} weaponPool - Weapons to give ammo for
+ * @returns {{weaponId: string, ammo: number}[]} Ammo given
+ */
+function givePoolAmmo(aiTank, weaponPool) {
+    const ammoGiven = [];
+
+    for (const weaponId of weaponPool) {
+        const ammo = AI_POOL_AMMO[weaponId] || 3; // Default to 3 if not specified
+
+        // For infinite ammo, we don't need to add (tank already has it for basic-shot)
+        if (ammo === Infinity) {
+            continue;
+        }
+
+        aiTank.addAmmo(weaponId, ammo);
+        ammoGiven.push({ weaponId, ammo });
+
+        if (debugMode) {
+            console.log(`[AI] Given ${ammo} ammo for ${weaponId}`);
+        }
+    }
+
+    return ammoGiven;
+}
+
+/**
+ * Set up AI for a new round with appropriate difficulty, weapon pool, and ammo.
  * This is the main entry point for round-based AI progression.
  *
  * @param {import('./tank.js').Tank} aiTank - The AI's tank
  * @param {number} roundNumber - Current round number (1-based)
- * @returns {{difficulty: string, difficultyName: string, purchases: Object}}
+ * @returns {{difficulty: string, difficultyName: string, weaponPool: string[], ammoGiven: Object[]}}
  */
 export function setupAIForRound(aiTank, roundNumber) {
     // Set difficulty based on round
     const difficulty = setDifficultyForRound(roundNumber);
     const difficultyName = getDifficultyName(difficulty);
 
-    // Purchase weapons based on difficulty
-    const purchases = purchaseWeaponsForAI(aiTank, difficulty);
+    // Set weapon pool based on round
+    const weaponPool = setWeaponPoolForRound(roundNumber);
+
+    // Give AI ammo for all weapons in their pool
+    const ammoGiven = givePoolAmmo(aiTank, weaponPool);
 
     if (debugMode) {
         console.log(`[AI] Round ${roundNumber} setup complete:`);
         console.log(`[AI]   Difficulty: ${difficultyName}`);
-        console.log(`[AI]   Weapons purchased: ${purchases.purchased.length}`);
-        console.log(`[AI]   Total spent: $${purchases.totalSpent}`);
+        console.log(`[AI]   Weapon pool: [${weaponPool.join(', ')}]`);
+        console.log(`[AI]   Ammo given for ${ammoGiven.length} weapons`);
     }
 
     return {
         difficulty,
         difficultyName,
-        purchases
+        weaponPool,
+        ammoGiven
     };
 }
