@@ -24,6 +24,7 @@ import {
     getDropRatesForDisplay,
     getCurrentPerformanceBonus
 } from './drop-rates.js';
+import * as LifetimeStats from './lifetime-stats.js';
 
 // =============================================================================
 // CONFIGURATION
@@ -150,6 +151,9 @@ function attemptPurchase(optionIndex) {
 
     console.log(`Purchased ${option.name} for ${option.cost} tokens`);
 
+    // Lifetime stats: record tokens spent
+    LifetimeStats.recordTokensSpent(option.cost);
+
     // Process the drop using the drop-rates module
     // This handles: rate calculation, rarity roll, tank selection,
     // consecutive duplicate protection, and collection/scrap management
@@ -158,6 +162,14 @@ function attemptPurchase(optionIndex) {
     if (!dropResult.tank) {
         console.error('Drop failed - no tank returned');
         return;
+    }
+
+    // Lifetime stats: record supply drop opened (with rarity)
+    LifetimeStats.recordSupplyDrop(dropResult.rarity);
+
+    // Lifetime stats: record new tank unlocked (if applicable)
+    if (dropResult.isNew) {
+        LifetimeStats.recordTankUnlocked();
     }
 
     console.log(`Rolled: ${dropResult.tank.name} (${dropResult.rarity})`, {

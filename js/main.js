@@ -51,6 +51,7 @@ import * as Tokens from './tokens.js';
 import * as TankCollection from './tank-collection.js';
 import * as PerformanceTracking from './performance-tracking.js';
 import * as PitySystem from './pity-system.js';
+import * as LifetimeStats from './lifetime-stats.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -1331,9 +1332,13 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
         if (isPlayerShot && directHitTank.team === 'enemy' && damageResult.actualDamage > 0) {
             const hitReward = Money.awardHitReward(damageResult.actualDamage);
             ProgressionAchievements.onMoneyEarned(hitReward);
+            LifetimeStats.recordMoneyEarned(hitReward);
             recordStat('damageDealt', damageResult.actualDamage);
             playerHitEnemy = true;
             wasDirectHit = damageResult.isDirectHit;
+
+            // Lifetime stats: record damage dealt
+            LifetimeStats.recordDamageDealt(damageResult.actualDamage);
 
             // Combat achievement detection: damage dealt to enemy
             CombatAchievements.onDamageDealt(damageResult, directHitTank, healthBeforeDamage);
@@ -1345,6 +1350,9 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
         // Track damage taken by player
         if (directHitTank.team === 'player' && damageResult.actualDamage > 0) {
             recordStat('damageTaken', damageResult.actualDamage);
+
+            // Lifetime stats: record damage taken
+            LifetimeStats.recordDamageTaken(damageResult.actualDamage);
 
             // Performance tracking: player took damage (affects flawless status and heavy damage penalty)
             PerformanceTracking.onDamageTaken(damageResult.actualDamage, TANK.START_HEALTH);
@@ -1373,8 +1381,12 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
                 if (result.tank.team === 'enemy' && result.actualDamage > 0) {
                     const splashReward = Money.awardHitReward(result.actualDamage);
                     ProgressionAchievements.onMoneyEarned(splashReward);
+                    LifetimeStats.recordMoneyEarned(splashReward);
                     recordStat('damageDealt', result.actualDamage);
                     playerHitEnemy = true;
+
+                    // Lifetime stats: record splash damage dealt
+                    LifetimeStats.recordDamageDealt(result.actualDamage);
 
                     // Combat achievement detection: splash damage dealt to enemy
                     CombatAchievements.onDamageDealt(result, result.tank, splashHealthBefore[result.tank.team]);
@@ -1389,6 +1401,9 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
         for (const result of splashResults) {
             if (result.tank.team === 'player' && result.actualDamage > 0) {
                 recordStat('damageTaken', result.actualDamage);
+
+                // Lifetime stats: record splash damage taken
+                LifetimeStats.recordDamageTaken(result.actualDamage);
 
                 // Combat achievement detection: player took splash damage
                 CombatAchievements.onPlayerDamageTaken(result.actualDamage, result.tank.health);
@@ -1417,8 +1432,12 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
                 if (result.tank.team === 'enemy' && result.actualDamage > 0) {
                     const terrainHitReward = Money.awardHitReward(result.actualDamage);
                     ProgressionAchievements.onMoneyEarned(terrainHitReward);
+                    LifetimeStats.recordMoneyEarned(terrainHitReward);
                     recordStat('damageDealt', result.actualDamage);
                     playerHitEnemy = true;
+
+                    // Lifetime stats: record terrain splash damage dealt
+                    LifetimeStats.recordDamageDealt(result.actualDamage);
 
                     // Combat achievement detection: damage dealt to enemy
                     CombatAchievements.onDamageDealt(result, result.tank, healthBefore[result.tank.team]);
@@ -1433,6 +1452,9 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
         for (const result of damageResults) {
             if (result.tank.team === 'player' && result.actualDamage > 0) {
                 recordStat('damageTaken', result.actualDamage);
+
+                // Lifetime stats: record terrain splash damage taken
+                LifetimeStats.recordDamageTaken(result.actualDamage);
 
                 // Performance tracking: player took splash damage
                 PerformanceTracking.onDamageTaken(result.actualDamage, TANK.START_HEALTH);
@@ -1451,6 +1473,9 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
     if (isPlayerShot && playerHitEnemy) {
         recordStat('shotHit');
 
+        // Lifetime stats: record shot that hit
+        LifetimeStats.recordShot(true);
+
         // Performance tracking: player hit enemy
         PerformanceTracking.updateAccuracy(true);
 
@@ -1464,6 +1489,9 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
         // Hidden achievement detection: player hit enemy (resets consecutive misses)
         HiddenAchievements.onPlayerHitEnemy();
     } else if (isPlayerShot) {
+        // Lifetime stats: record shot that missed
+        LifetimeStats.recordShot(false);
+
         // Performance tracking: player missed
         PerformanceTracking.updateAccuracy(false);
 
@@ -1770,6 +1798,9 @@ function checkRoundEnd() {
         // Performance tracking: round lost (draw counts as loss)
         PerformanceTracking.onRoundEnd(false);
 
+        // Lifetime stats: record loss (draw counts as loss)
+        LifetimeStats.recordLoss({ roundNumber: currentRound });
+
         // End the run and finalize stats (draw counts as loss)
         endRunState(true);
 
@@ -1817,12 +1848,24 @@ function checkRoundEnd() {
         // Performance tracking: round won (updates win streak)
         PerformanceTracking.onRoundEnd(true);
 
+        // Lifetime stats: record win
+        LifetimeStats.recordWin({
+            isFlawless,
+            roundNumber: currentRound
+        });
+
+        // Lifetime stats: record kill (enemy destroyed)
+        // Get the weapon that made the killing blow from combat state
+        const lastWeaponUsed = combatState.roundState.lastWeaponUsed || 'basic-shot';
+        LifetimeStats.recordKill(lastWeaponUsed);
+
         // Record enemy destroyed stat
         recordStat('enemyDestroyed');
 
         // Award victory bonus (hit rewards already given during combat)
         const victoryBonus = Money.awardVictoryBonus();
         ProgressionAchievements.onMoneyEarned(victoryBonus);
+        LifetimeStats.recordMoneyEarned(victoryBonus);
 
         // Get total round earnings for display
         const roundEarnings = Money.getRoundEarnings();
@@ -1859,6 +1902,9 @@ function checkRoundEnd() {
 
         // Performance tracking: round lost (resets win streak)
         PerformanceTracking.onRoundEnd(false);
+
+        // Lifetime stats: record loss
+        LifetimeStats.recordLoss({ roundNumber: currentRound });
 
         // End the run and finalize stats
         endRunState(false);
@@ -3166,6 +3212,9 @@ function setupPlayingState() {
                 startNewRunState(); // Reset run state and stats for new run
                 Money.init();
 
+                // Lifetime stats: record new run started
+                LifetimeStats.recordRunStarted();
+
                 // Combat achievement: notify new run started
                 CombatAchievements.onRunStart();
 
@@ -4425,9 +4474,17 @@ async function init() {
     // Initialize pity system (bad luck protection for supply drops)
     PitySystem.init();
 
+    // Initialize lifetime statistics tracking
+    LifetimeStats.init();
+
     // Register performance tracking callback for achievement unlocks (grants +15% bonus)
     onAchievementUnlock(() => {
         PerformanceTracking.onAchievementUnlocked();
+    });
+
+    // Register lifetime stats callback for achievement unlocks
+    onAchievementUnlock(() => {
+        LifetimeStats.recordAchievementUnlocked();
     });
 
     // Register post-render callback for achievement popups (renders on top of all game content)
@@ -4449,6 +4506,7 @@ async function init() {
     window.PitySystem = PitySystem;
     window.SupplyDrop = SupplyDrop;
     window.ExtractionReveal = ExtractionReveal;
+    window.LifetimeStats = LifetimeStats;
     // Expose DebugTools as 'Debug' for convenience (e.g., Debug.skipToShop())
     // This creates a merged object with both Debug module and DebugTools functions
     window.Debug = { ...Debug, ...DebugTools };

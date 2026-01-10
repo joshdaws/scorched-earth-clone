@@ -20,6 +20,7 @@ import {
     getAchievementCount,
     ACHIEVEMENT_CATEGORIES
 } from './achievements.js';
+import * as LifetimeStats from './lifetime-stats.js';
 
 // =============================================================================
 // CONFIGURATION
@@ -93,7 +94,8 @@ const FILTERS = [
     { key: 'precision', label: 'PRECISION', color: COLORS.NEON_CYAN },
     { key: 'weapon_mastery', label: 'WEAPONS', color: COLORS.NEON_ORANGE },
     { key: 'progression', label: 'PROGRESS', color: COLORS.NEON_PURPLE },
-    { key: 'economy', label: 'ECONOMY', color: COLORS.NEON_YELLOW }
+    { key: 'economy', label: 'ECONOMY', color: COLORS.NEON_YELLOW },
+    { key: 'stats', label: 'STATS', color: '#00FF88' }
 ];
 
 // =============================================================================
@@ -272,7 +274,11 @@ export function render(ctx) {
     // Render components
     renderHeader(ctx);
     renderFilters(ctx);
-    renderAchievementList(ctx);
+    if (currentFilter === 'stats') {
+        renderStatsView(ctx);
+    } else {
+        renderAchievementList(ctx);
+    }
     renderFooter(ctx);
     renderBackButton(ctx);
 }
@@ -563,6 +569,113 @@ function renderScrollIndicators(ctx, listTop, listBottom) {
         ctx.font = `20px ${UI.FONT_FAMILY}`;
         ctx.textAlign = 'center';
         ctx.fillText('\u25BC', CANVAS.DESIGN_WIDTH / 2, listBottom - 10);
+    }
+
+    ctx.restore();
+}
+
+/**
+ * Render the lifetime statistics view.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ */
+function renderStatsView(ctx) {
+    const summary = LifetimeStats.getSummary();
+    const listTop = CONFIG.HEADER_HEIGHT + CONFIG.FILTER_HEIGHT + 20;
+    const listBottom = CANVAS.DESIGN_HEIGHT - CONFIG.FOOTER_HEIGHT;
+
+    ctx.save();
+
+    // Stats container background
+    ctx.fillStyle = 'rgba(10, 10, 26, 0.6)';
+    ctx.beginPath();
+    ctx.roundRect(40, listTop, CANVAS.DESIGN_WIDTH - 80, listBottom - listTop - 20, 12);
+    ctx.fill();
+
+    // Stats title
+    ctx.fillStyle = '#00FF88';
+    ctx.font = `bold 28px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.shadowColor = '#00FF88';
+    ctx.shadowBlur = 8;
+    ctx.fillText('LIFETIME STATISTICS', CANVAS.DESIGN_WIDTH / 2, listTop + 40);
+    ctx.shadowBlur = 0;
+
+    // Define stat rows in two columns
+    const leftStats = [
+        { label: 'TOTAL WINS', value: summary.wins.toLocaleString(), color: COLORS.NEON_CYAN },
+        { label: 'TOTAL LOSSES', value: summary.losses.toLocaleString(), color: COLORS.NEON_PINK },
+        { label: 'WIN RATE', value: `${summary.winRate}%`, color: summary.winRate >= 50 ? COLORS.NEON_CYAN : COLORS.TEXT_LIGHT },
+        { label: 'HIGHEST ROUND', value: summary.highestRound.toLocaleString(), color: COLORS.NEON_ORANGE },
+        { label: 'TOTAL KILLS', value: summary.totalKills.toLocaleString(), color: COLORS.NEON_PINK },
+        { label: 'K/D RATIO', value: summary.kdRatio, color: COLORS.TEXT_LIGHT },
+        { label: 'FLAWLESS WINS', value: summary.flawlessWins.toLocaleString(), color: COLORS.NEON_YELLOW }
+    ];
+
+    const rightStats = [
+        { label: 'ACCURACY', value: `${summary.accuracy}%`, color: summary.accuracy >= 50 ? COLORS.NEON_CYAN : COLORS.TEXT_LIGHT },
+        { label: 'BEST ACCURACY', value: `${summary.bestAccuracy}%`, color: COLORS.NEON_YELLOW },
+        { label: 'DAMAGE DEALT', value: summary.damageDealt.toLocaleString(), color: COLORS.NEON_ORANGE },
+        { label: 'BIGGEST HIT', value: summary.biggestHit.toLocaleString(), color: COLORS.NEON_PINK },
+        { label: 'LONGEST STREAK', value: summary.longestStreak.toLocaleString(), color: COLORS.NEON_PURPLE },
+        { label: 'TANKS UNLOCKED', value: summary.tanksUnlocked.toLocaleString(), color: '#00FF88' },
+        { label: 'ACHIEVEMENTS', value: summary.achievementsUnlocked.toLocaleString(), color: COLORS.NEON_ORANGE }
+    ];
+
+    const rowHeight = 42;
+    const leftX = 100;
+    const rightX = CANVAS.DESIGN_WIDTH / 2 + 60;
+    let startY = listTop + 90;
+
+    // Render left column
+    for (let i = 0; i < leftStats.length; i++) {
+        const stat = leftStats[i];
+        const y = startY + i * rowHeight;
+
+        // Label
+        ctx.textAlign = 'left';
+        ctx.font = `bold 16px ${UI.FONT_FAMILY}`;
+        ctx.fillStyle = COLORS.TEXT_MUTED;
+        ctx.fillText(stat.label, leftX, y);
+
+        // Value
+        ctx.textAlign = 'right';
+        ctx.fillStyle = stat.color;
+        ctx.shadowColor = stat.color;
+        ctx.shadowBlur = 4;
+        ctx.fillText(stat.value, CANVAS.DESIGN_WIDTH / 2 - 60, y);
+        ctx.shadowBlur = 0;
+    }
+
+    // Render right column
+    for (let i = 0; i < rightStats.length; i++) {
+        const stat = rightStats[i];
+        const y = startY + i * rowHeight;
+
+        // Label
+        ctx.textAlign = 'left';
+        ctx.font = `bold 16px ${UI.FONT_FAMILY}`;
+        ctx.fillStyle = COLORS.TEXT_MUTED;
+        ctx.fillText(stat.label, rightX, y);
+
+        // Value
+        ctx.textAlign = 'right';
+        ctx.fillStyle = stat.color;
+        ctx.shadowColor = stat.color;
+        ctx.shadowBlur = 4;
+        ctx.fillText(stat.value, CANVAS.DESIGN_WIDTH - 100, y);
+        ctx.shadowBlur = 0;
+    }
+
+    // Footer info
+    ctx.textAlign = 'center';
+    ctx.font = `14px ${UI.FONT_FAMILY}`;
+    ctx.fillStyle = COLORS.TEXT_MUTED;
+    ctx.fillText(`Total Runs: ${summary.totalRuns} | Play Time: ${summary.playTime}`, CANVAS.DESIGN_WIDTH / 2, listBottom - 40);
+
+    // Favorite weapon (if any)
+    if (summary.favoriteWeapon) {
+        ctx.fillStyle = COLORS.TEXT_LIGHT;
+        ctx.fillText(`Favorite Weapon: ${summary.favoriteWeapon.toUpperCase().replace(/-/g, ' ')}`, CANVAS.DESIGN_WIDTH / 2, listBottom - 60);
     }
 
     ctx.restore();
