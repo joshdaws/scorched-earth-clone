@@ -111,6 +111,11 @@ const VALIDATION_RULES = {
   maxHitRate: 100,
 };
 
+// Rate limiting configuration (v2)
+const RATE_LIMITS = {
+  scoreSubmits: { max: 10, windowMs: 60000 }, // 10 scores per minute
+};
+
 /**
  * Validate run stats for reasonableness (anti-cheat)
  */
@@ -176,8 +181,25 @@ export const submitScore = mutation({
       throw new Error("Player not found");
     }
 
+    // Rate limiting: Check recent submissions
+    const windowStart = Date.now() - RATE_LIMITS.scoreSubmits.windowMs;
+    const recentScores = await ctx.db
+      .query("highScores")
+      .withIndex("by_playerId", (q) => q.eq("playerId", player._id))
+      .filter((q) => q.gte(q.field("timestamp"), windowStart))
+      .collect();
+
+    if (recentScores.length >= RATE_LIMITS.scoreSubmits.max) {
+      throw new Error(
+        `Rate limit exceeded: Maximum ${RATE_LIMITS.scoreSubmits.max} score submissions per minute`
+      );
+    }
+
     // Validate the stats
     const validation = validateRunStats(args.runStats);
+    if (!validation.valid) {
+      throw new Error(`Invalid score: ${validation.reason}`);
+    }
 
     // Calculate hit rate
     const hitRate =
@@ -198,7 +220,7 @@ export const submitScore = mutation({
       biggestHit: args.runStats.biggestHit,
       timestamp: Date.now(),
       platform: player.platform,
-      validated: validation.valid,
+      validated: true, // Validation passed (would have thrown if not)
     });
 
     // Update player's stats if this is a new best
@@ -230,7 +252,6 @@ export const submitScore = mutation({
       rank: isTop100 ? rank : null,
       isNewBest,
       isTop100,
-      validated: validation.valid,
     };
   },
 });
