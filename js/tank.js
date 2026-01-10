@@ -199,7 +199,7 @@ export class Tank {
 
         // Spawn dramatic destruction explosion at tank position
         // Use the center of the tank body for the explosion
-        const tankCenterY = this.y - TANK.BODY.HEIGHT / 2;
+        const tankCenterY = this.y - TANK.BODY_HEIGHT / 2;
         spawnTankDestructionExplosion(this.x, tankCenterY, this.team);
 
         // Play explosion sound (larger than normal)
