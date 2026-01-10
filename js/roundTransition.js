@@ -2,14 +2,15 @@
  * Scorched Earth: Synthwave Edition
  * Round Transition Screen
  *
- * Displays a brief transition screen after winning a round, showing round stats
- * and previewing the next round's difficulty. This screen appears between
- * round victory and the shop.
+ * Displays a brief transition screen after winning a round, showing round stats,
+ * tokens earned, achievements unlocked, and previewing the next round's difficulty.
+ * This screen appears between round victory and the shop.
  */
 
-import { CANVAS, COLORS, UI } from './constants.js';
+import { CANVAS, COLORS, UI, GAME_STATES } from './constants.js';
 import { playClickSound } from './sound.js';
 import * as AI from './ai.js';
+import * as Game from './game.js';
 
 // =============================================================================
 // SCREEN STATE
@@ -40,6 +41,24 @@ let roundDamage = 0;
 let roundMoney = 0;
 
 /**
+ * Token result from this round { total, breakdown }.
+ * @type {Object|null}
+ */
+let tokenResult = null;
+
+/**
+ * Current token balance.
+ * @type {number}
+ */
+let tokenBalance = 0;
+
+/**
+ * Achievements unlocked this round.
+ * @type {Array}
+ */
+let roundAchievements = [];
+
+/**
  * Animation time for pulsing and glow effects.
  * @type {number}
  */
@@ -63,21 +82,63 @@ let contentVisible = false;
  */
 let onContinueCallback = null;
 
+/**
+ * Callback to execute when "Collection" is clicked.
+ * @type {Function|null}
+ */
+let onCollectionCallback = null;
+
+/**
+ * Callback to execute when "Supply Drop" is clicked.
+ * @type {Function|null}
+ */
+let onSupplyDropCallback = null;
+
 // =============================================================================
-// BUTTON DEFINITION
+// BUTTON DEFINITIONS
 // =============================================================================
 
 /**
- * Continue button configuration.
- * Centered at bottom of screen.
+ * Standard supply drop cost in tokens.
  */
-const continueButton = {
-    x: CANVAS.DESIGN_WIDTH / 2,
-    y: CANVAS.DESIGN_HEIGHT - 150,
-    width: 300,
-    height: 55,
-    text: 'CONTINUE TO SHOP',
-    color: COLORS.NEON_CYAN
+const SUPPLY_DROP_COST = 50;
+
+/**
+ * Button configurations.
+ */
+const buttons = {
+    continue: {
+        x: CANVAS.DESIGN_WIDTH / 2 - 170,
+        y: CANVAS.DESIGN_HEIGHT - 100,
+        width: 200,
+        height: 50,
+        text: 'CONTINUE',
+        color: COLORS.NEON_CYAN
+    },
+    shop: {
+        x: CANVAS.DESIGN_WIDTH / 2,
+        y: CANVAS.DESIGN_HEIGHT - 100,
+        width: 140,
+        height: 50,
+        text: 'SHOP',
+        color: COLORS.NEON_YELLOW
+    },
+    collection: {
+        x: CANVAS.DESIGN_WIDTH / 2 + 170,
+        y: CANVAS.DESIGN_HEIGHT - 100,
+        width: 200,
+        height: 50,
+        text: 'COLLECTION',
+        color: COLORS.NEON_PURPLE
+    },
+    supplyDrop: {
+        x: CANVAS.DESIGN_WIDTH / 2,
+        y: CANVAS.DESIGN_HEIGHT - 160,
+        width: 250,
+        height: 45,
+        text: 'SUPPLY DROP (50)',
+        color: COLORS.NEON_ORANGE
+    }
 };
 
 // =============================================================================
@@ -90,6 +151,9 @@ const continueButton = {
  * @param {number} options.round - The round number that was completed
  * @param {number} options.damage - Damage dealt this round
  * @param {number} options.money - Money earned this round
+ * @param {Object} [options.tokenResult] - Token award result { total, breakdown }
+ * @param {number} [options.tokenBalance] - Current token balance
+ * @param {Array} [options.achievements] - Achievements unlocked this round
  * @param {number} [options.delay=500] - Delay in ms before screen appears
  */
 export function show(options = {}) {
@@ -97,12 +161,18 @@ export function show(options = {}) {
         round = 1,
         damage = 0,
         money = 0,
+        tokenResult: tokens = null,
+        tokenBalance: balance = 0,
+        achievements = [],
         delay = 500
     } = options;
 
     completedRound = round;
     roundDamage = damage;
     roundMoney = money;
+    tokenResult = tokens;
+    tokenBalance = balance;
+    roundAchievements = achievements;
     animationTime = 0;
     appearDelay = delay;
     contentVisible = false;
@@ -114,6 +184,7 @@ export function show(options = {}) {
     }, delay);
 
     console.log(`[RoundTransition] Screen queued, delay: ${delay}ms, round: ${round}`);
+    console.log(`[RoundTransition] Tokens: ${tokens?.total || 0}, Achievements: ${achievements.length}`);
 }
 
 /**
@@ -123,6 +194,8 @@ export function hide() {
     isVisible = false;
     contentVisible = false;
     animationTime = 0;
+    tokenResult = null;
+    roundAchievements = [];
 }
 
 /**
@@ -131,6 +204,22 @@ export function hide() {
  */
 export function onContinue(callback) {
     onContinueCallback = callback;
+}
+
+/**
+ * Register callback for "Collection" button.
+ * @param {Function} callback - Function to call when button is clicked
+ */
+export function onCollection(callback) {
+    onCollectionCallback = callback;
+}
+
+/**
+ * Register callback for "Supply Drop" button.
+ * @param {Function} callback - Function to call when button is clicked
+ */
+export function onSupplyDrop(callback) {
+    onSupplyDropCallback = callback;
 }
 
 /**
@@ -154,19 +243,20 @@ export function isActive() {
 // =============================================================================
 
 /**
- * Check if a point is inside the continue button.
+ * Check if a point is inside a button.
  * @param {number} x - X coordinate
  * @param {number} y - Y coordinate
+ * @param {Object} button - Button definition
  * @returns {boolean} True if point is inside button
  */
-function isInsideButton(x, y) {
-    const halfWidth = continueButton.width / 2;
-    const halfHeight = continueButton.height / 2;
+function isInsideButton(x, y, button) {
+    const halfWidth = button.width / 2;
+    const halfHeight = button.height / 2;
     return (
-        x >= continueButton.x - halfWidth &&
-        x <= continueButton.x + halfWidth &&
-        y >= continueButton.y - halfHeight &&
-        y <= continueButton.y + halfHeight
+        x >= button.x - halfWidth &&
+        x <= button.x + halfWidth &&
+        y >= button.y - halfHeight &&
+        y <= button.y + halfHeight
     );
 }
 
@@ -179,11 +269,50 @@ function isInsideButton(x, y) {
 export function handleClick(x, y) {
     if (!contentVisible) return false;
 
-    if (isInsideButton(x, y)) {
+    // Check Continue button (now goes to shop)
+    if (isInsideButton(x, y, buttons.continue)) {
         playClickSound();
-        console.log('[RoundTransition] Continue to Shop clicked');
+        console.log('[RoundTransition] Continue clicked');
         if (onContinueCallback) {
             onContinueCallback();
+        }
+        return true;
+    }
+
+    // Check Shop button
+    if (isInsideButton(x, y, buttons.shop)) {
+        playClickSound();
+        console.log('[RoundTransition] Shop clicked');
+        if (onContinueCallback) {
+            onContinueCallback();
+        }
+        return true;
+    }
+
+    // Check Collection button
+    if (isInsideButton(x, y, buttons.collection)) {
+        playClickSound();
+        console.log('[RoundTransition] Collection clicked');
+        if (onCollectionCallback) {
+            onCollectionCallback();
+        } else {
+            // Default: go to collection screen
+            hide();
+            Game.setState(GAME_STATES.COLLECTION);
+        }
+        return true;
+    }
+
+    // Check Supply Drop button (only if can afford)
+    if (tokenBalance >= SUPPLY_DROP_COST && isInsideButton(x, y, buttons.supplyDrop)) {
+        playClickSound();
+        console.log('[RoundTransition] Supply Drop clicked');
+        if (onSupplyDropCallback) {
+            onSupplyDropCallback();
+        } else {
+            // Default: go to supply drop screen
+            hide();
+            Game.setState(GAME_STATES.SUPPLY_DROP);
         }
         return true;
     }
@@ -232,8 +361,9 @@ function getDifficultyColor(difficulty) {
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  * @param {Object} button - Button definition
  * @param {number} pulseIntensity - Glow pulse intensity (0-1)
+ * @param {boolean} [disabled=false] - Whether button is disabled
  */
-function renderButton(ctx, button, pulseIntensity) {
+function renderButton(ctx, button, pulseIntensity, disabled = false) {
     const halfWidth = button.width / 2;
     const halfHeight = button.height / 2;
     const btnX = button.x - halfWidth;
@@ -242,19 +372,20 @@ function renderButton(ctx, button, pulseIntensity) {
     ctx.save();
 
     // Button background with rounded corners
-    ctx.fillStyle = 'rgba(26, 26, 46, 0.9)';
+    ctx.fillStyle = disabled ? 'rgba(26, 26, 46, 0.5)' : 'rgba(26, 26, 46, 0.9)';
     ctx.beginPath();
     ctx.roundRect(btnX, btnY, button.width, button.height, 8);
     ctx.fill();
 
-    // Neon glow effect (pulsing)
+    // Neon glow effect (pulsing) - reduced when disabled
+    const glowIntensity = disabled ? 0.3 : 1;
     ctx.shadowColor = button.color;
-    ctx.shadowBlur = 12 + pulseIntensity * 8;
+    ctx.shadowBlur = (12 + pulseIntensity * 8) * glowIntensity;
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
 
     // Button border
-    ctx.strokeStyle = button.color;
+    ctx.strokeStyle = disabled ? COLORS.TEXT_MUTED : button.color;
     ctx.lineWidth = 2;
     ctx.stroke();
 
@@ -263,9 +394,9 @@ function renderButton(ctx, button, pulseIntensity) {
 
     // Button text with glow
     ctx.shadowColor = button.color;
-    ctx.shadowBlur = 6 + pulseIntensity * 4;
-    ctx.fillStyle = COLORS.TEXT_LIGHT;
-    ctx.font = `bold ${UI.FONT_SIZE_LARGE - 2}px ${UI.FONT_FAMILY}`;
+    ctx.shadowBlur = disabled ? 0 : (6 + pulseIntensity * 4);
+    ctx.fillStyle = disabled ? COLORS.TEXT_MUTED : COLORS.TEXT_LIGHT;
+    ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(button.text, button.x, button.y);
@@ -312,7 +443,7 @@ export function render(ctx) {
     // =========================================================================
     // TITLE: "ROUND X COMPLETE" with glow animation
     // =========================================================================
-    const titleY = 160;
+    const titleY = 80;
 
     ctx.save();
     // Multi-layer glow effect for dramatic "ROUND COMPLETE" text
@@ -321,14 +452,10 @@ export function render(ctx) {
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
 
-    ctx.font = `bold 52px ${UI.FONT_FAMILY}`;
+    ctx.font = `bold 42px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = mainColor;
-    ctx.fillText(`ROUND ${completedRound} COMPLETE`, CANVAS.DESIGN_WIDTH / 2, titleY);
-
-    // Second layer for extra glow
-    ctx.shadowBlur = 15 + titlePulse * 10;
     ctx.fillText(`ROUND ${completedRound} COMPLETE`, CANVAS.DESIGN_WIDTH / 2, titleY);
 
     // Title outline for depth
@@ -339,87 +466,192 @@ export function render(ctx) {
     ctx.restore();
 
     // =========================================================================
-    // ROUND STATS
+    // TWO-COLUMN LAYOUT: Left (Stats) | Right (Tokens)
     // =========================================================================
-    const statsY = titleY + 90;
-    const statsSpacing = 36;
+    const contentY = titleY + 60;
+    const leftColumnX = CANVAS.DESIGN_WIDTH * 0.28;
+    const rightColumnX = CANVAS.DESIGN_WIDTH * 0.72;
 
+    // =========================================================================
+    // LEFT COLUMN: Round Stats
+    // =========================================================================
     ctx.save();
-    ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
+    // Section title
+    ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.fillText('ROUND STATS', leftColumnX, contentY);
+
+    let statY = contentY + 35;
+    const statSpacing = 28;
+
     // Damage dealt
+    ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
     ctx.fillStyle = COLORS.TEXT_MUTED;
-    ctx.fillText('Damage Dealt:', CANVAS.DESIGN_WIDTH / 2, statsY);
+    ctx.fillText('Damage Dealt', leftColumnX, statY);
+    ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
     ctx.fillStyle = COLORS.NEON_PINK;
     ctx.shadowColor = COLORS.NEON_PINK;
     ctx.shadowBlur = 6;
-    ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
-    ctx.fillText(roundDamage.toString(), CANVAS.DESIGN_WIDTH / 2, statsY + statsSpacing * 0.8);
+    ctx.fillText(roundDamage.toString(), leftColumnX, statY + 20);
+
+    statY += statSpacing + 25;
 
     // Money earned
     ctx.shadowBlur = 0;
-    ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+    ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
     ctx.fillStyle = COLORS.TEXT_MUTED;
-    ctx.fillText('Money Earned:', CANVAS.DESIGN_WIDTH / 2, statsY + statsSpacing * 2);
+    ctx.fillText('Money Earned', leftColumnX, statY);
+    ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
     ctx.fillStyle = COLORS.NEON_YELLOW;
     ctx.shadowColor = COLORS.NEON_YELLOW;
     ctx.shadowBlur = 6;
-    ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
-    ctx.fillText(`$${roundMoney.toLocaleString()}`, CANVAS.DESIGN_WIDTH / 2, statsY + statsSpacing * 2.8);
+    ctx.fillText(`$${roundMoney.toLocaleString()}`, leftColumnX, statY + 20);
 
     ctx.restore();
 
     // =========================================================================
-    // DIVIDER LINE
+    // RIGHT COLUMN: Tokens Earned
     // =========================================================================
-    const dividerY = statsY + statsSpacing * 4;
-
     ctx.save();
-    ctx.strokeStyle = COLORS.GRID;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(CANVAS.DESIGN_WIDTH / 2 - 150, dividerY);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH / 2 + 150, dividerY);
-    ctx.stroke();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // Section title
+    ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.fillText('TOKENS EARNED', rightColumnX, contentY);
+
+    let tokenY = contentY + 35;
+
+    if (tokenResult && tokenResult.breakdown && tokenResult.breakdown.length > 0) {
+        // Show breakdown
+        ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+
+        for (const item of tokenResult.breakdown) {
+            ctx.fillStyle = COLORS.TEXT_MUTED;
+            ctx.textAlign = 'left';
+            ctx.fillText(item.source, rightColumnX - 80, tokenY);
+            ctx.fillStyle = COLORS.NEON_CYAN;
+            ctx.textAlign = 'right';
+            ctx.fillText(`+${item.amount}`, rightColumnX + 80, tokenY);
+            tokenY += 22;
+        }
+
+        // Divider
+        tokenY += 5;
+        ctx.strokeStyle = COLORS.GRID;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(rightColumnX - 80, tokenY);
+        ctx.lineTo(rightColumnX + 80, tokenY);
+        ctx.stroke();
+        tokenY += 15;
+
+        // Total
+        ctx.textAlign = 'center';
+        ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+        ctx.fillStyle = COLORS.NEON_CYAN;
+        ctx.shadowColor = COLORS.NEON_CYAN;
+        ctx.shadowBlur = 8;
+        ctx.fillText(`TOTAL: ${tokenResult.total} tokens`, rightColumnX, tokenY);
+    } else {
+        // No tokens earned
+        ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+        ctx.fillStyle = COLORS.TEXT_MUTED;
+        ctx.fillText('No tokens this round', rightColumnX, tokenY);
+    }
+
+    // Current balance
+    tokenY += 35;
+    ctx.shadowBlur = 0;
+    ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+    ctx.fillStyle = COLORS.TEXT_MUTED;
+    ctx.fillText(`Balance: ${tokenBalance} tokens`, rightColumnX, tokenY);
+
     ctx.restore();
+
+    // =========================================================================
+    // ACHIEVEMENTS THIS ROUND (if any)
+    // =========================================================================
+    const achievementY = contentY + 175;
+
+    if (roundAchievements.length > 0) {
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        // Section title
+        ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+        ctx.fillStyle = COLORS.NEON_PURPLE;
+        ctx.shadowColor = COLORS.NEON_PURPLE;
+        ctx.shadowBlur = 8;
+        ctx.fillText('ACHIEVEMENTS UNLOCKED', CANVAS.DESIGN_WIDTH / 2, achievementY);
+
+        ctx.shadowBlur = 0;
+        let achY = achievementY + 30;
+
+        // Show up to 3 achievements
+        const displayAchievements = roundAchievements.slice(0, 3);
+        for (const { achievement, reward } of displayAchievements) {
+            ctx.font = `bold ${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+            ctx.fillStyle = COLORS.TEXT_LIGHT;
+            ctx.textAlign = 'center';
+
+            // Star + name + reward
+            const text = `★ ${achievement.name} (+${reward} tokens)`;
+            ctx.fillText(text, CANVAS.DESIGN_WIDTH / 2, achY);
+            achY += 24;
+        }
+
+        // Show "and X more..." if more than 3
+        if (roundAchievements.length > 3) {
+            ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+            ctx.fillStyle = COLORS.TEXT_MUTED;
+            ctx.fillText(`...and ${roundAchievements.length - 3} more`, CANVAS.DESIGN_WIDTH / 2, achY);
+        }
+
+        ctx.restore();
+    }
 
     // =========================================================================
     // NEXT ROUND PREVIEW
     // =========================================================================
-    const previewY = dividerY + 50;
+    const previewY = roundAchievements.length > 0 ? achievementY + 100 : achievementY + 20;
 
     ctx.save();
-    ctx.font = `bold ${UI.FONT_SIZE_LARGE}px ${UI.FONT_FAMILY}`;
+    ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
     // "NEXT ROUND: X"
     ctx.fillStyle = COLORS.TEXT_LIGHT;
-    ctx.fillText(`NEXT ROUND: ${nextRound}`, CANVAS.DESIGN_WIDTH / 2, previewY);
-
-    // "Difficulty: HARD" with colored difficulty
-    ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
-    ctx.fillStyle = COLORS.TEXT_MUTED;
-    ctx.fillText('Difficulty: ', CANVAS.DESIGN_WIDTH / 2 - 50, previewY + 40);
+    ctx.fillText(`NEXT: Round ${nextRound}`, CANVAS.DESIGN_WIDTH / 2 - 60, previewY);
 
     // Colored difficulty text with glow
-    ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
     ctx.fillStyle = difficultyColor;
     ctx.shadowColor = difficultyColor;
     ctx.shadowBlur = 8 + pulseIntensity * 6;
-
-    // Measure text to position properly
-    const difficultyX = CANVAS.DESIGN_WIDTH / 2 + 30;
-    ctx.fillText(nextDifficulty, difficultyX, previewY + 40);
+    ctx.fillText(nextDifficulty, CANVAS.DESIGN_WIDTH / 2 + 80, previewY);
 
     ctx.restore();
 
     // =========================================================================
-    // CONTINUE BUTTON
+    // SUPPLY DROP BUTTON (if can afford)
     // =========================================================================
-    renderButton(ctx, continueButton, pulseIntensity);
+    const canAffordSupplyDrop = tokenBalance >= SUPPLY_DROP_COST;
+    if (canAffordSupplyDrop) {
+        renderButton(ctx, buttons.supplyDrop, pulseIntensity);
+    }
+
+    // =========================================================================
+    // BOTTOM BUTTONS: CONTINUE | SHOP | COLLECTION
+    // =========================================================================
+    renderButton(ctx, buttons.continue, pulseIntensity);
+    renderButton(ctx, buttons.shop, pulseIntensity);
+    renderButton(ctx, buttons.collection, pulseIntensity);
 
     // =========================================================================
     // DECORATIVE FRAME
@@ -429,7 +661,7 @@ export function render(ctx) {
     ctx.shadowColor = mainColor;
     ctx.shadowBlur = 15;
     ctx.lineWidth = 2;
-    ctx.strokeRect(60, 60, CANVAS.DESIGN_WIDTH - 120, CANVAS.DESIGN_HEIGHT - 120);
+    ctx.strokeRect(40, 40, CANVAS.DESIGN_WIDTH - 80, CANVAS.DESIGN_HEIGHT - 80);
 
     // Corner accents
     const cornerSize = 25;
@@ -440,30 +672,30 @@ export function render(ctx) {
 
     // Top-left corner
     ctx.beginPath();
-    ctx.moveTo(60, 60 + cornerSize);
-    ctx.lineTo(60, 60);
-    ctx.lineTo(60 + cornerSize, 60);
+    ctx.moveTo(40, 40 + cornerSize);
+    ctx.lineTo(40, 40);
+    ctx.lineTo(40 + cornerSize, 40);
     ctx.stroke();
 
     // Top-right corner
     ctx.beginPath();
-    ctx.moveTo(CANVAS.DESIGN_WIDTH - 60 - cornerSize, 60);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH - 60, 60);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH - 60, 60 + cornerSize);
+    ctx.moveTo(CANVAS.DESIGN_WIDTH - 40 - cornerSize, 40);
+    ctx.lineTo(CANVAS.DESIGN_WIDTH - 40, 40);
+    ctx.lineTo(CANVAS.DESIGN_WIDTH - 40, 40 + cornerSize);
     ctx.stroke();
 
     // Bottom-left corner
     ctx.beginPath();
-    ctx.moveTo(60, CANVAS.DESIGN_HEIGHT - 60 - cornerSize);
-    ctx.lineTo(60, CANVAS.DESIGN_HEIGHT - 60);
-    ctx.lineTo(60 + cornerSize, CANVAS.DESIGN_HEIGHT - 60);
+    ctx.moveTo(40, CANVAS.DESIGN_HEIGHT - 40 - cornerSize);
+    ctx.lineTo(40, CANVAS.DESIGN_HEIGHT - 40);
+    ctx.lineTo(40 + cornerSize, CANVAS.DESIGN_HEIGHT - 40);
     ctx.stroke();
 
     // Bottom-right corner
     ctx.beginPath();
-    ctx.moveTo(CANVAS.DESIGN_WIDTH - 60 - cornerSize, CANVAS.DESIGN_HEIGHT - 60);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH - 60, CANVAS.DESIGN_HEIGHT - 60);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH - 60, CANVAS.DESIGN_HEIGHT - 60 - cornerSize);
+    ctx.moveTo(CANVAS.DESIGN_WIDTH - 40 - cornerSize, CANVAS.DESIGN_HEIGHT - 40);
+    ctx.lineTo(CANVAS.DESIGN_WIDTH - 40, CANVAS.DESIGN_HEIGHT - 40);
+    ctx.lineTo(CANVAS.DESIGN_WIDTH - 40, CANVAS.DESIGN_HEIGHT - 40 - cornerSize);
     ctx.stroke();
 
     ctx.restore();

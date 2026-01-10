@@ -776,6 +776,13 @@ let achievementState = { ...DEFAULT_ACHIEVEMENT_STATE };
  */
 const unlockCallbacks = [];
 
+/**
+ * Achievements unlocked during the current round.
+ * Reset at the start of each round.
+ * @type {Set<string>}
+ */
+const roundAchievements = new Set();
+
 // =============================================================================
 // DEBUG LOGGING
 // =============================================================================
@@ -1033,6 +1040,7 @@ export function unlockAchievement(id) {
 
     // Mark as unlocked
     achievementState.unlocked.push(id);
+    roundAchievements.add(id);
     achievementState.unlockDates[id] = new Date().toISOString();
 
     // Update progress to show complete (for counter achievements)
@@ -1139,6 +1147,35 @@ export function getTotalTokensEarned() {
 export function getUnlockDate(id) {
     const dateStr = achievementState.unlockDates[id];
     return dateStr ? new Date(dateStr) : null;
+}
+
+
+/**
+ * Get achievements unlocked during the current round.
+ * Returns full achievement objects with their rewards.
+ * @returns {Array<{achievement: Object, reward: number}>}
+ */
+export function getRoundAchievements() {
+    const achievements = [];
+    for (const id of roundAchievements) {
+        const achievement = getAchievement(id);
+        if (achievement) {
+            achievements.push({
+                achievement,
+                reward: achievement.tokenReward
+            });
+        }
+    }
+    return achievements;
+}
+
+/**
+ * Clear the round achievements tracker.
+ * Should be called at the start of each round.
+ */
+export function clearRoundAchievements() {
+    roundAchievements.clear();
+    debugLog('Round achievements cleared');
 }
 
 /**

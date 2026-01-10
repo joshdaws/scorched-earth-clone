@@ -46,7 +46,7 @@ import * as PrecisionAchievements from './precision-achievements.js';
 import * as WeaponAchievements from './weapon-achievements.js';
 import * as ProgressionAchievements from './progression-achievements.js';
 import * as HiddenAchievements from './hidden-achievements.js';
-import { onAchievementUnlock } from './achievements.js';
+import { onAchievementUnlock, clearRoundAchievements, getRoundAchievements } from './achievements.js';
 import * as Tokens from './tokens.js';
 import * as TankCollection from './tank-collection.js';
 import * as PerformanceTracking from './performance-tracking.js';
@@ -1757,7 +1757,10 @@ function checkRoundEnd() {
         // Token system: award tokens for round win
         const combatState = CombatAchievements.getState();
         const isFlawless = combatState.roundState.damageTakenThisRound === 0;
-        Tokens.onRoundWin({ isFlawless, roundNumber: currentRound });
+        const tokenResult = Tokens.onRoundWin({ isFlawless, roundNumber: currentRound });
+
+        // Get achievements unlocked during this round
+        const roundAchievements = getRoundAchievements();
 
         // Performance tracking: round won (updates win streak)
         PerformanceTracking.onRoundEnd(true);
@@ -1778,6 +1781,9 @@ function checkRoundEnd() {
             round: currentRound,
             damage: roundDamage,
             money: roundEarnings,
+            tokenResult: tokenResult,
+            tokenBalance: Tokens.getTokenBalance(),
+            achievements: roundAchievements,
             delay: 1200
         });
 
@@ -3129,6 +3135,9 @@ function setupPlayingState() {
             // Start round earnings tracking with round number for multiplier
             // Rounds 1-2: 1.0x, Rounds 3-4: 1.2x, Rounds 5+: 1.5x
             Money.startRound(currentRound);
+
+            // Clear round achievements tracker for new round
+            clearRoundAchievements();
 
             // Reset combat achievement round state for new round
             CombatAchievements.resetRoundState();
