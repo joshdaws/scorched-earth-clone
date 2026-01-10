@@ -3201,7 +3201,7 @@ function setupShopState() {
                 const x = (e.clientX - rect.left) * scaleX;
                 const y = (e.clientY - rect.top) * scaleY;
 
-                if (Shop.handleWheel(x, y, e.deltaY)) {
+                if (Shop.handleWheel(x, y, e.deltaY, e.shiftKey)) {
                     e.preventDefault();
                 }
             }

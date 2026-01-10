@@ -80,15 +80,37 @@ let activeTab = 'weapons';
 let categoryScrollOffsets = {};
 
 /**
- * Scroll drag state for horizontal scrolling.
- * @type {{active: boolean, categoryType: string|null, startX: number, startScrollX: number, lastX: number, velocity: number, potentialDrag: boolean}}
+ * Vertical scroll offset for the entire category list.
+ * @type {number}
+ */
+let verticalScrollOffset = 0;
+
+/**
+ * Maximum vertical scroll (calculated each frame based on content height).
+ * @type {number}
+ */
+let maxVerticalScroll = 0;
+
+/**
+ * Vertical scroll area bounds (set during render).
+ * @type {{x: number, y: number, width: number, height: number}|null}
+ */
+let verticalScrollArea = null;
+
+/**
+ * Scroll drag state for horizontal and vertical scrolling.
+ * @type {{active: boolean, direction: 'horizontal'|'vertical'|null, categoryType: string|null, startX: number, startY: number, startScrollX: number, startScrollY: number, lastX: number, lastY: number, velocity: number, potentialDrag: boolean}}
  */
 let scrollDragState = {
     active: false,
+    direction: null,  // 'horizontal' or 'vertical'
     categoryType: null,
     startX: 0,
+    startY: 0,
     startScrollX: 0,
+    startScrollY: 0,
     lastX: 0,
+    lastY: 0,
     velocity: 0,
     potentialDrag: false
 };
@@ -222,7 +244,10 @@ export function show(playerTank) {
     tabButtonAreas = [];
     categoryRowAreas = [];
     categoryScrollOffsets = {};
-    scrollDragState = { active: false, categoryType: null, startX: 0, startScrollX: 0, lastX: 0, velocity: 0, potentialDrag: false };
+    verticalScrollOffset = 0;
+    maxVerticalScroll = 0;
+    verticalScrollArea = null;
+    scrollDragState = { active: false, direction: null, categoryType: null, startX: 0, startY: 0, startScrollX: 0, startScrollY: 0, lastX: 0, lastY: 0, velocity: 0, potentialDrag: false };
     activeTab = 'weapons';  // Always start on WEAPONS tab
 
     console.log('[Shop] Opened');
@@ -238,7 +263,10 @@ export function hide() {
     tabButtonAreas = [];
     categoryRowAreas = [];
     categoryScrollOffsets = {};
-    scrollDragState = { active: false, categoryType: null, startX: 0, startScrollX: 0, lastX: 0, velocity: 0, potentialDrag: false };
+    verticalScrollOffset = 0;
+    maxVerticalScroll = 0;
+    verticalScrollArea = null;
+    scrollDragState = { active: false, direction: null, categoryType: null, startX: 0, startY: 0, startScrollX: 0, startScrollY: 0, lastX: 0, lastY: 0, velocity: 0, potentialDrag: false };
 
     console.log('[Shop] Closed');
 }
@@ -393,6 +421,20 @@ function getCategoryRowAtPoint(x, y) {
 }
 
 /**
+ * Check if a point is inside the vertical scroll area.
+ * @param {number} x - X coordinate
+ * @param {number} y - Y coordinate
+ * @returns {boolean} True if point is in vertical scroll area
+ */
+function isInVerticalScrollArea(x, y) {
+    if (!verticalScrollArea) return false;
+    return x >= verticalScrollArea.x &&
+           x <= verticalScrollArea.x + verticalScrollArea.width &&
+           y >= verticalScrollArea.y &&
+           y <= verticalScrollArea.y + verticalScrollArea.height;
+}
+
+/**
  * Handle pointer down on the shop screen.
  * Sets pressed state for touch feedback.
  * @param {number} x - X coordinate in design space
@@ -415,18 +457,24 @@ export function handlePointerDown(x, y) {
         return true;
     }
 
-    // Check if touching a category row (for potential scroll dragging)
-    const categoryRow = getCategoryRowAtPoint(x, y);
-    if (categoryRow && categoryRow.maxScroll > 0) {
-        // Start potential scroll drag (will become active after movement threshold)
+    // Check if touching in the vertical scroll area (for potential vertical/horizontal scrolling)
+    if (isInVerticalScrollArea(x, y)) {
+        // Check if touching a specific category row (for potential horizontal scroll)
+        const categoryRow = getCategoryRowAtPoint(x, y);
+
+        // Start potential scroll drag
         scrollDragState = {
             active: false,  // Not active until we detect actual dragging
-            categoryType: categoryRow.categoryType,
+            direction: null,  // Will be determined by first movement direction
+            categoryType: categoryRow && categoryRow.maxScroll > 0 ? categoryRow.categoryType : null,
             startX: x,
-            startScrollX: categoryScrollOffsets[categoryRow.categoryType] || 0,
+            startY: y,
+            startScrollX: categoryRow ? (categoryScrollOffsets[categoryRow.categoryType] || 0) : 0,
+            startScrollY: verticalScrollOffset,
             lastX: x,
+            lastY: y,
             velocity: 0,
-            potentialDrag: true  // Track that we're in a potential drag state
+            potentialDrag: true
         };
     }
 
@@ -456,10 +504,14 @@ export function handlePointerUp(x, y) {
     // Reset scroll drag state
     scrollDragState = {
         active: false,
+        direction: null,
         categoryType: null,
         startX: 0,
+        startY: 0,
         startScrollX: 0,
+        startScrollY: 0,
         lastX: 0,
+        lastY: 0,
         velocity: 0,
         potentialDrag: false
     };
@@ -533,25 +585,45 @@ export function handlePointerMove(x, y) {
 
     // Handle scroll dragging (potential or active)
     if (scrollDragState.potentialDrag || scrollDragState.active) {
-        const dragDistance = Math.abs(scrollDragState.startX - x);
+        const dragDistanceX = Math.abs(scrollDragState.startX - x);
+        const dragDistanceY = Math.abs(scrollDragState.startY - y);
 
-        // Activate dragging after threshold (10px horizontal movement)
-        if (!scrollDragState.active && dragDistance > 10) {
+        // Determine scroll direction if not yet active
+        if (!scrollDragState.active && (dragDistanceX > 10 || dragDistanceY > 10)) {
+            // Determine direction based on which axis moved more
+            // Prefer horizontal if there's a scrollable category row under the pointer
+            if (scrollDragState.categoryType && dragDistanceX >= dragDistanceY) {
+                scrollDragState.direction = 'horizontal';
+            } else if (maxVerticalScroll > 0) {
+                scrollDragState.direction = 'vertical';
+            } else if (scrollDragState.categoryType) {
+                scrollDragState.direction = 'horizontal';
+            } else {
+                // No scrolling possible, cancel potential drag
+                scrollDragState.potentialDrag = false;
+                return;
+            }
+
             scrollDragState.active = true;
             // Cancel any pressed element when we start actual dragging
             pressedElementId = null;
         }
 
         if (scrollDragState.active) {
-            const deltaX = scrollDragState.lastX - x;  // Positive = scroll right
-            scrollDragState.velocity = deltaX;
             scrollDragState.lastX = x;
+            scrollDragState.lastY = y;
 
-            // Update scroll offset (clamped to valid range)
-            const categoryRow = categoryRowAreas.find(r => r.categoryType === scrollDragState.categoryType);
-            if (categoryRow) {
-                const newScrollX = scrollDragState.startScrollX + (scrollDragState.startX - x);
-                categoryScrollOffsets[scrollDragState.categoryType] = Math.max(0, Math.min(categoryRow.maxScroll, newScrollX));
+            if (scrollDragState.direction === 'horizontal') {
+                // Update horizontal scroll offset (clamped to valid range)
+                const categoryRow = categoryRowAreas.find(r => r.categoryType === scrollDragState.categoryType);
+                if (categoryRow) {
+                    const newScrollX = scrollDragState.startScrollX + (scrollDragState.startX - x);
+                    categoryScrollOffsets[scrollDragState.categoryType] = Math.max(0, Math.min(categoryRow.maxScroll, newScrollX));
+                }
+            } else if (scrollDragState.direction === 'vertical') {
+                // Update vertical scroll offset (clamped to valid range)
+                const newScrollY = scrollDragState.startScrollY + (scrollDragState.startY - y);
+                verticalScrollOffset = Math.max(0, Math.min(maxVerticalScroll, newScrollY));
             }
             return;
         }
@@ -566,21 +638,44 @@ export function handlePointerMove(x, y) {
 }
 
 /**
- * Handle mouse wheel scroll for category rows.
- * Scrolls the category row under the pointer.
+ * Handle mouse wheel scroll for category rows and vertical scrolling.
+ * Scrolls vertically by default; scrolls horizontal category row when holding Shift.
  * @param {number} x - X coordinate in design space
  * @param {number} y - Y coordinate in design space
- * @param {number} deltaY - Wheel delta (positive = scroll down/right)
+ * @param {number} deltaY - Wheel delta (positive = scroll down)
+ * @param {boolean} shiftKey - Whether shift key is held
  * @returns {boolean} True if scroll was handled
  */
-export function handleWheel(x, y, deltaY) {
+export function handleWheel(x, y, deltaY, shiftKey = false) {
     if (!isVisible) return false;
 
-    // Check if pointer is over a category row
+    // Check if pointer is in the scroll area
+    if (!isInVerticalScrollArea(x, y)) return false;
+
+    // Check if pointer is over a category row that has horizontal overflow
     const categoryRow = getCategoryRowAtPoint(x, y);
-    if (categoryRow && categoryRow.maxScroll > 0) {
-        // Scroll the category row (use deltaY as horizontal scroll amount)
+    const hasHorizontalScroll = categoryRow && categoryRow.maxScroll > 0;
+
+    // If holding shift and over a scrollable row, scroll horizontally
+    if (shiftKey && hasHorizontalScroll) {
         const scrollAmount = deltaY * 0.5;  // Scale wheel delta for smoother scrolling
+        const currentScroll = categoryScrollOffsets[categoryRow.categoryType] || 0;
+        const newScroll = Math.max(0, Math.min(categoryRow.maxScroll, currentScroll + scrollAmount));
+        categoryScrollOffsets[categoryRow.categoryType] = newScroll;
+        return true;
+    }
+
+    // Default: scroll vertically (if there's content to scroll)
+    if (maxVerticalScroll > 0) {
+        const scrollAmount = deltaY * 0.5;  // Scale wheel delta for smoother scrolling
+        const newScroll = Math.max(0, Math.min(maxVerticalScroll, verticalScrollOffset + scrollAmount));
+        verticalScrollOffset = newScroll;
+        return true;
+    }
+
+    // Fallback: if no vertical scroll but there's horizontal scroll, use that
+    if (hasHorizontalScroll) {
+        const scrollAmount = deltaY * 0.5;
         const currentScroll = categoryScrollOffsets[categoryRow.categoryType] || 0;
         const newScroll = Math.max(0, Math.min(categoryRow.maxScroll, currentScroll + scrollAmount));
         categoryScrollOffsets[categoryRow.categoryType] = newScroll;
@@ -1204,7 +1299,7 @@ export function render(ctx) {
         }
     }
 
-    // Render weapons by category with horizontal scrolling
+    // Render weapons by category with horizontal and vertical scrolling
     // Each category section consists of:
     // 1. Category header (label + horizontal line)
     // 2. Padding below header
@@ -1217,7 +1312,48 @@ export function render(ctx) {
     // Visible row width matches the 5-column grid width
     const visibleRowWidth = totalCardWidth;
 
-    let currentY = panel.Y + SHOP_LAYOUT.CATEGORY.Y_START;
+    // Calculate vertical scroll area bounds
+    const scrollAreaTop = panel.Y + SHOP_LAYOUT.CATEGORY.Y_START;
+    const scrollAreaBottom = panel.Y + SHOP_LAYOUT.DONE_BUTTON.Y_OFFSET - SHOP_LAYOUT.DONE_BUTTON.HEIGHT / 2 - 20; // 20px margin
+    const scrollAreaHeight = scrollAreaBottom - scrollAreaTop;
+
+    // Store scroll area for hit detection
+    verticalScrollArea = {
+        x: gridStartX,
+        y: scrollAreaTop,
+        width: visibleRowWidth,
+        height: scrollAreaHeight
+    };
+
+    // First pass: calculate total content height (without vertical offset)
+    let totalContentHeight = 0;
+    let tempFirstCategory = true;
+    for (const category of WEAPON_CATEGORIES) {
+        const categoryWeapons = allWeapons.filter(w => w.type === category.type);
+        if (categoryWeapons.length === 0) continue;
+
+        if (!tempFirstCategory) {
+            totalContentHeight += categorySectionMargin;
+        }
+        tempFirstCategory = false;
+
+        // Height for this category: header + padding + card row
+        totalContentHeight += categoryHeaderHeight + categoryLabelPadding + cardHeight;
+    }
+
+    // Calculate max vertical scroll
+    maxVerticalScroll = Math.max(0, totalContentHeight - scrollAreaHeight);
+
+    // Clamp current vertical scroll offset
+    verticalScrollOffset = Math.max(0, Math.min(maxVerticalScroll, verticalScrollOffset));
+
+    // Apply vertical clipping to category area
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(gridStartX - 10, scrollAreaTop, visibleRowWidth + 20, scrollAreaHeight);
+    ctx.clip();
+
+    let currentY = scrollAreaTop - verticalScrollOffset;
     let isFirstCategory = true;
 
     for (const category of WEAPON_CATEGORIES) {
@@ -1265,15 +1401,28 @@ export function render(ctx) {
         // Move past header area + padding to get card start position
         const cardStartY = currentY + categoryHeaderHeight + categoryLabelPadding;
 
-        // Track category row area for scroll interactions
-        categoryRowAreas.push({
-            categoryType: category.type,
-            x: gridStartX,
-            y: cardStartY,
-            width: visibleRowWidth,
-            height: cardHeight,
-            maxScroll: maxScroll
-        });
+        // Skip this category if it's completely outside the visible scroll area
+        const categoryBottom = cardStartY + cardHeight;
+        if (categoryBottom < scrollAreaTop || currentY > scrollAreaBottom) {
+            // Update Y for next category and skip rendering
+            currentY = cardStartY + cardHeight;
+            continue;
+        }
+
+        // Track category row area for scroll interactions (only if visible)
+        // Clamp the hit area to the visible scroll region
+        const visibleTop = Math.max(scrollAreaTop, cardStartY);
+        const visibleBottom = Math.min(scrollAreaBottom, categoryBottom);
+        if (visibleBottom > visibleTop) {
+            categoryRowAreas.push({
+                categoryType: category.type,
+                x: gridStartX,
+                y: visibleTop,
+                width: visibleRowWidth,
+                height: visibleBottom - visibleTop,
+                maxScroll: maxScroll
+            });
+        }
 
         // === DRAW WEAPON CARDS (single horizontal row with scroll) ===
         // Apply clipping to only show cards within the visible area
@@ -1309,6 +1458,9 @@ export function render(ctx) {
         // Only one row per category now
         currentY = cardStartY + cardHeight;
     }
+
+    // Remove vertical clipping
+    ctx.restore();
 
     // Render Done button
     renderButton(ctx, doneButton, pulseIntensity);
