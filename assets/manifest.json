@@ -11,6 +11,173 @@
       "height": 32
     }
   },
+  "tankSkins": {
+    "common-standard": {
+      "path": "images/tanks/tank-common-standard.png",
+      "width": 64,
+      "height": 32
+    },
+    "common-desert-camo": {
+      "path": "images/tanks/tank-common-desert-camo.png",
+      "width": 64,
+      "height": 32
+    },
+    "common-forest-camo": {
+      "path": "images/tanks/tank-common-forest-camo.png",
+      "width": 64,
+      "height": 32
+    },
+    "common-arctic": {
+      "path": "images/tanks/tank-common-arctic.png",
+      "width": 64,
+      "height": 32
+    },
+    "common-midnight": {
+      "path": "images/tanks/tank-common-midnight.png",
+      "width": 64,
+      "height": 32
+    },
+    "common-crimson": {
+      "path": "images/tanks/tank-common-crimson.png",
+      "width": 64,
+      "height": 32
+    },
+    "common-tactical-gray": {
+      "path": "images/tanks/tank-common-tactical-gray.png",
+      "width": 64,
+      "height": 32
+    },
+    "uncommon-neon-pink": {
+      "path": "images/tanks/tank-uncommon-neon-pink.png",
+      "width": 64,
+      "height": 32
+    },
+    "uncommon-neon-cyan": {
+      "path": "images/tanks/tank-uncommon-neon-cyan.png",
+      "width": 64,
+      "height": 32
+    },
+    "uncommon-chrome": {
+      "path": "images/tanks/tank-uncommon-chrome.png",
+      "width": 64,
+      "height": 32
+    },
+    "uncommon-gold-plated": {
+      "path": "images/tanks/tank-uncommon-gold-plated.png",
+      "width": 64,
+      "height": 32
+    },
+    "uncommon-zebra": {
+      "path": "images/tanks/tank-uncommon-zebra.png",
+      "width": 64,
+      "height": 32
+    },
+    "uncommon-tiger": {
+      "path": "images/tanks/tank-uncommon-tiger.png",
+      "width": 64,
+      "height": 32
+    },
+    "uncommon-digital-camo": {
+      "path": "images/tanks/tank-uncommon-digital-camo.png",
+      "width": 64,
+      "height": 32
+    },
+    "uncommon-sunset-gradient": {
+      "path": "images/tanks/tank-uncommon-sunset-gradient.png",
+      "width": 64,
+      "height": 32
+    },
+    "rare-delorean": {
+      "path": "images/tanks/tank-rare-delorean.png",
+      "width": 64,
+      "height": 32
+    },
+    "rare-tron-cycle": {
+      "path": "images/tanks/tank-rare-tron-cycle.png",
+      "width": 64,
+      "height": 32
+    },
+    "rare-miami-vice": {
+      "path": "images/tanks/tank-rare-miami-vice.png",
+      "width": 64,
+      "height": 32
+    },
+    "rare-outrun": {
+      "path": "images/tanks/tank-rare-outrun.png",
+      "width": 64,
+      "height": 32
+    },
+    "rare-hotline": {
+      "path": "images/tanks/tank-rare-hotline.png",
+      "width": 64,
+      "height": 32
+    },
+    "rare-cobra-commander": {
+      "path": "images/tanks/tank-rare-cobra-commander.png",
+      "width": 64,
+      "height": 32
+    },
+    "rare-knight-rider": {
+      "path": "images/tanks/tank-rare-knight-rider.png",
+      "width": 64,
+      "height": 32
+    },
+    "epic-flame-rider": {
+      "path": "images/tanks/tank-epic-flame-rider.png",
+      "width": 64,
+      "height": 32
+    },
+    "epic-lightning-strike": {
+      "path": "images/tanks/tank-epic-lightning-strike.png",
+      "width": 64,
+      "height": 32
+    },
+    "epic-holographic": {
+      "path": "images/tanks/tank-epic-holographic.png",
+      "width": 64,
+      "height": 32
+    },
+    "epic-ghost-protocol": {
+      "path": "images/tanks/tank-epic-ghost-protocol.png",
+      "width": 64,
+      "height": 32
+    },
+    "epic-plasma-core": {
+      "path": "images/tanks/tank-epic-plasma-core.png",
+      "width": 64,
+      "height": 32
+    },
+    "epic-starfield": {
+      "path": "images/tanks/tank-epic-starfield.png",
+      "width": 64,
+      "height": 32
+    },
+    "legendary-blood-dragon": {
+      "path": "images/tanks/tank-legendary-blood-dragon.png",
+      "width": 64,
+      "height": 32
+    },
+    "legendary-terminator": {
+      "path": "images/tanks/tank-legendary-terminator.png",
+      "width": 64,
+      "height": 32
+    },
+    "legendary-golden-god": {
+      "path": "images/tanks/tank-legendary-golden-god.png",
+      "width": 64,
+      "height": 32
+    },
+    "legendary-arcade-champion": {
+      "path": "images/tanks/tank-legendary-arcade-champion.png",
+      "width": 64,
+      "height": 32
+    },
+    "legendary-synthwave-supreme": {
+      "path": "images/tanks/tank-legendary-synthwave-supreme.png",
+      "width": 64,
+      "height": 32
+    }
+  },
   "projectiles": {
     "basic": {
       "path": "images/weapons/shot-basic.png",
