@@ -1,95 +1,90 @@
-# Convex Backend Setup
+# Welcome to your Convex functions directory!
 
-This directory contains the Convex backend for Scorched Earth, providing:
-- Global leaderboards
-- Player profiles
-- Achievement sync
-- Tank collection management
-- Future Game Center integration
+Write your Convex functions here.
+See https://docs.convex.dev/functions for more.
 
-## First-Time Setup
+A query function that takes two arguments looks like:
 
-The Convex project requires manual initialization (interactive CLI). Run these commands in your terminal:
+```ts
+// convex/myFunctions.ts
+import { query } from "./_generated/server";
+import { v } from "convex/values";
 
-### 1. Initialize Convex Project
+export const myQueryFunction = query({
+  // Validators for arguments.
+  args: {
+    first: v.number(),
+    second: v.string(),
+  },
 
-```bash
-# From project root
-npx convex dev --once --configure=new
+  // Function implementation.
+  handler: async (ctx, args) => {
+    // Read the database as many times as you need here.
+    // See https://docs.convex.dev/database/reading-data.
+    const documents = await ctx.db.query("tablename").collect();
+
+    // Arguments passed from the client are properties of the args object.
+    console.log(args.first, args.second);
+
+    // Write arbitrary JavaScript here: filter, aggregate, build derived data,
+    // remove non-public properties, or create new objects.
+    return documents;
+  },
+});
 ```
 
-This will:
-1. Prompt for a project name (use `scorched-earth`)
-2. Ask about cloud vs local deployment (choose `cloud deployment`)
-3. Create `.env.local` with your deployment URL
-4. Deploy the schema and functions
+Using this query function in a React component looks like:
 
-### 2. Verify Setup
-
-After initialization, you should see:
-- `.env.local` file with `CONVEX_DEPLOYMENT` variable
-- `convex/_generated/` directory with generated types
-
-### 3. Development Mode
-
-For ongoing development:
-
-```bash
-npx convex dev
+```ts
+const data = useQuery(api.myFunctions.myQueryFunction, {
+  first: 10,
+  second: "hello",
+});
 ```
 
-This watches for changes and auto-deploys to your dev deployment.
+A mutation function looks like:
 
-## Project Structure
+```ts
+// convex/myFunctions.ts
+import { mutation } from "./_generated/server";
+import { v } from "convex/values";
 
-```
-convex/
-  schema.ts          # Database schema (6 tables)
-  players.ts         # Player management functions
-  highScores.ts      # Leaderboard functions
-  _generated/        # Auto-generated types (after init)
-```
+export const myMutationFunction = mutation({
+  // Validators for arguments.
+  args: {
+    first: v.string(),
+    second: v.string(),
+  },
 
-## Schema Overview
+  // Function implementation.
+  handler: async (ctx, args) => {
+    // Insert or modify documents in the database here.
+    // Mutations can also read from the database like queries.
+    // See https://docs.convex.dev/database/writing-data.
+    const message = { body: args.first, author: args.second };
+    const id = await ctx.db.insert("messages", message);
 
-| Table | Purpose |
-|-------|---------|
-| `players` | Central player profiles with identity, currency, and stats |
-| `highScores` | Global leaderboard entries |
-| `achievements` | Achievement unlock records per player |
-| `tankCollection` | Owned tanks per player |
-| `lifetimeStats` | Aggregate statistics per player |
-| `syncQueue` | Offline action queue for poor connectivity |
-
-## API Functions
-
-### Players
-- `getPlayer({ deviceId })` - Get player by device ID
-- `createPlayer({ deviceId, displayName, platform })` - Create new player
-- `updateDisplayName({ deviceId, displayName })` - Update display name
-- `linkGameCenterAccount({ deviceId, gameCenterId, displayName })` - Link Game Center
-
-### High Scores
-- `getLeaderboard({ limit? })` - Get global top scores
-- `getPlayerScores({ deviceId, limit? })` - Get player's scores
-- `getPlayerRank({ deviceId })` - Get player's rank
-- `submitScore({ deviceId, runStats })` - Submit a score
-
-## Environment Variables
-
-After setup, these will be in `.env.local`:
-
-```
-CONVEX_DEPLOYMENT=dev:your-deployment-name
+    // Optionally, return a value from your mutation.
+    return await ctx.db.get("messages", id);
+  },
+});
 ```
 
-## Troubleshooting
+Using this mutation function in a React component looks like:
 
-### "Cannot prompt for input in non-interactive terminals"
-Run the CLI in an interactive terminal (not in CI/CD without deploy keys).
+```ts
+const mutation = useMutation(api.myFunctions.myMutationFunction);
+function handleButtonPress() {
+  // fire and forget, the most common way to use mutations
+  mutation({ first: "Hello!", second: "me" });
+  // OR
+  // use the result once the mutation has completed
+  mutation({ first: "Hello!", second: "me" }).then((result) =>
+    console.log(result),
+  );
+}
+```
 
-### "No CONVEX_DEPLOYMENT set"
-Run `npx convex dev` to initialize or check that `.env.local` exists.
-
-### Schema not deploying
-Ensure the schema compiles: `npx convex codegen`
+Use the Convex CLI to push your functions to a deployment. See everything
+the Convex CLI can do by running `npx convex -h` in your project root
+directory. To learn more, launch the docs with `npx convex docs`.

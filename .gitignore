@@ -34,3 +34,8 @@ ios/App/*.xcworkspace
 xcuserdata/
 .playwright-mcp/
 .vercel
+
+.env.local
+
+# Convex
+convex/_generated/
