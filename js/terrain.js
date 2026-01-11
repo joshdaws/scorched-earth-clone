@@ -9,23 +9,33 @@
  * At 1920px width: 1920 * 4 = 7.5KB (very memory efficient)
  */
 
-import { CANVAS, TERRAIN } from './constants.js';
+import { TERRAIN } from './constants.js';
+import { getScreenWidth, getScreenHeight } from './screenSize.js';
 
 /**
  * Terrain heightmap data structure.
  * Stores ground height at each x-coordinate using a Float32Array for memory efficiency.
+ * Now supports dynamic screen dimensions for adaptive screen sizing.
  */
 export class Terrain {
     /**
      * Create a new terrain heightmap.
-     * @param {number} [width=CANVAS.DESIGN_WIDTH] - Width of the terrain in pixels
+     * @param {number} [width] - Width of the terrain in pixels (defaults to current screen width)
+     * @param {number} [height] - Height of the screen for collision calculations (defaults to current screen height)
      */
-    constructor(width = CANVAS.DESIGN_WIDTH) {
+    constructor(width, height) {
         /**
          * Width of the terrain in pixels (number of columns in heightmap)
          * @type {number}
          */
-        this.width = width;
+        this.width = width ?? getScreenWidth();
+
+        /**
+         * Height of the screen associated with this terrain (for collision calculations).
+         * This is the canvas height when the terrain was created.
+         * @type {number}
+         */
+        this.screenHeight = height ?? getScreenHeight();
 
         /**
          * The heightmap array where heightmap[x] = y-coordinate of ground surface at x.
@@ -33,14 +43,14 @@ export class Terrain {
          * after smoothing/interpolation operations.
          * @type {Float32Array}
          */
-        this.heightmap = new Float32Array(width);
+        this.heightmap = new Float32Array(this.width);
 
         // Initialize all heights to 0 (ground level at bottom)
         // Float32Array is zero-initialized by default, but being explicit for clarity
         this.heightmap.fill(0);
 
         // Log terrain creation with dimensions
-        console.log(`Terrain created: ${this.width}px wide, ${this.heightmap.byteLength} bytes (Float32Array)`);
+        console.log(`Terrain created: ${this.width}px wide x ${this.screenHeight}px tall, ${this.heightmap.byteLength} bytes (Float32Array)`);
     }
 
     /**
@@ -79,8 +89,8 @@ export class Terrain {
         }
 
         // Clamp y value to valid range (0 to canvas height)
-        // Heights are stored as distance from bottom, so 0 = bottom, DESIGN_HEIGHT = top
-        const clampedY = Math.max(0, Math.min(y, CANVAS.DESIGN_HEIGHT));
+        // Heights are stored as distance from bottom, so 0 = bottom, screenHeight = top
+        const clampedY = Math.max(0, Math.min(y, this.screenHeight));
 
         this.heightmap[index] = clampedY;
         return true;
@@ -92,6 +102,15 @@ export class Terrain {
      */
     getWidth() {
         return this.width;
+    }
+
+    /**
+     * Get the screen height associated with this terrain.
+     * This is the canvas height used for collision calculations.
+     * @returns {number} The screen height in pixels
+     */
+    getScreenHeight() {
+        return this.screenHeight;
     }
 
     /**
@@ -133,6 +152,7 @@ export class Terrain {
     serialize() {
         return {
             width: this.width,
+            screenHeight: this.screenHeight,
             // Convert Float32Array to regular array for JSON serialization
             heights: Array.from(this.heightmap)
         };
@@ -144,6 +164,7 @@ export class Terrain {
      *
      * @param {Object} data - The serialized terrain data
      * @param {number} data.width - Width of the terrain
+     * @param {number} [data.screenHeight] - Screen height (optional, defaults to current screen height)
      * @param {number[]} data.heights - Array of height values
      * @returns {Terrain} A new Terrain instance with the deserialized data
      * @throws {Error} If data is invalid or missing required properties
@@ -160,14 +181,15 @@ export class Terrain {
         }
 
         // Create new terrain and populate with deserialized data
-        const terrain = new Terrain(data.width);
+        // screenHeight is optional for backwards compatibility with old saves
+        const terrain = new Terrain(data.width, data.screenHeight);
 
         // Copy heights from array to Float32Array
         for (let i = 0; i < data.width; i++) {
             terrain.heightmap[i] = data.heights[i];
         }
 
-        console.log(`Terrain deserialized: ${terrain.width}px wide, heights range ${terrain.getMinHeight()}-${terrain.getMaxHeight()}`);
+        console.log(`Terrain deserialized: ${terrain.width}px wide x ${terrain.screenHeight}px tall, heights range ${terrain.getMinHeight()}-${terrain.getMaxHeight()}`);
 
         return terrain;
     }
@@ -179,7 +201,7 @@ export class Terrain {
      * @param {number} height - The height value to fill with
      */
     fill(height) {
-        const clampedHeight = Math.max(0, Math.min(height, CANVAS.DESIGN_HEIGHT));
+        const clampedHeight = Math.max(0, Math.min(height, this.screenHeight));
         this.heightmap.fill(clampedHeight);
     }
 
@@ -188,7 +210,7 @@ export class Terrain {
      * @returns {Terrain} A new Terrain instance with the same data
      */
     clone() {
-        const copy = new Terrain(this.width);
+        const copy = new Terrain(this.width, this.screenHeight);
         copy.heightmap.set(this.heightmap);
         return copy;
     }
@@ -221,8 +243,8 @@ export class Terrain {
         const terrainHeight = this.heightmap[flooredX];
 
         // Convert terrain height to canvas Y-coordinate
-        // Terrain surface in canvas coords = DESIGN_HEIGHT - terrainHeight
-        const terrainSurfaceY = CANVAS.DESIGN_HEIGHT - terrainHeight;
+        // Terrain surface in canvas coords = screenHeight - terrainHeight
+        const terrainSurfaceY = this.screenHeight - terrainHeight;
 
         // Collision occurs when projectile Y >= terrain surface Y
         // (projectile is at or below the terrain surface)
@@ -265,7 +287,7 @@ export class Terrain {
 
         // Convert canvas Y to terrain height (distance from bottom)
         // Canvas Y=0 is top, so lower Y means higher terrain height
-        const explosionHeight = CANVAS.DESIGN_HEIGHT - y;
+        const explosionHeight = this.screenHeight - y;
 
         // Track if any terrain was actually modified
         let terrainModified = false;
@@ -454,13 +476,14 @@ export class Terrain {
 }
 
 /**
- * Create a new terrain instance with the default game width.
- * Convenience function for creating terrain with standard dimensions.
+ * Create a new terrain instance with the current screen dimensions.
+ * Convenience function for creating terrain with dynamic dimensions.
+ * Uses getScreenWidth() and getScreenHeight() for fully adaptive sizing.
  *
  * @returns {Terrain} A new Terrain instance
  */
 export function createTerrain() {
-    return new Terrain(CANVAS.DESIGN_WIDTH);
+    return new Terrain(getScreenWidth(), getScreenHeight());
 }
 
 // =============================================================================
@@ -498,8 +521,8 @@ function createSeededRandom(seed) {
  * - Higher values (0.6-0.7) create more jagged, mountainous terrain
  * - Values around 0.5 provide a good balance for gameplay
  *
- * @param {number} width - Width of the terrain in pixels
- * @param {number} height - Height of the canvas (used for height calculations)
+ * @param {number} [width] - Width of the terrain in pixels (defaults to current screen width)
+ * @param {number} [height] - Height of the canvas (defaults to current screen height)
  * @param {Object} [options={}] - Generation options
  * @param {number} [options.roughness=0.5] - Roughness factor (0.4-0.6 recommended)
  * @param {number} [options.seed=null] - Seed for random generation (null for random seed)
@@ -508,6 +531,9 @@ function createSeededRandom(seed) {
  * @returns {Terrain} A new Terrain instance with generated heightmap
  */
 export function generateTerrain(width, height, options = {}) {
+    // Use dynamic screen dimensions if not provided
+    const actualWidth = width ?? getScreenWidth();
+    const actualHeight = height ?? getScreenHeight();
     // Extract options with defaults
     const {
         roughness = 0.5,
@@ -519,21 +545,21 @@ export function generateTerrain(width, height, options = {}) {
     // Validate roughness is in reasonable range
     const clampedRoughness = Math.max(0.3, Math.min(0.7, roughness));
 
-    // Calculate height bounds in pixels
-    const minHeight = height * minHeightPercent;
-    const maxHeight = height * maxHeightPercent;
+    // Calculate height bounds in pixels (using actual screen height)
+    const minHeight = actualHeight * minHeightPercent;
+    const maxHeight = actualHeight * maxHeightPercent;
     const heightRange = maxHeight - minHeight;
 
     // Create random number generator (seeded or unseeded)
     const actualSeed = seed !== null ? seed : Math.floor(Math.random() * 2147483647);
     const random = createSeededRandom(actualSeed);
 
-    // Create terrain instance
-    const terrain = new Terrain(width);
+    // Create terrain instance with dynamic dimensions
+    const terrain = new Terrain(actualWidth, actualHeight);
 
     // Temporary array for algorithm (we need power-of-2 + 1 points for clean subdivision)
     // Find the smallest power of 2 >= width
-    const pow2 = Math.pow(2, Math.ceil(Math.log2(width)));
+    const pow2 = Math.pow(2, Math.ceil(Math.log2(actualWidth)));
     const numPoints = pow2 + 1;
     const points = new Float32Array(numPoints);
 
@@ -577,9 +603,9 @@ export function generateTerrain(width, height, options = {}) {
 
     // Copy points to terrain heightmap, handling width differences
     // If width < numPoints, we sample; if width > numPoints, we interpolate
-    for (let x = 0; x < width; x++) {
+    for (let x = 0; x < actualWidth; x++) {
         // Map x coordinate to points array
-        const pointIndex = (x / (width - 1)) * (numPoints - 1);
+        const pointIndex = (x / (actualWidth - 1)) * (numPoints - 1);
         const leftIndex = Math.floor(pointIndex);
         const rightIndex = Math.min(leftIndex + 1, numPoints - 1);
         const t = pointIndex - leftIndex;
@@ -589,7 +615,7 @@ export function generateTerrain(width, height, options = {}) {
         terrain.heightmap[x] = interpolatedHeight;
     }
 
-    console.log(`Terrain generated: seed=${actualSeed}, roughness=${clampedRoughness.toFixed(2)}, height range=[${terrain.getMinHeight().toFixed(0)}, ${terrain.getMaxHeight().toFixed(0)}]`);
+    console.log(`Terrain generated: ${actualWidth}x${actualHeight}, seed=${actualSeed}, roughness=${clampedRoughness.toFixed(2)}, height range=[${terrain.getMinHeight().toFixed(0)}, ${terrain.getMaxHeight().toFixed(0)}]`);
 
     return terrain;
 }

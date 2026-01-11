@@ -2095,23 +2095,24 @@ function renderTerrain(ctx) {
 
     const terrain = currentTerrain;
     const width = terrain.getWidth();
+    const screenHeight = terrain.getScreenHeight();
 
     // Build terrain path once and reuse for fill and stroke
     ctx.beginPath();
 
     // Start at bottom-left corner
-    ctx.moveTo(0, CANVAS.DESIGN_HEIGHT);
+    ctx.moveTo(0, screenHeight);
 
     // Draw terrain profile
-    // Heights are distance from bottom, so canvas Y = DESIGN_HEIGHT - terrainHeight
+    // Heights are distance from bottom, so canvas Y = screenHeight - terrainHeight
     for (let x = 0; x < width; x++) {
         const terrainHeight = terrain.getHeight(x);
-        const canvasY = CANVAS.DESIGN_HEIGHT - terrainHeight;
+        const canvasY = screenHeight - terrainHeight;
         ctx.lineTo(x, canvasY);
     }
 
     // Close the path at bottom-right corner
-    ctx.lineTo(width - 1, CANVAS.DESIGN_HEIGHT);
+    ctx.lineTo(width - 1, screenHeight);
     ctx.closePath();
 
     // Fill terrain with solid dark purple
@@ -2134,7 +2135,7 @@ function renderTerrain(ctx) {
     ctx.beginPath();
     for (let x = 0; x < width; x++) {
         const terrainHeight = terrain.getHeight(x);
-        const canvasY = CANVAS.DESIGN_HEIGHT - terrainHeight;
+        const canvasY = screenHeight - terrainHeight;
         if (x === 0) {
             ctx.moveTo(x, canvasY);
         } else {
@@ -3281,10 +3282,11 @@ function setupPlayingState() {
 
             // Generate new terrain for this game
             // Uses midpoint displacement algorithm for natural-looking hills and valleys
-            currentTerrain = generateTerrain(CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT, {
+            // Terrain adapts to dynamic screen dimensions (no fixed width/height)
+            currentTerrain = generateTerrain(undefined, undefined, {
                 roughness: 0.5,  // Balanced jaggedness (0.4-0.6 recommended)
-                minHeightPercent: 0.2,  // Terrain starts at 20% of canvas height minimum
-                maxHeightPercent: 0.7   // Terrain peaks at 70% of canvas height maximum
+                minHeightPercent: 0.2,  // Terrain starts at 20% of screen height minimum
+                maxHeightPercent: 0.7   // Terrain peaks at 70% of screen height maximum
             });
 
             // Place tanks on the generated terrain
