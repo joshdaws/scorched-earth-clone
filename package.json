@@ -8,9 +8,9 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build:web": "rm -rf www && mkdir -p www && cp -r index.html style.css js assets www/",
+    "build:web": "rm -rf www && mkdir -p www/node_modules/convex/dist && cp -r index.html style.css js assets www/ && cp node_modules/convex/dist/browser.bundle.js www/node_modules/convex/dist/",
     "build:ios": "npm run build:web && npx cap sync ios",
-    "ios:sync": "rsync -av --delete index.html style.css js/ assets/ www/ && npx cap copy ios",
+    "ios:sync": "mkdir -p www/js www/assets www/node_modules/convex/dist && rsync -av --delete index.html style.css www/ && rsync -av --delete js/ www/js/ && rsync -av --delete assets/ www/assets/ && cp node_modules/convex/dist/browser.bundle.js www/node_modules/convex/dist/ && npx cap copy ios",
     "open:ios": "npx cap open ios",
     "serve": "python3 -m http.server 8000"
   },

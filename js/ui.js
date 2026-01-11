@@ -131,7 +131,7 @@ function getHUDLayoutDynamic() {
         },
         PLAYER_INFO_PANEL: {
             X: fromLeft(20),
-            Y: fromTop(95 * scale),  // Below round indicator
+            Y: fromTop(55 * scale),  // Aligned with enemy health bar Y position
             WIDTH: playerPanelWidth,
             PADDING: panelPadding,
             SECTION_GAP: scaled(HUD_BASE.PLAYER_INFO_PANEL.SECTION_GAP),
@@ -865,21 +865,26 @@ export function renderPlayerInfoPanel(ctx, playerTank, money, isPlayerTurn = tru
     // =========================================================================
     ctx.save();
 
-    // Dollar sign with glow
-    ctx.fillStyle = COLORS.NEON_YELLOW;
+    // Format money with dollar sign directly in front: "$1,500"
+    const moneyValue = money !== undefined ? money : 0;
+    const moneyText = `$${moneyValue.toLocaleString()}`;
+
+    // Draw money text right-aligned with dollar sign glow effect
     ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'left';
+    ctx.textAlign = 'right';
     ctx.textBaseline = 'top';
+
+    // First pass: draw with glow on dollar sign color
+    ctx.fillStyle = COLORS.NEON_YELLOW;
     ctx.shadowColor = COLORS.NEON_YELLOW;
     ctx.shadowBlur = 4;
-    ctx.fillText('$', contentX, currentY);
+    ctx.fillText(moneyText, panel.X + panel.WIDTH - panel.PADDING, currentY);
 
-    // Money amount
+    // Second pass: overdraw just the number portion in white (no $ sign)
     ctx.shadowBlur = 0;
     ctx.fillStyle = COLORS.TEXT_LIGHT;
-    ctx.textAlign = 'right';
-    const moneyValue = money !== undefined ? money : 0;
-    ctx.fillText(moneyValue.toLocaleString(), panel.X + panel.WIDTH - panel.PADDING, currentY);
+    const numberOnly = moneyValue.toLocaleString();
+    ctx.fillText(numberOnly, panel.X + panel.WIDTH - panel.PADDING, currentY);
 
     ctx.restore();
 
