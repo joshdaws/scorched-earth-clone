@@ -54,6 +54,7 @@ import * as PitySystem from './pity-system.js';
 import * as LifetimeStats from './lifetime-stats.js';
 import * as NameEntry from './nameEntry.js';
 import * as TitleScene from './titleScene/titleScene.js';
+import { Button } from './ui/Button.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -1352,53 +1353,81 @@ function setupMenuState() {
 let selectedDifficulty = null;
 
 /**
- * Difficulty selection button definitions.
- * Centered vertically on screen with consistent spacing.
+ * Difficulty selection button definitions using Button component.
+ * Each entry includes the Button instance plus metadata (difficulty level, description).
  */
-const difficultyButtons = {
+const difficultyButtonConfigs = {
     easy: {
-        x: CANVAS.DESIGN_WIDTH / 2,
-        y: CANVAS.DESIGN_HEIGHT / 2 - 70,
-        width: 280,
-        height: 60,
-        text: 'EASY',
-        color: '#00ff88',  // Green
         difficulty: 'easy',
-        description: 'Relaxed gameplay • AI makes more mistakes'
+        description: 'Relaxed gameplay • AI makes more mistakes',
+        color: '#00ff88'  // Green - for description text
     },
     medium: {
-        x: CANVAS.DESIGN_WIDTH / 2,
-        y: CANVAS.DESIGN_HEIGHT / 2 + 10,
-        width: 280,
-        height: 60,
-        text: 'MEDIUM',
-        color: '#ffff00',  // Yellow
         difficulty: 'medium',
-        description: 'Balanced challenge • AI compensates for wind'
+        description: 'Balanced challenge • AI compensates for wind',
+        color: '#ffff00'  // Yellow - for description text
     },
     hard: {
-        x: CANVAS.DESIGN_WIDTH / 2,
-        y: CANVAS.DESIGN_HEIGHT / 2 + 90,
-        width: 280,
-        height: 60,
-        text: 'HARD',
-        color: '#ff4444',  // Red
         difficulty: 'hard',
-        description: 'Brutal precision • AI rarely misses'
+        description: 'Brutal precision • AI rarely misses',
+        color: '#ff4444'  // Red - for description text
     }
 };
 
 /**
- * Back button for difficulty selection screen.
+ * Button component instances for difficulty selection.
+ * Created once, positions updated dynamically.
  */
-const difficultyBackButton = {
+const difficultyButtons = {
+    easy: new Button({
+        text: 'EASY',
+        x: CANVAS.DESIGN_WIDTH / 2,
+        y: CANVAS.DESIGN_HEIGHT / 2 - 70,
+        width: 280,
+        height: 60,
+        fontSize: UI.FONT_SIZE_LARGE,
+        borderColor: '#00ff88',
+        glowColor: '#00ff88',
+        textColor: COLORS.TEXT_LIGHT
+    }),
+    medium: new Button({
+        text: 'MEDIUM',
+        x: CANVAS.DESIGN_WIDTH / 2,
+        y: CANVAS.DESIGN_HEIGHT / 2 + 10,
+        width: 280,
+        height: 60,
+        fontSize: UI.FONT_SIZE_LARGE,
+        borderColor: '#ffff00',
+        glowColor: '#ffff00',
+        textColor: COLORS.TEXT_LIGHT
+    }),
+    hard: new Button({
+        text: 'HARD',
+        x: CANVAS.DESIGN_WIDTH / 2,
+        y: CANVAS.DESIGN_HEIGHT / 2 + 90,
+        width: 280,
+        height: 60,
+        fontSize: UI.FONT_SIZE_LARGE,
+        borderColor: '#ff4444',
+        glowColor: '#ff4444',
+        textColor: COLORS.TEXT_LIGHT
+    })
+};
+
+/**
+ * Back button for difficulty selection screen using Button component.
+ */
+const difficultyBackButton = new Button({
+    text: '← BACK',
     x: CANVAS.DESIGN_WIDTH / 2,
     y: CANVAS.DESIGN_HEIGHT - 80,
     width: 200,
     height: 50,
-    text: '← BACK',
-    color: COLORS.TEXT_MUTED
-};
+    fontSize: UI.FONT_SIZE_MEDIUM,
+    borderColor: COLORS.TEXT_MUTED,
+    glowColor: COLORS.TEXT_MUTED,
+    textColor: COLORS.TEXT_MUTED
+});
 
 /**
  * Update difficulty button positions based on current screen dimensions.
@@ -1410,17 +1439,10 @@ function updateDifficultyButtonPositions() {
     const centerX = width / 2;
     const centerY = height / 2;
 
-    difficultyButtons.easy.x = centerX;
-    difficultyButtons.easy.y = centerY - 70;
-
-    difficultyButtons.medium.x = centerX;
-    difficultyButtons.medium.y = centerY + 10;
-
-    difficultyButtons.hard.x = centerX;
-    difficultyButtons.hard.y = centerY + 90;
-
-    difficultyBackButton.x = centerX;
-    difficultyBackButton.y = height - 80;
+    difficultyButtons.easy.setPosition(centerX, centerY - 70);
+    difficultyButtons.medium.setPosition(centerX, centerY + 10);
+    difficultyButtons.hard.setPosition(centerX, centerY + 90);
+    difficultyBackButton.setPosition(centerX, height - 80);
 }
 
 /**
@@ -1438,14 +1460,14 @@ function handleDifficultyClick(pos) {
     // Ensure button positions are current for the screen size
     updateDifficultyButtonPositions();
 
-    // Check difficulty buttons
+    // Check difficulty buttons (using Button component's containsPoint)
     for (const key of Object.keys(difficultyButtons)) {
         const button = difficultyButtons[key];
-        if (isInsideButton(pos.x, pos.y, button)) {
+        if (button.containsPoint(pos.x, pos.y)) {
             // Play click sound
             Sound.playClickSound();
-            // Set the selected difficulty
-            selectedDifficulty = button.difficulty;
+            // Set the selected difficulty from config
+            selectedDifficulty = difficultyButtonConfigs[key].difficulty;
             console.log(`[Main] Player selected difficulty: ${selectedDifficulty}`);
             // Start the game
             Game.setState(GAME_STATES.PLAYING);
@@ -1453,64 +1475,33 @@ function handleDifficultyClick(pos) {
         }
     }
 
-    // Check back button
-    if (isInsideButton(pos.x, pos.y, difficultyBackButton)) {
+    // Check back button (using Button component's containsPoint)
+    if (difficultyBackButton.containsPoint(pos.x, pos.y)) {
         Sound.playClickSound();
         Game.setState(GAME_STATES.MENU);
     }
 }
 
 /**
- * Render a difficulty selection button with glow effect.
+ * Render a difficulty selection button using Button component with description text.
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
- * @param {Object} button - Button definition
+ * @param {string} key - Button key (easy, medium, hard)
  * @param {number} pulseIntensity - Glow pulse intensity (0-1)
  */
-function renderDifficultyButton(ctx, button, pulseIntensity) {
-    const halfWidth = button.width / 2;
-    const halfHeight = button.height / 2;
-    const btnX = button.x - halfWidth;
-    const btnY = button.y - halfHeight;
+function renderDifficultyButton(ctx, key, pulseIntensity) {
+    const button = difficultyButtons[key];
+    const config = difficultyButtonConfigs[key];
 
+    // Render the button using Button component
+    button.render(ctx, pulseIntensity);
+
+    // Render description text below the button
     ctx.save();
-
-    // Button background with rounded corners
-    ctx.fillStyle = 'rgba(26, 26, 46, 0.8)';
-    ctx.beginPath();
-    ctx.roundRect(btnX, btnY, button.width, button.height, 8);
-    ctx.fill();
-
-    // Neon glow effect (pulsing)
-    ctx.shadowColor = button.color;
-    ctx.shadowBlur = 15 + pulseIntensity * 10;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
-
-    // Button border (neon outline)
-    ctx.strokeStyle = button.color;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.roundRect(btnX, btnY, button.width, button.height, 8);
-    ctx.stroke();
-
-    // Reset shadow for text
-    ctx.shadowBlur = 0;
-
-    // Button text with glow
-    ctx.shadowColor = button.color;
-    ctx.shadowBlur = 8 + pulseIntensity * 5;
-    ctx.fillStyle = COLORS.TEXT_LIGHT;
-    ctx.font = `bold ${UI.FONT_SIZE_LARGE}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(button.text, button.x, button.y - 5);
-
-    // Description text below button text
-    ctx.shadowBlur = 0;
     ctx.fillStyle = COLORS.TEXT_MUTED;
     ctx.font = `${UI.FONT_SIZE_SMALL - 2}px ${UI.FONT_FAMILY}`;
-    ctx.fillText(button.description, button.x, button.y + 18);
-
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(config.description, button.x, button.y + 18);
     ctx.restore();
 }
 
@@ -1567,36 +1558,13 @@ function renderDifficultySelect(ctx) {
     ctx.textBaseline = 'middle';
     ctx.fillText('Choose your challenge level', width / 2, titleY + 45);
 
-    // Render difficulty buttons
+    // Render difficulty buttons using Button component
     for (const key of Object.keys(difficultyButtons)) {
-        renderDifficultyButton(ctx, difficultyButtons[key], pulseIntensity);
+        renderDifficultyButton(ctx, key, pulseIntensity);
     }
 
-    // Render back button (simpler style)
-    const backBtn = difficultyBackButton;
-    const backHalfWidth = backBtn.width / 2;
-    const backHalfHeight = backBtn.height / 2;
-    const backBtnX = backBtn.x - backHalfWidth;
-    const backBtnY = backBtn.y - backHalfHeight;
-
-    ctx.save();
-    ctx.fillStyle = 'rgba(26, 26, 46, 0.6)';
-    ctx.beginPath();
-    ctx.roundRect(backBtnX, backBtnY, backBtn.width, backBtn.height, 6);
-    ctx.fill();
-
-    ctx.strokeStyle = COLORS.TEXT_MUTED;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.roundRect(backBtnX, backBtnY, backBtn.width, backBtn.height, 6);
-    ctx.stroke();
-
-    ctx.fillStyle = COLORS.TEXT_MUTED;
-    ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(backBtn.text, backBtn.x, backBtn.y);
-    ctx.restore();
+    // Render back button using Button component
+    difficultyBackButton.render(ctx, pulseIntensity);
 
     // Neon frame around the screen (same as menu)
     ctx.save();
