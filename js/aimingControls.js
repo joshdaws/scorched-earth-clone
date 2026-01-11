@@ -19,7 +19,7 @@ import { getScreenWidth, getScreenHeight } from './screenSize.js';
 import {
     fromRight, fromBottom,
     scaled, scaledTouch, isVeryShortScreen, isMobileDevice
-} from './uiPosition.js';
+} from './uiPosition.js?v=20260111a';
 
 // =============================================================================
 // LAYOUT HELPERS

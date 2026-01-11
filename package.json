@@ -8,9 +8,9 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build:web": "rm -rf www && mkdir -p www/node_modules/convex/dist && cp -r index.html style.css config.js js assets www/ && cp node_modules/convex/dist/browser.bundle.js www/node_modules/convex/dist/",
+    "build:web": "rm -rf www && mkdir -p www/node_modules/convex/dist www/node_modules/three/build www/node_modules/three/examples/jsm/postprocessing && cp -r index.html style.css config.js js assets www/ && cp node_modules/convex/dist/browser.bundle.js www/node_modules/convex/dist/ && cp node_modules/three/build/three.module.js www/node_modules/three/build/ && cp -r node_modules/three/examples/jsm/postprocessing www/node_modules/three/examples/jsm/",
     "build:ios": "npm run build:web && npx cap sync ios",
-    "ios:sync": "mkdir -p www/js www/assets www/node_modules/convex/dist && rsync -av --delete index.html style.css config.js www/ && rsync -av --delete js/ www/js/ && rsync -av --delete assets/ www/assets/ && cp node_modules/convex/dist/browser.bundle.js www/node_modules/convex/dist/ && npx cap copy ios",
+    "ios:sync": "mkdir -p www/js www/assets www/node_modules/convex/dist www/node_modules/three/build www/node_modules/three/examples/jsm/postprocessing && rsync -av --delete index.html style.css config.js www/ && rsync -av --delete js/ www/js/ && rsync -av --delete assets/ www/assets/ && cp node_modules/convex/dist/browser.bundle.js www/node_modules/convex/dist/ && cp node_modules/three/build/three.module.js www/node_modules/three/build/ && rsync -av --delete node_modules/three/examples/jsm/postprocessing/ www/node_modules/three/examples/jsm/postprocessing/ && npx cap copy ios",
     "open:ios": "npx cap open ios",
     "serve": "python3 -m http.server 8000",
     "generate-config": "node scripts/generate-config.js"
@@ -38,7 +38,8 @@
     "@capacitor/haptics": "^8.0.0",
     "@capacitor/ios": "^8.0.0",
     "convex": "^1.31.3",
-    "sharp": "^0.34.5"
+    "sharp": "^0.34.5",
+    "three": "^0.182.0"
   },
   "devDependencies": {
     "canvas": "^3.2.0",

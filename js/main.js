@@ -19,8 +19,8 @@ import { applyExplosionDamage, applyExplosionToAllTanks, DAMAGE } from './damage
 import * as Wind from './wind.js';
 import { WeaponRegistry, WEAPON_TYPES } from './weapons.js';
 import * as AI from './ai.js';
-import * as HUD from './ui.js?v=20260111c';
-import * as AimingControls from './aimingControls.js';
+import * as HUD from './ui.js?v=20260111d';
+import * as AimingControls from './aimingControls.js?v=20260111a';
 import * as VictoryDefeat from './victoryDefeat.js';
 import * as Money from './money.js';
 import * as Shop from './shop.js';
@@ -53,6 +53,7 @@ import * as PerformanceTracking from './performance-tracking.js';
 import * as PitySystem from './pity-system.js';
 import * as LifetimeStats from './lifetime-stats.js';
 import * as NameEntry from './nameEntry.js';
+import * as TitleScene from './titleScene/titleScene.js?v=20260111b';
 
 // =============================================================================
 // TERRAIN STATE
@@ -782,14 +783,21 @@ function renderMenu(ctx) {
         }
     }
 
-    // Render synthwave background (visible behind everything)
-    renderMenuBackground(ctx);
+    // If Three.js title scene is active, skip the 2D background
+    // and let the 3D animation show through. Otherwise render 2D fallback.
+    if (TitleScene.isActive()) {
+        // Clear to transparent so Three.js shows through
+        ctx.clearRect(0, 0, width, height);
+    } else {
+        // Render 2D synthwave background as fallback
+        renderMenuBackground(ctx);
+    }
 
-    // Semi-transparent overlay for menu content area
+    // Semi-transparent overlay for menu content area (darken slightly for readability)
     const overlayGradient = ctx.createLinearGradient(0, 0, 0, height);
-    overlayGradient.addColorStop(0, 'rgba(10, 10, 26, 0.7)');
-    overlayGradient.addColorStop(0.5, 'rgba(10, 10, 26, 0.3)');
-    overlayGradient.addColorStop(1, 'rgba(10, 10, 26, 0.7)');
+    overlayGradient.addColorStop(0, 'rgba(10, 10, 26, 0.6)');
+    overlayGradient.addColorStop(0.5, 'rgba(10, 10, 26, 0.2)');
+    overlayGradient.addColorStop(1, 'rgba(10, 10, 26, 0.6)');
     ctx.fillStyle = overlayGradient;
     ctx.fillRect(0, 0, width, height);
 
@@ -998,6 +1006,8 @@ function setupMenuState() {
             console.log('Entered MENU state');
             // Play menu music
             Music.playForState(GAME_STATES.MENU);
+            // Start animated 3D title scene
+            TitleScene.start();
         },
         onExit: (toState) => {
             console.log('Exiting MENU state');
@@ -1006,6 +1016,8 @@ function setupMenuState() {
                 optionsOverlayVisible = false;
                 VolumeControls.reset();
             }
+            // Stop animated 3D title scene
+            TitleScene.stop();
         },
         render: renderMenu
     });
@@ -4880,6 +4892,11 @@ async function init() {
 
     // Initialize synthwave background (static layer behind gameplay)
     initBackground(Renderer.getWidth(), Renderer.getHeight());
+
+    // Initialize Three.js title scene (animated 3D background for menu)
+    TitleScene.init();
+    // Start the title scene immediately since we begin in MENU state
+    TitleScene.start();
 
     // Setup state handlers BEFORE starting the loop
     // These register the update/render functions for each state

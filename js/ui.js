@@ -17,7 +17,7 @@ import {
     fromLeft, fromRight, fromTop, fromBottom,
     centerX, getUIScale, scaled, scaledTouch, isShortScreen, isVeryShortScreen,
     isMobileDevice
-} from './uiPosition.js';
+} from './uiPosition.js?v=20260111a';
 
 // =============================================================================
 // HUD LAYOUT HELPERS

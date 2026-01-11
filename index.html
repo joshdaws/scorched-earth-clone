@@ -7,13 +7,24 @@
     <meta name="theme-color" content="#0a0a1a">
     <title>Scorched Earth: Synthwave Edition</title>
     <link rel="stylesheet" href="style.css">
+    <!-- Import map for Three.js (ES modules) -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "./node_modules/three/build/three.module.js",
+                "three/addons/": "./node_modules/three/examples/jsm/"
+            }
+        }
+    </script>
 </head>
 <body>
     <canvas id="game"></canvas>
+    <!-- Three.js background canvas for title screen animation -->
+    <canvas id="titleScene"></canvas>
     <!-- Runtime configuration - must load before other scripts -->
     <script src="config.js"></script>
     <!-- Convex browser client bundle - provides global 'convex' object -->
     <script src="node_modules/convex/dist/browser.bundle.js"></script>
-    <script type="module" src="js/main.js?v=20260111e"></script>
+    <script type="module" src="js/main.js?v=20260111h"></script>
 </body>
 </html>
