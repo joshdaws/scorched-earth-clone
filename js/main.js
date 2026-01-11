@@ -849,8 +849,19 @@ function renderMenuButton(ctx, button, pulseIntensity, badgeCount = 0) {
 }
 
 /**
- * Render the synthwave chrome-style title text for "SCORCHED".
- * Creates a gradient pink/magenta title with cyan glow effect matching design reference.
+ * Configuration for synthwave title text effect.
+ * Based on docs/examples/synthwave-title-text.html
+ */
+const TITLE_TEXT_CONFIG = {
+    extrusionDepth: 8,    // How "thick" the 3D block shadow is
+    skewX: -0.15,         // Slight italic skew for dynamic feel
+    extrusionColor: '#2a003b', // Dark purple shadow color
+};
+
+/**
+ * Render synthwave chrome-style title text with 3D extrusion effect.
+ * Creates a chrome gradient (cyan → white → black horizon → purple → pink)
+ * with 3D depth, cyan outline, and purple glow.
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  * @param {string} text - Text to render
  * @param {number} x - Center X position
@@ -858,49 +869,58 @@ function renderMenuButton(ctx, button, pulseIntensity, badgeCount = 0) {
  * @param {number} fontSize - Font size in pixels
  * @param {number} pulseIntensity - Glow pulse intensity (0-1)
  */
-function renderPinkChromeTitle(ctx, text, x, y, fontSize, pulseIntensity) {
+function drawSynthwaveText(ctx, text, x, y, fontSize, pulseIntensity) {
     ctx.save();
-
-    // Create gradient for chrome/synthwave effect (pink to magenta)
-    const gradient = ctx.createLinearGradient(x - 200, y - fontSize / 2, x + 200, y + fontSize / 2);
-    gradient.addColorStop(0, '#ff69b4');    // Hot pink
-    gradient.addColorStop(0.25, '#ff1493'); // Deep pink
-    gradient.addColorStop(0.5, '#da70d6');  // Orchid (highlight)
-    gradient.addColorStop(0.75, '#ff1493'); // Deep pink
-    gradient.addColorStop(1, '#ff69b4');    // Hot pink
-
-    // Outer glow (cyan/blue - stronger for neon effect)
-    ctx.shadowColor = '#05d9e8';
-    ctx.shadowBlur = 30 + pulseIntensity * 20;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
-
-    ctx.font = `bold ${fontSize}px ${UI.FONT_FAMILY}`;
+    
+    // Apply skew transform for dynamic appearance
+    ctx.translate(x, y);
+    ctx.transform(1, 0, TITLE_TEXT_CONFIG.skewX, 1, 0, 0);
+    
+    ctx.font = `${fontSize}px ${UI.TITLE_FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    // Draw multiple layers for chrome effect
-    // Layer 1: Outer stroke (cyan outline for neon glow)
-    ctx.strokeStyle = '#05d9e8';
-    ctx.lineWidth = 5;
-    ctx.strokeText(text, x, y);
+    // Scale extrusion depth based on font size
+    const extrusionDepth = Math.round(TITLE_TEXT_CONFIG.extrusionDepth * (fontSize / 80));
 
-    // Layer 2: Inner stroke (white highlight)
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2;
-    ctx.strokeText(text, x, y);
+    // A. THE 3D EXTRUSION (dark purple blocky shadow)
+    ctx.fillStyle = TITLE_TEXT_CONFIG.extrusionColor;
+    for (let i = extrusionDepth; i > 0; i--) {
+        ctx.fillText(text, i * 1.5, i * 1.5);
+    }
 
-    // Layer 3: Fill with gradient
+    // B. THE CHROME GRADIENT (vertical gradient spanning text height)
+    const gradient = ctx.createLinearGradient(0, -fontSize / 2, 0, fontSize / 2);
+    gradient.addColorStop(0.0, '#00ffff');    // Top: Cyan/Electric Blue
+    gradient.addColorStop(0.45, '#ffffff');   // Middle-Top: White horizon
+    gradient.addColorStop(0.5, '#000000');    // Sharp Horizon Line
+    gradient.addColorStop(0.55, '#bd00ff');   // Middle-Bottom: Deep Purple
+    gradient.addColorStop(1.0, '#ff00cc');    // Bottom: Hot Pink
+
+    // Draw the gradient face
     ctx.fillStyle = gradient;
-    ctx.fillText(text, x, y);
+    ctx.fillText(text, 0, 0);
+
+    // C. THE OUTLINE & GLOW
+    ctx.lineWidth = 2 + (fontSize / 40);
+    ctx.strokeStyle = '#00ffff'; // Cyan outline
+    ctx.shadowColor = '#bd00ff'; // Purple glow
+    ctx.shadowBlur = 15 + pulseIntensity * 10;
+    ctx.strokeText(text, 0, 0);
+
+    // Reset shadow
+    ctx.shadowBlur = 0;
+
+    // D. REFLECTION/SHINE (subtle white overlay)
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.fillText(text, 0, 0);
 
     ctx.restore();
 }
 
 /**
- * Render the synthwave chrome-style title text for "EARTH".
- * Creates a gradient yellow/gold title with warm glow effect matching design reference.
+ * Render the glowing neon subtitle.
+ * Creates a hot pink/red glow effect with yellow stroke.
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  * @param {string} text - Text to render
  * @param {number} x - Center X position
@@ -908,42 +928,28 @@ function renderPinkChromeTitle(ctx, text, x, y, fontSize, pulseIntensity) {
  * @param {number} fontSize - Font size in pixels
  * @param {number} pulseIntensity - Glow pulse intensity (0-1)
  */
-function renderGoldChromeTitle(ctx, text, x, y, fontSize, pulseIntensity) {
+function drawNeonSubtitle(ctx, text, x, y, fontSize, pulseIntensity) {
     ctx.save();
-
-    // Create gradient for chrome/synthwave effect (gold to yellow with chrome highlights)
-    const gradient = ctx.createLinearGradient(x - 200, y - fontSize / 2, x + 200, y + fontSize / 2);
-    gradient.addColorStop(0, '#ffa500');    // Orange
-    gradient.addColorStop(0.25, '#ffcc00'); // Gold
-    gradient.addColorStop(0.5, '#ffee88');  // Light gold (chrome highlight)
-    gradient.addColorStop(0.75, '#ffcc00'); // Gold
-    gradient.addColorStop(1, '#ffa500');    // Orange
-
-    // Outer glow (warm orange)
-    ctx.shadowColor = '#ff8c00';
-    ctx.shadowBlur = 25 + pulseIntensity * 15;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
-
-    ctx.font = `bold ${fontSize}px ${UI.FONT_FAMILY}`;
+    
+    // Apply same skew as main title for consistency
+    ctx.translate(x, y);
+    ctx.transform(1, 0, TITLE_TEXT_CONFIG.skewX, 1, 0, 0);
+    
+    ctx.font = `${fontSize}px ${UI.TITLE_FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    // Draw multiple layers for chrome effect
-    // Layer 1: Outer stroke (orange/gold outline)
-    ctx.strokeStyle = '#ff6600';
-    ctx.lineWidth = 4;
-    ctx.strokeText(text, x, y);
-
-    // Layer 2: Inner stroke (white highlight)
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = '#ffffff';
+    // Neon Red/Orange Glow
+    ctx.shadowColor = '#ff3300';
+    ctx.shadowBlur = 12 + pulseIntensity * 8;
+    ctx.strokeStyle = '#ffcc00'; // Yellow stroke
     ctx.lineWidth = 2;
-    ctx.strokeText(text, x, y);
+    ctx.strokeText(text, 0, 0);
 
-    // Layer 3: Fill with gradient
-    ctx.fillStyle = gradient;
-    ctx.fillText(text, x, y);
+    // Solid fill inside
+    ctx.fillStyle = '#ff0055'; // Hot pink/red
+    ctx.shadowBlur = 0; // Remove blur for sharp fill
+    ctx.fillText(text, 0, 0);
 
     ctx.restore();
 }
@@ -1020,32 +1026,24 @@ function renderMenu(ctx) {
     const titleScale = layout.titleScale;
 
     // Title positioning - split into "SCORCHED" and "EARTH" on separate lines
-    // to match design reference (start-redesign.png)
-    const scorchedY = isCompact ? 45 : 65;
-    const earthY = isCompact ? 85 : 115;
-    const subtitleY = isCompact ? 115 : 155;
+    // to match design reference (start-redesign.png) with chrome synthwave effect
+    const scorchedY = isCompact ? 50 : 60;
+    const earthY = isCompact ? 95 : 110;
+    const subtitleY = isCompact ? 130 : 150;
 
-    // Font sizes - "SCORCHED" is larger, "EARTH" slightly smaller
-    const scorchedFontSize = Math.round(56 * titleScale);
-    const earthFontSize = Math.round(48 * titleScale);
-    const subtitleFontSize = Math.round(20 * titleScale);
+    // Font sizes - "SCORCHED" is larger, "EARTH" slightly smaller (using Audiowide font)
+    const scorchedFontSize = Math.round(60 * titleScale);
+    const earthFontSize = Math.round(50 * titleScale);
+    const subtitleFontSize = Math.round(22 * titleScale);
 
-    // Render "SCORCHED" - pink/magenta chrome with cyan glow
-    renderPinkChromeTitle(ctx, 'SCORCHED', width / 2, scorchedY, scorchedFontSize, pulseIntensity);
+    // Render "SCORCHED" - chrome synthwave effect with 3D extrusion
+    drawSynthwaveText(ctx, 'SCORCHED', width / 2, scorchedY, scorchedFontSize, pulseIntensity);
 
-    // Render "EARTH" - gold/yellow chrome with warm glow
-    renderGoldChromeTitle(ctx, 'EARTH', width / 2, earthY, earthFontSize, pulseIntensity);
+    // Render "EARTH" - same chrome synthwave effect
+    drawSynthwaveText(ctx, 'EARTH', width / 2, earthY, earthFontSize, pulseIntensity);
 
-    // Subtitle "SYNTHWAVE EDITION" - cyan neon color to match design
-    ctx.save();
-    ctx.shadowColor = '#05d9e8';
-    ctx.shadowBlur = 12 + pulseIntensity * 8;
-    ctx.font = `bold ${subtitleFontSize}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#05d9e8';
-    ctx.fillText('SYNTHWAVE EDITION', width / 2, subtitleY);
-    ctx.restore();
+    // Subtitle "SYNTHWAVE EDITION" - neon glow effect
+    drawNeonSubtitle(ctx, 'SYNTHWAVE EDITION', width / 2, subtitleY, subtitleFontSize, pulseIntensity);
 
     // Get badge counts for buttons
     const unviewedAchievements = getUnviewedCount();

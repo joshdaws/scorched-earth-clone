@@ -260,6 +260,7 @@ export const UI = {
     FONT_SIZE_LARGE: 24,
     FONT_SIZE_TITLE: 48,
     FONT_FAMILY: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+    TITLE_FONT_FAMILY: "'Audiowide', cursive",
     // Wind indicator settings
     WIND_INDICATOR_X: 100,     // X position from left edge
     WIND_INDICATOR_Y: 30,      // Y position from top
