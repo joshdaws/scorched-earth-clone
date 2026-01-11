@@ -24,6 +24,8 @@ import { CANVAS, GAME_KEYS, KEYS, PHYSICS } from './constants.js';
 export const INPUT_EVENTS = {
     ANGLE_CHANGE: 'angle_change',
     POWER_CHANGE: 'power_change',
+    ANGLE_SET: 'angle_set',      // Set angle to absolute value (for touch aiming)
+    POWER_SET: 'power_set',      // Set power to absolute value (for touch aiming)
     FIRE: 'fire',
     SELECT_WEAPON: 'select_weapon',
     SELECT_PREV_WEAPON: 'select_prev_weapon'
@@ -48,6 +50,8 @@ let inputEnabled = true;
 const gameInputCallbacks = {
     [INPUT_EVENTS.ANGLE_CHANGE]: [],
     [INPUT_EVENTS.POWER_CHANGE]: [],
+    [INPUT_EVENTS.ANGLE_SET]: [],
+    [INPUT_EVENTS.POWER_SET]: [],
     [INPUT_EVENTS.FIRE]: [],
     [INPUT_EVENTS.SELECT_WEAPON]: [],
     [INPUT_EVENTS.SELECT_PREV_WEAPON]: []

@@ -3236,6 +3236,22 @@ function handlePowerChange(delta) {
 }
 
 /**
+ * Handle absolute angle set input event (for touch aiming)
+ * @param {number} angle - Target angle in degrees
+ */
+function handleAngleSet(angle) {
+    playerAim.angle = Math.max(PHYSICS.MIN_ANGLE, Math.min(PHYSICS.MAX_ANGLE, angle));
+}
+
+/**
+ * Handle absolute power set input event (for touch aiming)
+ * @param {number} power - Target power percentage
+ */
+function handlePowerSet(power) {
+    playerAim.power = Math.max(PHYSICS.MIN_POWER, Math.min(PHYSICS.MAX_POWER, power));
+}
+
+/**
  * Handle fire input event
  */
 function handleFire() {
@@ -3539,6 +3555,8 @@ function setupPlayingState() {
     // Register game input event handlers
     Input.onGameInput(INPUT_EVENTS.ANGLE_CHANGE, handleAngleChange);
     Input.onGameInput(INPUT_EVENTS.POWER_CHANGE, handlePowerChange);
+    Input.onGameInput(INPUT_EVENTS.ANGLE_SET, handleAngleSet);
+    Input.onGameInput(INPUT_EVENTS.POWER_SET, handlePowerSet);
     Input.onGameInput(INPUT_EVENTS.FIRE, handleFire);
     Input.onGameInput(INPUT_EVENTS.SELECT_WEAPON, handleSelectWeapon);
     Input.onGameInput(INPUT_EVENTS.SELECT_PREV_WEAPON, handleSelectPrevWeapon);
