@@ -1114,15 +1114,18 @@ function renderMenu(ctx) {
 
     ctx.save();
     // Card background
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillStyle = 'rgba(10, 10, 26, 0.85)';
     ctx.beginPath();
     ctx.roundRect(bestCardPadding, height - bestCardPadding - bestCardHeight, bestCardWidth, bestCardHeight, 8);
     ctx.fill();
 
-    // Card border
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-    ctx.lineWidth = 1;
+    // Neon border with glow effect
+    ctx.strokeStyle = COLORS.NEON_YELLOW;
+    ctx.lineWidth = 2;
+    ctx.shadowColor = COLORS.NEON_YELLOW;
+    ctx.shadowBlur = 8;
     ctx.stroke();
+    ctx.shadowBlur = 0;
 
     // Best Run label
     ctx.fillStyle = '#888899';
