@@ -173,7 +173,7 @@ function getHUDLayoutDynamic() {
             }
         },
         WEAPON_BAR: {
-            RIGHT_EDGE: fromRight(weaponBarRightMargin),
+            X: (screenWidth - weaponBarWidth) / 2,  // Horizontally centered
             Y: fromBottom(veryShortScreen ? 45 : 75),  // Closer to bottom on short screens
             HEIGHT: weaponBarHeight,
             WIDTH: weaponBarWidth,
@@ -1138,7 +1138,7 @@ export function renderWeaponBar(ctx, playerTank) {
     const totalWeapons = allWeapons.length;
 
     const bar = HUD.WEAPON_BAR;
-    const drawX = bar.RIGHT_EDGE - bar.WIDTH;
+    const drawX = bar.X;
     const drawY = bar.Y - bar.HEIGHT / 2;
 
     ctx.save();
@@ -1569,7 +1569,7 @@ function drawStar(ctx, cx, cy, spikes, outerRadius, innerRadius) {
  */
 export function isInsideWeaponBarLeftArrow(x, y) {
     const bar = HUD.WEAPON_BAR;
-    const drawX = bar.RIGHT_EDGE - bar.WIDTH;
+    const drawX = bar.X;
     const drawY = bar.Y - bar.HEIGHT / 2;
     const arrowX = drawX + bar.PADDING;
     const arrowY = drawY + bar.PADDING;
@@ -1591,7 +1591,7 @@ export function isInsideWeaponBarLeftArrow(x, y) {
  */
 export function isInsideWeaponBarRightArrow(x, y) {
     const bar = HUD.WEAPON_BAR;
-    const drawX = bar.RIGHT_EDGE - bar.WIDTH;
+    const drawX = bar.X;
     const drawY = bar.Y - bar.HEIGHT / 2;
     const arrowX = drawX + bar.WIDTH - bar.PADDING - bar.ARROW_WIDTH;
     const arrowY = drawY + bar.PADDING;
@@ -1613,7 +1613,7 @@ export function isInsideWeaponBarRightArrow(x, y) {
  */
 export function isInsideWeaponBar(x, y) {
     const bar = HUD.WEAPON_BAR;
-    const drawX = bar.RIGHT_EDGE - bar.WIDTH;
+    const drawX = bar.X;
     const drawY = bar.Y - bar.HEIGHT / 2;
 
     return (
