@@ -403,8 +403,29 @@ export function init() {
         resize(dimensions.width, dimensions.height);
     });
 
+    // Pause animation when tab is hidden (battery/performance optimization)
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     console.log('TitleScene initialized');
     return true;
+}
+
+/**
+ * Handle page visibility changes to pause/resume animation.
+ * Saves battery and CPU when tab is backgrounded.
+ */
+function handleVisibilityChange() {
+    if (document.hidden) {
+        // Tab is hidden - pause if running
+        if (isRunning && clock) {
+            clock.stop();
+        }
+    } else {
+        // Tab is visible - resume if was running
+        if (isRunning && clock) {
+            clock.start();
+        }
+    }
 }
 
 /**
@@ -718,6 +739,9 @@ export function resize(width, height) {
  */
 export function cleanup() {
     stop();
+
+    // Remove event listeners
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
 
     // Dispose chunks
     chunks.forEach(chunk => chunk.dispose());
