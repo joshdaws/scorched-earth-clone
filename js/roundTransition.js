@@ -282,6 +282,7 @@ export function isActive() {
 
 /**
  * Check if a point is inside a button.
+ * Uses exclusive right/bottom edges to prevent overlap at boundaries.
  * @param {number} x - X coordinate
  * @param {number} y - Y coordinate
  * @param {Object} button - Button definition
@@ -292,9 +293,9 @@ function isInsideButton(x, y, button) {
     const halfHeight = button.height / 2;
     return (
         x >= button.x - halfWidth &&
-        x <= button.x + halfWidth &&
+        x < button.x + halfWidth &&  // Exclusive right edge to prevent overlap
         y >= button.y - halfHeight &&
-        y <= button.y + halfHeight
+        y < button.y + halfHeight    // Exclusive bottom edge to prevent overlap
     );
 }
 
