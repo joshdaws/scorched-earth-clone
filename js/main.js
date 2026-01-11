@@ -447,11 +447,14 @@ function startMenuTransition(targetState) {
 
 /**
  * Handle click on menu - check if buttons were clicked
- * @param {{x: number, y: number}} pos - Click position in design coordinates
+ * @param {{x: number, y: number}} pos - Click position in game coordinates
  */
 function handleMenuClick(pos) {
     if (Game.getState() !== GAME_STATES.MENU) return;
     if (menuTransition.active) return;  // Don't allow clicks during transition
+
+    // Ensure button positions are current for the screen size
+    updateMenuButtonPositions();
 
     if (isInsideButton(pos.x, pos.y, menuButtons.start)) {
         // Play click sound
@@ -1178,10 +1181,13 @@ let difficultyAnimationTime = 0;
 
 /**
  * Handle click on difficulty selection screen.
- * @param {{x: number, y: number}} pos - Click position in design coordinates
+ * @param {{x: number, y: number}} pos - Click position in game coordinates
  */
 function handleDifficultyClick(pos) {
     if (Game.getState() !== GAME_STATES.DIFFICULTY_SELECT) return;
+
+    // Ensure button positions are current for the screen size
+    updateDifficultyButtonPositions();
 
     // Check difficulty buttons
     for (const key of Object.keys(difficultyButtons)) {
@@ -4416,10 +4422,13 @@ function renderHighScoresButton(ctx, button, pulseIntensity) {
 
 /**
  * Handle click on the high scores screen.
- * @param {{x: number, y: number}} pos - Click position in design coordinates
+ * @param {{x: number, y: number}} pos - Click position in game coordinates
  */
 function handleHighScoresClick(pos) {
     if (Game.getState() !== GAME_STATES.HIGH_SCORES) return;
+
+    // Ensure button positions are current for the screen size
+    updateHighScoresButtonPositions();
 
     // Check tab clicks
     if (isInsideButton(pos.x, pos.y, highScoresTabs.global)) {

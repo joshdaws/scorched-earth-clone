@@ -4,6 +4,20 @@
 
 Replace the static menu background with a fully animated, procedurally generated synthwave scene using Three.js. The effect creates the illusion of driving down an endless neon grid road toward a sunset, with wireframe mountains scrolling past on either side.
 
+## Design References
+
+**See reference images for visual direction (these are inspiration, not pixel-perfect targets):**
+
+- `docs/specs/images/start-redesign.png` - Title font style and menu button layout inspiration
+  - Note the 80s synthwave title font with glowing outline
+  - Clean menu button layout with consistent spacing
+  - Overall composition and color palette
+
+- `docs/specs/images/start-redesign-background.png` - Background scene inspiration
+  - Canyon/mountain road perspective heading into sunset
+  - Gradient sky colors
+  - Use as reference for static fallback or animation target aesthetic
+
 ## Visual Reference
 
 Classic "OutRun" / synthwave aesthetic:

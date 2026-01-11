@@ -112,25 +112,42 @@ let onMainMenuCallback = null;
  * Screen buttons configuration.
  * Only "New Run" and "Main Menu" - no continue option!
  * Positioned lower to accommodate stats display.
+ * Positions are updated dynamically via updateButtonPositions().
  */
 const buttons = {
     newRun: {
-        x: Renderer.getWidth() / 2 - 155,
-        y: Renderer.getHeight() - 130,
+        x: 0,
+        y: 0,
         width: 200,
         height: 50,
         text: 'NEW RUN',
         color: COLORS.NEON_CYAN
     },
     mainMenu: {
-        x: Renderer.getWidth() / 2 + 155,
-        y: Renderer.getHeight() - 130,
+        x: 0,
+        y: 0,
         width: 200,
         height: 50,
         text: 'MAIN MENU',
         color: COLORS.NEON_PURPLE
     }
 };
+
+/**
+ * Update button positions based on current screen size.
+ * Called before rendering and hit testing to ensure positions are current.
+ */
+function updateButtonPositions() {
+    const width = Renderer.getWidth();
+    const height = Renderer.getHeight();
+    const centerX = width / 2;
+
+    buttons.newRun.x = centerX - 155;
+    buttons.newRun.y = height - 130;
+
+    buttons.mainMenu.x = centerX + 155;
+    buttons.mainMenu.y = height - 130;
+}
 
 // =============================================================================
 // PUBLIC API
@@ -257,12 +274,15 @@ function isInsideButton(x, y, button) {
 
 /**
  * Handle click/tap on the game over screen.
- * @param {number} x - X coordinate in design space
- * @param {number} y - Y coordinate in design space
+ * @param {number} x - X coordinate in game space
+ * @param {number} y - Y coordinate in game space
  * @returns {boolean} True if a button was clicked
  */
 export function handleClick(x, y) {
     if (!contentVisible) return false;
+
+    // Ensure button positions are current for the screen size
+    updateButtonPositions();
 
     // Check New Run button
     if (isInsideButton(x, y, buttons.newRun)) {
@@ -456,6 +476,9 @@ function renderCelebrationParticles(ctx) {
  */
 export function render(ctx) {
     if (!isVisible || !contentVisible) return;
+
+    // Update button positions for current screen size
+    updateButtonPositions();
 
     // Update animation time
     animationTime += 16; // Approximate 60fps

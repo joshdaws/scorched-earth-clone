@@ -70,25 +70,43 @@ let onQuitCallback = null;
 /**
  * Screen buttons configuration.
  * Centered horizontally with consistent spacing.
+ * Positions are updated dynamically via updateButtonPositions().
  */
 const buttons = {
     continue: {
-        x: Renderer.getWidth() / 2,
-        y: Renderer.getHeight() / 2 + 120,
+        x: 0,
+        y: 0,
         width: 280,
         height: 55,
         text: 'CONTINUE TO SHOP',
         color: COLORS.NEON_CYAN
     },
     quit: {
-        x: Renderer.getWidth() / 2,
-        y: Renderer.getHeight() / 2 + 195,
+        x: 0,
+        y: 0,
         width: 280,
         height: 55,
         text: 'QUIT TO MENU',
         color: COLORS.NEON_PINK
     }
 };
+
+/**
+ * Update button positions based on current screen size.
+ * Called before rendering and hit testing to ensure positions are current.
+ */
+function updateButtonPositions() {
+    const width = Renderer.getWidth();
+    const height = Renderer.getHeight();
+    const centerX = width / 2;
+    const centerY = height / 2;
+
+    buttons.continue.x = centerX;
+    buttons.continue.y = centerY + 120;
+
+    buttons.quit.x = centerX;
+    buttons.quit.y = centerY + 195;
+}
 
 // =============================================================================
 // INITIALIZATION
@@ -203,12 +221,15 @@ function isInsideButton(x, y, button) {
 
 /**
  * Handle click/tap on the victory/defeat screen.
- * @param {number} x - X coordinate in design space
- * @param {number} y - Y coordinate in design space
+ * @param {number} x - X coordinate in game space
+ * @param {number} y - Y coordinate in game space
  * @returns {boolean} True if a button was clicked
  */
 export function handleClick(x, y) {
     if (!isVisible || !screenResult) return false;
+
+    // Ensure button positions are current for the screen size
+    updateButtonPositions();
 
     // Check continue button
     if (isInsideButton(x, y, buttons.continue)) {
@@ -297,6 +318,9 @@ function renderButton(ctx, button, pulseIntensity) {
  */
 export function render(ctx) {
     if (!screenResult || !isVisible) return;
+
+    // Update button positions for current screen size
+    updateButtonPositions();
 
     // Update animation time
     animationTime += 16; // Approximate 60fps

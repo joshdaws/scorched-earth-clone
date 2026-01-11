@@ -6,8 +6,9 @@
  * Projectiles spawn from tank barrel and follow parabolic arcs.
  */
 
-import { PHYSICS, PROJECTILE, CANVAS, DEBUG } from './constants.js';
+import { PHYSICS, PROJECTILE, DEBUG } from './constants.js';
 import { WeaponRegistry, WEAPON_TYPES } from './weapons.js';
+import { getScreenWidth, getScreenHeight } from './screenSize.js';
 
 /**
  * Projectile entity for the game.
@@ -321,8 +322,8 @@ export class Projectile {
      *
      * Out of bounds conditions:
      * - X < 0 (left of screen)
-     * - X > canvas width (right of screen)
-     * - Y > canvas height (below screen)
+     * - X > screen width (right of screen) - uses dynamic screen width
+     * - Y > screen height (below screen) - uses dynamic screen height
      *
      * Note: Y < 0 (above screen) is NOT out of bounds - projectiles
      * can arc high and come back down.
@@ -330,6 +331,10 @@ export class Projectile {
      * @private
      */
     _checkBounds() {
+        // Get dynamic screen dimensions for bounds checking
+        const screenWidth = getScreenWidth();
+        const screenHeight = getScreenHeight();
+
         // Left boundary
         if (this.x < 0) {
             this.active = false;
@@ -337,15 +342,15 @@ export class Projectile {
             return;
         }
 
-        // Right boundary
-        if (this.x > CANVAS.DESIGN_WIDTH) {
+        // Right boundary (uses dynamic screen width)
+        if (this.x > screenWidth) {
             this.active = false;
-            console.log('Projectile went out of bounds (right)');
+            console.log(`Projectile went out of bounds (right at x=${this.x.toFixed(0)}, screenWidth=${screenWidth})`);
             return;
         }
 
-        // Bottom boundary (below terrain floor)
-        if (this.y > CANVAS.DESIGN_HEIGHT) {
+        // Bottom boundary (below terrain floor, uses dynamic screen height)
+        if (this.y > screenHeight) {
             this.active = false;
             console.log('Projectile went out of bounds (bottom)');
             return;
@@ -565,8 +570,10 @@ export class Projectile {
         }
 
         // Get current terrain height at position
+        // Use terrain's screen height for dynamic screen support
+        const screenHeight = terrain.getScreenHeight();
         const currentTerrainHeight = terrain.getHeight(Math.floor(this.x));
-        const currentSurfaceY = CANVAS.DESIGN_HEIGHT - currentTerrainHeight;
+        const currentSurfaceY = screenHeight - currentTerrainHeight;
 
         // Calculate slope at current position
         // Look ahead in roll direction to find slope
@@ -579,7 +586,7 @@ export class Projectile {
         }
 
         const nextTerrainHeight = terrain.getHeight(nextX);
-        const nextSurfaceY = CANVAS.DESIGN_HEIGHT - nextTerrainHeight;
+        const nextSurfaceY = screenHeight - nextTerrainHeight;
 
         // Calculate slope angle (positive = going downhill, negative = going uphill)
         // In canvas coords: lower Y = higher on screen
@@ -631,7 +638,7 @@ export class Projectile {
         const newX = Math.floor(this.x);
         if (newX >= 0 && newX < terrain.getWidth()) {
             const newTerrainHeight = terrain.getHeight(newX);
-            this.y = CANVAS.DESIGN_HEIGHT - newTerrainHeight;
+            this.y = screenHeight - newTerrainHeight;
         }
 
         // Update rotation for visual effect
@@ -775,7 +782,7 @@ export class Projectile {
         const flooredX = Math.floor(this.x);
         if (flooredX >= 0 && flooredX < terrain.getWidth()) {
             const terrainHeight = terrain.getHeight(flooredX);
-            const terrainSurfaceY = CANVAS.DESIGN_HEIGHT - terrainHeight;
+            const terrainSurfaceY = terrain.getScreenHeight() - terrainHeight;
 
             // We've emerged if we're above the terrain surface
             // Add a small buffer to prevent immediate re-triggering
@@ -798,8 +805,8 @@ export class Projectile {
             return { explode: true, reason: 'wall' };
         }
 
-        // Check for out of bounds (bottom)
-        if (this.y >= CANVAS.DESIGN_HEIGHT) {
+        // Check for out of bounds (bottom) - use dynamic screen height
+        if (this.y >= terrain.getScreenHeight()) {
             return { explode: true, reason: 'bottom' };
         }
 
@@ -971,7 +978,8 @@ export function calculateTrajectory(startX, startY, angle, power, wind = 0, maxS
         points.push({ x: proj.x, y: proj.y });
 
         // Early exit if below screen (terrain collision will be checked elsewhere)
-        if (proj.y > CANVAS.DESIGN_HEIGHT) {
+        // Use dynamic screen height for proper bounds on all screen sizes
+        if (proj.y > getScreenHeight()) {
             break;
         }
     }

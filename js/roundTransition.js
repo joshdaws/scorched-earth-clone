@@ -112,41 +112,64 @@ const SUPPLY_DROP_COST = 50;
 
 /**
  * Button configurations.
+ * Positions are updated dynamically via updateButtonPositions().
  */
 const buttons = {
     continue: {
-        x: Renderer.getWidth() / 2 - 170,
-        y: Renderer.getHeight() - 100,
+        x: 0,
+        y: 0,
         width: 200,
         height: 50,
         text: 'CONTINUE',
         color: COLORS.NEON_CYAN
     },
     shop: {
-        x: Renderer.getWidth() / 2,
-        y: Renderer.getHeight() - 100,
+        x: 0,
+        y: 0,
         width: 140,
         height: 50,
         text: 'SHOP',
         color: COLORS.NEON_YELLOW
     },
     collection: {
-        x: Renderer.getWidth() / 2 + 170,
-        y: Renderer.getHeight() - 100,
+        x: 0,
+        y: 0,
         width: 200,
         height: 50,
         text: 'COLLECTION',
         color: COLORS.NEON_PURPLE
     },
     supplyDrop: {
-        x: Renderer.getWidth() / 2,
-        y: Renderer.getHeight() - 160,
+        x: 0,
+        y: 0,
         width: 250,
         height: 45,
         text: 'SUPPLY DROP (50)',
         color: COLORS.NEON_ORANGE
     }
 };
+
+/**
+ * Update button positions based on current screen size.
+ * Called before rendering and hit testing to ensure positions are current.
+ */
+function updateButtonPositions() {
+    const width = Renderer.getWidth();
+    const height = Renderer.getHeight();
+    const centerX = width / 2;
+
+    buttons.continue.x = centerX - 170;
+    buttons.continue.y = height - 100;
+
+    buttons.shop.x = centerX;
+    buttons.shop.y = height - 100;
+
+    buttons.collection.x = centerX + 170;
+    buttons.collection.y = height - 100;
+
+    buttons.supplyDrop.x = centerX;
+    buttons.supplyDrop.y = height - 160;
+}
 
 // =============================================================================
 // PUBLIC API
@@ -277,12 +300,15 @@ function isInsideButton(x, y, button) {
 
 /**
  * Handle click/tap on the round transition screen.
- * @param {number} x - X coordinate in design space
- * @param {number} y - Y coordinate in design space
+ * @param {number} x - X coordinate in game space
+ * @param {number} y - Y coordinate in game space
  * @returns {boolean} True if a button was clicked
  */
 export function handleClick(x, y) {
     if (!contentVisible) return false;
+
+    // Ensure button positions are current for the screen size
+    updateButtonPositions();
 
     // Check Continue button (skip shop, go directly to next round)
     if (isInsideButton(x, y, buttons.continue)) {
@@ -433,6 +459,9 @@ function renderButton(ctx, button, pulseIntensity, disabled = false) {
  */
 export function render(ctx) {
     if (!isVisible || !contentVisible) return;
+
+    // Update button positions for current screen size
+    updateButtonPositions();
 
     // Calculate pulse intensity (0-1, oscillating)
     const pulseIntensity = (Math.sin(animationTime * 0.003) + 1) / 2;

@@ -254,15 +254,28 @@ const WEAPON_CATEGORIES = [
 
 /**
  * Done button configuration.
+ * Position is updated dynamically via updateButtonPositions().
  */
 const doneButton = {
-    x: Renderer.getWidth() / 2,
-    y: Renderer.getHeight() / 2 + SHOP_LAYOUT.DONE_BUTTON.Y_OFFSET,
+    x: 0,
+    y: 0,
     width: SHOP_LAYOUT.DONE_BUTTON.WIDTH,
     height: SHOP_LAYOUT.DONE_BUTTON.HEIGHT,
     text: 'DONE',
     color: COLORS.NEON_CYAN
 };
+
+/**
+ * Update button positions based on current screen size.
+ * Called before rendering and hit testing to ensure positions are current.
+ */
+function updateButtonPositions() {
+    const width = Renderer.getWidth();
+    const height = Renderer.getHeight();
+
+    doneButton.x = width / 2;
+    doneButton.y = height / 2 + SHOP_LAYOUT.DONE_BUTTON.Y_OFFSET;
+}
 
 /**
  * Weapon card hit areas (populated during render).
@@ -513,12 +526,15 @@ function isInVerticalScrollArea(x, y) {
 /**
  * Handle pointer down on the shop screen.
  * Sets pressed state for touch feedback.
- * @param {number} x - X coordinate in design space
- * @param {number} y - Y coordinate in design space
+ * @param {number} x - X coordinate in game space
+ * @param {number} y - Y coordinate in game space
  * @returns {boolean} True if an element was pressed
  */
 export function handlePointerDown(x, y) {
     if (!isVisible) return false;
+
+    // Ensure button positions are current for the screen size
+    updateButtonPositions();
 
     // Stop any active momentum scrolling when user touches
     if (momentumState.active) {
@@ -805,12 +821,15 @@ export function handleWheel(x, y, deltaY, shiftKey = false) {
 /**
  * Handle click/tap on the shop screen (legacy - immediate action).
  * Prefer using handlePointerDown/handlePointerUp for touch feedback.
- * @param {number} x - X coordinate in design space
- * @param {number} y - Y coordinate in design space
+ * @param {number} x - X coordinate in game space
+ * @param {number} y - Y coordinate in game space
  * @returns {boolean} True if a button was clicked
  */
 export function handleClick(x, y) {
     if (!isVisible) return false;
+
+    // Ensure button positions are current for the screen size
+    updateButtonPositions();
 
     // Check done button
     if (isInsideButton(x, y, doneButton)) {
@@ -1383,6 +1402,9 @@ function renderWeaponCard(ctx, weapon, x, y, currentAmmo, canAfford, pulseIntens
  */
 export function render(ctx) {
     if (!isVisible) return;
+
+    // Update button positions for current screen size
+    updateButtonPositions();
 
     // Clear hit areas for this frame
     weaponCardAreas = [];

@@ -6,8 +6,8 @@
  * Each difficulty level has different accuracy and behavior characteristics.
  */
 
-import { CANVAS, PHYSICS } from './constants.js';
-import { getScreenWidth } from './screenSize.js';
+import { PHYSICS } from './constants.js';
+import { getScreenWidth, getScreenHeight } from './screenSize.js';
 import { WEAPON_TYPES, WeaponRegistry } from './weapons.js';
 
 // =============================================================================
@@ -389,8 +389,10 @@ function simulateTrajectory(startX, startY, angle, power, windValue, terrain) {
         }
 
         // Check if projectile fell below bottom of screen
-        if (y >= CANVAS.DESIGN_HEIGHT) {
-            return { x, y: CANVAS.DESIGN_HEIGHT, hit: true, blocked, blockX, blockY };
+        // Use dynamic screen height for proper bounds on all screen sizes
+        const screenHeight = getScreenHeight();
+        if (y >= screenHeight) {
+            return { x, y: screenHeight, hit: true, blocked, blockX, blockY };
         }
     }
 
