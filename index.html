@@ -7,6 +7,15 @@
     <meta name="theme-color" content="#0a0a1a">
     <title>Scorched Earth: Synthwave Edition</title>
     <link rel="stylesheet" href="style.css">
+    <!-- Import map for ES module resolution -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "./node_modules/three/build/three.module.js",
+                "three/addons/": "./node_modules/three/examples/jsm/"
+            }
+        }
+    </script>
     <!-- Audiowide font for synthwave title text -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

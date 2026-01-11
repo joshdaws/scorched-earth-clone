@@ -89,6 +89,20 @@ let tabTransition = null;
 let pressedElementId = null;
 
 /**
+ * Timestamp when shop was shown (for debounce protection).
+ * Prevents accidental immediate Done clicks from stale pointer state.
+ * @type {number}
+ */
+let showTime = 0;
+
+/**
+ * Minimum time (ms) shop must be open before Done button can be clicked.
+ * This prevents race conditions where pointer events from the previous
+ * state accidentally trigger the Done button.
+ */
+const DONE_DEBOUNCE_MS = 150;
+
+/**
  * Currently hovered weapon card for visual feedback.
  * @type {string|null}
  */
@@ -316,6 +330,12 @@ export function show(playerTank) {
     scrollDragState = { active: false, direction: null, categoryType: null, startX: 0, startY: 0, startScrollX: 0, startScrollY: 0, lastX: 0, lastY: 0, velocity: 0, potentialDrag: false };
     momentumState = { active: false, direction: null, categoryType: null, velocityX: 0, velocityY: 0 };
     activeTab = 'weapons';  // Always start on WEAPONS tab
+
+    // Reset pointer state and record show time for debounce protection
+    // This prevents stale pointer events from the previous state from
+    // accidentally triggering the Done button
+    pressedElementId = null;
+    showTime = performance.now();
 
     console.log('[Shop] Opened');
 }
@@ -644,6 +664,15 @@ export function handlePointerUp(x, y) {
 
     // Check done button release
     if (wasPressed === 'done' && isInsideButton(x, y, doneButton)) {
+        // Debounce protection: ignore Done clicks that happen immediately after shop opens
+        // This prevents race conditions where stale pointer events from the previous
+        // state (e.g., clicking Shop button in round transition) accidentally close the shop
+        const timeSinceShow = performance.now() - showTime;
+        if (timeSinceShow < DONE_DEBOUNCE_MS) {
+            console.log(`[Shop] Done click ignored (debounce: ${timeSinceShow.toFixed(0)}ms < ${DONE_DEBOUNCE_MS}ms)`);
+            return false;
+        }
+
         playClickSound();
         console.log('[Shop] Done clicked');
         if (onDoneCallback) {
