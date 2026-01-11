@@ -53,7 +53,7 @@ import * as PerformanceTracking from './performance-tracking.js';
 import * as PitySystem from './pity-system.js';
 import * as LifetimeStats from './lifetime-stats.js';
 import * as NameEntry from './nameEntry.js';
-import * as TitleScene from './titleScene/titleScene.js?v=20260111b';
+import * as TitleScene from './titleScene/titleScene.js?v=20260111d';
 
 // =============================================================================
 // TERRAIN STATE

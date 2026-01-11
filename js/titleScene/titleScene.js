@@ -383,6 +383,9 @@ export function init() {
     // Create sun
     createSun();
 
+    // Create starfield in sky
+    createStarfield();
+
     // Create infinite floor (black, below grid to prevent see-through)
     const floor = new THREE.Mesh(
         new THREE.PlaneGeometry(2000, 2000),
@@ -444,6 +447,104 @@ function createSun() {
     const sun = new THREE.Mesh(sunGeo, sunMat);
     sun.position.set(0, 25, -300);
     scene.add(sun);
+}
+
+/**
+ * Create a starfield in the sky area above the horizon.
+ * Uses Points geometry with random positions and subtle color variations.
+ */
+function createStarfield() {
+    const starCount = 200;
+    const positions = new Float32Array(starCount * 3);
+    const colors = new Float32Array(starCount * 3);
+    const sizes = new Float32Array(starCount);
+
+    for (let i = 0; i < starCount; i++) {
+        const i3 = i * 3;
+
+        // Random position in sky hemisphere
+        // Stars placed in a dome above the scene, closer to avoid fog
+        // Using spherical distribution for more natural sky feel
+        const theta = Math.random() * Math.PI * 2; // angle around y-axis
+        const phi = Math.random() * Math.PI * 0.4; // angle from zenith (0-72 degrees from top)
+        const radius = 50 + Math.random() * 30; // distance 50-80 units
+
+        positions[i3] = Math.sin(phi) * Math.cos(theta) * radius * 3; // x (wider spread)
+        positions[i3 + 1] = Math.cos(phi) * radius + 20; // y (above horizon, +20 offset)
+        positions[i3 + 2] = Math.sin(phi) * Math.sin(theta) * radius - 50; // z (slightly back)
+
+        // Bright colors for visibility - mostly white with some color variation
+        const colorType = Math.random();
+        if (colorType < 0.6) {
+            // Bright white stars
+            colors[i3] = 1.0;
+            colors[i3 + 1] = 1.0;
+            colors[i3 + 2] = 1.0;
+        } else if (colorType < 0.8) {
+            // Warm stars (yellow/orange tint)
+            colors[i3] = 1.0;
+            colors[i3 + 1] = 0.9;
+            colors[i3 + 2] = 0.6;
+        } else {
+            // Cool stars (blue tint)
+            colors[i3] = 0.6;
+            colors[i3 + 1] = 0.8;
+            colors[i3 + 2] = 1.0;
+        }
+
+        // Random sizes (2-5 for better visibility)
+        sizes[i] = 2 + Math.random() * 3;
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+    // Custom shader for stars - unaffected by fog, with twinkle effect
+    const starMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+            time: { value: 0 }
+        },
+        vertexShader: `
+            attribute float size;
+            attribute vec3 color;
+            varying vec3 vColor;
+            varying float vSize;
+            void main() {
+                vColor = color;
+                vSize = size;
+                vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                gl_PointSize = size * 2.0;
+                gl_Position = projectionMatrix * mvPosition;
+            }
+        `,
+        fragmentShader: `
+            varying vec3 vColor;
+            varying float vSize;
+            void main() {
+                // Circular point shape with soft glow
+                vec2 center = gl_PointCoord - vec2(0.5);
+                float dist = length(center);
+                if (dist > 0.5) discard;
+
+                // Bright center with soft falloff for glow effect
+                float alpha = 1.0 - smoothstep(0.0, 0.5, dist);
+                float brightness = 1.0 - smoothstep(0.0, 0.3, dist);
+
+                gl_FragColor = vec4(vColor * (0.5 + brightness * 0.5), alpha);
+            }
+        `,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthTest: false, // Stars always visible (sky is infinitely far)
+        depthWrite: false,
+        fog: false // Stars not affected by fog
+    });
+
+    const stars = new THREE.Points(geometry, starMaterial);
+    stars.renderOrder = -1; // Render first (behind everything)
+    scene.add(stars);
 }
 
 // =============================================================================
