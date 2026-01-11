@@ -1551,13 +1551,6 @@ function renderDifficultySelect(ctx) {
     ctx.fillText('SELECT DIFFICULTY', width / 2, titleY);
     ctx.restore();
 
-    // Subtitle
-    ctx.fillStyle = COLORS.TEXT_MUTED;
-    ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('Choose your challenge level', width / 2, titleY + 45);
-
     // Render difficulty buttons using Button component
     for (const key of Object.keys(difficultyButtons)) {
         renderDifficultyButton(ctx, key, pulseIntensity);
