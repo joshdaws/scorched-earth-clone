@@ -2055,11 +2055,11 @@ export function renderHUD(ctx, state) {
     // The legacy renderTurnIndicatorPhase and renderWindIndicator are kept for backwards compatibility
     // but no longer called from renderHUD
 
-    // Render weapon bar at bottom-center (left of fire button)
+    // Render weapon bar at bottom-center
     renderWeaponBar(ctx, playerTank);
 
-    // Render token panel at bottom-right (for supply drop currency)
-    renderTokenPanel(ctx);
+    // Note: Token panel is no longer rendered during gameplay.
+    // Tokens are only shown in menus, shop, and supply drop screens.
 }
 
 // =============================================================================

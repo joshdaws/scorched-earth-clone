@@ -19,7 +19,7 @@ import { applyExplosionDamage, applyExplosionToAllTanks, DAMAGE } from './damage
 import * as Wind from './wind.js';
 import { WeaponRegistry, WEAPON_TYPES } from './weapons.js';
 import * as AI from './ai.js';
-import * as HUD from './ui.js';
+import * as HUD from './ui.js?v=20260111c';
 import * as AimingControls from './aimingControls.js';
 import * as VictoryDefeat from './victoryDefeat.js';
 import * as Money from './money.js';
