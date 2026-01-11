@@ -3271,14 +3271,13 @@ function handlePlayingPointerDown(pos) {
     // Only process other interactions in PLAYING state
     if (state !== GAME_STATES.PLAYING) return;
 
-    // Check aiming controls first (power bar, angle arc, fire button)
+    // Check aiming controls first (angle arc, fire button)
     if (Turn.canPlayerAim()) {
-        // Fire button, power bar, or angle arc
+        // Fire button or angle arc
         AimingControls.handlePointerDown(pos.x, pos.y, playerTank, Turn.canPlayerFire());
 
         // Check if any control was activated - don't process other clicks
         if (AimingControls.isInsideFireButton(pos.x, pos.y) ||
-            AimingControls.isInsidePowerBar(pos.x, pos.y) ||
             AimingControls.isInsideAngleArc(pos.x, pos.y, playerTank)) {
             return;
         }

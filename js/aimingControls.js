@@ -2,11 +2,12 @@
  * Scorched Earth: Synthwave Edition
  * Aiming Controls UI Module
  *
- * Provides visual controls for adjusting angle and power:
+ * Provides visual controls for aiming:
  * - Angle indicator: arc display around tank turret
- * - Power bar: vertical slider on the left side
  * - Fire button: large, prominent, neon styled
  * - Trajectory preview: dotted line showing projected path
+ *
+ * Power is controlled via the slingshot/drag mechanic in touchAiming.js.
  *
  * All coordinates are in design space (1200x800).
  */
@@ -16,8 +17,8 @@ import { registerSliderZone, queueGameInput, INPUT_EVENTS, isGameInputEnabled } 
 import * as Wind from './wind.js';
 import { getScreenWidth, getScreenHeight } from './screenSize.js';
 import {
-    fromLeft, fromRight, fromTop, fromBottom,
-    getUIScale, scaled, scaledTouch, isShortScreen, isVeryShortScreen
+    fromRight, fromBottom,
+    scaled, scaledTouch, isVeryShortScreen
 } from './uiPosition.js';
 
 // =============================================================================
@@ -29,15 +30,6 @@ import {
  * These are scaled based on screen size for responsive UI.
  */
 const CONTROLS_BASE = {
-    POWER_BAR: {
-        WIDTH: 55,
-        HEIGHT: 280,
-        PADDING: 10,
-        KNOB_HEIGHT: 48,
-        TOUCH_ZONE_PADDING: 24,
-        LEFT_OFFSET: 50,   // Distance from left edge
-        TOP_OFFSET: 220    // Distance from top
-    },
     FIRE_BUTTON: {
         WIDTH: 180,
         HEIGHT: 70,
@@ -66,20 +58,7 @@ const CONTROLS_BASE = {
  * @returns {Object} Controls layout configuration
  */
 function getControlsLayoutDynamic() {
-    const scale = getUIScale();
-    const screenHeight = getScreenHeight();
-    const shortScreen = isShortScreen();
     const veryShortScreen = isVeryShortScreen();
-
-    // Scale dimensions while enforcing minimum touch target sizes
-    const powerBarWidth = scaledTouch(CONTROLS_BASE.POWER_BAR.WIDTH);
-    // More aggressive height reduction for very short screens
-    const powerBarHeight = veryShortScreen
-        ? Math.min(scaled(180), screenHeight * 0.35)  // Very compact
-        : shortScreen
-            ? Math.min(scaled(CONTROLS_BASE.POWER_BAR.HEIGHT), screenHeight * 0.45)
-            : scaled(CONTROLS_BASE.POWER_BAR.HEIGHT);
-    const knobHeight = scaledTouch(CONTROLS_BASE.POWER_BAR.KNOB_HEIGHT);
 
     // Smaller fire button on very short screens
     const fireButtonWidth = veryShortScreen
@@ -89,30 +68,12 @@ function getControlsLayoutDynamic() {
         ? scaledTouch(50)   // Smaller height
         : scaledTouch(CONTROLS_BASE.FIRE_BUTTON.HEIGHT);
 
-    // Calculate dynamic positions
-    const powerBarX = fromLeft(scaled(CONTROLS_BASE.POWER_BAR.LEFT_OFFSET));
-    // Adjust power bar Y based on screen height - move it lower on short screens
-    const powerBarY = veryShortScreen
-        ? fromTop(scaled(120))  // Very close to top
-        : shortScreen
-            ? fromTop(scaled(160))  // Closer to top on short screens
-            : fromTop(scaled(CONTROLS_BASE.POWER_BAR.TOP_OFFSET));
-
     // Fire button position: from right and bottom edges - closer to bottom on short screens
     const fireButtonBottomOffset = veryShortScreen ? 50 : scaled(CONTROLS_BASE.FIRE_BUTTON.BOTTOM_OFFSET);
     const fireButtonX = fromRight(veryShortScreen ? 90 : scaled(CONTROLS_BASE.FIRE_BUTTON.RIGHT_OFFSET));
     const fireButtonY = fromBottom(fireButtonBottomOffset);
 
     return {
-        POWER_BAR: {
-            X: powerBarX,
-            Y: powerBarY,
-            WIDTH: powerBarWidth,
-            HEIGHT: powerBarHeight,
-            PADDING: scaled(CONTROLS_BASE.POWER_BAR.PADDING),
-            KNOB_HEIGHT: knobHeight,
-            TOUCH_ZONE_PADDING: scaled(CONTROLS_BASE.POWER_BAR.TOUCH_ZONE_PADDING)
-        },
         FIRE_BUTTON: {
             X: fireButtonX,
             Y: fireButtonY,
@@ -161,7 +122,6 @@ function getControls() {
 
 // Legacy reference using dynamic getters
 const CONTROLS = {
-    get POWER_BAR() { return getControls().POWER_BAR; },
     get FIRE_BUTTON() { return getControls().FIRE_BUTTON; },
     get ANGLE_ARC() { return getControls().ANGLE_ARC; },
     get TRAJECTORY() { return getControls().TRAJECTORY; }
@@ -176,11 +136,7 @@ const CONTROLS = {
  */
 const controlState = {
     // Which control is being interacted with
-    activeControl: null,  // 'power', 'angle', or null
-
-    // Power bar drag state
-    powerDragStartY: 0,
-    powerDragStartValue: 0,
+    activeControl: null,  // 'angle' or null
 
     // Angle arc drag state
     angleDragStartAngle: 0,
@@ -209,94 +165,6 @@ let controlsEnabled = false;
  * @type {number}
  */
 let animationTime = 0;
-
-// =============================================================================
-// POWER BAR RENDERING
-// =============================================================================
-
-/**
- * Render the power bar control.
- * A vertical slider on the left side of the screen.
- *
- * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
- * @param {number} power - Current power value (0-100)
- */
-function renderPowerBar(ctx, power) {
-    const bar = CONTROLS.POWER_BAR;
-    const isActive = controlState.activeControl === 'power';
-    const accentColor = isActive ? COLORS.NEON_PINK : COLORS.NEON_CYAN;
-
-    ctx.save();
-
-    // Background panel
-    ctx.fillStyle = 'rgba(10, 10, 26, 0.85)';
-    ctx.beginPath();
-    ctx.roundRect(bar.X - bar.PADDING, bar.Y - bar.PADDING,
-                  bar.WIDTH + bar.PADDING * 2, bar.HEIGHT + bar.PADDING * 2 + 30, 8);
-    ctx.fill();
-
-    // Glowing border
-    ctx.strokeStyle = accentColor;
-    ctx.lineWidth = 2;
-    ctx.shadowColor = accentColor;
-    ctx.shadowBlur = isActive ? 12 : 6;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-
-    // Track background
-    const trackX = bar.X + (bar.WIDTH - 20) / 2;
-    const trackWidth = 20;
-    ctx.fillStyle = 'rgba(30, 30, 60, 0.8)';
-    ctx.beginPath();
-    ctx.roundRect(trackX, bar.Y, trackWidth, bar.HEIGHT, 4);
-    ctx.fill();
-
-    // Power fill with gradient
-    const fillHeight = (power / 100) * bar.HEIGHT;
-    const fillY = bar.Y + bar.HEIGHT - fillHeight;
-
-    const gradient = ctx.createLinearGradient(trackX, fillY, trackX, bar.Y + bar.HEIGHT);
-    gradient.addColorStop(0, COLORS.NEON_PINK);
-    gradient.addColorStop(0.5, COLORS.NEON_ORANGE);
-    gradient.addColorStop(1, COLORS.NEON_YELLOW);
-
-    ctx.fillStyle = gradient;
-    ctx.beginPath();
-    ctx.roundRect(trackX + 2, fillY + 2, trackWidth - 4, fillHeight - 4, 2);
-    ctx.fill();
-
-    // Knob at current position
-    const knobY = fillY - bar.KNOB_HEIGHT / 2;
-    ctx.fillStyle = 'rgba(10, 10, 26, 0.95)';
-    ctx.beginPath();
-    ctx.roundRect(bar.X, Math.max(bar.Y - bar.KNOB_HEIGHT / 2, knobY),
-                  bar.WIDTH, bar.KNOB_HEIGHT, 6);
-    ctx.fill();
-
-    ctx.strokeStyle = accentColor;
-    ctx.lineWidth = 3;
-    ctx.shadowColor = accentColor;
-    ctx.shadowBlur = 8;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-
-    // Power value on knob
-    ctx.fillStyle = COLORS.TEXT_LIGHT;
-    ctx.font = `bold ${UI.FONT_SIZE_LARGE}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`${Math.round(power)}`, bar.X + bar.WIDTH / 2,
-                 Math.max(bar.Y, knobY + bar.KNOB_HEIGHT / 2));
-
-    // Label
-    ctx.fillStyle = COLORS.TEXT_LIGHT;
-    ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    ctx.fillText('POWER', bar.X + bar.WIDTH / 2, bar.Y + bar.HEIGHT + bar.PADDING + 5);
-
-    ctx.restore();
-}
 
 // =============================================================================
 // ANGLE ARC RENDERING
@@ -659,23 +527,6 @@ export function isInsideFireButton(x, y) {
 }
 
 /**
- * Check if a point is inside the power bar area.
- * @param {number} x - X coordinate
- * @param {number} y - Y coordinate
- * @returns {boolean} True if inside power bar
- */
-export function isInsidePowerBar(x, y) {
-    const bar = CONTROLS.POWER_BAR;
-    const padding = bar.TOUCH_ZONE_PADDING;
-    return (
-        x >= bar.X - padding &&
-        x <= bar.X + bar.WIDTH + padding &&
-        y >= bar.Y - padding - bar.KNOB_HEIGHT / 2 &&
-        y <= bar.Y + bar.HEIGHT + padding
-    );
-}
-
-/**
  * Check if a point is inside the angle arc area.
  * @param {number} x - X coordinate
  * @param {number} y - Y coordinate
@@ -727,21 +578,6 @@ function calculateAngleFromPoint(x, y, tank) {
 }
 
 /**
- * Calculate power from Y position on power bar.
- * @param {number} y - Y coordinate
- * @returns {number} Power value (0-100)
- */
-function calculatePowerFromY(y) {
-    const bar = CONTROLS.POWER_BAR;
-
-    // Invert: top of bar = 100, bottom = 0
-    const relativeY = y - bar.Y;
-    const power = 100 - (relativeY / bar.HEIGHT) * 100;
-
-    return Math.max(0, Math.min(100, power));
-}
-
-/**
  * Handle pointer down on aiming controls.
  * @param {number} x - X coordinate
  * @param {number} y - Y coordinate
@@ -754,14 +590,6 @@ export function handlePointerDown(x, y, tank, canFire) {
     // Check fire button
     if (canFire && isInsideFireButton(x, y)) {
         controlState.fireButtonPressed = true;
-        return;
-    }
-
-    // Check power bar
-    if (isInsidePowerBar(x, y)) {
-        controlState.activeControl = 'power';
-        controlState.powerDragStartY = y;
-        controlState.powerDragStartValue = tank ? tank.power : 50;
         return;
     }
 
@@ -787,14 +615,7 @@ export function handlePointerMove(x, y, tank) {
 
     if (!controlsEnabled || !isGameInputEnabled()) return;
 
-    if (controlState.activeControl === 'power') {
-        // Calculate new power from Y position
-        const newPower = calculatePowerFromY(y);
-        const delta = newPower - (tank ? tank.power : 50);
-        if (Math.abs(delta) > 0.5) {
-            queueGameInput(INPUT_EVENTS.POWER_CHANGE, delta);
-        }
-    } else if (controlState.activeControl === 'angle') {
+    if (controlState.activeControl === 'angle') {
         // Calculate new angle from pointer position
         const newAngle = calculateAngleFromPoint(x, y, tank);
         const delta = newAngle - (tank ? tank.angle : 90);
@@ -895,9 +716,6 @@ export function renderAimingControls(ctx, state) {
     if (playerTank) {
         renderTrajectoryPreview(ctx, playerTank, angle, power, terrain);
     }
-
-    // Render power bar
-    renderPowerBar(ctx, power);
 
     // Render angle arc (around tank)
     if (playerTank) {
