@@ -8,11 +8,13 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build:web": "rm -rf www && mkdir -p www/node_modules/convex/dist www/node_modules/three/build www/node_modules/three/examples/jsm/postprocessing && cp -r index.html style.css config.js js assets www/ && cp node_modules/convex/dist/browser.bundle.js www/node_modules/convex/dist/ && cp node_modules/three/build/three.module.js www/node_modules/three/build/ && cp -r node_modules/three/examples/jsm/postprocessing www/node_modules/three/examples/jsm/",
-    "build:ios": "npm run build:web && npx cap sync ios",
-    "ios:sync": "mkdir -p www/js www/assets www/node_modules/convex/dist www/node_modules/three/build www/node_modules/three/examples/jsm/postprocessing && rsync -av --delete index.html style.css config.js www/ && rsync -av --delete js/ www/js/ && rsync -av --delete assets/ www/assets/ && cp node_modules/convex/dist/browser.bundle.js www/node_modules/convex/dist/ && cp node_modules/three/build/three.module.js www/node_modules/three/build/ && rsync -av --delete node_modules/three/examples/jsm/postprocessing/ www/node_modules/three/examples/jsm/postprocessing/ && npx cap copy ios",
+    "dev": "vite",
+    "build": "vite build && npm run copy-static",
+    "copy-static": "cp config.js www/ && mkdir -p www/node_modules/convex/dist && cp node_modules/convex/dist/browser.bundle.js www/node_modules/convex/dist/ && cp -r assets www/",
+    "build:ios": "npm run build && npx cap sync ios",
+    "ios:sync": "npm run build && npx cap copy ios",
     "open:ios": "npx cap open ios",
-    "serve": "python3 -m http.server 8000",
+    "preview": "vite preview",
     "generate-config": "node scripts/generate-config.js"
   },
   "repository": {
@@ -43,6 +45,7 @@
   },
   "devDependencies": {
     "canvas": "^3.2.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1"
   }
 }

@@ -8,11 +8,11 @@
  * Based on reference: docs/examples/threejs-synthwave-grid.html
  */
 
-// Use relative paths for Three.js imports (works without import maps)
-import * as THREE from '../../node_modules/three/build/three.module.js';
-import { EffectComposer } from '../../node_modules/three/examples/jsm/postprocessing/EffectComposer.js';
-import { RenderPass } from '../../node_modules/three/examples/jsm/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from '../../node_modules/three/examples/jsm/postprocessing/UnrealBloomPass.js';
+// Three.js imports (Vite resolves these at build time)
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { getSafeAreaInsets, onResize as registerResize, getScreenWidth, getScreenHeight } from '../screenSize.js';
 
 // =============================================================================

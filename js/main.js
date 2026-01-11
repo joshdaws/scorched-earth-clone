@@ -853,7 +853,7 @@ function renderMenuButton(ctx, button, pulseIntensity, badgeCount = 0) {
  * Based on docs/examples/synthwave-title-text.html
  */
 const TITLE_TEXT_CONFIG = {
-    extrusionDepth: 8,    // How "thick" the 3D block shadow is
+    extrusionDepth: 16,   // How "thick" the 3D block shadow is (doubled for larger title)
     skewX: -0.15,         // Slight italic skew for dynamic feel
     extrusionColor: '#2a003b', // Dark purple shadow color
 };
@@ -1027,14 +1027,16 @@ function renderMenu(ctx) {
 
     // Title positioning - split into "SCORCHED" and "EARTH" on separate lines
     // to match design reference (start-redesign.png) with chrome synthwave effect
-    const scorchedY = isCompact ? 50 : 60;
-    const earthY = isCompact ? 95 : 110;
-    const subtitleY = isCompact ? 130 : 150;
+    // Y positions doubled for larger title text
+    const scorchedY = isCompact ? 100 : 120;
+    const earthY = isCompact ? 190 : 220;
+    const subtitleY = isCompact ? 260 : 300;
 
     // Font sizes - "SCORCHED" is larger, "EARTH" slightly smaller (using Audiowide font)
-    const scorchedFontSize = Math.round(60 * titleScale);
-    const earthFontSize = Math.round(50 * titleScale);
-    const subtitleFontSize = Math.round(22 * titleScale);
+    // Font sizes doubled for greater visual impact
+    const scorchedFontSize = Math.round(120 * titleScale);
+    const earthFontSize = Math.round(100 * titleScale);
+    const subtitleFontSize = Math.round(44 * titleScale);
 
     // Render "SCORCHED" - chrome synthwave effect with 3D extrusion
     drawSynthwaveText(ctx, 'SCORCHED', width / 2, scorchedY, scorchedFontSize, pulseIntensity);
@@ -5094,6 +5096,15 @@ async function init() {
 
     // Initialize debug module
     Debug.init();
+
+    // Preload Audiowide font to prevent flash of unstyled text (FOUT) on title screen
+    // Use document.fonts.load() to explicitly load the font before rendering
+    try {
+        await document.fonts.load(`120px ${UI.TITLE_FONT_FAMILY}`);
+        console.log('Audiowide font loaded successfully');
+    } catch (err) {
+        console.warn('Font preloading failed, title may flash:', err);
+    }
 
     // Initialize synthwave background (static layer behind gameplay)
     initBackground(Renderer.getWidth(), Renderer.getHeight());
