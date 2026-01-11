@@ -255,12 +255,12 @@ const MENU_BUTTON_STYLES = {
         textColor: '#ffffff',
         glowColor: '#F59E0B'
     },
-    // Dark outlined button (OPTIONS) - white border
+    // Dark outlined button (OPTIONS) - subtle cyan border to match reference
     DARK: {
         bgColor: 'rgba(20, 15, 40, 0.95)',
-        borderColor: 'rgba(255, 255, 255, 0.5)',
+        borderColor: 'rgba(255, 255, 255, 0.6)',
         textColor: 'rgba(255, 255, 255, 0.9)',
-        glowColor: 'rgba(255, 255, 255, 0.3)'
+        glowColor: 'rgba(255, 255, 255, 0.4)'
     }
 };
 
@@ -363,10 +363,10 @@ function calculateMenuLayout(height, width) {
     const defaultPrimaryHeight = 50;
     const defaultSecondaryHeight = 45;
     const defaultPrimaryWidth = 350;  // Wide NEW RUN button
-    const defaultPairedWidth = 180;   // Half-width paired buttons
-    const defaultOptionsWidth = 200;  // OPTIONS button
+    const defaultPairedWidth = 200;   // Half-width paired buttons (increased for better text padding)
+    const defaultOptionsWidth = 180;  // OPTIONS button
     const defaultRowSpacing = 55;     // Space between rows
-    const defaultPairGap = 20;        // Gap between paired buttons
+    const defaultPairGap = 16;        // Gap between paired buttons
     const defaultFontSize = UI.FONT_SIZE_LARGE;
 
     // Calculate scale factor based on available height
@@ -385,7 +385,7 @@ function calculateMenuLayout(height, width) {
     // Width scaling based on screen width
     // Ensure minimum 30px edge margin on each side
     const minEdgeMargin = 30;
-    const totalPairedWidth = defaultPairedWidth * 2 + defaultPairGap;  // 380px
+    const totalPairedWidth = defaultPairedWidth * 2 + defaultPairGap;  // 416px (200*2 + 16)
     const availableWidth = width - (minEdgeMargin * 2);
 
     // Scale based on the larger of primary width or paired buttons width
@@ -776,20 +776,34 @@ function renderMenuButton(ctx, button, pulseIntensity, badgeCount = 0) {
     ctx.roundRect(btnX, btnY, button.width, button.height, 8);
     ctx.fill();
 
-    // Neon glow effect (pulsing)
+    // Neon border effect with outer glow (matching reference design)
     if (!isDisabled) {
+        // Outer glow layer - softer, wider glow
         ctx.shadowColor = style.glowColor;
-        ctx.shadowBlur = 10 + glowIntensity * 8;
+        ctx.shadowBlur = 15 + glowIntensity * 10;
         ctx.shadowOffsetX = 0;
         ctx.shadowOffsetY = 0;
-    }
+        ctx.strokeStyle = style.borderColor;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(btnX, btnY, button.width, button.height, 8);
+        ctx.stroke();
 
-    // Button border (neon outline)
-    ctx.strokeStyle = isDisabled ? COLORS.TEXT_MUTED : style.borderColor;
-    ctx.lineWidth = isDisabled ? 1 : 2;
-    ctx.beginPath();
-    ctx.roundRect(btnX, btnY, button.width, button.height, 8);
-    ctx.stroke();
+        // Inner border - crisp line without shadow
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = style.borderColor;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(btnX, btnY, button.width, button.height, 8);
+        ctx.stroke();
+    } else {
+        // Disabled button border
+        ctx.strokeStyle = COLORS.TEXT_MUTED;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(btnX, btnY, button.width, button.height, 8);
+        ctx.stroke();
+    }
 
     // Reset shadow for text
     ctx.shadowBlur = 0;
@@ -797,7 +811,7 @@ function renderMenuButton(ctx, button, pulseIntensity, badgeCount = 0) {
     // Button text with subtle glow
     if (!isDisabled) {
         ctx.shadowColor = style.glowColor;
-        ctx.shadowBlur = 4 + glowIntensity * 3;
+        ctx.shadowBlur = 4 + glowIntensity * 2;
     }
     ctx.fillStyle = isDisabled ? COLORS.TEXT_MUTED : style.textColor;
     // Use button-specific font size if available (for adaptive layouts)
