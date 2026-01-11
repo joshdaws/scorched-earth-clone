@@ -13,6 +13,7 @@
  */
 
 import { CANVAS, COLORS, DEBUG } from './constants.js';
+import * as Renderer from './renderer.js';
 import { RARITY, RARITY_COLORS, RARITY_NAMES } from './tank-skins.js';
 import {
     playRadioStaticSound,
@@ -78,7 +79,7 @@ const VISUALS = {
     // Spotlight
     SPOTLIGHT_WIDTH: 400,
     SPOTLIGHT_START_X: -100,
-    SPOTLIGHT_SWEEP_WIDTH: CANVAS.DESIGN_WIDTH + 200,
+    SPOTLIGHT_SWEEP_WIDTH: Renderer.getWidth() + 200,
 
     // Platform
     PLATFORM_WIDTH: 300,
@@ -138,7 +139,7 @@ let isInitialized = false;
 /** @type {number} Helicopter Y position */
 let heliY = VISUALS.HELI_START_Y;
 /** @type {number} Helicopter X position */
-let heliX = CANVAS.DESIGN_WIDTH / 2;
+let heliX = Renderer.getWidth() / 2;
 /** @type {number} Main rotor angle */
 let rotorAngle = 0;
 /** @type {number} Spotlight X position (for sweep) */
@@ -226,7 +227,7 @@ function updateWashParticles(deltaTime) {
         p.vy += 50 * dt; // Slight downward pull
         p.life -= deltaTime;
 
-        if (p.life <= 0 || p.y > CANVAS.DESIGN_HEIGHT) {
+        if (p.life <= 0 || p.y > Renderer.getHeight()) {
             washParticles.splice(i, 1);
         }
     }
@@ -279,7 +280,7 @@ function drawStatic(ctx, intensity) {
     ctx.save();
 
     // Create static noise
-    const imageData = ctx.getImageData(0, 0, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    const imageData = ctx.getImageData(0, 0, Renderer.getWidth(), Renderer.getHeight());
     const data = imageData.data;
 
     for (let i = 0; i < data.length; i += 4) {
@@ -296,16 +297,16 @@ function drawStatic(ctx, intensity) {
 
     // Add scanlines
     ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
-    for (let y = 0; y < CANVAS.DESIGN_HEIGHT; y += 4) {
-        ctx.fillRect(0, y, CANVAS.DESIGN_WIDTH, 2);
+    for (let y = 0; y < Renderer.getHeight(); y += 4) {
+        ctx.fillRect(0, y, Renderer.getWidth(), 2);
     }
 
     // Add color distortion bands
     if (Math.random() < intensity * 0.5) {
-        const bandY = Math.random() * CANVAS.DESIGN_HEIGHT;
+        const bandY = Math.random() * Renderer.getHeight();
         const bandHeight = 10 + Math.random() * 30;
         ctx.fillStyle = `rgba(255, 0, 102, ${intensity * 0.3})`;
-        ctx.fillRect(0, bandY, CANVAS.DESIGN_WIDTH, bandHeight);
+        ctx.fillRect(0, bandY, Renderer.getWidth(), bandHeight);
     }
 
     ctx.restore();
@@ -322,8 +323,8 @@ function drawTransmissionText(ctx, flickerProgress) {
 
     ctx.save();
 
-    const centerX = CANVAS.DESIGN_WIDTH / 2;
-    const centerY = CANVAS.DESIGN_HEIGHT / 2;
+    const centerX = Renderer.getWidth() / 2;
+    const centerY = Renderer.getHeight() / 2;
 
     // Terminal-style background
     const boxWidth = 450;
@@ -381,7 +382,7 @@ function drawFogLayers(ctx, progress) {
         gradient.addColorStop(1, 'rgba(26, 0, 51, 0)');
 
         ctx.fillStyle = gradient;
-        ctx.fillRect(0, layerY - 50, CANVAS.DESIGN_WIDTH, 100);
+        ctx.fillRect(0, layerY - 50, Renderer.getWidth(), 100);
     }
 
     ctx.restore();
@@ -600,7 +601,7 @@ function drawCableAndTank(ctx, heliX, heliY, cableLen, swing, tank, landed) {
  * @param {CanvasRenderingContext2D} ctx - Canvas context
  */
 function drawPlatform(ctx) {
-    const centerX = CANVAS.DESIGN_WIDTH / 2;
+    const centerX = Renderer.getWidth() / 2;
     const platformX = centerX - VISUALS.PLATFORM_WIDTH / 2;
 
     ctx.save();
@@ -661,7 +662,7 @@ function drawRevealText(ctx, tank, alpha) {
     ctx.save();
     ctx.globalAlpha = alpha;
 
-    const centerX = CANVAS.DESIGN_WIDTH / 2;
+    const centerX = Renderer.getWidth() / 2;
 
     // Main announcement
     ctx.shadowColor = EXTRACTION_COLORS.GLOW;
@@ -702,7 +703,7 @@ function drawScreenFlash(ctx, opacity) {
 
     ctx.save();
     ctx.fillStyle = `rgba(255, 255, 255, ${opacity * 0.8})`;
-    ctx.fillRect(0, 0, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    ctx.fillRect(0, 0, Renderer.getWidth(), Renderer.getHeight());
     ctx.restore();
 }
 
@@ -714,7 +715,7 @@ function drawScreenFlash(ctx, opacity) {
 function drawOverlay(ctx, opacity) {
     ctx.save();
     ctx.fillStyle = `rgba(10, 10, 26, ${opacity})`;
-    ctx.fillRect(0, 0, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    ctx.fillRect(0, 0, Renderer.getWidth(), Renderer.getHeight());
     ctx.restore();
 }
 
@@ -756,7 +757,7 @@ function updateApproach(phaseProgress, deltaTime) {
         spotlightX = VISUALS.SPOTLIGHT_START_X + sweepProgress * VISUALS.SPOTLIGHT_SWEEP_WIDTH;
     } else {
         // Spotlight centers, helicopter descends
-        spotlightX = CANVAS.DESIGN_WIDTH / 2;
+        spotlightX = Renderer.getWidth() / 2;
         const descendProgress = (phaseProgress - 0.4) / 0.6;
         heliY = VISUALS.HELI_START_Y + descendProgress * (VISUALS.HELI_END_Y - VISUALS.HELI_START_Y);
     }
@@ -948,7 +949,7 @@ export function render(ctx) {
 
             // Tank on ground
             if (tankLanded && revealTank) {
-                const tankX = CANVAS.DESIGN_WIDTH / 2;
+                const tankX = Renderer.getWidth() / 2;
                 const tankY = VISUALS.PLATFORM_Y;
 
                 ctx.save();
@@ -1025,7 +1026,7 @@ export function play(tank, onComplete = null) {
 
     // Reset state
     heliY = VISUALS.HELI_START_Y;
-    heliX = CANVAS.DESIGN_WIDTH / 2;
+    heliX = Renderer.getWidth() / 2;
     rotorAngle = 0;
     spotlightX = VISUALS.SPOTLIGHT_START_X;
     cableLength = 0;

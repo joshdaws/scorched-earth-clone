@@ -8,6 +8,7 @@
  */
 
 import { CANVAS, COLORS, UI } from './constants.js';
+import * as Renderer from './renderer.js';
 import { onAchievementUnlock, getAchievement } from './achievements.js';
 import * as Sound from './sound.js';
 
@@ -342,8 +343,8 @@ function renderPopup(ctx, popup, now) {
     }
 
     // Calculate position (slides in from right)
-    const targetX = CANVAS.DESIGN_WIDTH - config.MARGIN_RIGHT - config.WIDTH;
-    const offscreenX = CANVAS.DESIGN_WIDTH + 20;
+    const targetX = Renderer.getWidth() - config.MARGIN_RIGHT - config.WIDTH;
+    const offscreenX = Renderer.getWidth() + 20;
     const x = offscreenX + (targetX - offscreenX) * slideProgress;
     const y = popup.y;
 

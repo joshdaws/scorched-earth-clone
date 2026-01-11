@@ -7,6 +7,7 @@
  */
 
 import { COLORS, UI, CANVAS, GAME_STATES } from './constants.js';
+import * as Renderer from './renderer.js';
 import * as VolumeControls from './volumeControls.js';
 import * as Sound from './sound.js';
 
@@ -153,8 +154,10 @@ export function render(ctx) {
     console.log('[PauseMenu] render called, isVisible:', isVisible);
     if (!ctx || !isVisible) return;
 
-    const centerX = CANVAS.DESIGN_WIDTH / 2;
-    const centerY = CANVAS.DESIGN_HEIGHT / 2;
+    const width = Renderer.getWidth();
+    const height = Renderer.getHeight();
+    const centerX = width / 2;
+    const centerY = height / 2;
     const panelX = centerX - PAUSE_PANEL.WIDTH / 2;
     const panelY = centerY - PAUSE_PANEL.HEIGHT / 2;
     panelPosition = { x: panelX, y: panelY };
@@ -163,7 +166,7 @@ export function render(ctx) {
 
     // Dark overlay to dim the game
     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(0, 0, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    ctx.fillRect(0, 0, width, height);
 
     // If showing options, render volume controls instead
     if (showingOptions) {
@@ -289,9 +292,9 @@ function renderButton(ctx, button) {
  * @param {number} panelY - Panel Y position
  */
 function renderQuitConfirmation(ctx, panelX, panelY) {
-    const centerX = CANVAS.DESIGN_WIDTH / 2;
+    const centerX = Renderer.getWidth() / 2;
     const confirmHeight = 260;
-    const confirmY = CANVAS.DESIGN_HEIGHT / 2 - confirmHeight / 2;
+    const confirmY = Renderer.getHeight() / 2 - confirmHeight / 2;
 
     // Panel background
     ctx.fillStyle = 'rgba(10, 10, 26, 0.95)';
@@ -350,8 +353,8 @@ export function handlePointerDown(x, y) {
         }
 
         // Check back button
-        const centerX = CANVAS.DESIGN_WIDTH / 2;
-        const centerY = CANVAS.DESIGN_HEIGHT / 2;
+        const centerX = Renderer.getWidth() / 2;
+        const centerY = Renderer.getHeight() / 2;
         const backButton = {
             id: 'back',
             x: centerX - 70,
@@ -386,7 +389,7 @@ export function handlePointerDown(x, y) {
 
     // If showing quit confirmation
     if (showingQuitConfirm) {
-        const confirmY = CANVAS.DESIGN_HEIGHT / 2 - 130;
+        const confirmY = Renderer.getHeight() / 2 - 130;
         const buttons = getQuitConfirmButtons(panelPosition.x, confirmY);
 
         for (const button of buttons) {
@@ -457,8 +460,8 @@ export function handlePointerUpWithAction(x, y) {
 
     // Handle back button in options
     if (showingOptions && wasPressed === 'back') {
-        const centerX = CANVAS.DESIGN_WIDTH / 2;
-        const centerY = CANVAS.DESIGN_HEIGHT / 2;
+        const centerX = Renderer.getWidth() / 2;
+        const centerY = Renderer.getHeight() / 2;
         const backButton = {
             x: centerX - 70,
             y: centerY + VolumeControls.getPanelDimensions().height / 2 + 30,
@@ -477,7 +480,7 @@ export function handlePointerUpWithAction(x, y) {
 
     // Handle quit confirmation buttons
     if (showingQuitConfirm) {
-        const confirmY = CANVAS.DESIGN_HEIGHT / 2 - 130;
+        const confirmY = Renderer.getHeight() / 2 - 130;
         const buttons = getQuitConfirmButtons(panelPosition.x, confirmY);
         const button = buttons.find(b => b.id === wasPressed);
 
@@ -526,8 +529,8 @@ export function handlePointerMove(x, y) {
 
     if (showingOptions) {
         // Update back button hover state
-        const centerX = CANVAS.DESIGN_WIDTH / 2;
-        const centerY = CANVAS.DESIGN_HEIGHT / 2;
+        const centerX = Renderer.getWidth() / 2;
+        const centerY = Renderer.getHeight() / 2;
         const backButton = {
             id: 'back',
             x: centerX - 70,
@@ -541,7 +544,7 @@ export function handlePointerMove(x, y) {
 
     // If showing quit confirmation, track hover on confirm buttons
     if (showingQuitConfirm && panelPosition) {
-        const confirmY = CANVAS.DESIGN_HEIGHT / 2 - 130;
+        const confirmY = Renderer.getHeight() / 2 - 130;
         const buttons = getQuitConfirmButtons(panelPosition.x, confirmY);
         hoveredButtonId = null;
         for (const button of buttons) {

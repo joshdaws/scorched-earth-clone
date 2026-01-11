@@ -7,6 +7,7 @@
  */
 
 import { COLORS, UI, CANVAS } from './constants.js';
+import * as Renderer from './renderer.js';
 import * as Sound from './sound.js';
 import { isCrtEnabled, toggleCrt } from './effects.js';
 
@@ -162,7 +163,7 @@ function getChangeNameButton(panelX, panelY) {
  * @param {number} [centerX] - Center X position (defaults to canvas center)
  * @param {number} [centerY] - Center Y position (defaults to canvas center)
  */
-export function render(ctx, centerX = CANVAS.DESIGN_WIDTH / 2, centerY = CANVAS.DESIGN_HEIGHT / 2) {
+export function render(ctx, centerX = Renderer.getWidth() / 2, centerY = Renderer.getHeight() / 2) {
     if (!ctx) return;
 
     const panelX = centerX - VOLUME_PANEL.WIDTH / 2;

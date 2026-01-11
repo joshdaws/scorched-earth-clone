@@ -7,6 +7,7 @@
  */
 
 import { CANVAS, COLORS, UI, GAME_STATES } from './constants.js';
+import * as Renderer from './renderer.js';
 import * as Game from './game.js';
 import { playClickSound } from './sound.js';
 
@@ -72,16 +73,16 @@ let onQuitCallback = null;
  */
 const buttons = {
     continue: {
-        x: CANVAS.DESIGN_WIDTH / 2,
-        y: CANVAS.DESIGN_HEIGHT / 2 + 120,
+        x: Renderer.getWidth() / 2,
+        y: Renderer.getHeight() / 2 + 120,
         width: 280,
         height: 55,
         text: 'CONTINUE TO SHOP',
         color: COLORS.NEON_CYAN
     },
     quit: {
-        x: CANVAS.DESIGN_WIDTH / 2,
-        y: CANVAS.DESIGN_HEIGHT / 2 + 195,
+        x: Renderer.getWidth() / 2,
+        y: Renderer.getHeight() / 2 + 195,
         width: 280,
         height: 55,
         text: 'QUIT TO MENU',
@@ -311,18 +312,18 @@ export function render(ctx) {
 
     // Semi-transparent dark overlay
     ctx.fillStyle = 'rgba(10, 10, 26, 0.92)';
-    ctx.fillRect(0, 0, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    ctx.fillRect(0, 0, Renderer.getWidth(), Renderer.getHeight());
 
     // Dramatic scanlines effect
     ctx.globalAlpha = 0.03;
-    for (let y = 0; y < CANVAS.DESIGN_HEIGHT; y += 4) {
+    for (let y = 0; y < Renderer.getHeight(); y += 4) {
         ctx.fillStyle = '#000000';
-        ctx.fillRect(0, y, CANVAS.DESIGN_WIDTH, 2);
+        ctx.fillRect(0, y, Renderer.getWidth(), 2);
     }
     ctx.globalAlpha = 1;
 
     // Main title with dramatic glow
-    const titleY = CANVAS.DESIGN_HEIGHT / 3 - 40;
+    const titleY = Renderer.getHeight() / 3 - 40;
 
     ctx.save();
     ctx.shadowColor = mainColor;
@@ -334,13 +335,13 @@ export function render(ctx) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = mainColor;
-    ctx.fillText(titleText, CANVAS.DESIGN_WIDTH / 2, titleY);
+    ctx.fillText(titleText, Renderer.getWidth() / 2, titleY);
 
     // Title outline for extra depth
     ctx.shadowBlur = 0;
     ctx.strokeStyle = COLORS.TEXT_LIGHT;
     ctx.lineWidth = 2;
-    ctx.strokeText(titleText, CANVAS.DESIGN_WIDTH / 2, titleY);
+    ctx.strokeText(titleText, Renderer.getWidth() / 2, titleY);
     ctx.restore();
 
     // Decorative line under title
@@ -351,26 +352,26 @@ export function render(ctx) {
     ctx.lineWidth = 3;
     ctx.beginPath();
     const lineWidth = 180;
-    ctx.moveTo(CANVAS.DESIGN_WIDTH / 2 - lineWidth, titleY + 55);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH / 2 + lineWidth, titleY + 55);
+    ctx.moveTo(Renderer.getWidth() / 2 - lineWidth, titleY + 55);
+    ctx.lineTo(Renderer.getWidth() / 2 + lineWidth, titleY + 55);
     ctx.stroke();
     ctx.restore();
 
     // Money earned display
-    const moneyY = CANVAS.DESIGN_HEIGHT / 2 - 10;
+    const moneyY = Renderer.getHeight() / 2 - 10;
 
     ctx.save();
     ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
     ctx.fillStyle = COLORS.TEXT_MUTED;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('ROUND EARNINGS', CANVAS.DESIGN_WIDTH / 2, moneyY - 30);
+    ctx.fillText('ROUND EARNINGS', Renderer.getWidth() / 2, moneyY - 30);
 
     ctx.shadowColor = COLORS.NEON_YELLOW;
     ctx.shadowBlur = 10 + pulseIntensity * 5;
     ctx.font = `bold ${UI.FONT_SIZE_TITLE}px ${UI.FONT_FAMILY}`;
     ctx.fillStyle = COLORS.NEON_YELLOW;
-    ctx.fillText(`$${moneyEarned.toLocaleString()}`, CANVAS.DESIGN_WIDTH / 2, moneyY + 15);
+    ctx.fillText(`$${moneyEarned.toLocaleString()}`, Renderer.getWidth() / 2, moneyY + 15);
     ctx.restore();
 
     // Optional: Damage dealt statistic
@@ -379,7 +380,7 @@ export function render(ctx) {
         ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
         ctx.fillStyle = COLORS.TEXT_MUTED;
         ctx.textAlign = 'center';
-        ctx.fillText(`Damage dealt: ${damageDealt}`, CANVAS.DESIGN_WIDTH / 2, moneyY + 55);
+        ctx.fillText(`Damage dealt: ${damageDealt}`, Renderer.getWidth() / 2, moneyY + 55);
         ctx.restore();
     }
 
@@ -393,7 +394,7 @@ export function render(ctx) {
     ctx.shadowColor = mainColor;
     ctx.shadowBlur = 20;
     ctx.lineWidth = 4;
-    ctx.strokeRect(30, 30, CANVAS.DESIGN_WIDTH - 60, CANVAS.DESIGN_HEIGHT - 60);
+    ctx.strokeRect(30, 30, Renderer.getWidth() - 60, Renderer.getHeight() - 60);
 
     // Corner accents (same style as main menu)
     const cornerSize = 40;
@@ -411,23 +412,23 @@ export function render(ctx) {
 
     // Top-right corner
     ctx.beginPath();
-    ctx.moveTo(CANVAS.DESIGN_WIDTH - 30 - cornerSize, 30);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH - 30, 30);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH - 30, 30 + cornerSize);
+    ctx.moveTo(Renderer.getWidth() - 30 - cornerSize, 30);
+    ctx.lineTo(Renderer.getWidth() - 30, 30);
+    ctx.lineTo(Renderer.getWidth() - 30, 30 + cornerSize);
     ctx.stroke();
 
     // Bottom-left corner
     ctx.beginPath();
-    ctx.moveTo(30, CANVAS.DESIGN_HEIGHT - 30 - cornerSize);
-    ctx.lineTo(30, CANVAS.DESIGN_HEIGHT - 30);
-    ctx.lineTo(30 + cornerSize, CANVAS.DESIGN_HEIGHT - 30);
+    ctx.moveTo(30, Renderer.getHeight() - 30 - cornerSize);
+    ctx.lineTo(30, Renderer.getHeight() - 30);
+    ctx.lineTo(30 + cornerSize, Renderer.getHeight() - 30);
     ctx.stroke();
 
     // Bottom-right corner
     ctx.beginPath();
-    ctx.moveTo(CANVAS.DESIGN_WIDTH - 30 - cornerSize, CANVAS.DESIGN_HEIGHT - 30);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH - 30, CANVAS.DESIGN_HEIGHT - 30);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH - 30, CANVAS.DESIGN_HEIGHT - 30 - cornerSize);
+    ctx.moveTo(Renderer.getWidth() - 30 - cornerSize, Renderer.getHeight() - 30);
+    ctx.lineTo(Renderer.getWidth() - 30, Renderer.getHeight() - 30);
+    ctx.lineTo(Renderer.getWidth() - 30, Renderer.getHeight() - 30 - cornerSize);
     ctx.stroke();
 
     ctx.restore();
@@ -441,7 +442,7 @@ export function render(ctx) {
     const flavorText = isVictory
         ? 'Another enemy tank destroyed!'
         : 'Your tank was destroyed...';
-    ctx.fillText(flavorText, CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT - 70);
+    ctx.fillText(flavorText, Renderer.getWidth() / 2, Renderer.getHeight() - 70);
     ctx.restore();
 
     ctx.restore();

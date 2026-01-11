@@ -7,6 +7,7 @@
  */
 
 import { CANVAS, COLORS, UI, GAME_STATES } from './constants.js';
+import * as Renderer from './renderer.js';
 import * as Game from './game.js';
 import * as Input from './input.js';
 import * as Sound from './sound.js';
@@ -125,7 +126,7 @@ function updateFilteredList() {
 
     // Calculate max scroll
     const listHeight = filteredAchievements.length * (CONFIG.ITEM_HEIGHT + CONFIG.ITEM_GAP);
-    const viewportHeight = CANVAS.DESIGN_HEIGHT - CONFIG.HEADER_HEIGHT - CONFIG.FILTER_HEIGHT - CONFIG.FOOTER_HEIGHT;
+    const viewportHeight = Renderer.getHeight() - CONFIG.HEADER_HEIGHT - CONFIG.FILTER_HEIGHT - CONFIG.FOOTER_HEIGHT;
     maxScrollY = Math.max(0, listHeight - viewportHeight + CONFIG.SCROLL_MARGIN * 2);
 
     // Clamp scroll position
@@ -151,7 +152,7 @@ function handleClick(pos) {
     // Check filter buttons
     const filterY = CONFIG.HEADER_HEIGHT + 10;
     const totalFilterWidth = FILTERS.length * (CONFIG.FILTER_BUTTON_WIDTH + CONFIG.FILTER_BUTTON_GAP) - CONFIG.FILTER_BUTTON_GAP;
-    let filterX = (CANVAS.DESIGN_WIDTH - totalFilterWidth) / 2;
+    let filterX = (Renderer.getWidth() - totalFilterWidth) / 2;
 
     for (const filter of FILTERS) {
         const buttonRect = {
@@ -204,7 +205,7 @@ function handleWheel(deltaY) {
  */
 function handleDragStart(y) {
     const listTop = CONFIG.HEADER_HEIGHT + CONFIG.FILTER_HEIGHT;
-    const listBottom = CANVAS.DESIGN_HEIGHT - CONFIG.FOOTER_HEIGHT;
+    const listBottom = Renderer.getHeight() - CONFIG.FOOTER_HEIGHT;
 
     if (y >= listTop && y <= listBottom) {
         isDragging = true;
@@ -269,7 +270,7 @@ export function update(deltaTime) {
 export function render(ctx) {
     // Clear with background
     ctx.fillStyle = COLORS.BACKGROUND;
-    ctx.fillRect(0, 0, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    ctx.fillRect(0, 0, Renderer.getWidth(), Renderer.getHeight());
 
     // Render components
     renderHeader(ctx);
@@ -299,13 +300,13 @@ function renderHeader(ctx) {
     ctx.textBaseline = 'middle';
     ctx.shadowColor = COLORS.NEON_ORANGE;
     ctx.shadowBlur = 12;
-    ctx.fillText('ACHIEVEMENTS', CANVAS.DESIGN_WIDTH / 2, 50);
+    ctx.fillText('ACHIEVEMENTS', Renderer.getWidth() / 2, 50);
 
     // Progress counter
     ctx.shadowBlur = 6;
     ctx.fillStyle = COLORS.TEXT_LIGHT;
     ctx.font = `bold 24px ${UI.FONT_FAMILY}`;
-    ctx.fillText(`${unlockedCount} / ${totalCount} UNLOCKED`, CANVAS.DESIGN_WIDTH / 2, 95);
+    ctx.fillText(`${unlockedCount} / ${totalCount} UNLOCKED`, Renderer.getWidth() / 2, 95);
 
     ctx.restore();
 }
@@ -316,7 +317,7 @@ function renderHeader(ctx) {
 function renderFilters(ctx) {
     const filterY = CONFIG.HEADER_HEIGHT + 10;
     const totalFilterWidth = FILTERS.length * (CONFIG.FILTER_BUTTON_WIDTH + CONFIG.FILTER_BUTTON_GAP) - CONFIG.FILTER_BUTTON_GAP;
-    let filterX = (CANVAS.DESIGN_WIDTH - totalFilterWidth) / 2;
+    let filterX = (Renderer.getWidth() - totalFilterWidth) / 2;
 
     ctx.save();
 
@@ -365,14 +366,14 @@ function renderFilters(ctx) {
  */
 function renderAchievementList(ctx) {
     const listTop = CONFIG.HEADER_HEIGHT + CONFIG.FILTER_HEIGHT + CONFIG.SCROLL_MARGIN;
-    const listBottom = CANVAS.DESIGN_HEIGHT - CONFIG.FOOTER_HEIGHT;
+    const listBottom = Renderer.getHeight() - CONFIG.FOOTER_HEIGHT;
     const listHeight = listBottom - listTop;
 
     ctx.save();
 
     // Clip to list area
     ctx.beginPath();
-    ctx.rect(0, listTop, CANVAS.DESIGN_WIDTH, listHeight);
+    ctx.rect(0, listTop, Renderer.getWidth(), listHeight);
     ctx.clip();
 
     // Render each achievement
@@ -401,7 +402,7 @@ function renderAchievementList(ctx) {
  */
 function renderAchievementItem(ctx, achievement, y) {
     const x = 60;
-    const width = CANVAS.DESIGN_WIDTH - 120;
+    const width = Renderer.getWidth() - 120;
     const height = CONFIG.ITEM_HEIGHT;
     const unlocked = isAchievementUnlocked(achievement.id);
     const progress = getAchievementProgress(achievement.id);
@@ -547,13 +548,13 @@ function renderScrollIndicators(ctx, listTop, listBottom) {
         gradient.addColorStop(0, COLORS.BACKGROUND);
         gradient.addColorStop(1, 'rgba(10, 10, 26, 0)');
         ctx.fillStyle = gradient;
-        ctx.fillRect(0, listTop, CANVAS.DESIGN_WIDTH, 30);
+        ctx.fillRect(0, listTop, Renderer.getWidth(), 30);
 
         // Up arrow
         ctx.fillStyle = COLORS.TEXT_MUTED;
         ctx.font = `20px ${UI.FONT_FAMILY}`;
         ctx.textAlign = 'center';
-        ctx.fillText('\u25B2', CANVAS.DESIGN_WIDTH / 2, listTop + 15);
+        ctx.fillText('\u25B2', Renderer.getWidth() / 2, listTop + 15);
     }
 
     // Bottom indicator (if more content below)
@@ -562,13 +563,13 @@ function renderScrollIndicators(ctx, listTop, listBottom) {
         gradient.addColorStop(0, 'rgba(10, 10, 26, 0)');
         gradient.addColorStop(1, COLORS.BACKGROUND);
         ctx.fillStyle = gradient;
-        ctx.fillRect(0, listBottom - 30, CANVAS.DESIGN_WIDTH, 30);
+        ctx.fillRect(0, listBottom - 30, Renderer.getWidth(), 30);
 
         // Down arrow
         ctx.fillStyle = COLORS.TEXT_MUTED;
         ctx.font = `20px ${UI.FONT_FAMILY}`;
         ctx.textAlign = 'center';
-        ctx.fillText('\u25BC', CANVAS.DESIGN_WIDTH / 2, listBottom - 10);
+        ctx.fillText('\u25BC', Renderer.getWidth() / 2, listBottom - 10);
     }
 
     ctx.restore();
@@ -581,14 +582,14 @@ function renderScrollIndicators(ctx, listTop, listBottom) {
 function renderStatsView(ctx) {
     const summary = LifetimeStats.getSummary();
     const listTop = CONFIG.HEADER_HEIGHT + CONFIG.FILTER_HEIGHT + 20;
-    const listBottom = CANVAS.DESIGN_HEIGHT - CONFIG.FOOTER_HEIGHT;
+    const listBottom = Renderer.getHeight() - CONFIG.FOOTER_HEIGHT;
 
     ctx.save();
 
     // Stats container background
     ctx.fillStyle = 'rgba(10, 10, 26, 0.6)';
     ctx.beginPath();
-    ctx.roundRect(40, listTop, CANVAS.DESIGN_WIDTH - 80, listBottom - listTop - 20, 12);
+    ctx.roundRect(40, listTop, Renderer.getWidth() - 80, listBottom - listTop - 20, 12);
     ctx.fill();
 
     // Stats title
@@ -597,7 +598,7 @@ function renderStatsView(ctx) {
     ctx.textAlign = 'center';
     ctx.shadowColor = '#00FF88';
     ctx.shadowBlur = 8;
-    ctx.fillText('LIFETIME STATISTICS', CANVAS.DESIGN_WIDTH / 2, listTop + 40);
+    ctx.fillText('LIFETIME STATISTICS', Renderer.getWidth() / 2, listTop + 40);
     ctx.shadowBlur = 0;
 
     // Define stat rows in two columns
@@ -623,7 +624,7 @@ function renderStatsView(ctx) {
 
     const rowHeight = 42;
     const leftX = 100;
-    const rightX = CANVAS.DESIGN_WIDTH / 2 + 60;
+    const rightX = Renderer.getWidth() / 2 + 60;
     let startY = listTop + 90;
 
     // Render left column
@@ -642,7 +643,7 @@ function renderStatsView(ctx) {
         ctx.fillStyle = stat.color;
         ctx.shadowColor = stat.color;
         ctx.shadowBlur = 4;
-        ctx.fillText(stat.value, CANVAS.DESIGN_WIDTH / 2 - 60, y);
+        ctx.fillText(stat.value, Renderer.getWidth() / 2 - 60, y);
         ctx.shadowBlur = 0;
     }
 
@@ -662,7 +663,7 @@ function renderStatsView(ctx) {
         ctx.fillStyle = stat.color;
         ctx.shadowColor = stat.color;
         ctx.shadowBlur = 4;
-        ctx.fillText(stat.value, CANVAS.DESIGN_WIDTH - 100, y);
+        ctx.fillText(stat.value, Renderer.getWidth() - 100, y);
         ctx.shadowBlur = 0;
     }
 
@@ -670,12 +671,12 @@ function renderStatsView(ctx) {
     ctx.textAlign = 'center';
     ctx.font = `14px ${UI.FONT_FAMILY}`;
     ctx.fillStyle = COLORS.TEXT_MUTED;
-    ctx.fillText(`Total Runs: ${summary.totalRuns} | Play Time: ${summary.playTime}`, CANVAS.DESIGN_WIDTH / 2, listBottom - 40);
+    ctx.fillText(`Total Runs: ${summary.totalRuns} | Play Time: ${summary.playTime}`, Renderer.getWidth() / 2, listBottom - 40);
 
     // Favorite weapon (if any)
     if (summary.favoriteWeapon) {
         ctx.fillStyle = COLORS.TEXT_LIGHT;
-        ctx.fillText(`Favorite Weapon: ${summary.favoriteWeapon.toUpperCase().replace(/-/g, ' ')}`, CANVAS.DESIGN_WIDTH / 2, listBottom - 60);
+        ctx.fillText(`Favorite Weapon: ${summary.favoriteWeapon.toUpperCase().replace(/-/g, ' ')}`, Renderer.getWidth() / 2, listBottom - 60);
     }
 
     ctx.restore();
@@ -691,7 +692,7 @@ function renderFooter(ctx) {
     ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('Use arrow keys or scroll to navigate', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT - 40);
+    ctx.fillText('Use arrow keys or scroll to navigate', Renderer.getWidth() / 2, Renderer.getHeight() - 40);
 
     ctx.restore();
 }

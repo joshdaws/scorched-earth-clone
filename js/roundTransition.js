@@ -8,6 +8,7 @@
  */
 
 import { CANVAS, COLORS, UI, GAME_STATES } from './constants.js';
+import * as Renderer from './renderer.js';
 import { playClickSound } from './sound.js';
 import * as AI from './ai.js';
 import * as Game from './game.js';
@@ -114,32 +115,32 @@ const SUPPLY_DROP_COST = 50;
  */
 const buttons = {
     continue: {
-        x: CANVAS.DESIGN_WIDTH / 2 - 170,
-        y: CANVAS.DESIGN_HEIGHT - 100,
+        x: Renderer.getWidth() / 2 - 170,
+        y: Renderer.getHeight() - 100,
         width: 200,
         height: 50,
         text: 'CONTINUE',
         color: COLORS.NEON_CYAN
     },
     shop: {
-        x: CANVAS.DESIGN_WIDTH / 2,
-        y: CANVAS.DESIGN_HEIGHT - 100,
+        x: Renderer.getWidth() / 2,
+        y: Renderer.getHeight() - 100,
         width: 140,
         height: 50,
         text: 'SHOP',
         color: COLORS.NEON_YELLOW
     },
     collection: {
-        x: CANVAS.DESIGN_WIDTH / 2 + 170,
-        y: CANVAS.DESIGN_HEIGHT - 100,
+        x: Renderer.getWidth() / 2 + 170,
+        y: Renderer.getHeight() - 100,
         width: 200,
         height: 50,
         text: 'COLLECTION',
         color: COLORS.NEON_PURPLE
     },
     supplyDrop: {
-        x: CANVAS.DESIGN_WIDTH / 2,
-        y: CANVAS.DESIGN_HEIGHT - 160,
+        x: Renderer.getWidth() / 2,
+        y: Renderer.getHeight() - 160,
         width: 250,
         height: 45,
         text: 'SUPPLY DROP (50)',
@@ -448,13 +449,13 @@ export function render(ctx) {
 
     // Semi-transparent dark overlay
     ctx.fillStyle = 'rgba(10, 10, 26, 0.95)';
-    ctx.fillRect(0, 0, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    ctx.fillRect(0, 0, Renderer.getWidth(), Renderer.getHeight());
 
     // Subtle scanlines effect
     ctx.globalAlpha = 0.02;
-    for (let y = 0; y < CANVAS.DESIGN_HEIGHT; y += 4) {
+    for (let y = 0; y < Renderer.getHeight(); y += 4) {
         ctx.fillStyle = '#000000';
-        ctx.fillRect(0, y, CANVAS.DESIGN_WIDTH, 2);
+        ctx.fillRect(0, y, Renderer.getWidth(), 2);
     }
     ctx.globalAlpha = 1;
 
@@ -474,21 +475,21 @@ export function render(ctx) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = mainColor;
-    ctx.fillText(`ROUND ${completedRound} COMPLETE`, CANVAS.DESIGN_WIDTH / 2, titleY);
+    ctx.fillText(`ROUND ${completedRound} COMPLETE`, Renderer.getWidth() / 2, titleY);
 
     // Title outline for depth
     ctx.shadowBlur = 0;
     ctx.strokeStyle = COLORS.TEXT_LIGHT;
     ctx.lineWidth = 1;
-    ctx.strokeText(`ROUND ${completedRound} COMPLETE`, CANVAS.DESIGN_WIDTH / 2, titleY);
+    ctx.strokeText(`ROUND ${completedRound} COMPLETE`, Renderer.getWidth() / 2, titleY);
     ctx.restore();
 
     // =========================================================================
     // TWO-COLUMN LAYOUT: Left (Stats) | Right (Tokens)
     // =========================================================================
     const contentY = titleY + 60;
-    const leftColumnX = CANVAS.DESIGN_WIDTH * 0.28;
-    const rightColumnX = CANVAS.DESIGN_WIDTH * 0.72;
+    const leftColumnX = Renderer.getWidth() * 0.28;
+    const rightColumnX = Renderer.getWidth() * 0.72;
 
     // =========================================================================
     // LEFT COLUMN: Round Stats
@@ -606,7 +607,7 @@ export function render(ctx) {
         ctx.fillStyle = COLORS.NEON_PURPLE;
         ctx.shadowColor = COLORS.NEON_PURPLE;
         ctx.shadowBlur = 8;
-        ctx.fillText('ACHIEVEMENTS UNLOCKED', CANVAS.DESIGN_WIDTH / 2, achievementY);
+        ctx.fillText('ACHIEVEMENTS UNLOCKED', Renderer.getWidth() / 2, achievementY);
 
         ctx.shadowBlur = 0;
         let achY = achievementY + 30;
@@ -620,7 +621,7 @@ export function render(ctx) {
 
             // Star + name + reward
             const text = `★ ${achievement.name} (+${reward} tokens)`;
-            ctx.fillText(text, CANVAS.DESIGN_WIDTH / 2, achY);
+            ctx.fillText(text, Renderer.getWidth() / 2, achY);
             achY += 24;
         }
 
@@ -628,7 +629,7 @@ export function render(ctx) {
         if (roundAchievements.length > 3) {
             ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
             ctx.fillStyle = COLORS.TEXT_MUTED;
-            ctx.fillText(`...and ${roundAchievements.length - 3} more`, CANVAS.DESIGN_WIDTH / 2, achY);
+            ctx.fillText(`...and ${roundAchievements.length - 3} more`, Renderer.getWidth() / 2, achY);
         }
 
         ctx.restore();
@@ -646,13 +647,13 @@ export function render(ctx) {
 
     // "NEXT ROUND: X"
     ctx.fillStyle = COLORS.TEXT_LIGHT;
-    ctx.fillText(`NEXT: Round ${nextRound}`, CANVAS.DESIGN_WIDTH / 2 - 60, previewY);
+    ctx.fillText(`NEXT: Round ${nextRound}`, Renderer.getWidth() / 2 - 60, previewY);
 
     // Colored difficulty text with glow
     ctx.fillStyle = difficultyColor;
     ctx.shadowColor = difficultyColor;
     ctx.shadowBlur = 8 + pulseIntensity * 6;
-    ctx.fillText(nextDifficulty, CANVAS.DESIGN_WIDTH / 2 + 80, previewY);
+    ctx.fillText(nextDifficulty, Renderer.getWidth() / 2 + 80, previewY);
 
     ctx.restore();
 
@@ -679,7 +680,7 @@ export function render(ctx) {
     ctx.shadowColor = mainColor;
     ctx.shadowBlur = 15;
     ctx.lineWidth = 2;
-    ctx.strokeRect(40, 40, CANVAS.DESIGN_WIDTH - 80, CANVAS.DESIGN_HEIGHT - 80);
+    ctx.strokeRect(40, 40, Renderer.getWidth() - 80, Renderer.getHeight() - 80);
 
     // Corner accents
     const cornerSize = 25;
@@ -697,23 +698,23 @@ export function render(ctx) {
 
     // Top-right corner
     ctx.beginPath();
-    ctx.moveTo(CANVAS.DESIGN_WIDTH - 40 - cornerSize, 40);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH - 40, 40);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH - 40, 40 + cornerSize);
+    ctx.moveTo(Renderer.getWidth() - 40 - cornerSize, 40);
+    ctx.lineTo(Renderer.getWidth() - 40, 40);
+    ctx.lineTo(Renderer.getWidth() - 40, 40 + cornerSize);
     ctx.stroke();
 
     // Bottom-left corner
     ctx.beginPath();
-    ctx.moveTo(40, CANVAS.DESIGN_HEIGHT - 40 - cornerSize);
-    ctx.lineTo(40, CANVAS.DESIGN_HEIGHT - 40);
-    ctx.lineTo(40 + cornerSize, CANVAS.DESIGN_HEIGHT - 40);
+    ctx.moveTo(40, Renderer.getHeight() - 40 - cornerSize);
+    ctx.lineTo(40, Renderer.getHeight() - 40);
+    ctx.lineTo(40 + cornerSize, Renderer.getHeight() - 40);
     ctx.stroke();
 
     // Bottom-right corner
     ctx.beginPath();
-    ctx.moveTo(CANVAS.DESIGN_WIDTH - 40 - cornerSize, CANVAS.DESIGN_HEIGHT - 40);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH - 40, CANVAS.DESIGN_HEIGHT - 40);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH - 40, CANVAS.DESIGN_HEIGHT - 40 - cornerSize);
+    ctx.moveTo(Renderer.getWidth() - 40 - cornerSize, Renderer.getHeight() - 40);
+    ctx.lineTo(Renderer.getWidth() - 40, Renderer.getHeight() - 40);
+    ctx.lineTo(Renderer.getWidth() - 40, Renderer.getHeight() - 40 - cornerSize);
     ctx.stroke();
 
     ctx.restore();

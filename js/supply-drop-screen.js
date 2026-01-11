@@ -7,6 +7,7 @@
  */
 
 import { GAME_STATES, CANVAS } from './constants.js';
+import * as Renderer from './renderer.js';
 import * as Game from './game.js';
 import * as Input from './input.js';
 import * as Music from './music.js';
@@ -115,7 +116,7 @@ let returnToState = GAME_STATES.MENU;
  */
 function getCardPosition(index) {
     const totalWidth = (CONFIG.CARD_WIDTH * 3) + (CONFIG.CARD_GAP * 2);
-    const startX = (CANVAS.DESIGN_WIDTH - totalWidth) / 2;
+    const startX = (Renderer.getWidth() - totalWidth) / 2;
     return {
         x: startX + (index * (CONFIG.CARD_WIDTH + CONFIG.CARD_GAP)),
         y: CONFIG.CARD_Y
@@ -331,25 +332,25 @@ function drawHeader(ctx) {
     ctx.font = 'bold 36px "Orbitron", monospace';
     ctx.fillStyle = CONFIG.COLORS.TEXT_PRIMARY;
     ctx.textAlign = 'center';
-    ctx.fillText('SUPPLY DROPS', CANVAS.DESIGN_WIDTH / 2, 55);
+    ctx.fillText('SUPPLY DROPS', Renderer.getWidth() / 2, 55);
 
     // Token balance (top right)
     const balance = getTokenBalance();
     ctx.font = 'bold 24px "Orbitron", monospace';
     ctx.textAlign = 'right';
     ctx.fillStyle = CONFIG.COLORS.TOKEN_COLOR;
-    ctx.fillText(`${balance}`, CANVAS.DESIGN_WIDTH - 40, 50);
+    ctx.fillText(`${balance}`, Renderer.getWidth() - 40, 50);
 
     // Token icon (simple circle)
     ctx.beginPath();
-    ctx.arc(CANVAS.DESIGN_WIDTH - 60 - ctx.measureText(`${balance}`).width, 44, 12, 0, Math.PI * 2);
+    ctx.arc(Renderer.getWidth() - 60 - ctx.measureText(`${balance}`).width, 44, 12, 0, Math.PI * 2);
     ctx.strokeStyle = CONFIG.COLORS.TOKEN_COLOR;
     ctx.lineWidth = 2;
     ctx.stroke();
     ctx.fillStyle = CONFIG.COLORS.TOKEN_COLOR;
     ctx.font = 'bold 14px "Orbitron", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('T', CANVAS.DESIGN_WIDTH - 60 - ctx.measureText(`${balance}`).width, 49);
+    ctx.fillText('T', Renderer.getWidth() - 60 - ctx.measureText(`${balance}`).width, 49);
 }
 
 /**
@@ -363,13 +364,13 @@ function drawPerformanceRating(ctx) {
     ctx.font = '14px "Orbitron", monospace';
     ctx.fillStyle = CONFIG.COLORS.TEXT_SECONDARY;
     ctx.textAlign = 'center';
-    ctx.fillText('PERFORMANCE RATING', CANVAS.DESIGN_WIDTH / 2, 95);
+    ctx.fillText('PERFORMANCE RATING', Renderer.getWidth() / 2, 95);
 
     // Star rating display
     const stars = getPerformanceStars(bonus);
     const starWidth = 24;
     const totalStarsWidth = 5 * starWidth;
-    const startX = (CANVAS.DESIGN_WIDTH - totalStarsWidth) / 2;
+    const startX = (Renderer.getWidth() - totalStarsWidth) / 2;
     const starY = 115;
 
     ctx.font = '20px "Orbitron", monospace';
@@ -394,19 +395,19 @@ function drawPerformanceRating(ctx) {
         ctx.font = '12px "Orbitron", monospace';
         ctx.fillStyle = '#00FF88';
         ctx.textAlign = 'center';
-        ctx.fillText(`+${bonus}% RARE+ CHANCE`, CANVAS.DESIGN_WIDTH / 2, 138);
+        ctx.fillText(`+${bonus}% RARE+ CHANCE`, Renderer.getWidth() / 2, 138);
     } else {
         ctx.font = '12px "Orbitron", monospace';
         ctx.fillStyle = CONFIG.COLORS.TEXT_SECONDARY;
         ctx.textAlign = 'center';
-        ctx.fillText('Win rounds to boost odds!', CANVAS.DESIGN_WIDTH / 2, 138);
+        ctx.fillText('Win rounds to boost odds!', Renderer.getWidth() / 2, 138);
     }
 
     // Tooltip hint - show breakdown on hover (simplified for now)
     if (bonus > 0 && Object.keys(performanceData.breakdown).length > 0) {
         ctx.font = '10px "Orbitron", monospace';
         ctx.fillStyle = '#666699';
-        ctx.fillText('(Win streaks, accuracy, flawless rounds boost chances)', CANVAS.DESIGN_WIDTH / 2, 155);
+        ctx.fillText('(Win streaks, accuracy, flawless rounds boost chances)', Renderer.getWidth() / 2, 155);
     }
 }
 
@@ -566,7 +567,7 @@ function drawHints(ctx) {
     ctx.font = '12px "Orbitron", monospace';
     ctx.fillStyle = CONFIG.COLORS.TEXT_SECONDARY;
     ctx.textAlign = 'center';
-    ctx.fillText('Press 1, 2, or 3 to quick-purchase  |  ESC to return', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT - 30);
+    ctx.fillText('Press 1, 2, or 3 to quick-purchase  |  ESC to return', Renderer.getWidth() / 2, Renderer.getHeight() - 30);
 }
 
 /**
@@ -577,7 +578,7 @@ function render(ctx) {
     if (state.isAnimating) {
         // Draw dark background
         ctx.fillStyle = CONFIG.COLORS.BACKGROUND;
-        ctx.fillRect(0, 0, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+        ctx.fillRect(0, 0, Renderer.getWidth(), Renderer.getHeight());
 
         // Check which animation system is active and render it
         if (ExtractionReveal.isAnimating()) {
@@ -590,7 +591,7 @@ function render(ctx) {
 
     // Clear with background
     ctx.fillStyle = CONFIG.COLORS.BACKGROUND;
-    ctx.fillRect(0, 0, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    ctx.fillRect(0, 0, Renderer.getWidth(), Renderer.getHeight());
 
     // Draw synthwave grid (simple version)
     drawGrid(ctx);
@@ -616,18 +617,18 @@ function drawGrid(ctx) {
     ctx.lineWidth = 1;
 
     // Horizontal lines
-    for (let y = 0; y < CANVAS.DESIGN_HEIGHT; y += 40) {
+    for (let y = 0; y < Renderer.getHeight(); y += 40) {
         ctx.beginPath();
         ctx.moveTo(0, y);
-        ctx.lineTo(CANVAS.DESIGN_WIDTH, y);
+        ctx.lineTo(Renderer.getWidth(), y);
         ctx.stroke();
     }
 
     // Vertical lines
-    for (let x = 0; x < CANVAS.DESIGN_WIDTH; x += 40) {
+    for (let x = 0; x < Renderer.getWidth(); x += 40) {
         ctx.beginPath();
         ctx.moveTo(x, 0);
-        ctx.lineTo(x, CANVAS.DESIGN_HEIGHT);
+        ctx.lineTo(x, Renderer.getHeight());
         ctx.stroke();
     }
 }

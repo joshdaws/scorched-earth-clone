@@ -10,6 +10,7 @@
  */
 
 import { CANVAS, COLORS, UI, GAME_STATES } from './constants.js';
+import * as Renderer from './renderer.js';
 import * as Game from './game.js';
 import { playClickSound } from './sound.js';
 import * as RunState from './runState.js';
@@ -114,16 +115,16 @@ let onMainMenuCallback = null;
  */
 const buttons = {
     newRun: {
-        x: CANVAS.DESIGN_WIDTH / 2 - 155,
-        y: CANVAS.DESIGN_HEIGHT - 130,
+        x: Renderer.getWidth() / 2 - 155,
+        y: Renderer.getHeight() - 130,
         width: 200,
         height: 50,
         text: 'NEW RUN',
         color: COLORS.NEON_CYAN
     },
     mainMenu: {
-        x: CANVAS.DESIGN_WIDTH / 2 + 155,
-        y: CANVAS.DESIGN_HEIGHT - 130,
+        x: Renderer.getWidth() / 2 + 155,
+        y: Renderer.getHeight() - 130,
         width: 200,
         height: 50,
         text: 'MAIN MENU',
@@ -313,7 +314,7 @@ function formatNumber(num) {
  * @param {string} valueColor - Color for the value
  */
 function renderStatRow(ctx, label, value, y, valueColor = COLORS.TEXT_LIGHT) {
-    const centerX = CANVAS.DESIGN_WIDTH / 2;
+    const centerX = Renderer.getWidth() / 2;
     const labelX = centerX - 20;
     const valueX = centerX + 20;
 
@@ -468,13 +469,13 @@ export function render(ctx) {
 
     // Semi-transparent dark overlay
     ctx.fillStyle = 'rgba(10, 10, 26, 0.97)';
-    ctx.fillRect(0, 0, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    ctx.fillRect(0, 0, Renderer.getWidth(), Renderer.getHeight());
 
     // Dramatic scanlines effect
     ctx.globalAlpha = 0.04;
-    for (let y = 0; y < CANVAS.DESIGN_HEIGHT; y += 4) {
+    for (let y = 0; y < Renderer.getHeight(); y += 4) {
         ctx.fillStyle = '#000000';
-        ctx.fillRect(0, y, CANVAS.DESIGN_WIDTH, 2);
+        ctx.fillRect(0, y, Renderer.getWidth(), 2);
     }
     ctx.globalAlpha = 1;
 
@@ -483,7 +484,7 @@ export function render(ctx) {
         ctx.save();
         ctx.globalAlpha = flashIntensity;
         ctx.fillStyle = COLORS.NEON_YELLOW;
-        ctx.fillRect(0, 0, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+        ctx.fillRect(0, 0, Renderer.getWidth(), Renderer.getHeight());
         ctx.restore();
     }
 
@@ -500,14 +501,14 @@ export function render(ctx) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = mainColor;
-    ctx.fillText('GAME OVER', CANVAS.DESIGN_WIDTH / 2, titleY);
+    ctx.fillText('GAME OVER', Renderer.getWidth() / 2, titleY);
 
     // Title outline for extra depth
     ctx.shadowBlur = 0;
     ctx.strokeStyle = COLORS.TEXT_LIGHT;
     ctx.lineWidth = 2;
     ctx.lineJoin = 'round'; // Prevent miter artifacts on letters like 'A' and 'M'
-    ctx.strokeText('GAME OVER', CANVAS.DESIGN_WIDTH / 2, titleY);
+    ctx.strokeText('GAME OVER', Renderer.getWidth() / 2, titleY);
     ctx.restore();
 
     // Subtitle for draw condition
@@ -518,7 +519,7 @@ export function render(ctx) {
         ctx.textAlign = 'center';
         ctx.shadowColor = COLORS.NEON_ORANGE;
         ctx.shadowBlur = 10;
-        ctx.fillText('MUTUAL DESTRUCTION', CANVAS.DESIGN_WIDTH / 2, titleY + 45);
+        ctx.fillText('MUTUAL DESTRUCTION', Renderer.getWidth() / 2, titleY + 45);
         ctx.restore();
     }
 
@@ -530,8 +531,8 @@ export function render(ctx) {
     ctx.shadowBlur = 15;
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(CANVAS.DESIGN_WIDTH / 2 - 200, lineY);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH / 2 + 200, lineY);
+    ctx.moveTo(Renderer.getWidth() / 2 - 200, lineY);
+    ctx.lineTo(Renderer.getWidth() / 2 + 200, lineY);
     ctx.stroke();
     ctx.restore();
 
@@ -544,13 +545,13 @@ export function render(ctx) {
     ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
     ctx.fillStyle = COLORS.TEXT_MUTED;
     ctx.textAlign = 'center';
-    ctx.fillText('ROUNDS SURVIVED', CANVAS.DESIGN_WIDTH / 2, roundsY);
+    ctx.fillText('ROUNDS SURVIVED', Renderer.getWidth() / 2, roundsY);
 
     ctx.shadowColor = COLORS.NEON_YELLOW;
     ctx.shadowBlur = 15 + pulseIntensity * 10;
     ctx.font = `bold 48px ${UI.FONT_FAMILY}`;
     ctx.fillStyle = COLORS.NEON_YELLOW;
-    ctx.fillText(roundsSurvived.toString(), CANVAS.DESIGN_WIDTH / 2, roundsY + 45);
+    ctx.fillText(roundsSurvived.toString(), Renderer.getWidth() / 2, roundsY + 45);
     ctx.restore();
 
     // =========================================================================
@@ -564,7 +565,7 @@ export function render(ctx) {
         if (!flashShown) {
             flashShown = true;
             flashIntensity = 0.6; // Start with bright flash
-            createCelebrationParticles(CANVAS.DESIGN_WIDTH / 2, statsStartY);
+            createCelebrationParticles(Renderer.getWidth() / 2, statsStartY);
         }
 
         // Calculate celebration-specific animations
@@ -580,22 +581,22 @@ export function render(ctx) {
         ctx.textAlign = 'center';
 
         // Apply scale transform for pulsing text
-        ctx.translate(CANVAS.DESIGN_WIDTH / 2, statsStartY);
+        ctx.translate(Renderer.getWidth() / 2, statsStartY);
         ctx.scale(scalePulse, scalePulse);
-        ctx.translate(-CANVAS.DESIGN_WIDTH / 2, -statsStartY);
+        ctx.translate(-Renderer.getWidth() / 2, -statsStartY);
 
         // Draw the banner with alternating colors
         ctx.shadowColor = celebrationColor;
         ctx.shadowBlur = 25 + pulseIntensity * 20;
         ctx.font = `bold ${UI.FONT_SIZE_LARGE}px ${UI.FONT_FAMILY}`;
         ctx.fillStyle = celebrationColor;
-        ctx.fillText('★ NEW HIGH SCORE! ★', CANVAS.DESIGN_WIDTH / 2, statsStartY);
+        ctx.fillText('★ NEW HIGH SCORE! ★', Renderer.getWidth() / 2, statsStartY);
 
         // Draw glowing stars in alternating color
         ctx.shadowColor = starColor;
         ctx.shadowBlur = 15 + pulseIntensity * 15;
         ctx.fillStyle = starColor;
-        ctx.fillText('★                    ★', CANVAS.DESIGN_WIDTH / 2, statsStartY);
+        ctx.fillText('★                    ★', Renderer.getWidth() / 2, statsStartY);
 
         ctx.restore();
 
@@ -605,7 +606,7 @@ export function render(ctx) {
         ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
         ctx.fillStyle = COLORS.TEXT_MUTED;
         ctx.textAlign = 'center';
-        ctx.fillText(`Previous Best: ${previousBest} rounds`, CANVAS.DESIGN_WIDTH / 2, statsStartY + 30);
+        ctx.fillText(`Previous Best: ${previousBest} rounds`, Renderer.getWidth() / 2, statsStartY + 30);
         ctx.restore();
 
         statsStartY += 65;
@@ -617,7 +618,7 @@ export function render(ctx) {
         ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
         ctx.fillStyle = COLORS.NEON_CYAN;
         ctx.textAlign = 'center';
-        ctx.fillText(`TOP 10! Rank #${highScoreResult.rank}`, CANVAS.DESIGN_WIDTH / 2, statsStartY);
+        ctx.fillText(`TOP 10! Rank #${highScoreResult.rank}`, Renderer.getWidth() / 2, statsStartY);
         ctx.restore();
 
         statsStartY += 35;
@@ -631,8 +632,8 @@ export function render(ctx) {
     ctx.strokeStyle = COLORS.GRID;
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(CANVAS.DESIGN_WIDTH / 2 - 180, statsStartY);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH / 2 + 180, statsStartY);
+    ctx.moveTo(Renderer.getWidth() / 2 - 180, statsStartY);
+    ctx.lineTo(Renderer.getWidth() / 2 + 180, statsStartY);
     ctx.stroke();
     ctx.restore();
 
@@ -684,7 +685,7 @@ export function render(ctx) {
     ctx.shadowColor = mainColor;
     ctx.shadowBlur = 20;
     ctx.lineWidth = 3;
-    ctx.strokeRect(40, 40, CANVAS.DESIGN_WIDTH - 80, CANVAS.DESIGN_HEIGHT - 80);
+    ctx.strokeRect(40, 40, Renderer.getWidth() - 80, Renderer.getHeight() - 80);
 
     // Corner accents
     const cornerSize = 30;
@@ -702,23 +703,23 @@ export function render(ctx) {
 
     // Top-right corner
     ctx.beginPath();
-    ctx.moveTo(CANVAS.DESIGN_WIDTH - 40 - cornerSize, 40);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH - 40, 40);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH - 40, 40 + cornerSize);
+    ctx.moveTo(Renderer.getWidth() - 40 - cornerSize, 40);
+    ctx.lineTo(Renderer.getWidth() - 40, 40);
+    ctx.lineTo(Renderer.getWidth() - 40, 40 + cornerSize);
     ctx.stroke();
 
     // Bottom-left corner
     ctx.beginPath();
-    ctx.moveTo(40, CANVAS.DESIGN_HEIGHT - 40 - cornerSize);
-    ctx.lineTo(40, CANVAS.DESIGN_HEIGHT - 40);
-    ctx.lineTo(40 + cornerSize, CANVAS.DESIGN_HEIGHT - 40);
+    ctx.moveTo(40, Renderer.getHeight() - 40 - cornerSize);
+    ctx.lineTo(40, Renderer.getHeight() - 40);
+    ctx.lineTo(40 + cornerSize, Renderer.getHeight() - 40);
     ctx.stroke();
 
     // Bottom-right corner
     ctx.beginPath();
-    ctx.moveTo(CANVAS.DESIGN_WIDTH - 40 - cornerSize, CANVAS.DESIGN_HEIGHT - 40);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH - 40, CANVAS.DESIGN_HEIGHT - 40);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH - 40, CANVAS.DESIGN_HEIGHT - 40 - cornerSize);
+    ctx.moveTo(Renderer.getWidth() - 40 - cornerSize, Renderer.getHeight() - 40);
+    ctx.lineTo(Renderer.getWidth() - 40, Renderer.getHeight() - 40);
+    ctx.lineTo(Renderer.getWidth() - 40, Renderer.getHeight() - 40 - cornerSize);
     ctx.stroke();
 
     ctx.restore();
@@ -728,7 +729,7 @@ export function render(ctx) {
     ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
     ctx.fillStyle = COLORS.TEXT_MUTED;
     ctx.textAlign = 'center';
-    ctx.fillText('Your tank was destroyed. The run has ended.', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT - 60);
+    ctx.fillText('Your tank was destroyed. The run has ended.', Renderer.getWidth() / 2, Renderer.getHeight() - 60);
     ctx.restore();
 
     ctx.restore();

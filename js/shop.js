@@ -8,6 +8,7 @@
  */
 
 import { CANVAS, COLORS, UI, GAME_STATES, DEBUG } from './constants.js';
+import * as Renderer from './renderer.js';
 import { WeaponRegistry, WEAPON_TYPES } from './weapons.js';
 import * as Money from './money.js';
 import * as Game from './game.js';
@@ -190,8 +191,8 @@ const SHOP_TABS = {
 const SHOP_LAYOUT = {
     // Main shop panel - fills most of the screen to fit all 5 weapon categories
     PANEL: {
-        X: CANVAS.DESIGN_WIDTH / 2,
-        Y: CANVAS.DESIGN_HEIGHT / 2,
+        X: Renderer.getWidth() / 2,
+        Y: Renderer.getHeight() / 2,
         WIDTH: 920,
         HEIGHT: 780,
         PADDING: 15
@@ -255,8 +256,8 @@ const WEAPON_CATEGORIES = [
  * Done button configuration.
  */
 const doneButton = {
-    x: CANVAS.DESIGN_WIDTH / 2,
-    y: CANVAS.DESIGN_HEIGHT / 2 + SHOP_LAYOUT.DONE_BUTTON.Y_OFFSET,
+    x: Renderer.getWidth() / 2,
+    y: Renderer.getHeight() / 2 + SHOP_LAYOUT.DONE_BUTTON.Y_OFFSET,
     width: SHOP_LAYOUT.DONE_BUTTON.WIDTH,
     height: SHOP_LAYOUT.DONE_BUTTON.HEIGHT,
     text: 'DONE',
@@ -1400,13 +1401,13 @@ export function render(ctx) {
 
     // Semi-transparent dark overlay
     ctx.fillStyle = 'rgba(10, 10, 26, 0.95)';
-    ctx.fillRect(0, 0, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    ctx.fillRect(0, 0, Renderer.getWidth(), Renderer.getHeight());
 
     // Subtle scanlines effect
     ctx.globalAlpha = 0.02;
-    for (let y = 0; y < CANVAS.DESIGN_HEIGHT; y += 4) {
+    for (let y = 0; y < Renderer.getHeight(); y += 4) {
         ctx.fillStyle = '#000000';
-        ctx.fillRect(0, y, CANVAS.DESIGN_WIDTH, 2);
+        ctx.fillRect(0, y, Renderer.getWidth(), 2);
     }
     ctx.globalAlpha = 1;
 

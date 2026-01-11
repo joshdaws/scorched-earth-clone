@@ -7,6 +7,7 @@
  */
 
 import { CANVAS, COLORS, UI, GAME_STATES } from './constants.js';
+import * as Renderer from './renderer.js';
 import * as Game from './game.js';
 import * as Input from './input.js';
 import * as Sound from './sound.js';
@@ -199,7 +200,7 @@ function updateFilteredList() {
 
     // Calculate viewport
     const viewportTop = CONFIG.HEADER_HEIGHT + CONFIG.FILTER_HEIGHT + CONFIG.GRID_TOP_PADDING;
-    const viewportBottom = CANVAS.DESIGN_HEIGHT - CONFIG.DETAILS_HEIGHT - CONFIG.FOOTER_HEIGHT;
+    const viewportBottom = Renderer.getHeight() - CONFIG.DETAILS_HEIGHT - CONFIG.FOOTER_HEIGHT;
     const viewportHeight = viewportBottom - viewportTop;
 
     maxScrollY = Math.max(0, gridHeight - viewportHeight + CONFIG.GRID_TOP_PADDING);
@@ -247,7 +248,7 @@ function handleClick(pos) {
     // Check filter buttons
     const filterY = CONFIG.HEADER_HEIGHT + 7;
     const totalFilterWidth = FILTERS.length * (CONFIG.FILTER_BUTTON_WIDTH + CONFIG.FILTER_BUTTON_GAP) - CONFIG.FILTER_BUTTON_GAP;
-    let filterX = (CANVAS.DESIGN_WIDTH - totalFilterWidth) / 2;
+    let filterX = (Renderer.getWidth() - totalFilterWidth) / 2;
 
     for (const filter of FILTERS) {
         if (pos.x >= filterX && pos.x <= filterX + CONFIG.FILTER_BUTTON_WIDTH &&
@@ -293,7 +294,7 @@ function handleClick(pos) {
 
     // Check tank grid click
     const gridTop = CONFIG.HEADER_HEIGHT + CONFIG.FILTER_HEIGHT + CONFIG.GRID_TOP_PADDING;
-    const gridBottom = CANVAS.DESIGN_HEIGHT - CONFIG.DETAILS_HEIGHT - CONFIG.FOOTER_HEIGHT;
+    const gridBottom = Renderer.getHeight() - CONFIG.DETAILS_HEIGHT - CONFIG.FOOTER_HEIGHT;
 
     if (pos.y >= gridTop && pos.y < gridBottom) {
         const tankId = getTankAtPosition(pos.x, pos.y);
@@ -348,9 +349,9 @@ function getTankAtPosition(x, y) {
  * Get the equip button rectangle.
  */
 function getEquipButtonRect() {
-    const detailsTop = CANVAS.DESIGN_HEIGHT - CONFIG.DETAILS_HEIGHT - CONFIG.FOOTER_HEIGHT;
+    const detailsTop = Renderer.getHeight() - CONFIG.DETAILS_HEIGHT - CONFIG.FOOTER_HEIGHT;
     return {
-        x: CANVAS.DESIGN_WIDTH - CONFIG.GRID_PADDING - CONFIG.EQUIP_BUTTON.width,
+        x: Renderer.getWidth() - CONFIG.GRID_PADDING - CONFIG.EQUIP_BUTTON.width,
         y: detailsTop + 50,
         width: CONFIG.EQUIP_BUTTON.width,
         height: CONFIG.EQUIP_BUTTON.height
@@ -362,9 +363,9 @@ function getEquipButtonRect() {
  * Get the purchase button rectangle (scrap shop mode).
  */
 function getPurchaseButtonRect() {
-    const detailsTop = CANVAS.DESIGN_HEIGHT - CONFIG.DETAILS_HEIGHT - CONFIG.FOOTER_HEIGHT;
+    const detailsTop = Renderer.getHeight() - CONFIG.DETAILS_HEIGHT - CONFIG.FOOTER_HEIGHT;
     return {
-        x: CANVAS.DESIGN_WIDTH - CONFIG.GRID_PADDING - CONFIG.PURCHASE_BUTTON.width,
+        x: Renderer.getWidth() - CONFIG.GRID_PADDING - CONFIG.PURCHASE_BUTTON.width,
         y: detailsTop + 50,
         width: CONFIG.PURCHASE_BUTTON.width,
         height: CONFIG.PURCHASE_BUTTON.height
@@ -473,7 +474,7 @@ export function update(deltaTime) {
 export function render(ctx) {
     // Background
     ctx.fillStyle = COLORS.BACKGROUND;
-    ctx.fillRect(0, 0, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    ctx.fillRect(0, 0, Renderer.getWidth(), Renderer.getHeight());
 
     // Render components
     renderHeader(ctx);
@@ -501,7 +502,7 @@ function renderHeader(ctx) {
     ctx.textBaseline = 'middle';
     ctx.shadowColor = isScrapShopMode ? COLORS.NEON_ORANGE : COLORS.NEON_PINK;
     ctx.shadowBlur = 12;
-    ctx.fillText(isScrapShopMode ? 'SCRAP SHOP' : 'TANK COLLECTION', CANVAS.DESIGN_WIDTH / 2, 45);
+    ctx.fillText(isScrapShopMode ? 'SCRAP SHOP' : 'TANK COLLECTION', Renderer.getWidth() / 2, 45);
 
     // Progress counter or scrap balance
     ctx.shadowBlur = 6;
@@ -511,9 +512,9 @@ function renderHeader(ctx) {
     if (isScrapShopMode) {
         // Show scrap balance with icon
         ctx.fillStyle = COLORS.NEON_ORANGE;
-        ctx.fillText(`\u2699 ${scrap} SCRAP`, CANVAS.DESIGN_WIDTH / 2, 82);
+        ctx.fillText(`\u2699 ${scrap} SCRAP`, Renderer.getWidth() / 2, 82);
     } else {
-        ctx.fillText(`${progress.owned} / ${progress.total} UNLOCKED`, CANVAS.DESIGN_WIDTH / 2, 82);
+        ctx.fillText(`${progress.owned} / ${progress.total} UNLOCKED`, Renderer.getWidth() / 2, 82);
     }
 
     ctx.restore();
@@ -525,7 +526,7 @@ function renderHeader(ctx) {
 function renderFilters(ctx) {
     const filterY = CONFIG.HEADER_HEIGHT + 7;
     const totalFilterWidth = FILTERS.length * (CONFIG.FILTER_BUTTON_WIDTH + CONFIG.FILTER_BUTTON_GAP) - CONFIG.FILTER_BUTTON_GAP;
-    let filterX = (CANVAS.DESIGN_WIDTH - totalFilterWidth) / 2;
+    let filterX = (Renderer.getWidth() - totalFilterWidth) / 2;
 
     ctx.save();
 
@@ -574,14 +575,14 @@ function renderFilters(ctx) {
  */
 function renderTankGrid(ctx) {
     const gridTop = CONFIG.HEADER_HEIGHT + CONFIG.FILTER_HEIGHT + CONFIG.GRID_TOP_PADDING;
-    const gridBottom = CANVAS.DESIGN_HEIGHT - CONFIG.DETAILS_HEIGHT - CONFIG.FOOTER_HEIGHT;
+    const gridBottom = Renderer.getHeight() - CONFIG.DETAILS_HEIGHT - CONFIG.FOOTER_HEIGHT;
     const gridLeft = CONFIG.GRID_PADDING;
 
     ctx.save();
 
     // Clip to grid area
     ctx.beginPath();
-    ctx.rect(0, gridTop, CANVAS.DESIGN_WIDTH, gridBottom - gridTop);
+    ctx.rect(0, gridTop, Renderer.getWidth(), gridBottom - gridTop);
     ctx.clip();
 
     // Render each tank card
@@ -774,13 +775,13 @@ function renderScrollIndicators(ctx, gridTop, gridBottom) {
         gradient.addColorStop(0, COLORS.BACKGROUND);
         gradient.addColorStop(1, 'rgba(10, 10, 26, 0)');
         ctx.fillStyle = gradient;
-        ctx.fillRect(0, gridTop, CANVAS.DESIGN_WIDTH, 30);
+        ctx.fillRect(0, gridTop, Renderer.getWidth(), 30);
 
         // Up arrow
         ctx.fillStyle = COLORS.TEXT_MUTED;
         ctx.font = `20px ${UI.FONT_FAMILY}`;
         ctx.textAlign = 'center';
-        ctx.fillText('\u25B2', CANVAS.DESIGN_WIDTH / 2, gridTop + 15);
+        ctx.fillText('\u25B2', Renderer.getWidth() / 2, gridTop + 15);
     }
 
     // Bottom indicator (if more content below)
@@ -789,13 +790,13 @@ function renderScrollIndicators(ctx, gridTop, gridBottom) {
         gradient.addColorStop(0, 'rgba(10, 10, 26, 0)');
         gradient.addColorStop(1, COLORS.BACKGROUND);
         ctx.fillStyle = gradient;
-        ctx.fillRect(0, gridBottom - 30, CANVAS.DESIGN_WIDTH, 30);
+        ctx.fillRect(0, gridBottom - 30, Renderer.getWidth(), 30);
 
         // Down arrow
         ctx.fillStyle = COLORS.TEXT_MUTED;
         ctx.font = `20px ${UI.FONT_FAMILY}`;
         ctx.textAlign = 'center';
-        ctx.fillText('\u25BC', CANVAS.DESIGN_WIDTH / 2, gridBottom - 10);
+        ctx.fillText('\u25BC', Renderer.getWidth() / 2, gridBottom - 10);
     }
 
     ctx.restore();
@@ -805,20 +806,20 @@ function renderScrollIndicators(ctx, gridTop, gridBottom) {
  * Render the details panel for selected tank.
  */
 function renderDetailsPanel(ctx) {
-    const detailsTop = CANVAS.DESIGN_HEIGHT - CONFIG.DETAILS_HEIGHT - CONFIG.FOOTER_HEIGHT;
+    const detailsTop = Renderer.getHeight() - CONFIG.DETAILS_HEIGHT - CONFIG.FOOTER_HEIGHT;
 
     ctx.save();
 
     // Panel background
     ctx.fillStyle = 'rgba(15, 15, 35, 0.95)';
-    ctx.fillRect(0, detailsTop, CANVAS.DESIGN_WIDTH, CONFIG.DETAILS_HEIGHT);
+    ctx.fillRect(0, detailsTop, Renderer.getWidth(), CONFIG.DETAILS_HEIGHT);
 
     // Top border - different color for scrap shop
     ctx.strokeStyle = isScrapShopMode ? COLORS.NEON_ORANGE : COLORS.NEON_PINK;
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(0, detailsTop);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH, detailsTop);
+    ctx.lineTo(Renderer.getWidth(), detailsTop);
     ctx.stroke();
 
     if (selectedTankId) {
@@ -962,7 +963,7 @@ function renderDetailsPanel(ctx) {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         const message = isScrapShopMode ? 'Select a tank to purchase' : 'Select a tank to view details';
-        ctx.fillText(message, CANVAS.DESIGN_WIDTH / 2, detailsTop + CONFIG.DETAILS_HEIGHT / 2);
+        ctx.fillText(message, Renderer.getWidth() / 2, detailsTop + CONFIG.DETAILS_HEIGHT / 2);
     }
 
     ctx.restore();
@@ -982,7 +983,7 @@ function renderFooter(ctx) {
     const message = isScrapShopMode
         ? 'Click to select \u2022 Scroll to browse \u2022 Legendary tanks not purchasable'
         : 'Click to select \u2022 Scroll to browse \u2022 ESC to return';
-    ctx.fillText(message, CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT - CONFIG.FOOTER_HEIGHT / 2);
+    ctx.fillText(message, Renderer.getWidth() / 2, Renderer.getHeight() - CONFIG.FOOTER_HEIGHT / 2);
 
     ctx.restore();
 }

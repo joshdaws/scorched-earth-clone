@@ -7,6 +7,7 @@
  */
 
 import { CANVAS, COLORS, DEBUG } from './constants.js';
+import * as Renderer from './renderer.js';
 import { RARITY, RARITY_COLORS, RARITY_NAMES } from './tank-skins.js';
 import {
     playPlaneApproachSound,
@@ -439,8 +440,8 @@ export function shouldShowSkipPrompt() {
 function drawSkipPrompt(ctx) {
     if (!showSkipPrompt || !canSkipCurrent) return;
 
-    const centerX = CANVAS.DESIGN_WIDTH / 2;
-    const promptY = CANVAS.DESIGN_HEIGHT - 60;
+    const centerX = Renderer.getWidth() / 2;
+    const promptY = Renderer.getHeight() - 60;
 
     ctx.save();
 
@@ -493,8 +494,8 @@ function drawSkipPrompt(ctx) {
 function drawResultCard(ctx) {
     if (!revealTank) return;
 
-    const centerX = CANVAS.DESIGN_WIDTH / 2;
-    const centerY = CANVAS.DESIGN_HEIGHT / 2;
+    const centerX = Renderer.getWidth() / 2;
+    const centerY = Renderer.getHeight() / 2;
     const rarity = revealTank.rarity;
     const rarityColor = RARITY_COLORS[rarity] || '#FFFFFF';
     const rarityName = RARITY_NAMES[rarity] || 'Unknown';
@@ -767,7 +768,7 @@ function drawScreenFlash(ctx) {
     if (flashOpacity > 0) {
         ctx.save();
         ctx.fillStyle = `rgba(255, 255, 255, ${flashOpacity * 0.8})`;
-        ctx.fillRect(0, 0, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+        ctx.fillRect(0, 0, Renderer.getWidth(), Renderer.getHeight());
         ctx.restore();
     }
 }
@@ -896,7 +897,7 @@ function updateGlitch(deltaTime, intensity) {
         const sliceCount = 3 + Math.floor(Math.random() * 5);
         for (let i = 0; i < sliceCount; i++) {
             glitchSlices.push({
-                y: Math.random() * CANVAS.DESIGN_HEIGHT,
+                y: Math.random() * Renderer.getHeight(),
                 height: 5 + Math.random() * 30,
                 offsetX: (Math.random() - 0.5) * 40 * intensity,
                 color: Math.random() > 0.5 ? '#FF0066' : '#00FFFF'
@@ -917,7 +918,7 @@ function drawGlitchEffect(ctx) {
 
     for (const slice of glitchSlices) {
         ctx.fillStyle = slice.color;
-        ctx.fillRect(slice.offsetX, slice.y, CANVAS.DESIGN_WIDTH, slice.height);
+        ctx.fillRect(slice.offsetX, slice.y, Renderer.getWidth(), slice.height);
     }
 
     ctx.restore();
@@ -999,7 +1000,7 @@ function drawCrateGlow(ctx, x, y, rarity, progress) {
 function drawOverlay(ctx, opacity) {
     ctx.save();
     ctx.fillStyle = `rgba(10, 10, 26, ${opacity})`;
-    ctx.fillRect(0, 0, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    ctx.fillRect(0, 0, Renderer.getWidth(), Renderer.getHeight());
     ctx.restore();
 }
 
@@ -1008,7 +1009,7 @@ function drawOverlay(ctx, opacity) {
  * @param {CanvasRenderingContext2D} ctx - Canvas context
  */
 function drawPlatform(ctx) {
-    const centerX = CANVAS.DESIGN_WIDTH / 2;
+    const centerX = Renderer.getWidth() / 2;
     const platformX = centerX - VISUALS.PLATFORM_WIDTH / 2;
 
     ctx.save();
@@ -1272,7 +1273,7 @@ function drawSpotlight(ctx, x, targetY) {
  * @param {number} riseProgress - Rise animation progress (0-1)
  */
 function drawRevealedTank(ctx, tank, riseProgress) {
-    const centerX = CANVAS.DESIGN_WIDTH / 2;
+    const centerX = Renderer.getWidth() / 2;
     const baseY = VISUALS.PLATFORM_Y;
     const tankY = baseY - (riseProgress * 80);
     const size = VISUALS.TANK_DISPLAY_SIZE;
@@ -1345,7 +1346,7 @@ function drawRevealedTank(ctx, tank, riseProgress) {
  * @param {number} alpha - Banner opacity
  */
 function drawRarityBanner(ctx, tank, alpha) {
-    const centerX = CANVAS.DESIGN_WIDTH / 2;
+    const centerX = Renderer.getWidth() / 2;
     const bannerY = 200;
     const rarityColor = RARITY_COLORS[tank.rarity] || '#FFFFFF';
     const rarityName = RARITY_NAMES[tank.rarity] || 'Unknown';
@@ -1394,7 +1395,7 @@ function drawRarityBanner(ctx, tank, alpha) {
  */
 function updateApproach(phaseProgress) {
     // Plane flies from right to center
-    planeX = CANVAS.DESIGN_WIDTH + VISUALS.PLANE_WIDTH - phaseProgress * (CANVAS.DESIGN_WIDTH / 2 + VISUALS.PLANE_WIDTH);
+    planeX = Renderer.getWidth() + VISUALS.PLANE_WIDTH - phaseProgress * (Renderer.getWidth() / 2 + VISUALS.PLANE_WIDTH);
 }
 
 /**
@@ -1402,10 +1403,10 @@ function updateApproach(phaseProgress) {
  * @param {number} phaseProgress - Progress through phase (0-1)
  */
 function updateDrop(phaseProgress) {
-    const centerX = CANVAS.DESIGN_WIDTH / 2;
+    const centerX = Renderer.getWidth() / 2;
 
     // Continue plane movement
-    planeX = CANVAS.DESIGN_WIDTH / 2 - phaseProgress * (CANVAS.DESIGN_WIDTH / 2 + VISUALS.PLANE_WIDTH);
+    planeX = Renderer.getWidth() / 2 - phaseProgress * (Renderer.getWidth() / 2 + VISUALS.PLANE_WIDTH);
 
     // Deploy parachute immediately
     parachuteDeployed = true;
@@ -1420,7 +1421,7 @@ function updateDrop(phaseProgress) {
  * @param {number} phaseProgress - Progress through phase (0-1)
  */
 function updateLanding(phaseProgress) {
-    const centerX = CANVAS.DESIGN_WIDTH / 2;
+    const centerX = Renderer.getWidth() / 2;
 
     // Crate settles at center
     crateX = centerX;
@@ -1443,7 +1444,7 @@ function updateLanding(phaseProgress) {
  * @param {number} deltaTime - Time since last update in ms
  */
 function updateReveal(phaseProgress, deltaTime) {
-    const centerX = CANVAS.DESIGN_WIDTH / 2;
+    const centerX = Renderer.getWidth() / 2;
     const rarity = revealTank?.rarity || RARITY.COMMON;
     const effects = RARITY_EFFECTS[rarity] || RARITY_EFFECTS[RARITY.COMMON];
 
@@ -1654,7 +1655,7 @@ export function render(ctx) {
             drawPlane(ctx, planeX);
             drawSpotlight(ctx, crateX, crateY);
             if (parachuteDeployed && revealTank) {
-                const sway = crateX - CANVAS.DESIGN_WIDTH / 2;
+                const sway = crateX - Renderer.getWidth() / 2;
                 drawParachute(ctx, crateX, crateY + VISUALS.PARACHUTE_OFFSET_Y, revealTank.rarity, sway);
             }
             drawCrate(ctx, crateX, crateY);
@@ -1765,8 +1766,8 @@ export function play(tank, onComplete = null) {
 
     // Reset core state
     particles = [];
-    planeX = CANVAS.DESIGN_WIDTH + VISUALS.PLANE_WIDTH;
-    crateX = CANVAS.DESIGN_WIDTH / 2;
+    planeX = Renderer.getWidth() + VISUALS.PLANE_WIDTH;
+    crateX = Renderer.getWidth() / 2;
     crateY = VISUALS.CRATE_DROP_START_Y;
     parachuteDeployed = false;
     rainbowHue = 0;

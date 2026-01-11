@@ -7,6 +7,7 @@
  */
 
 import { COLORS, UI, CANVAS } from './constants.js';
+import * as Renderer from './renderer.js';
 import * as ConvexAPI from './convex-api.js';
 import * as Sound from './sound.js';
 
@@ -287,8 +288,8 @@ export function handleKeyDown(event) {
 export function handleClick(pos) {
     if (!isVisible || isSaving) return false;
 
-    const panelX = (CANVAS.DESIGN_WIDTH - NAME_PANEL.WIDTH) / 2;
-    const panelY = (CANVAS.DESIGN_HEIGHT - NAME_PANEL.HEIGHT) / 2;
+    const panelX = (Renderer.getWidth() - NAME_PANEL.WIDTH) / 2;
+    const panelY = (Renderer.getHeight() - NAME_PANEL.HEIGHT) / 2;
 
     // Check if click is inside panel
     const insidePanel = pos.x >= panelX && pos.x <= panelX + NAME_PANEL.WIDTH &&
@@ -383,11 +384,11 @@ export function render(ctx) {
 
     // Semi-transparent overlay
     ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-    ctx.fillRect(0, 0, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    ctx.fillRect(0, 0, Renderer.getWidth(), Renderer.getHeight());
 
     // Panel position
-    const panelX = (CANVAS.DESIGN_WIDTH - NAME_PANEL.WIDTH) / 2;
-    const panelY = (CANVAS.DESIGN_HEIGHT - NAME_PANEL.HEIGHT) / 2;
+    const panelX = (Renderer.getWidth() - NAME_PANEL.WIDTH) / 2;
+    const panelY = (Renderer.getHeight() - NAME_PANEL.HEIGHT) / 2;
 
     // Panel background
     ctx.fillStyle = 'rgba(20, 20, 40, 0.95)';

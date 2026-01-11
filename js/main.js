@@ -131,7 +131,7 @@ let explosionEffect = null;
 
 /**
  * Pause button dimensions and position.
- * Small button in top-right corner for mouse/touch pause.
+ * Small button in bottom-right corner for mouse/touch pause.
  */
 const pauseButton = {
     x: CANVAS.DESIGN_WIDTH - 50,
@@ -139,6 +139,15 @@ const pauseButton = {
     width: 40,
     height: 40
 };
+
+/**
+ * Update pause button position based on current screen dimensions.
+ * Should be called before rendering or hit testing pause button.
+ */
+function updatePauseButtonPosition() {
+    pauseButton.x = Renderer.getWidth() - 50;
+    pauseButton.y = Renderer.getHeight() - 50;
+}
 
 /**
  * Check if a point is inside the pause button.
@@ -160,6 +169,9 @@ function isInsidePauseButton(x, y) {
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  */
 function renderPauseButton(ctx) {
+    // Update position for current screen size
+    updatePauseButtonPosition();
+
     ctx.save();
 
     // Button background
@@ -268,6 +280,35 @@ const menuButtons = {
         enabled: true  // Enabled for volume controls
     }
 };
+
+/**
+ * Update menu button positions based on current screen dimensions.
+ * Should be called before rendering or hit testing menu buttons.
+ */
+function updateMenuButtonPositions() {
+    const width = Renderer.getWidth();
+    const height = Renderer.getHeight();
+    const centerX = width / 2;
+    const centerY = height / 2;
+
+    menuButtons.start.x = centerX;
+    menuButtons.start.y = centerY - 30;
+
+    menuButtons.highScores.x = centerX;
+    menuButtons.highScores.y = centerY + 30;
+
+    menuButtons.achievements.x = centerX;
+    menuButtons.achievements.y = centerY + 90;
+
+    menuButtons.collection.x = centerX;
+    menuButtons.collection.y = centerY + 150;
+
+    menuButtons.supplyDrop.x = centerX;
+    menuButtons.supplyDrop.y = centerY + 210;
+
+    menuButtons.options.x = centerX;
+    menuButtons.options.y = centerY + 270;
+}
 
 // =============================================================================
 // OPTIONS OVERLAY STATE
@@ -387,8 +428,8 @@ function handleOptionsOverlayClick(pos) {
 
     // Click outside panel - close overlay
     const panelDims = VolumeControls.getPanelDimensions();
-    const panelX = CANVAS.DESIGN_WIDTH / 2 - panelDims.width / 2;
-    const panelY = CANVAS.DESIGN_HEIGHT / 2 - panelDims.height / 2;
+    const panelX = Renderer.getWidth() / 2 - panelDims.width / 2;
+    const panelY = Renderer.getHeight() / 2 - panelDims.height / 2;
 
     const isInsidePanel = (
         pos.x >= panelX &&
@@ -421,8 +462,8 @@ function closeOptionsOverlay() {
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  */
 function renderMenuBackground(ctx) {
-    const width = CANVAS.DESIGN_WIDTH;
-    const height = CANVAS.DESIGN_HEIGHT;
+    const width = Renderer.getWidth();
+    const height = Renderer.getHeight();
     const horizonY = height * 0.6;  // Horizon line at 60% down
 
     ctx.save();
@@ -618,6 +659,13 @@ function renderMenuButton(ctx, button, pulseIntensity, badgeCount = 0) {
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  */
 function renderMenu(ctx) {
+    // Update button positions for current screen size
+    updateMenuButtonPositions();
+
+    // Get dynamic screen dimensions
+    const width = Renderer.getWidth();
+    const height = Renderer.getHeight();
+
     // Update animation time
     menuAnimationTime += 16;  // Approximate 60fps frame time
 
@@ -654,15 +702,15 @@ function renderMenu(ctx) {
     renderMenuBackground(ctx);
 
     // Semi-transparent overlay for menu content area
-    const overlayGradient = ctx.createLinearGradient(0, 0, 0, CANVAS.DESIGN_HEIGHT);
+    const overlayGradient = ctx.createLinearGradient(0, 0, 0, height);
     overlayGradient.addColorStop(0, 'rgba(10, 10, 26, 0.7)');
     overlayGradient.addColorStop(0.5, 'rgba(10, 10, 26, 0.3)');
     overlayGradient.addColorStop(1, 'rgba(10, 10, 26, 0.7)');
     ctx.fillStyle = overlayGradient;
-    ctx.fillRect(0, 0, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    ctx.fillRect(0, 0, width, height);
 
     // Title with neon glow effect
-    const titleY = CANVAS.DESIGN_HEIGHT / 3 - 20;
+    const titleY = height / 3 - 20;
 
     // Title shadow/glow layers
     ctx.save();
@@ -675,12 +723,12 @@ function renderMenu(ctx) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = COLORS.NEON_CYAN;
-    ctx.fillText('SCORCHED EARTH', CANVAS.DESIGN_WIDTH / 2, titleY);
+    ctx.fillText('SCORCHED EARTH', width / 2, titleY);
 
     // Title outline for extra depth
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 1;
-    ctx.strokeText('SCORCHED EARTH', CANVAS.DESIGN_WIDTH / 2, titleY);
+    ctx.strokeText('SCORCHED EARTH', width / 2, titleY);
     ctx.restore();
 
     // Subtitle with different color glow
@@ -691,7 +739,7 @@ function renderMenu(ctx) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = COLORS.NEON_PINK;
-    ctx.fillText('SYNTHWAVE EDITION', CANVAS.DESIGN_WIDTH / 2, titleY + 55);
+    ctx.fillText('SYNTHWAVE EDITION', width / 2, titleY + 55);
     ctx.restore();
 
     // Get badge counts for buttons
@@ -715,7 +763,7 @@ function renderMenu(ctx) {
     ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(`🪙 ${tokenBalance} TOKENS`, CANVAS.DESIGN_WIDTH / 2, menuButtons.supplyDrop.y - 32);
+    ctx.fillText(`🪙 ${tokenBalance} TOKENS`, width / 2, menuButtons.supplyDrop.y - 32);
     ctx.shadowBlur = 0;
     ctx.restore();
 
@@ -728,7 +776,7 @@ function renderMenu(ctx) {
     ctx.textBaseline = 'middle';
     ctx.shadowColor = COLORS.NEON_YELLOW;
     ctx.shadowBlur = 8;
-    ctx.fillText(bestRunText, CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT / 2 + 320);
+    ctx.fillText(bestRunText, width / 2, height / 2 + 320);
     ctx.shadowBlur = 0;
 
     // Instructions text at bottom
@@ -736,8 +784,8 @@ function renderMenu(ctx) {
     ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('Click or tap NEW RUN to begin', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT - 50);
-    ctx.fillText('Press D to toggle debug mode', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT - 25);
+    ctx.fillText('Click or tap NEW RUN to begin', width / 2, height - 50);
+    ctx.fillText('Press D to toggle debug mode', width / 2, height - 25);
 
     // Decorative line under title
     ctx.save();
@@ -747,8 +795,8 @@ function renderMenu(ctx) {
     ctx.lineWidth = 2;
     ctx.beginPath();
     const lineWidth = 200;
-    ctx.moveTo(CANVAS.DESIGN_WIDTH / 2 - lineWidth, titleY + 80);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH / 2 + lineWidth, titleY + 80);
+    ctx.moveTo(width / 2 - lineWidth, titleY + 80);
+    ctx.lineTo(width / 2 + lineWidth, titleY + 80);
     ctx.stroke();
     ctx.restore();
 
@@ -758,7 +806,7 @@ function renderMenu(ctx) {
     ctx.shadowColor = COLORS.NEON_CYAN;
     ctx.shadowBlur = 15;
     ctx.lineWidth = 3;
-    ctx.strokeRect(20, 20, CANVAS.DESIGN_WIDTH - 40, CANVAS.DESIGN_HEIGHT - 40);
+    ctx.strokeRect(20, 20, width - 40, height - 40);
 
     // Corner accents
     const cornerSize = 30;
@@ -775,23 +823,23 @@ function renderMenu(ctx) {
 
     // Top-right corner
     ctx.beginPath();
-    ctx.moveTo(CANVAS.DESIGN_WIDTH - 20 - cornerSize, 20);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH - 20, 20);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH - 20, 20 + cornerSize);
+    ctx.moveTo(width - 20 - cornerSize, 20);
+    ctx.lineTo(width - 20, 20);
+    ctx.lineTo(width - 20, 20 + cornerSize);
     ctx.stroke();
 
     // Bottom-left corner
     ctx.beginPath();
-    ctx.moveTo(20, CANVAS.DESIGN_HEIGHT - 20 - cornerSize);
-    ctx.lineTo(20, CANVAS.DESIGN_HEIGHT - 20);
-    ctx.lineTo(20 + cornerSize, CANVAS.DESIGN_HEIGHT - 20);
+    ctx.moveTo(20, height - 20 - cornerSize);
+    ctx.lineTo(20, height - 20);
+    ctx.lineTo(20 + cornerSize, height - 20);
     ctx.stroke();
 
     // Bottom-right corner
     ctx.beginPath();
-    ctx.moveTo(CANVAS.DESIGN_WIDTH - 20 - cornerSize, CANVAS.DESIGN_HEIGHT - 20);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH - 20, CANVAS.DESIGN_HEIGHT - 20);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH - 20, CANVAS.DESIGN_HEIGHT - 20 - cornerSize);
+    ctx.moveTo(width - 20 - cornerSize, height - 20);
+    ctx.lineTo(width - 20, height - 20);
+    ctx.lineTo(width - 20, height - 20 - cornerSize);
     ctx.stroke();
 
     ctx.restore();
@@ -804,7 +852,7 @@ function renderMenu(ctx) {
     }
 
     // Render CRT effects as final post-processing overlay
-    renderCrtEffects(ctx, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    renderCrtEffects(ctx, width, height);
 }
 
 /**
@@ -812,11 +860,14 @@ function renderMenu(ctx) {
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  */
 function renderOptionsOverlay(ctx) {
+    const width = Renderer.getWidth();
+    const height = Renderer.getHeight();
+
     ctx.save();
 
     // Semi-transparent dark overlay
     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(0, 0, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    ctx.fillRect(0, 0, width, height);
 
     // Render volume controls panel
     VolumeControls.render(ctx);
@@ -826,7 +877,7 @@ function renderOptionsOverlay(ctx) {
     ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
-    ctx.fillText('Press ESC or click outside to close', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT - 30);
+    ctx.fillText('Press ESC or click outside to close', width / 2, height - 30);
 
     ctx.restore();
 }
@@ -995,6 +1046,29 @@ const difficultyBackButton = {
 };
 
 /**
+ * Update difficulty button positions based on current screen dimensions.
+ * Should be called before rendering or hit testing difficulty buttons.
+ */
+function updateDifficultyButtonPositions() {
+    const width = Renderer.getWidth();
+    const height = Renderer.getHeight();
+    const centerX = width / 2;
+    const centerY = height / 2;
+
+    difficultyButtons.easy.x = centerX;
+    difficultyButtons.easy.y = centerY - 70;
+
+    difficultyButtons.medium.x = centerX;
+    difficultyButtons.medium.y = centerY + 10;
+
+    difficultyButtons.hard.x = centerX;
+    difficultyButtons.hard.y = centerY + 90;
+
+    difficultyBackButton.x = centerX;
+    difficultyBackButton.y = height - 80;
+}
+
+/**
  * Animation time for difficulty selection screen.
  */
 let difficultyAnimationTime = 0;
@@ -1088,6 +1162,13 @@ function renderDifficultyButton(ctx, button, pulseIntensity) {
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  */
 function renderDifficultySelect(ctx) {
+    // Update button positions for current screen size
+    updateDifficultyButtonPositions();
+
+    // Get dynamic screen dimensions
+    const width = Renderer.getWidth();
+    const height = Renderer.getHeight();
+
     // Update animation time
     difficultyAnimationTime += 16;  // Approximate 60fps frame time
 
@@ -1100,12 +1181,12 @@ function renderDifficultySelect(ctx) {
     renderMenuBackground(ctx);
 
     // Semi-transparent overlay for content area
-    const overlayGradient = ctx.createLinearGradient(0, 0, 0, CANVAS.DESIGN_HEIGHT);
+    const overlayGradient = ctx.createLinearGradient(0, 0, 0, height);
     overlayGradient.addColorStop(0, 'rgba(10, 10, 26, 0.7)');
     overlayGradient.addColorStop(0.5, 'rgba(10, 10, 26, 0.3)');
     overlayGradient.addColorStop(1, 'rgba(10, 10, 26, 0.7)');
     ctx.fillStyle = overlayGradient;
-    ctx.fillRect(0, 0, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    ctx.fillRect(0, 0, width, height);
 
     // Title with neon glow effect
     const titleY = 120;
@@ -1120,7 +1201,7 @@ function renderDifficultySelect(ctx) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = COLORS.NEON_CYAN;
-    ctx.fillText('SELECT DIFFICULTY', CANVAS.DESIGN_WIDTH / 2, titleY);
+    ctx.fillText('SELECT DIFFICULTY', width / 2, titleY);
     ctx.restore();
 
     // Subtitle
@@ -1128,7 +1209,7 @@ function renderDifficultySelect(ctx) {
     ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('Choose your challenge level', CANVAS.DESIGN_WIDTH / 2, titleY + 45);
+    ctx.fillText('Choose your challenge level', width / 2, titleY + 45);
 
     // Render difficulty buttons
     for (const key of Object.keys(difficultyButtons)) {
@@ -1167,13 +1248,13 @@ function renderDifficultySelect(ctx) {
     ctx.shadowColor = COLORS.NEON_CYAN;
     ctx.shadowBlur = 15;
     ctx.lineWidth = 3;
-    ctx.strokeRect(20, 20, CANVAS.DESIGN_WIDTH - 40, CANVAS.DESIGN_HEIGHT - 40);
+    ctx.strokeRect(20, 20, width - 40, height - 40);
     ctx.restore();
 
     ctx.restore();
 
     // Render CRT effects as final post-processing overlay
-    renderCrtEffects(ctx, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    renderCrtEffects(ctx, width, height);
 }
 
 /**
@@ -2989,7 +3070,7 @@ function renderPlaying(ctx) {
     }
 
     // Render synthwave background (behind everything)
-    renderBackground(ctx, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    renderBackground(ctx, Renderer.getWidth(), Renderer.getHeight());
 
     // Render terrain (in front of background)
     renderTerrain(ctx);
@@ -3056,10 +3137,10 @@ function renderPlaying(ctx) {
     }
 
     // Render screen flash on top of everything (not affected by shake)
-    renderScreenFlash(ctx, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    renderScreenFlash(ctx, Renderer.getWidth(), Renderer.getHeight());
 
     // Render CRT effects as final post-processing overlay
-    renderCrtEffects(ctx, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    renderCrtEffects(ctx, Renderer.getWidth(), Renderer.getHeight());
 }
 
 /**
@@ -3766,11 +3847,36 @@ const highScoresRefreshButton = {
 };
 
 /**
+ * Update high scores button positions based on current screen dimensions.
+ * Should be called before rendering or hit testing high scores buttons.
+ */
+function updateHighScoresButtonPositions() {
+    const width = Renderer.getWidth();
+    const height = Renderer.getHeight();
+    const centerX = width / 2;
+
+    highScoresBackButton.x = centerX;
+    highScoresBackButton.y = height - 100;
+
+    highScoresTabs.global.x = centerX - 100;
+    highScoresTabs.local.x = centerX + 100;
+
+    highScoresRefreshButton.x = width - 100;
+}
+
+/**
  * Render the high scores screen.
  * Shows global leaderboard or local scores with tabs.
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  */
 function renderHighScores(ctx) {
+    // Update button positions for current screen size
+    updateHighScoresButtonPositions();
+
+    // Get dynamic screen dimensions
+    const width = Renderer.getWidth();
+    const height = Renderer.getHeight();
+
     // Update animation time
     highScoresAnimationTime += 16;
 
@@ -3784,7 +3890,7 @@ function renderHighScores(ctx) {
 
     // Semi-transparent overlay for content area
     ctx.fillStyle = 'rgba(10, 10, 26, 0.85)';
-    ctx.fillRect(0, 0, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    ctx.fillRect(0, 0, width, height);
 
     // Title
     ctx.save();
@@ -3794,7 +3900,7 @@ function renderHighScores(ctx) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = COLORS.NEON_YELLOW;
-    ctx.fillText('LEADERBOARD', CANVAS.DESIGN_WIDTH / 2, 55);
+    ctx.fillText('LEADERBOARD', width / 2, 55);
     ctx.restore();
 
     // Render tab buttons
@@ -3814,15 +3920,15 @@ function renderHighScores(ctx) {
         ctx.textAlign = 'right';
         if (status.isOnline) {
             ctx.fillStyle = '#00ff88';
-            ctx.fillText('● ONLINE', CANVAS.DESIGN_WIDTH - 50, 55);
+            ctx.fillText('● ONLINE', width - 50, 55);
         } else {
             ctx.fillStyle = COLORS.NEON_PINK;
-            ctx.fillText('○ OFFLINE', CANVAS.DESIGN_WIDTH - 50, 55);
+            ctx.fillText('○ OFFLINE', width - 50, 55);
         }
     }
 
     // Table layout - adjusted Y to account for tabs
-    const tableX = CANVAS.DESIGN_WIDTH / 2 - 280;
+    const tableX = width / 2 - 280;
     const tableWidth = 560;
     const tableY = 155;
     const headerHeight = 40;
@@ -3957,7 +4063,7 @@ function renderHighScores(ctx) {
             ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
             ctx.fillStyle = COLORS.NEON_CYAN;
             ctx.textAlign = 'center';
-            ctx.fillText('Refreshing...', CANVAS.DESIGN_WIDTH / 2, tableY - 20);
+            ctx.fillText('Refreshing...', width / 2, tableY - 20);
         }
 
         // Show message when no scores
@@ -3968,7 +4074,7 @@ function renderHighScores(ctx) {
             const message = isLoading ? 'Loading leaderboard...' :
                            status.isOnline ? 'No scores yet - play to be the first!' :
                            'Offline - connect to see global scores';
-            ctx.fillText(message, CANVAS.DESIGN_WIDTH / 2, tableY + headerHeight + rowHeight * 4);
+            ctx.fillText(message, width / 2, tableY + headerHeight + rowHeight * 4);
         }
 
         // Render refresh button (only when online)
@@ -4067,7 +4173,7 @@ function renderHighScores(ctx) {
     ctx.shadowColor = COLORS.NEON_CYAN;
     ctx.shadowBlur = 15;
     ctx.lineWidth = 3;
-    ctx.strokeRect(20, 20, CANVAS.DESIGN_WIDTH - 40, CANVAS.DESIGN_HEIGHT - 40);
+    ctx.strokeRect(20, 20, width - 40, height - 40);
 
     // Corner accents
     const cornerSize = 30;
@@ -4084,23 +4190,23 @@ function renderHighScores(ctx) {
 
     // Top-right corner
     ctx.beginPath();
-    ctx.moveTo(CANVAS.DESIGN_WIDTH - 20 - cornerSize, 20);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH - 20, 20);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH - 20, 20 + cornerSize);
+    ctx.moveTo(width - 20 - cornerSize, 20);
+    ctx.lineTo(width - 20, 20);
+    ctx.lineTo(width - 20, 20 + cornerSize);
     ctx.stroke();
 
     // Bottom-left corner
     ctx.beginPath();
-    ctx.moveTo(20, CANVAS.DESIGN_HEIGHT - 20 - cornerSize);
-    ctx.lineTo(20, CANVAS.DESIGN_HEIGHT - 20);
-    ctx.lineTo(20 + cornerSize, CANVAS.DESIGN_HEIGHT - 20);
+    ctx.moveTo(20, height - 20 - cornerSize);
+    ctx.lineTo(20, height - 20);
+    ctx.lineTo(20 + cornerSize, height - 20);
     ctx.stroke();
 
     // Bottom-right corner
     ctx.beginPath();
-    ctx.moveTo(CANVAS.DESIGN_WIDTH - 20 - cornerSize, CANVAS.DESIGN_HEIGHT - 20);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH - 20, CANVAS.DESIGN_HEIGHT - 20);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH - 20, CANVAS.DESIGN_HEIGHT - 20 - cornerSize);
+    ctx.moveTo(width - 20 - cornerSize, height - 20);
+    ctx.lineTo(width - 20, height - 20);
+    ctx.lineTo(width - 20, height - 20 - cornerSize);
     ctx.stroke();
 
     ctx.restore();
@@ -4108,7 +4214,7 @@ function renderHighScores(ctx) {
     ctx.restore();
 
     // Render CRT effects as final post-processing overlay
-    renderCrtEffects(ctx, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    renderCrtEffects(ctx, width, height);
 }
 
 /**
@@ -4662,7 +4768,7 @@ async function init() {
     Debug.init();
 
     // Initialize synthwave background (static layer behind gameplay)
-    initBackground(CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    initBackground(Renderer.getWidth(), Renderer.getHeight());
 
     // Setup state handlers BEFORE starting the loop
     // These register the update/render functions for each state
