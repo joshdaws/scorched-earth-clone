@@ -187,12 +187,13 @@ const SHOP_TABS = {
  * Shop layout configuration.
  * Centered on screen with weapon cards in a grid layout.
  * Touch-optimized: larger cards and buttons with adequate spacing.
+ * NOTE: PANEL.X and PANEL.Y are placeholders - actual values calculated dynamically
+ * in render() to adapt to current viewport size.
  */
 const SHOP_LAYOUT = {
     // Main shop panel - fills most of the screen to fit all 5 weapon categories
+    // X and Y are calculated dynamically during render for viewport adaptation
     PANEL: {
-        X: Renderer.getWidth() / 2,
-        Y: Renderer.getHeight() / 2,
         WIDTH: 920,
         HEIGHT: 780,
         PADDING: 15
@@ -1415,9 +1416,15 @@ export function render(ctx) {
     // Calculate pulse intensity (0-1, oscillating)
     const pulseIntensity = (Math.sin(animationTime * 0.003) + 1) / 2;
 
+    // Calculate panel center dynamically based on current viewport
+    const screenWidth = Renderer.getWidth();
+    const screenHeight = Renderer.getHeight();
+    const panelX = screenWidth / 2;
+    const panelY = screenHeight / 2;
+
     const panel = SHOP_LAYOUT.PANEL;
-    const panelLeft = panel.X - panel.WIDTH / 2;
-    const panelTop = panel.Y - panel.HEIGHT / 2;
+    const panelLeft = panelX - panel.WIDTH / 2;
+    const panelTop = panelY - panel.HEIGHT / 2;
 
     ctx.save();
 
@@ -1455,7 +1462,7 @@ export function render(ctx) {
     ctx.fillStyle = COLORS.NEON_CYAN;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('WEAPON SHOP', panel.X, panel.Y + SHOP_LAYOUT.TITLE.Y_OFFSET);
+    ctx.fillText('WEAPON SHOP', panelX, panelY + SHOP_LAYOUT.TITLE.Y_OFFSET);
     ctx.restore();
 
     // Decorative line under title
@@ -1466,8 +1473,8 @@ export function render(ctx) {
     ctx.lineWidth = 2;
     ctx.beginPath();
     const lineWidth = 150;
-    ctx.moveTo(panel.X - lineWidth, panel.Y + SHOP_LAYOUT.TITLE.Y_OFFSET + 30);
-    ctx.lineTo(panel.X + lineWidth, panel.Y + SHOP_LAYOUT.TITLE.Y_OFFSET + 30);
+    ctx.moveTo(panelX - lineWidth, panelY + SHOP_LAYOUT.TITLE.Y_OFFSET + 30);
+    ctx.lineTo(panelX + lineWidth, panelY + SHOP_LAYOUT.TITLE.Y_OFFSET + 30);
     ctx.stroke();
     ctx.restore();
 
@@ -1501,18 +1508,18 @@ export function render(ctx) {
     ctx.fillStyle = COLORS.TEXT_MUTED;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('YOUR BALANCE', panel.X, panel.Y + SHOP_LAYOUT.BALANCE.Y_OFFSET - 15);
+    ctx.fillText('YOUR BALANCE', panelX, panelY + SHOP_LAYOUT.BALANCE.Y_OFFSET - 15);
 
     // Enhanced glow during balance animation
     ctx.shadowColor = COLORS.NEON_YELLOW;
     ctx.shadowBlur = 10 + pulseIntensity * 5 + balanceGlowIntensity * 15;
     ctx.font = `bold ${UI.FONT_SIZE_TITLE - 8}px ${UI.FONT_FAMILY}`;
     ctx.fillStyle = COLORS.NEON_YELLOW;
-    ctx.fillText(`$${displayMoney.toLocaleString()}`, panel.X, panel.Y + SHOP_LAYOUT.BALANCE.Y_OFFSET + 15);
+    ctx.fillText(`$${displayMoney.toLocaleString()}`, panelX, panelY + SHOP_LAYOUT.BALANCE.Y_OFFSET + 15);
     ctx.restore();
 
     // Tab navigation bar
-    renderTabBar(ctx, panel.X, panel.Y + SHOP_LAYOUT.TABS.Y_OFFSET, pulseIntensity);
+    renderTabBar(ctx, panelX, panelY + SHOP_LAYOUT.TABS.Y_OFFSET, pulseIntensity);
 
     // Calculate tab transition opacity for crossfade effect
     let contentOpacity = 1;
@@ -1538,9 +1545,9 @@ export function render(ctx) {
         ctx.fillStyle = COLORS.TEXT_MUTED;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('ITEMS COMING SOON', panel.X, panel.Y);
+        ctx.fillText('ITEMS COMING SOON', panelX, panelY);
         ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
-        ctx.fillText('Check back in future updates!', panel.X, panel.Y + 35);
+        ctx.fillText('Check back in future updates!', panelX, panelY + 35);
         ctx.restore();
 
         // Render Done button only (skip weapons rendering)
@@ -1600,7 +1607,7 @@ export function render(ctx) {
     const cardGap = SHOP_LAYOUT.CARD.GAP;
     const columns = SHOP_LAYOUT.CARD.COLUMNS;
     const totalCardWidth = columns * cardWidth + (columns - 1) * cardGap;
-    const gridStartX = panel.X - totalCardWidth / 2;
+    const gridStartX = panelX - totalCardWidth / 2;
 
     // Category layout constants
     const categoryHeaderHeight = SHOP_LAYOUT.CATEGORY.HEADER_HEIGHT;
@@ -1636,8 +1643,8 @@ export function render(ctx) {
     const visibleRowWidth = totalCardWidth;
 
     // Calculate vertical scroll area bounds
-    const scrollAreaTop = panel.Y + SHOP_LAYOUT.CATEGORY.Y_START;
-    const scrollAreaBottom = panel.Y + SHOP_LAYOUT.DONE_BUTTON.Y_OFFSET - SHOP_LAYOUT.DONE_BUTTON.HEIGHT / 2 - 20; // 20px margin
+    const scrollAreaTop = panelY + SHOP_LAYOUT.CATEGORY.Y_START;
+    const scrollAreaBottom = panelY + SHOP_LAYOUT.DONE_BUTTON.Y_OFFSET - SHOP_LAYOUT.DONE_BUTTON.HEIGHT / 2 - 20; // 20px margin
     const scrollAreaHeight = scrollAreaBottom - scrollAreaTop;
 
     // Store scroll area for hit detection
