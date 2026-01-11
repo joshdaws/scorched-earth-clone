@@ -282,32 +282,111 @@ const menuButtons = {
 };
 
 /**
+ * Calculate adaptive menu button layout based on screen dimensions.
+ * Scales button size and spacing for small screens (phones).
+ * @param {number} height - Available screen height
+ * @returns {{buttonHeight: number, buttonWidth: number, buttonSpacing: number, startY: number, fontSize: number, isCompact: boolean, titleScale: number}}
+ */
+function calculateMenuLayout(height) {
+    // Default (desktop/tablet) values
+    const defaultButtonHeight = 50;
+    const defaultButtonWidth = 280;
+    const defaultButtonSpacing = 60;  // Space between button centers
+    const defaultFontSize = UI.FONT_SIZE_LARGE;  // 24px
+
+    // Determine if we're on a compact screen (phone-sized)
+    // iPhone SE landscape is 375px, iPhone 15 is 390px, iPhone 15 Pro Max is 430px
+    const isCompact = height < 500;
+
+    // On compact screens, use fixed title at top rather than proportional
+    // Title needs: ~45px from top edge to center (scaled down), plus 35px to subtitle bottom
+    const titleAreaHeight = isCompact ? 90 : 130;
+
+    // Footer area: on compact screens, hide/minimize footer text
+    // Just need space for best run display
+    const footerAreaHeight = isCompact ? 30 : 70;
+
+    // Calculate available space for buttons
+    const availableHeight = height - titleAreaHeight - footerAreaHeight;
+
+    // Total height needed for 6 buttons with default spacing
+    const numButtons = 6;
+    const numGaps = numButtons - 1;
+
+    // Calculate scale factor if needed
+    const defaultTotalHeight = numGaps * defaultButtonSpacing + defaultButtonHeight;
+    const scaleFactor = Math.min(1, availableHeight / defaultTotalHeight);
+
+    // Apply scale with minimum values (maintain tap target of 44px per Apple HIG)
+    const minButtonHeight = 36;
+    const minSpacing = 42;
+
+    const buttonHeight = Math.max(minButtonHeight, Math.round(defaultButtonHeight * scaleFactor));
+    const buttonSpacing = Math.max(minSpacing, Math.round(defaultButtonSpacing * scaleFactor));
+    const buttonWidth = Math.round(defaultButtonWidth * Math.max(0.7, scaleFactor));
+
+    // Calculate font size (scale down for small buttons)
+    const fontScale = buttonHeight / defaultButtonHeight;
+    const fontSize = Math.max(12, Math.round(defaultFontSize * fontScale));
+
+    // Calculate where buttons should start
+    const actualTotalHeight = numGaps * buttonSpacing + buttonHeight;
+    const buttonsAreaTop = titleAreaHeight;
+    const buttonsAreaBottom = height - footerAreaHeight;
+    const buttonsAreaCenter = (buttonsAreaTop + buttonsAreaBottom) / 2;
+    const startY = buttonsAreaCenter - actualTotalHeight / 2 + buttonHeight / 2;
+
+    // Title scale for compact screens
+    const titleScale = isCompact ? Math.max(0.5, height / 800) : 1;
+
+    return {
+        buttonHeight,
+        buttonWidth,
+        buttonSpacing,
+        startY,
+        fontSize,
+        scaleFactor,
+        isCompact,
+        titleScale,
+        titleAreaHeight
+    };
+}
+
+// Store current menu layout for rendering
+let currentMenuLayout = null;
+
+/**
  * Update menu button positions based on current screen dimensions.
+ * Adapts layout for small screens by scaling button size and spacing.
  * Should be called before rendering or hit testing menu buttons.
  */
 function updateMenuButtonPositions() {
     const width = Renderer.getWidth();
     const height = Renderer.getHeight();
     const centerX = width / 2;
-    const centerY = height / 2;
 
-    menuButtons.start.x = centerX;
-    menuButtons.start.y = centerY - 30;
+    // Calculate adaptive layout
+    const layout = calculateMenuLayout(height);
+    currentMenuLayout = layout;
 
-    menuButtons.highScores.x = centerX;
-    menuButtons.highScores.y = centerY + 30;
+    // Update all buttons with new dimensions
+    const buttons = [
+        menuButtons.start,
+        menuButtons.highScores,
+        menuButtons.achievements,
+        menuButtons.collection,
+        menuButtons.supplyDrop,
+        menuButtons.options
+    ];
 
-    menuButtons.achievements.x = centerX;
-    menuButtons.achievements.y = centerY + 90;
-
-    menuButtons.collection.x = centerX;
-    menuButtons.collection.y = centerY + 150;
-
-    menuButtons.supplyDrop.x = centerX;
-    menuButtons.supplyDrop.y = centerY + 210;
-
-    menuButtons.options.x = centerX;
-    menuButtons.options.y = centerY + 270;
+    buttons.forEach((button, index) => {
+        button.x = centerX;
+        button.y = layout.startY + index * layout.buttonSpacing;
+        button.width = layout.buttonWidth;
+        button.height = layout.buttonHeight;
+        // Store font size for rendering (optional - can use in renderMenuButton)
+        button.fontSize = layout.fontSize;
+    });
 }
 
 // =============================================================================
@@ -603,7 +682,9 @@ function renderMenuButton(ctx, button, pulseIntensity, badgeCount = 0) {
         ctx.shadowBlur = 8 + glowIntensity * 5;
     }
     ctx.fillStyle = isDisabled ? COLORS.TEXT_MUTED : COLORS.TEXT_LIGHT;
-    ctx.font = `bold ${UI.FONT_SIZE_LARGE}px ${UI.FONT_FAMILY}`;
+    // Use button-specific font size if available (for adaptive layouts)
+    const fontSize = button.fontSize || UI.FONT_SIZE_LARGE;
+    ctx.font = `bold ${fontSize}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(button.text, button.x, button.y);
@@ -709,17 +790,26 @@ function renderMenu(ctx) {
     ctx.fillStyle = overlayGradient;
     ctx.fillRect(0, 0, width, height);
 
-    // Title with neon glow effect
-    const titleY = height / 3 - 20;
+    // Title with neon glow effect - adaptive sizing for compact screens
+    const layout = currentMenuLayout || calculateMenuLayout(height);
+    const isCompact = layout.isCompact;
+    const titleScale = layout.titleScale;
+
+    // On compact screens, position title at fixed location near top
+    // On larger screens, use proportional positioning
+    const titleY = isCompact ? 45 : (height / 3 - 20);
+    const titleFontSize = Math.round(72 * titleScale);
+    const subtitleFontSize = Math.round((UI.FONT_SIZE_LARGE + 4) * titleScale);
+    const subtitleOffset = Math.round(55 * titleScale);
 
     // Title shadow/glow layers
     ctx.save();
     ctx.shadowColor = COLORS.NEON_CYAN;
-    ctx.shadowBlur = 30 + pulseIntensity * 20;
+    ctx.shadowBlur = (30 + pulseIntensity * 20) * titleScale;
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
 
-    ctx.font = `bold 72px ${UI.FONT_FAMILY}`;
+    ctx.font = `bold ${titleFontSize}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = COLORS.NEON_CYAN;
@@ -734,12 +824,12 @@ function renderMenu(ctx) {
     // Subtitle with different color glow
     ctx.save();
     ctx.shadowColor = COLORS.NEON_PINK;
-    ctx.shadowBlur = 15 + pulseIntensity * 10;
-    ctx.font = `bold ${UI.FONT_SIZE_LARGE + 4}px ${UI.FONT_FAMILY}`;
+    ctx.shadowBlur = (15 + pulseIntensity * 10) * titleScale;
+    ctx.font = `bold ${subtitleFontSize}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = COLORS.NEON_PINK;
-    ctx.fillText('SYNTHWAVE EDITION', width / 2, titleY + 55);
+    ctx.fillText('SYNTHWAVE EDITION', width / 2, titleY + subtitleOffset);
     ctx.restore();
 
     // Get badge counts for buttons
@@ -754,51 +844,64 @@ function renderMenu(ctx) {
     renderMenuButton(ctx, menuButtons.supplyDrop, pulseIntensity);
     renderMenuButton(ctx, menuButtons.options, pulseIntensity);
 
-    // Token balance display (above SUPPLY DROPS button)
-    const tokenBalance = Tokens.getTokenBalance();
-    ctx.save();
-    ctx.shadowColor = '#F59E0B';
-    ctx.shadowBlur = 8 + pulseIntensity * 4;
-    ctx.fillStyle = '#F59E0B';
-    ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`🪙 ${tokenBalance} TOKENS`, width / 2, menuButtons.supplyDrop.y - 32);
-    ctx.shadowBlur = 0;
-    ctx.restore();
+    // Token balance display (above SUPPLY DROPS button) - hide on compact screens
+    if (!isCompact) {
+        const tokenBalance = Tokens.getTokenBalance();
+        const tokenGap = (menuButtons.supplyDrop.y - menuButtons.collection.y) / 2;
+        const tokenY = menuButtons.supplyDrop.y - tokenGap;
+        ctx.save();
+        ctx.shadowColor = '#F59E0B';
+        ctx.shadowBlur = 8 + pulseIntensity * 4;
+        ctx.fillStyle = '#F59E0B';
+        ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`🪙 ${tokenBalance} TOKENS`, width / 2, tokenY);
+        ctx.shadowBlur = 0;
+        ctx.restore();
+    }
 
-    // Best run display (below OPTIONS button)
+    // Best run display (below OPTIONS button, adaptive position)
+    // On compact screens, show smaller and closer to button
     const bestRound = HighScores.getBestRoundCount();
     const bestRunText = bestRound > 0 ? `Best Run: ${bestRound} rounds` : 'Best Run: --';
     ctx.fillStyle = COLORS.NEON_YELLOW;
-    ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+    const bestRunFontSize = isCompact ? UI.FONT_SIZE_SMALL : UI.FONT_SIZE_MEDIUM;
+    ctx.font = `bold ${bestRunFontSize}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.shadowColor = COLORS.NEON_YELLOW;
-    ctx.shadowBlur = 8;
-    ctx.fillText(bestRunText, width / 2, height / 2 + 320);
+    ctx.shadowBlur = isCompact ? 4 : 8;
+    // Position below the options button (last button)
+    const bestRunGap = isCompact ? 12 : 20;
+    const bestRunY = menuButtons.options.y + menuButtons.options.height / 2 + bestRunGap;
+    ctx.fillText(bestRunText, width / 2, bestRunY);
     ctx.shadowBlur = 0;
 
-    // Instructions text at bottom
-    ctx.fillStyle = COLORS.TEXT_MUTED;
-    ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('Click or tap NEW RUN to begin', width / 2, height - 50);
-    ctx.fillText('Press D to toggle debug mode', width / 2, height - 25);
+    // Instructions text at bottom - hide on compact screens to save space
+    if (!isCompact) {
+        ctx.fillStyle = COLORS.TEXT_MUTED;
+        ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Click or tap NEW RUN to begin', width / 2, height - 50);
+        ctx.fillText('Press D to toggle debug mode', width / 2, height - 25);
+    }
 
-    // Decorative line under title
-    ctx.save();
-    ctx.strokeStyle = COLORS.NEON_PURPLE;
-    ctx.shadowColor = COLORS.NEON_PURPLE;
-    ctx.shadowBlur = 10;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    const lineWidth = 200;
-    ctx.moveTo(width / 2 - lineWidth, titleY + 80);
-    ctx.lineTo(width / 2 + lineWidth, titleY + 80);
-    ctx.stroke();
-    ctx.restore();
+    // Decorative line under title - scale and position based on screen size
+    if (!isCompact) {
+        ctx.save();
+        ctx.strokeStyle = COLORS.NEON_PURPLE;
+        ctx.shadowColor = COLORS.NEON_PURPLE;
+        ctx.shadowBlur = 10;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        const lineWidth = 200;
+        ctx.moveTo(width / 2 - lineWidth, titleY + 80);
+        ctx.lineTo(width / 2 + lineWidth, titleY + 80);
+        ctx.stroke();
+        ctx.restore();
+    }
 
     // Neon frame around the screen
     ctx.save();
