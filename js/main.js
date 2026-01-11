@@ -1250,8 +1250,11 @@ function setupMenuState() {
                 optionsOverlayVisible = false;
                 VolumeControls.reset();
             }
-            // Stop animated 3D title scene
-            TitleScene.stop();
+            // Keep TitleScene running for difficulty select (seamless visual transition)
+            // Stop it only when going to other states
+            if (toState !== GAME_STATES.DIFFICULTY_SELECT) {
+                TitleScene.stop();
+            }
         },
         render: renderMenu
     });
@@ -1532,14 +1535,12 @@ function renderDifficultySelect(ctx) {
 
     ctx.save();
 
-    // Render synthwave background (same as menu)
-    renderMenuBackground(ctx);
-
-    // Semi-transparent overlay for content area
+    // TitleScene provides the 3D animated background (same as menu screen)
+    // We only need a subtle overlay to improve readability of UI elements
     const overlayGradient = ctx.createLinearGradient(0, 0, 0, height);
-    overlayGradient.addColorStop(0, 'rgba(10, 10, 26, 0.7)');
-    overlayGradient.addColorStop(0.5, 'rgba(10, 10, 26, 0.3)');
-    overlayGradient.addColorStop(1, 'rgba(10, 10, 26, 0.7)');
+    overlayGradient.addColorStop(0, 'rgba(10, 10, 26, 0.5)');
+    overlayGradient.addColorStop(0.5, 'rgba(10, 10, 26, 0.2)');
+    overlayGradient.addColorStop(1, 'rgba(10, 10, 26, 0.5)');
     ctx.fillStyle = overlayGradient;
     ctx.fillRect(0, 0, width, height);
 
@@ -1621,9 +1622,18 @@ function setupDifficultySelectState() {
         onEnter: (fromState) => {
             console.log('Entered DIFFICULTY_SELECT state');
             difficultyAnimationTime = 0;
+            // Ensure TitleScene is running (in case we arrived from non-MENU state)
+            if (!TitleScene.isActive()) {
+                TitleScene.start();
+            }
         },
         onExit: (toState) => {
             console.log('Exiting DIFFICULTY_SELECT state');
+            // Keep TitleScene running if going back to MENU (seamless transition)
+            // Stop it when going to PLAYING or other states
+            if (toState !== GAME_STATES.MENU) {
+                TitleScene.stop();
+            }
         },
         render: renderDifficultySelect
     });
@@ -5359,8 +5369,19 @@ function update(deltaTime) {
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D rendering context
  */
 function render(ctx) {
-    // Clear canvas
-    Renderer.clear();
+    // For menu states with TitleScene background, use transparent clear
+    // so the 3D background shows through. For gameplay, use opaque clear.
+    const currentState = Game.getState();
+    const useTransparentClear = currentState === GAME_STATES.MENU ||
+                                 currentState === GAME_STATES.DIFFICULTY_SELECT;
+
+    if (useTransparentClear) {
+        // Clear to transparent so TitleScene (3D WebGL) shows through
+        ctx.clearRect(0, 0, Renderer.getWidth(), Renderer.getHeight());
+    } else {
+        // Normal opaque clear for gameplay states
+        Renderer.clear();
+    }
 
     // Render game elements will go here
     // Note: Achievement popups are rendered in postRender() which is called after state-specific renders
