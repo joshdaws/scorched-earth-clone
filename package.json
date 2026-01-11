@@ -10,6 +10,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "build:web": "rm -rf www && mkdir -p www && cp -r index.html style.css js assets www/",
     "build:ios": "npm run build:web && npx cap sync ios",
+    "ios:sync": "rsync -av --delete index.html style.css js/ assets/ www/ && npx cap copy ios",
     "open:ios": "npx cap open ios",
     "serve": "python3 -m http.server 8000"
   },
