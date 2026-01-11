@@ -5355,7 +5355,16 @@ function render(ctx) {
     // Note: Achievement popups are rendered in postRender() which is called after state-specific renders
 
     // Render debug overlay last (on top of everything)
-    Debug.render(ctx);
+    // Skip on menu screens to avoid visual clutter
+    const isMenuState = currentState === GAME_STATES.MENU ||
+                        currentState === GAME_STATES.DIFFICULTY_SELECT ||
+                        currentState === GAME_STATES.HIGH_SCORES ||
+                        currentState === GAME_STATES.ACHIEVEMENTS ||
+                        currentState === GAME_STATES.COLLECTION ||
+                        currentState === GAME_STATES.SUPPLY_DROP;
+    if (!isMenuState) {
+        Debug.render(ctx);
+    }
 }
 
 /**
