@@ -52,6 +52,7 @@ import * as TankCollection from './tank-collection.js';
 import * as PerformanceTracking from './performance-tracking.js';
 import * as PitySystem from './pity-system.js';
 import * as LifetimeStats from './lifetime-stats.js';
+import * as NameEntry from './nameEntry.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -857,7 +858,13 @@ function setupMenuState() {
     Input.onMouseDown((x, y, button) => {
         if (Game.getState() !== GAME_STATES.MENU) return;
 
-        // Check options overlay first
+        // Check name entry modal first (has highest priority)
+        if (NameEntry.isOpen()) {
+            NameEntry.handleClick({ x, y });
+            return;
+        }
+
+        // Check options overlay next
         if (optionsOverlayVisible) {
             handleOptionsOverlayClick({ x, y });
             return;
@@ -870,7 +877,13 @@ function setupMenuState() {
     Input.onTouchStart((x, y) => {
         if (Game.getState() !== GAME_STATES.MENU) return;
 
-        // Check options overlay first
+        // Check name entry modal first (has highest priority)
+        if (NameEntry.isOpen()) {
+            NameEntry.handleClick({ x, y });
+            return;
+        }
+
+        // Check options overlay next
         if (optionsOverlayVisible) {
             handleOptionsOverlayClick({ x, y });
             return;
@@ -3710,8 +3723,49 @@ const highScoresBackButton = {
 let highScoresAnimationTime = 0;
 
 /**
+ * Current tab selection for high scores screen.
+ * 'local' = player's local scores, 'global' = global leaderboard
+ * @type {string}
+ */
+let highScoresActiveTab = 'global';
+
+/**
+ * Tab button definitions for high scores screen.
+ */
+const highScoresTabs = {
+    global: {
+        x: CANVAS.DESIGN_WIDTH / 2 - 100,
+        y: 110,
+        width: 180,
+        height: 36,
+        text: 'GLOBAL',
+        color: COLORS.NEON_CYAN
+    },
+    local: {
+        x: CANVAS.DESIGN_WIDTH / 2 + 100,
+        y: 110,
+        width: 180,
+        height: 36,
+        text: 'MY SCORES',
+        color: COLORS.NEON_PURPLE
+    }
+};
+
+/**
+ * Refresh button for leaderboard
+ */
+const highScoresRefreshButton = {
+    x: CANVAS.DESIGN_WIDTH - 100,
+    y: 100,
+    width: 40,
+    height: 40,
+    text: '↻',
+    color: COLORS.NEON_CYAN
+};
+
+/**
  * Render the high scores screen.
- * Shows top 10 high scores and lifetime statistics.
+ * Shows global leaderboard or local scores with tabs.
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  */
 function renderHighScores(ctx) {
@@ -3738,19 +3792,39 @@ function renderHighScores(ctx) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = COLORS.NEON_YELLOW;
-    ctx.fillText('HIGH SCORES', CANVAS.DESIGN_WIDTH / 2, 70);
+    ctx.fillText('LEADERBOARD', CANVAS.DESIGN_WIDTH / 2, 55);
     ctx.restore();
 
-    // Get high scores and lifetime stats
-    const scores = HighScores.getHighScores();
+    // Render tab buttons
+    renderHighScoresTabButton(ctx, highScoresTabs.global, highScoresActiveTab === 'global', pulseIntensity);
+    renderHighScoresTabButton(ctx, highScoresTabs.local, highScoresActiveTab === 'local', pulseIntensity);
+
+    // Get scores based on active tab
+    const scores = highScoresActiveTab === 'global'
+        ? HighScores.getGlobalLeaderboard()
+        : HighScores.getHighScores();
     const lifetimeStats = HighScores.getFormattedLifetimeStats();
 
-    // Table layout
+    // Connection status indicator for global tab
+    if (highScoresActiveTab === 'global') {
+        const status = HighScores.getConnectionStatus();
+        ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+        ctx.textAlign = 'right';
+        if (status.isOnline) {
+            ctx.fillStyle = '#00ff88';
+            ctx.fillText('● ONLINE', CANVAS.DESIGN_WIDTH - 50, 55);
+        } else {
+            ctx.fillStyle = COLORS.NEON_PINK;
+            ctx.fillText('○ OFFLINE', CANVAS.DESIGN_WIDTH - 50, 55);
+        }
+    }
+
+    // Table layout - adjusted Y to account for tabs
     const tableX = CANVAS.DESIGN_WIDTH / 2 - 280;
     const tableWidth = 560;
-    const tableY = 130;
+    const tableY = 155;
     const headerHeight = 40;
-    const rowHeight = 38;
+    const rowHeight = 36;
 
     // Table background
     ctx.fillStyle = 'rgba(20, 20, 40, 0.7)';
@@ -3758,38 +3832,46 @@ function renderHighScores(ctx) {
     ctx.roundRect(tableX - 20, tableY - 10, tableWidth + 40, headerHeight + rowHeight * 10 + 30, 12);
     ctx.fill();
 
-    // Table border
-    ctx.strokeStyle = COLORS.NEON_CYAN;
+    // Table border - color based on active tab
+    const borderColor = highScoresActiveTab === 'global' ? COLORS.NEON_CYAN : COLORS.NEON_PURPLE;
+    ctx.strokeStyle = borderColor;
     ctx.lineWidth = 2;
-    ctx.shadowColor = COLORS.NEON_CYAN;
+    ctx.shadowColor = borderColor;
     ctx.shadowBlur = 8;
     ctx.stroke();
     ctx.shadowBlur = 0;
 
-    // Table header
+    // Table header - different columns for global vs local
     ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
-    ctx.fillStyle = COLORS.NEON_CYAN;
+    ctx.fillStyle = borderColor;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
 
     const colRank = tableX;
-    const colRounds = tableX + 70;
-    const colDamage = tableX + 200;
-    const colDate = tableX + 350;
+    const colName = tableX + 50;
+    const colRounds = highScoresActiveTab === 'global' ? tableX + 220 : tableX + 70;
+    const colDamage = highScoresActiveTab === 'global' ? tableX + 320 : tableX + 200;
+    const colDate = highScoresActiveTab === 'global' ? tableX + 440 : tableX + 350;
 
     const headerY = tableY + headerHeight / 2;
     ctx.fillText('#', colRank, headerY);
+    if (highScoresActiveTab === 'global') {
+        ctx.fillText('PLAYER', colName, headerY);
+    }
     ctx.fillText('ROUNDS', colRounds, headerY);
     ctx.fillText('DAMAGE', colDamage, headerY);
     ctx.fillText('DATE', colDate, headerY);
 
     // Header separator line
-    ctx.strokeStyle = `${COLORS.NEON_CYAN}60`;
+    ctx.strokeStyle = `${borderColor}60`;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(tableX - 10, tableY + headerHeight);
     ctx.lineTo(tableX + tableWidth + 10, tableY + headerHeight);
     ctx.stroke();
+
+    // Get current player's device ID for highlighting
+    const currentDeviceId = highScoresActiveTab === 'global' ? HighScores.getCurrentDeviceId() : null;
 
     // Table rows
     ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
@@ -3798,38 +3880,135 @@ function renderHighScores(ctx) {
         const rowY = tableY + headerHeight + rowHeight * i + rowHeight / 2;
         const score = scores[i];
 
+        // Check if this is the current player's row
+        const isCurrentPlayer = highScoresActiveTab === 'global' && score && score.deviceId === currentDeviceId;
+
+        // Highlight current player's row with a subtle background
+        if (isCurrentPlayer) {
+            ctx.fillStyle = 'rgba(0, 255, 255, 0.15)';
+            ctx.fillRect(tableX - 15, rowY - rowHeight / 2 + 2, tableWidth + 30, rowHeight - 4);
+        }
+
         if (score) {
-            // Rank with special styling for top 3
-            ctx.fillStyle = i === 0 ? COLORS.NEON_YELLOW :
-                           i === 1 ? '#c0c0c0' :
-                           i === 2 ? '#cd7f32' :
-                           COLORS.TEXT_LIGHT;
+            // Rank with special styling for top 3 or current player
+            if (isCurrentPlayer) {
+                ctx.fillStyle = COLORS.NEON_CYAN;
+            } else {
+                ctx.fillStyle = i === 0 ? COLORS.NEON_YELLOW :
+                               i === 1 ? '#c0c0c0' :
+                               i === 2 ? '#cd7f32' :
+                               COLORS.TEXT_LIGHT;
+            }
             ctx.fillText(`${i + 1}`, colRank, rowY);
 
+            // Player name (global only)
+            if (highScoresActiveTab === 'global') {
+                ctx.fillStyle = isCurrentPlayer ? COLORS.NEON_CYAN : COLORS.TEXT_LIGHT;
+                const playerName = score.displayName || score.playerName || 'Anonymous';
+                // Truncate long names
+                const truncatedName = playerName.length > 14 ? playerName.substring(0, 12) + '...' : playerName;
+                // Add (YOU) indicator for current player
+                ctx.fillText(isCurrentPlayer ? `${truncatedName} ★` : truncatedName, colName, rowY);
+            }
+
             // Rounds
-            ctx.fillStyle = COLORS.TEXT_LIGHT;
-            ctx.fillText(`${score.roundsSurvived}`, colRounds, rowY);
+            ctx.fillStyle = isCurrentPlayer ? COLORS.NEON_CYAN : COLORS.TEXT_LIGHT;
+            const rounds = score.roundsSurvived || score.rounds || 0;
+            ctx.fillText(`${rounds}`, colRounds, rowY);
 
             // Damage
-            ctx.fillText(score.totalDamage ? score.totalDamage.toLocaleString() : '0', colDamage, rowY);
+            const damage = score.totalDamage || score.damage || 0;
+            ctx.fillText(damage ? damage.toLocaleString() : '0', colDamage, rowY);
 
             // Date
-            const date = new Date(score.timestamp);
-            const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            ctx.fillStyle = COLORS.TEXT_MUTED;
-            ctx.fillText(dateStr, colDate, rowY);
+            const timestamp = score.timestamp || score._creationTime;
+            if (timestamp) {
+                const date = new Date(timestamp);
+                const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                ctx.fillStyle = isCurrentPlayer ? COLORS.NEON_CYAN : COLORS.TEXT_MUTED;
+                ctx.fillText(dateStr, colDate, rowY);
+            } else {
+                ctx.fillStyle = isCurrentPlayer ? COLORS.NEON_CYAN : COLORS.TEXT_MUTED;
+                ctx.fillText('-', colDate, rowY);
+            }
         } else {
             // Empty row
             ctx.fillStyle = COLORS.TEXT_MUTED;
             ctx.fillText(`${i + 1}`, colRank, rowY);
+            if (highScoresActiveTab === 'global') {
+                ctx.fillText('-', colName, rowY);
+            }
             ctx.fillText('-', colRounds, rowY);
             ctx.fillText('-', colDamage, rowY);
             ctx.fillText('-', colDate, rowY);
         }
     }
 
+    // Show loading indicator for global tab
+    const isLoading = highScoresActiveTab === 'global' && HighScores.isLoadingLeaderboard();
+    if (highScoresActiveTab === 'global') {
+        const status = HighScores.getConnectionStatus();
+
+        // Show loading overlay when fetching with data
+        if (isLoading && scores.length > 0) {
+            // Show subtle loading indicator at top
+            ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+            ctx.fillStyle = COLORS.NEON_CYAN;
+            ctx.textAlign = 'center';
+            ctx.fillText('Refreshing...', CANVAS.DESIGN_WIDTH / 2, tableY - 20);
+        }
+
+        // Show message when no scores
+        if (scores.length === 0) {
+            ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+            ctx.fillStyle = COLORS.TEXT_MUTED;
+            ctx.textAlign = 'center';
+            const message = isLoading ? 'Loading leaderboard...' :
+                           status.isOnline ? 'No scores yet - play to be the first!' :
+                           'Offline - connect to see global scores';
+            ctx.fillText(message, CANVAS.DESIGN_WIDTH / 2, tableY + headerHeight + rowHeight * 4);
+        }
+
+        // Render refresh button (only when online)
+        if (status.isOnline) {
+            const refreshBtn = highScoresRefreshButton;
+            const isRefreshing = isLoading;
+
+            // Button background
+            ctx.fillStyle = 'rgba(20, 20, 40, 0.8)';
+            ctx.beginPath();
+            ctx.roundRect(refreshBtn.x - refreshBtn.width / 2, refreshBtn.y - refreshBtn.height / 2, refreshBtn.width, refreshBtn.height, 8);
+            ctx.fill();
+
+            // Button border with glow
+            ctx.strokeStyle = isRefreshing ? COLORS.TEXT_MUTED : COLORS.NEON_CYAN;
+            ctx.lineWidth = 2;
+            ctx.shadowColor = isRefreshing ? 'transparent' : COLORS.NEON_CYAN;
+            ctx.shadowBlur = isRefreshing ? 0 : 5;
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+
+            // Refresh icon with rotation when loading
+            ctx.font = `bold 24px ${UI.FONT_FAMILY}`;
+            ctx.fillStyle = isRefreshing ? COLORS.TEXT_MUTED : COLORS.NEON_CYAN;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            if (isRefreshing) {
+                // Animate the refresh icon
+                ctx.save();
+                ctx.translate(refreshBtn.x, refreshBtn.y);
+                ctx.rotate(highScoresAnimationTime * 0.01);
+                ctx.fillText('↻', 0, 0);
+                ctx.restore();
+            } else {
+                ctx.fillText('↻', refreshBtn.x, refreshBtn.y);
+            }
+        }
+    }
+
     // Lifetime stats section
-    const statsY = tableY + headerHeight + rowHeight * 10 + 60;
+    const statsY = tableY + headerHeight + rowHeight * 10 + 50;
 
     // Stats background
     ctx.fillStyle = 'rgba(20, 20, 40, 0.7)';
@@ -3936,6 +4115,52 @@ function renderHighScores(ctx) {
  * @param {Object} button - Button definition
  * @param {number} pulseIntensity - Glow pulse intensity (0-1)
  */
+function renderHighScoresTabButton(ctx, tab, isActive, pulseIntensity) {
+    const halfWidth = tab.width / 2;
+    const halfHeight = tab.height / 2;
+    const tabX = tab.x - halfWidth;
+    const tabY = tab.y - halfHeight;
+
+    ctx.save();
+
+    // Tab background
+    if (isActive) {
+        ctx.fillStyle = 'rgba(26, 26, 46, 0.9)';
+    } else {
+        ctx.fillStyle = 'rgba(20, 20, 40, 0.5)';
+    }
+    ctx.beginPath();
+    ctx.roundRect(tabX, tabY, tab.width, tab.height, 6);
+    ctx.fill();
+
+    // Tab border with glow if active
+    ctx.strokeStyle = isActive ? tab.color : `${tab.color}60`;
+    ctx.lineWidth = isActive ? 2 : 1;
+    if (isActive) {
+        ctx.shadowColor = tab.color;
+        ctx.shadowBlur = 8 + pulseIntensity * 5;
+    }
+    ctx.beginPath();
+    ctx.roundRect(tabX, tabY, tab.width, tab.height, 6);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Tab text
+    ctx.fillStyle = isActive ? COLORS.TEXT_LIGHT : COLORS.TEXT_MUTED;
+    ctx.font = `bold ${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(tab.text, tab.x, tab.y);
+
+    ctx.restore();
+}
+
+/**
+ * Render a button for the high scores screen.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {Object} button - Button definition
+ * @param {number} pulseIntensity - Glow pulse intensity (0-1)
+ */
 function renderHighScoresButton(ctx, button, pulseIntensity) {
     const halfWidth = button.width / 2;
     const halfHeight = button.height / 2;
@@ -3984,6 +4209,35 @@ function renderHighScoresButton(ctx, button, pulseIntensity) {
  */
 function handleHighScoresClick(pos) {
     if (Game.getState() !== GAME_STATES.HIGH_SCORES) return;
+
+    // Check tab clicks
+    if (isInsideButton(pos.x, pos.y, highScoresTabs.global)) {
+        if (highScoresActiveTab !== 'global') {
+            Sound.playClickSound();
+            highScoresActiveTab = 'global';
+            // Trigger leaderboard refresh
+            HighScores.fetchGlobalLeaderboard(true).catch(() => {});
+        }
+        return;
+    }
+
+    if (isInsideButton(pos.x, pos.y, highScoresTabs.local)) {
+        if (highScoresActiveTab !== 'local') {
+            Sound.playClickSound();
+            highScoresActiveTab = 'local';
+        }
+        return;
+    }
+
+    // Check refresh button click (global tab only)
+    if (highScoresActiveTab === 'global' && isInsideButton(pos.x, pos.y, highScoresRefreshButton)) {
+        // Only refresh if not already loading
+        if (!HighScores.isLoadingLeaderboard()) {
+            Sound.playClickSound();
+            HighScores.fetchGlobalLeaderboard(true).catch(() => {});
+        }
+        return;
+    }
 
     if (isInsideButton(pos.x, pos.y, highScoresBackButton)) {
         Sound.playClickSound();
@@ -4441,6 +4695,11 @@ async function init() {
 
     // Register debug keyboard shortcuts (Shift+1-9 when debug mode is on)
     document.addEventListener('keydown', (event) => {
+        // Name entry modal has priority for keyboard input
+        if (NameEntry.isOpen()) {
+            NameEntry.handleKeyDown(event);
+            return;
+        }
         DebugTools.handleKeyDown(event);
     });
 
@@ -4482,6 +4741,36 @@ async function init() {
 
     // Initialize lifetime statistics tracking
     LifetimeStats.init();
+
+    // Initialize name entry module
+    NameEntry.init();
+
+    // Set up VolumeControls callback for Change Name button
+    VolumeControls.setChangeNameCallback(() => {
+        // Close options overlay first
+        optionsOverlayVisible = false;
+        VolumeControls.reset();
+        // Show name entry modal
+        NameEntry.show({
+            isFirstTime: false,
+            onConfirm: (name) => {
+                console.log('[Main] Player name changed to:', name);
+            }
+        });
+    });
+
+    // Check if first-time name entry is needed
+    if (NameEntry.needsNameEntry()) {
+        // Show name entry modal after a brief delay to let the menu render
+        setTimeout(() => {
+            NameEntry.show({
+                isFirstTime: true,
+                onConfirm: (name) => {
+                    console.log('[Main] Player name set:', name);
+                }
+            });
+        }, 500);
+    }
 
     // Register performance tracking callback for achievement unlocks (grants +15% bonus)
     onAchievementUnlock(() => {
@@ -4561,6 +4850,9 @@ function update(deltaTime) {
     // Update supply drop animation
     SupplyDrop.update(deltaTime);
 
+    // Update name entry modal (cursor blink, etc.)
+    NameEntry.update(deltaTime);
+
     // Clear single-fire input state at end of frame
     // This must be done after all game logic that checks wasKeyPressed()
     Input.clearFrameState();
@@ -4593,6 +4885,11 @@ function postRender(ctx) {
     // Render supply drop animation (covers everything when active)
     if (SupplyDrop.isAnimating()) {
         SupplyDrop.render(ctx);
+    }
+
+    // Render name entry modal (on top of everything)
+    if (NameEntry.isOpen()) {
+        NameEntry.render(ctx);
     }
 }
 

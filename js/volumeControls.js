@@ -21,7 +21,7 @@ import { isCrtEnabled, toggleCrt } from './effects.js';
  */
 const VOLUME_PANEL = {
     WIDTH: 340,
-    HEIGHT: 330,               // Increased to fit CRT toggle
+    HEIGHT: 400,               // Increased to fit Change Name button
     PADDING: 24,
     SLIDER_HEIGHT: 12,         // Thicker track for easier tapping
     SLIDER_WIDTH: 260,
@@ -32,6 +32,21 @@ const VOLUME_PANEL = {
     BUTTON_HEIGHT: 48,         // Touch-friendly height
     BUTTON_SPACING: 12         // Space between buttons
 };
+
+// =============================================================================
+// CALLBACKS
+// =============================================================================
+
+/** @type {Function|null} Callback when Change Name button is clicked */
+let onChangeNameCallback = null;
+
+/**
+ * Set callback for Change Name button.
+ * @param {Function} callback - Function to call when Change Name is clicked
+ */
+export function setChangeNameCallback(callback) {
+    onChangeNameCallback = callback;
+}
 
 // =============================================================================
 // INTERACTION STATE
@@ -97,7 +112,7 @@ function getMuteButton(panelX, panelY) {
     const startX = panelX + (VOLUME_PANEL.WIDTH - totalWidth) / 2;
     return {
         x: startX,
-        y: panelY + VOLUME_PANEL.HEIGHT - 70,
+        y: panelY + VOLUME_PANEL.HEIGHT - 130,
         width: VOLUME_PANEL.BUTTON_WIDTH,
         height: VOLUME_PANEL.BUTTON_HEIGHT
     };
@@ -114,8 +129,25 @@ function getCrtButton(panelX, panelY) {
     const startX = panelX + (VOLUME_PANEL.WIDTH - totalWidth) / 2;
     return {
         x: startX + VOLUME_PANEL.BUTTON_WIDTH + VOLUME_PANEL.BUTTON_SPACING,
-        y: panelY + VOLUME_PANEL.HEIGHT - 70,
+        y: panelY + VOLUME_PANEL.HEIGHT - 130,
         width: VOLUME_PANEL.BUTTON_WIDTH,
+        height: VOLUME_PANEL.BUTTON_HEIGHT
+    };
+}
+
+/**
+ * Get Change Name button bounds.
+ * @param {number} panelX - Panel X position
+ * @param {number} panelY - Panel Y position
+ * @returns {{x: number, y: number, width: number, height: number}}
+ */
+function getChangeNameButton(panelX, panelY) {
+    // Centered, full width-ish button at the bottom
+    const buttonWidth = VOLUME_PANEL.WIDTH - VOLUME_PANEL.PADDING * 2;
+    return {
+        x: panelX + VOLUME_PANEL.PADDING,
+        y: panelY + VOLUME_PANEL.HEIGHT - 70,
+        width: buttonWidth,
         height: VOLUME_PANEL.BUTTON_HEIGHT
     };
 }
@@ -171,6 +203,9 @@ export function render(ctx, centerX = CANVAS.DESIGN_WIDTH / 2, centerY = CANVAS.
 
     // Render CRT effects toggle button
     renderCrtButton(ctx, getCrtButton(panelX, panelY));
+
+    // Render Change Name button
+    renderChangeNameButton(ctx, getChangeNameButton(panelX, panelY));
 
     ctx.restore();
 }
@@ -295,6 +330,35 @@ function renderCrtButton(ctx, button) {
     ctx.restore();
 }
 
+/**
+ * Render the Change Name button.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {Object} button - Button bounds
+ */
+function renderChangeNameButton(ctx, button) {
+    ctx.save();
+
+    // Button background - yellow/gold theme for profile actions
+    ctx.fillStyle = 'rgba(255, 215, 0, 0.15)';
+    ctx.beginPath();
+    ctx.roundRect(button.x, button.y, button.width, button.height, 6);
+    ctx.fill();
+
+    // Button border
+    ctx.strokeStyle = COLORS.NEON_YELLOW;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Button text
+    ctx.fillStyle = COLORS.NEON_YELLOW;
+    ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('CHANGE NAME', button.x + button.width / 2, button.y + button.height / 2);
+
+    ctx.restore();
+}
+
 // =============================================================================
 // INPUT HANDLING
 // =============================================================================
@@ -333,6 +397,16 @@ export function handlePointerDown(x, y) {
     if (isInsideButton(x, y, crtBtn)) {
         toggleCrt();
         Sound.playClickSound();
+        return true;
+    }
+
+    // Check Change Name button
+    const changeNameBtn = getChangeNameButton(panelPosition.x, panelPosition.y);
+    if (isInsideButton(x, y, changeNameBtn)) {
+        Sound.playClickSound();
+        if (onChangeNameCallback) {
+            onChangeNameCallback();
+        }
         return true;
     }
 

@@ -17,10 +17,19 @@ export const getLeaderboard = query({
       .order("desc")
       .take(limit);
 
-    return scores.map((score, index) => ({
-      rank: index + 1,
-      ...score,
-    }));
+    // Fetch player deviceIds for highlighting
+    const scoresWithDeviceId = await Promise.all(
+      scores.map(async (score, index) => {
+        const player = await ctx.db.get(score.playerId);
+        return {
+          rank: index + 1,
+          ...score,
+          deviceId: player?.deviceId ?? null,
+        };
+      })
+    );
+
+    return scoresWithDeviceId;
   },
 });
 

@@ -99,6 +99,14 @@ function getOfflineQueue() {
     }
 }
 
+// Retry configuration
+const RETRY_CONFIG = {
+    maxRetries: 5,
+    baseDelayMs: 1000,
+    maxDelayMs: 30000,
+    maxAgeMs: 24 * 60 * 60 * 1000 // Discard actions older than 24 hours
+};
+
 /**
  * Add an action to the offline queue
  */
@@ -106,7 +114,9 @@ function queueOfflineAction(action) {
     const queue = getOfflineQueue();
     queue.push({
         ...action,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        retryCount: 0,
+        nextRetryAt: 0
     });
     localStorage.setItem(STORAGE_KEYS.OFFLINE_QUEUE, JSON.stringify(queue));
     console.log('[ConvexAPI] Queued offline action:', action.type);
@@ -120,7 +130,23 @@ function clearOfflineQueue() {
 }
 
 /**
+ * Calculate delay with exponential backoff
+ * @param {number} retryCount - Number of previous retry attempts
+ * @returns {number} Delay in milliseconds
+ */
+function calculateBackoffDelay(retryCount) {
+    const delay = Math.min(
+        RETRY_CONFIG.baseDelayMs * Math.pow(2, retryCount),
+        RETRY_CONFIG.maxDelayMs
+    );
+    // Add jitter (±20%)
+    const jitter = delay * 0.2 * (Math.random() * 2 - 1);
+    return Math.floor(delay + jitter);
+}
+
+/**
  * Process offline queue when connection is restored
+ * Uses exponential backoff for failed operations
  */
 async function processOfflineQueue() {
     const queue = getOfflineQueue();
@@ -128,26 +154,79 @@ async function processOfflineQueue() {
 
     console.log('[ConvexAPI] Processing offline queue:', queue.length, 'actions');
 
+    const now = Date.now();
     const failedActions = [];
+    const processedCount = { success: 0, failed: 0, skipped: 0, expired: 0 };
 
     for (const action of queue) {
+        // Skip if action is too old
+        if (now - action.timestamp > RETRY_CONFIG.maxAgeMs) {
+            console.warn('[ConvexAPI] Discarding expired action:', action.type, 'age:', Math.round((now - action.timestamp) / 1000 / 60), 'min');
+            processedCount.expired++;
+            continue;
+        }
+
+        // Skip if not ready for retry yet (backoff period)
+        if (action.nextRetryAt && now < action.nextRetryAt) {
+            console.log('[ConvexAPI] Action not ready for retry yet:', action.type, 'wait:', Math.round((action.nextRetryAt - now) / 1000), 's');
+            failedActions.push(action);
+            processedCount.skipped++;
+            continue;
+        }
+
+        // Skip if max retries exceeded
+        if (action.retryCount >= RETRY_CONFIG.maxRetries) {
+            console.error('[ConvexAPI] Max retries exceeded for action:', action.type, 'discarding');
+            processedCount.failed++;
+            continue;
+        }
+
         try {
             switch (action.type) {
                 case 'submit_score':
+                    // For score submissions, server's score always wins (no conflict)
+                    // We just submit and let the server handle deduplication
                     await submitScore(action.runStats);
+                    break;
+                case 'update_name':
+                    await updatePlayerName(action.newName);
                     break;
                 // Add more action types as needed
                 default:
                     console.warn('[ConvexAPI] Unknown offline action type:', action.type);
             }
+            processedCount.success++;
         } catch (e) {
-            console.error('[ConvexAPI] Failed to process offline action:', e);
-            failedActions.push(action);
+            console.error('[ConvexAPI] Failed to process offline action:', action.type, e);
+
+            // Update retry count and calculate next retry time
+            const newRetryCount = (action.retryCount || 0) + 1;
+            const backoffDelay = calculateBackoffDelay(newRetryCount);
+
+            failedActions.push({
+                ...action,
+                retryCount: newRetryCount,
+                nextRetryAt: now + backoffDelay,
+                lastError: e.message
+            });
+            processedCount.failed++;
         }
     }
 
+    console.log('[ConvexAPI] Queue processing complete:', processedCount);
+
     if (failedActions.length > 0) {
         localStorage.setItem(STORAGE_KEYS.OFFLINE_QUEUE, JSON.stringify(failedActions));
+
+        // Schedule next retry attempt if there are actions waiting
+        const nextRetryAction = failedActions.find(a => a.nextRetryAt);
+        if (nextRetryAction && isOnline) {
+            const waitTime = Math.max(0, nextRetryAction.nextRetryAt - Date.now());
+            console.log('[ConvexAPI] Scheduling retry in', Math.round(waitTime / 1000), 'seconds');
+            setTimeout(() => {
+                if (isOnline) processOfflineQueue();
+            }, waitTime);
+        }
     } else {
         clearOfflineQueue();
     }
