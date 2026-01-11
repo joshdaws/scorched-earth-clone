@@ -1100,19 +1100,23 @@ function renderMenu(ctx) {
     renderMenuButton(ctx, menuButtons.supplyDrop, pulseIntensity);
     renderMenuButton(ctx, menuButtons.options, pulseIntensity);
 
-    // Token balance display - top left corner with neon box (matching start-redesign reference)
+    // Token balance display - bottom right corner with neon box (mirroring Best Run box on left)
     const tokenBalance = Tokens.getTokenBalance();
     const tokenPadding = isCompact ? 15 : 25;
     const tokenFontSize = isCompact ? UI.FONT_SIZE_SMALL : UI.FONT_SIZE_MEDIUM;
     const tokenCardWidth = isCompact ? 75 : 90;
     const tokenCardHeight = isCompact ? 50 : 60;
 
+    // Position: bottom right corner (mirroring Best Run's bottom left position)
+    const tokenCardX = width - tokenPadding - tokenCardWidth;
+    const tokenCardY = height - tokenPadding - tokenCardHeight;
+
     ctx.save();
-    
+
     // Card background with neon border (like Best Run box)
     ctx.fillStyle = 'rgba(10, 10, 26, 0.85)';
     ctx.beginPath();
-    ctx.roundRect(tokenPadding, tokenPadding, tokenCardWidth, tokenCardHeight, 8);
+    ctx.roundRect(tokenCardX, tokenCardY, tokenCardWidth, tokenCardHeight, 8);
     ctx.fill();
 
     // Neon border with cyan glow effect
@@ -1123,10 +1127,10 @@ function renderMenu(ctx) {
     ctx.stroke();
     ctx.shadowBlur = 0;
 
-    // Coin icon (circle with glow) - positioned on left side
+    // Coin icon (circle with glow) - positioned on left side of card
     const coinRadius = isCompact ? 8 : 10;
-    const coinX = tokenPadding + 18;
-    const coinY = tokenPadding + tokenCardHeight / 2 - 2;
+    const coinX = tokenCardX + 18;
+    const coinY = tokenCardY + tokenCardHeight / 2 - 2;
 
     ctx.fillStyle = '#F59E0B';
     ctx.shadowColor = '#F59E0B';
@@ -1148,7 +1152,7 @@ function renderMenu(ctx) {
     ctx.font = `${isCompact ? 9 : 11}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
-    ctx.fillText('TOKENS', tokenPadding + tokenCardWidth / 2, tokenPadding + tokenCardHeight - 6);
+    ctx.fillText('TOKENS', tokenCardX + tokenCardWidth / 2, tokenCardY + tokenCardHeight - 6);
     ctx.restore();
 
     // Best run display - bottom left corner as a styled card
