@@ -94,20 +94,52 @@ const REFERENCE_HEIGHT = 800;
 const REFERENCE_WIDTH = 1200;
 
 // Minimum scale factor to prevent UI from becoming too small
-const MIN_UI_SCALE = 0.7;
+// Lower on mobile to allow more compact UI on small screens
+const MIN_UI_SCALE = 0.5;
 
 // Maximum scale factor to prevent UI from becoming too large
 const MAX_UI_SCALE = 1.3;
 
+// Mobile screen threshold (CSS pixels height in landscape)
+// Below this, we apply additional mobile scaling
+const MOBILE_HEIGHT_THRESHOLD = 500;
+
+// Additional scale factor applied on mobile devices
+const MOBILE_SCALE_FACTOR = 0.85;
+
+/**
+ * Check if the current device appears to be a mobile device based on screen size.
+ * Uses screen height as primary indicator (mobile landscape is typically <500px).
+ * @returns {boolean} True if device appears to be mobile
+ */
+export function isMobileDevice() {
+    const screenHeight = getScreenHeight();
+    return screenHeight < MOBILE_HEIGHT_THRESHOLD;
+}
+
 /**
  * Calculate UI scale factor based on screen height.
- * Smaller screens get slightly smaller UI elements (but still touch-friendly).
- * @returns {number} Scale factor (typically 0.7 - 1.3)
+ * Smaller screens get smaller UI elements. Mobile devices get additional
+ * scaling to keep UI compact and touch-friendly without being oversized.
+ * @returns {number} Scale factor (typically 0.5 - 1.3)
  */
 export function getUIScale() {
     const screenHeight = getScreenHeight();
-    const scale = screenHeight / REFERENCE_HEIGHT;
-    return Math.max(MIN_UI_SCALE, Math.min(MAX_UI_SCALE, scale));
+    let scale = screenHeight / REFERENCE_HEIGHT;
+
+    // Clamp to valid range
+    scale = Math.max(MIN_UI_SCALE, Math.min(MAX_UI_SCALE, scale));
+
+    // Apply additional mobile scaling for small screens
+    // This helps keep UI proportional on phones where the natural scale
+    // (e.g., 400/800 = 0.5) would make elements too large relative to screen
+    if (isMobileDevice()) {
+        scale *= MOBILE_SCALE_FACTOR;
+        // Re-clamp after mobile adjustment
+        scale = Math.max(MIN_UI_SCALE, scale);
+    }
+
+    return scale;
 }
 
 /**

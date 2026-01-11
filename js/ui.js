@@ -15,7 +15,8 @@ import * as Tokens from './tokens.js';
 import { getScreenWidth, getScreenHeight } from './screenSize.js';
 import {
     fromLeft, fromRight, fromTop, fromBottom,
-    centerX, getUIScale, scaled, scaledTouch, isShortScreen, isVeryShortScreen
+    centerX, getUIScale, scaled, scaledTouch, isShortScreen, isVeryShortScreen,
+    isMobileDevice
 } from './uiPosition.js';
 
 // =============================================================================
@@ -88,14 +89,15 @@ function getHUDLayoutDynamic() {
     const screenHeight = getScreenHeight();
     const shortScreen = isShortScreen();
     const veryShortScreen = isVeryShortScreen();
+    const mobile = isMobileDevice();
 
-    // Calculate scaled dimensions
-    const healthBarWidth = scaled(HUD_BASE.HEALTH_BAR.WIDTH);
+    // Calculate scaled dimensions - use smaller sizes on mobile
+    const healthBarWidth = mobile ? scaled(HUD_BASE.HEALTH_BAR.WIDTH * 0.85) : scaled(HUD_BASE.HEALTH_BAR.WIDTH);
     const healthBarHeight = scaled(HUD_BASE.HEALTH_BAR.HEIGHT);
-    const healthBarPadding = scaled(HUD_BASE.HEALTH_BAR.PADDING);
+    const healthBarPadding = mobile ? scaled(HUD_BASE.HEALTH_BAR.PADDING * 0.7) : scaled(HUD_BASE.HEALTH_BAR.PADDING);
 
-    const playerPanelWidth = scaled(HUD_BASE.PLAYER_INFO_PANEL.WIDTH);
-    const panelPadding = scaled(HUD_BASE.PLAYER_INFO_PANEL.PADDING);
+    const playerPanelWidth = mobile ? scaled(HUD_BASE.PLAYER_INFO_PANEL.WIDTH * 0.85) : scaled(HUD_BASE.PLAYER_INFO_PANEL.WIDTH);
+    const panelPadding = mobile ? scaled(HUD_BASE.PLAYER_INFO_PANEL.PADDING * 0.8) : scaled(HUD_BASE.PLAYER_INFO_PANEL.PADDING);
 
     const moneyPanelWidth = scaled(HUD_BASE.MONEY_PANEL.WIDTH);
     const moneyPanelHeight = scaled(HUD_BASE.MONEY_PANEL.HEIGHT);
@@ -103,50 +105,60 @@ function getHUDLayoutDynamic() {
     const tokenPanelWidth = scaled(HUD_BASE.TOKEN_PANEL.WIDTH);
     const tokenPanelHeight = scaled(HUD_BASE.TOKEN_PANEL.HEIGHT);
 
-    const gameStatePanelWidth = Math.min(scaled(HUD_BASE.GAME_STATE_PANEL.WIDTH), screenWidth * 0.4);
-    const gameStatePanelMinHeight = veryShortScreen ? scaled(70) : shortScreen ? scaled(85) : scaled(HUD_BASE.GAME_STATE_PANEL.MIN_HEIGHT);
+    // Game state panel - more compact on mobile
+    const gameStatePanelWidth = mobile
+        ? Math.min(scaled(HUD_BASE.GAME_STATE_PANEL.WIDTH * 0.8), screenWidth * 0.45)
+        : Math.min(scaled(HUD_BASE.GAME_STATE_PANEL.WIDTH), screenWidth * 0.4);
+    const gameStatePanelMinHeight = mobile
+        ? scaled(65)
+        : veryShortScreen ? scaled(70) : shortScreen ? scaled(85) : scaled(HUD_BASE.GAME_STATE_PANEL.MIN_HEIGHT);
 
-    // Weapon bar: calculate based on available space - more compact on short screens
-    const fireButtonWidth = veryShortScreen ? scaledTouch(140) : scaledTouch(180);
-    const fireButtonOffset = veryShortScreen ? 90 : 130;  // Distance from right edge to fire button center
-    const weaponBarRightMargin = fireButtonOffset + fireButtonWidth / 2 + 20; // Gap from fire button
-    const weaponBarHeight = veryShortScreen ? scaledTouch(50) : scaledTouch(HUD_BASE.WEAPON_BAR.HEIGHT);
-    const arrowWidth = scaledTouch(HUD_BASE.WEAPON_BAR.ARROW_WIDTH);
-    const slotSize = veryShortScreen ? scaledTouch(50) : scaledTouch(HUD_BASE.WEAPON_BAR.SLOT_SIZE);
-    const slotGap = scaled(HUD_BASE.WEAPON_BAR.SLOT_GAP);
+    // Weapon bar: calculate based on available space - more compact on mobile/short screens
+    const fireButtonWidth = (mobile || veryShortScreen) ? scaledTouch(120, 36) : scaledTouch(180);
+    const fireButtonOffset = (mobile || veryShortScreen) ? 75 : 130;  // Distance from right edge to fire button center
+    const weaponBarRightMargin = fireButtonOffset + fireButtonWidth / 2 + 15; // Gap from fire button
+    const weaponBarHeight = (mobile || veryShortScreen) ? scaledTouch(44, 36) : scaledTouch(HUD_BASE.WEAPON_BAR.HEIGHT);
+    const arrowWidth = mobile ? scaledTouch(36, 32) : scaledTouch(HUD_BASE.WEAPON_BAR.ARROW_WIDTH);
+    const slotSize = (mobile || veryShortScreen) ? scaledTouch(44, 36) : scaledTouch(HUD_BASE.WEAPON_BAR.SLOT_SIZE);
+    const slotGap = mobile ? scaled(HUD_BASE.WEAPON_BAR.SLOT_GAP * 0.6) : scaled(HUD_BASE.WEAPON_BAR.SLOT_GAP);
 
     // Calculate visible slots based on available width
-    const availableWidth = screenWidth - weaponBarRightMargin - fromLeft(20);
+    const availableWidth = screenWidth - weaponBarRightMargin - fromLeft(mobile ? 10 : 20);
     const slotAndArrowSpace = availableWidth - arrowWidth * 2 - scaled(HUD_BASE.WEAPON_BAR.PADDING) * 2;
     const visibleSlots = Math.max(3, Math.min(6, Math.floor(slotAndArrowSpace / (slotSize + slotGap))));
     const weaponBarWidth = arrowWidth * 2 + visibleSlots * slotSize + (visibleSlots - 1) * slotGap + scaled(HUD_BASE.WEAPON_BAR.PADDING) * 2;
+
+    // Vertical position offsets for mobile
+    const topOffset = mobile ? 8 : 12;
+    const topYScale = mobile ? 45 : 55;
+    const bottomOffset = mobile ? 35 : (veryShortScreen ? 45 : 75);
 
     return {
         HEALTH_BAR: {
             WIDTH: healthBarWidth,
             HEIGHT: healthBarHeight,
             PADDING: healthBarPadding,
-            Y: fromTop(55 * scale),  // Below wind indicator and round indicator
+            Y: fromTop(topYScale * scale),  // Below wind indicator and round indicator
             BORDER_RADIUS: 4
         },
         PLAYER_INFO_PANEL: {
-            X: fromLeft(20),
-            Y: fromTop(55 * scale),  // Aligned with enemy health bar Y position
+            X: fromLeft(mobile ? 10 : 20),
+            Y: fromTop(topYScale * scale),  // Aligned with enemy health bar Y position
             WIDTH: playerPanelWidth,
             PADDING: panelPadding,
             SECTION_GAP: scaled(HUD_BASE.PLAYER_INFO_PANEL.SECTION_GAP),
             HEALTH_BAR_HEIGHT: scaled(HUD_BASE.PLAYER_INFO_PANEL.HEALTH_BAR_HEIGHT),
-            BORDER_RADIUS: 10
+            BORDER_RADIUS: mobile ? 8 : 10
         },
         MONEY_PANEL: {
-            X: fromRight(20),
+            X: fromRight(mobile ? 10 : 20),
             Y: fromBottom(50),
             WIDTH: moneyPanelWidth,
             HEIGHT: moneyPanelHeight,
             PADDING: scaled(HUD_BASE.MONEY_PANEL.PADDING)
         },
         TOKEN_PANEL: {
-            X: fromRight(20 + moneyPanelWidth + 10),  // Left of money panel with gap
+            X: fromRight((mobile ? 10 : 20) + moneyPanelWidth + 10),  // Left of money panel with gap
             Y: fromBottom(50),
             WIDTH: tokenPanelWidth,
             HEIGHT: tokenPanelHeight,
@@ -154,34 +166,34 @@ function getHUDLayoutDynamic() {
         },
         TURN_INDICATOR: {
             X: centerX(),
-            Y: fromTop(20),
+            Y: fromTop(mobile ? 15 : 20),
             WIDTH: scaled(HUD_BASE.TURN_INDICATOR.WIDTH),
             HEIGHT: scaled(HUD_BASE.TURN_INDICATOR.HEIGHT)
         },
         GAME_STATE_PANEL: {
             X: centerX(),  // Center X
-            Y: fromTop(12),
+            Y: fromTop(topOffset),
             WIDTH: gameStatePanelWidth,
             MIN_HEIGHT: gameStatePanelMinHeight,
-            PADDING: scaled(HUD_BASE.GAME_STATE_PANEL.PADDING),
-            BORDER_RADIUS: 12,
+            PADDING: scaled(HUD_BASE.GAME_STATE_PANEL.PADDING * (mobile ? 0.7 : 1)),
+            BORDER_RADIUS: mobile ? 8 : 12,
             WIND_BAR: {
-                HEIGHT: scaled(HUD_BASE.GAME_STATE_PANEL.WIND_BAR.HEIGHT),
-                MARGIN_TOP: scaled(HUD_BASE.GAME_STATE_PANEL.WIND_BAR.MARGIN_TOP),
+                HEIGHT: scaled(HUD_BASE.GAME_STATE_PANEL.WIND_BAR.HEIGHT * (mobile ? 0.8 : 1)),
+                MARGIN_TOP: scaled(HUD_BASE.GAME_STATE_PANEL.WIND_BAR.MARGIN_TOP * (mobile ? 0.6 : 1)),
                 ARROW_MIN_LENGTH: scaled(HUD_BASE.GAME_STATE_PANEL.WIND_BAR.ARROW_MIN_LENGTH),
-                ARROW_MAX_LENGTH: scaled(HUD_BASE.GAME_STATE_PANEL.WIND_BAR.ARROW_MAX_LENGTH)
+                ARROW_MAX_LENGTH: scaled(HUD_BASE.GAME_STATE_PANEL.WIND_BAR.ARROW_MAX_LENGTH * (mobile ? 0.7 : 1))
             }
         },
         WEAPON_BAR: {
             X: (screenWidth - weaponBarWidth) / 2,  // Horizontally centered
-            Y: fromBottom(veryShortScreen ? 45 : 75),  // Closer to bottom on short screens
+            Y: fromBottom(bottomOffset),  // Closer to bottom on mobile/short screens
             HEIGHT: weaponBarHeight,
             WIDTH: weaponBarWidth,
             ARROW_WIDTH: arrowWidth,
             SLOT_SIZE: slotSize,
             SLOT_GAP: slotGap,
-            PADDING: scaled(HUD_BASE.WEAPON_BAR.PADDING),
-            BORDER_RADIUS: 12,
+            PADDING: scaled(HUD_BASE.WEAPON_BAR.PADDING * (mobile ? 0.7 : 1)),
+            BORDER_RADIUS: mobile ? 8 : 12,
             VISIBLE_SLOTS: visibleSlots
         }
     };
@@ -501,45 +513,48 @@ function renderTurnIndicatorInPanel(ctx, bounds, turnPhase, shooter, currentRoun
 
     // Calculate center position in panel
     const centerX = bounds.x + bounds.width / 2;
-    // Position turn indicator near the top of the panel
-    const turnY = bounds.y + 24;
+    // Position turn indicator near the top of the panel - scaled for mobile
+    const mobile = isMobileDevice();
+    const turnY = bounds.y + (mobile ? 18 : 24);
 
     // Pulsing glow effect
     const pulse = Math.sin(animationTime * 3) * 0.2 + 0.8;
 
-    // Large, prominent font for turn indicator
-    ctx.font = `bold 24px ${UI.FONT_FAMILY}`;
+    // Large, prominent font for turn indicator - smaller on mobile
+    const turnFontSize = mobile ? 18 : 24;
+    ctx.font = `bold ${turnFontSize}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
     // Multi-layer glow effect for synthwave aesthetic
     // Outer glow (larger, more diffuse)
     ctx.shadowColor = glowColor;
-    ctx.shadowBlur = 20 * pulse;
+    ctx.shadowBlur = (mobile ? 14 : 20) * pulse;
     ctx.fillStyle = glowColor;
     ctx.fillText(text, centerX, turnY);
 
     // Middle glow layer
-    ctx.shadowBlur = 10 * pulse;
+    ctx.shadowBlur = (mobile ? 7 : 10) * pulse;
     ctx.fillText(text, centerX, turnY);
 
     // Inner bright text
-    ctx.shadowBlur = 4;
+    ctx.shadowBlur = mobile ? 3 : 4;
     ctx.fillStyle = '#ffffff';
     ctx.fillText(text, centerX, turnY);
 
     // Render round and difficulty info below turn indicator
-    const roundY = turnY + 20; // Position below turn text
+    const roundY = turnY + (mobile ? 15 : 20); // Position below turn text
     const roundText = `ROUND ${currentRound} | ${difficulty.toUpperCase()}`;
 
-    // Smaller font for round/difficulty
-    ctx.font = `bold 12px ${UI.FONT_FAMILY}`;
+    // Smaller font for round/difficulty - scaled for mobile
+    const roundFontSize = mobile ? 10 : 12;
+    ctx.font = `bold ${roundFontSize}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
     // Subtle glow for round info (less intense than turn indicator)
     ctx.shadowColor = COLORS.NEON_CYAN;
-    ctx.shadowBlur = 4;
+    ctx.shadowBlur = mobile ? 3 : 4;
     ctx.fillStyle = COLORS.TEXT_MUTED;
     ctx.fillText(roundText, centerX, roundY);
 
@@ -612,12 +627,14 @@ function renderWindBarInPanel(ctx, bounds, roundY) {
     // WIND NUMERICAL VALUE BELOW BAR
     // ==========================================================================
 
-    const windLabelY = barY + barHeight + 12; // Position below the bar
+    const mobileWind = isMobileDevice();
+    const windLabelY = barY + barHeight + (mobileWind ? 9 : 12); // Position below the bar
     const windValue = Math.abs(Math.round(currentWind));
 
     ctx.save();
 
-    ctx.font = `bold 11px ${UI.FONT_FAMILY}`;
+    const windFontSize = mobileWind ? 9 : 11;
+    ctx.font = `bold ${windFontSize}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
@@ -629,7 +646,7 @@ function renderWindBarInPanel(ctx, bounds, roundY) {
         // Add subtle glow for non-zero wind
         const labelColor = currentWind > 0 ? COLORS.NEON_PINK : COLORS.NEON_CYAN;
         ctx.shadowColor = labelColor;
-        ctx.shadowBlur = 4;
+        ctx.shadowBlur = mobileWind ? 3 : 4;
         ctx.fillStyle = COLORS.TEXT_LIGHT;
         ctx.fillText(`WIND ${windValue}`, bounds.x + bounds.width / 2, windLabelY);
     }

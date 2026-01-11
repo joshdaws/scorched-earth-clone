@@ -18,7 +18,7 @@ import * as Wind from './wind.js';
 import { getScreenWidth, getScreenHeight } from './screenSize.js';
 import {
     fromRight, fromBottom,
-    scaled, scaledTouch, isVeryShortScreen
+    scaled, scaledTouch, isVeryShortScreen, isMobileDevice
 } from './uiPosition.js';
 
 // =============================================================================
@@ -59,19 +59,25 @@ const CONTROLS_BASE = {
  */
 function getControlsLayoutDynamic() {
     const veryShortScreen = isVeryShortScreen();
+    const mobile = isMobileDevice();
 
-    // Smaller fire button on very short screens
-    const fireButtonWidth = veryShortScreen
-        ? scaledTouch(140)  // Smaller but still touch-friendly
+    // Smaller fire button on mobile/very short screens - use smaller min sizes on mobile
+    const compactMode = mobile || veryShortScreen;
+    const fireButtonWidth = compactMode
+        ? scaledTouch(110, 36)  // Smaller but still touch-friendly, lower min on mobile
         : scaledTouch(CONTROLS_BASE.FIRE_BUTTON.WIDTH);
-    const fireButtonHeight = veryShortScreen
-        ? scaledTouch(50)   // Smaller height
+    const fireButtonHeight = compactMode
+        ? scaledTouch(44, 36)   // Smaller height, matches Apple HIG minimum
         : scaledTouch(CONTROLS_BASE.FIRE_BUTTON.HEIGHT);
 
-    // Fire button position: from right and bottom edges - closer to bottom on short screens
-    const fireButtonBottomOffset = veryShortScreen ? 50 : scaled(CONTROLS_BASE.FIRE_BUTTON.BOTTOM_OFFSET);
-    const fireButtonX = fromRight(veryShortScreen ? 90 : scaled(CONTROLS_BASE.FIRE_BUTTON.RIGHT_OFFSET));
+    // Fire button position: from right and bottom edges - closer to edges on mobile
+    const fireButtonBottomOffset = compactMode ? 40 : scaled(CONTROLS_BASE.FIRE_BUTTON.BOTTOM_OFFSET);
+    const fireButtonRightOffset = compactMode ? 70 : scaled(CONTROLS_BASE.FIRE_BUTTON.RIGHT_OFFSET);
+    const fireButtonX = fromRight(fireButtonRightOffset);
     const fireButtonY = fromBottom(fireButtonBottomOffset);
+
+    // Scale factors for mobile
+    const mobileScale = mobile ? 0.75 : 1;
 
     return {
         FIRE_BUTTON: {
@@ -79,19 +85,19 @@ function getControlsLayoutDynamic() {
             Y: fireButtonY,
             WIDTH: fireButtonWidth,
             HEIGHT: fireButtonHeight,
-            BORDER_RADIUS: scaled(CONTROLS_BASE.FIRE_BUTTON.BORDER_RADIUS)
+            BORDER_RADIUS: scaled(CONTROLS_BASE.FIRE_BUTTON.BORDER_RADIUS * (mobile ? 0.7 : 1))
         },
         ANGLE_ARC: {
-            RADIUS: scaled(CONTROLS_BASE.ANGLE_ARC.RADIUS),
-            ARC_WIDTH: scaled(CONTROLS_BASE.ANGLE_ARC.ARC_WIDTH),
-            TICK_LENGTH: scaled(CONTROLS_BASE.ANGLE_ARC.TICK_LENGTH),
-            TOUCH_RADIUS: scaled(CONTROLS_BASE.ANGLE_ARC.TOUCH_RADIUS)
+            RADIUS: scaled(CONTROLS_BASE.ANGLE_ARC.RADIUS * mobileScale),
+            ARC_WIDTH: scaled(CONTROLS_BASE.ANGLE_ARC.ARC_WIDTH * mobileScale),
+            TICK_LENGTH: scaled(CONTROLS_BASE.ANGLE_ARC.TICK_LENGTH * mobileScale),
+            TOUCH_RADIUS: scaled(CONTROLS_BASE.ANGLE_ARC.TOUCH_RADIUS)  // Keep touch area same for usability
         },
         TRAJECTORY: {
             MAX_POINTS: CONTROLS_BASE.TRAJECTORY.MAX_POINTS,
             STEP_TIME: CONTROLS_BASE.TRAJECTORY.STEP_TIME,
-            DOT_SPACING: scaled(CONTROLS_BASE.TRAJECTORY.DOT_SPACING),
-            DOT_RADIUS: scaled(CONTROLS_BASE.TRAJECTORY.DOT_RADIUS),
+            DOT_SPACING: scaled(CONTROLS_BASE.TRAJECTORY.DOT_SPACING * mobileScale),
+            DOT_RADIUS: scaled(CONTROLS_BASE.TRAJECTORY.DOT_RADIUS * mobileScale),
             FADE_START: CONTROLS_BASE.TRAJECTORY.FADE_START,
             PREVIEW_PERCENT: CONTROLS_BASE.TRAJECTORY.PREVIEW_PERCENT
         }
