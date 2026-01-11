@@ -1059,50 +1059,55 @@ function renderMenu(ctx) {
     renderMenuButton(ctx, menuButtons.supplyDrop, pulseIntensity);
     renderMenuButton(ctx, menuButtons.options, pulseIntensity);
 
-    // Token balance display - top left corner with coin icon (like design reference)
+    // Token balance display - top left corner with neon box (matching start-redesign reference)
     const tokenBalance = Tokens.getTokenBalance();
     const tokenPadding = isCompact ? 15 : 25;
     const tokenFontSize = isCompact ? UI.FONT_SIZE_SMALL : UI.FONT_SIZE_MEDIUM;
+    const tokenCardWidth = isCompact ? 75 : 90;
+    const tokenCardHeight = isCompact ? 50 : 60;
 
     ctx.save();
-    // Token background pill
-    const tokenText = `${tokenBalance}`;
-    ctx.font = `bold ${tokenFontSize}px ${UI.FONT_FAMILY}`;
-    const tokenTextWidth = ctx.measureText(tokenText + ' TOKENS').width;
-    const pillWidth = tokenTextWidth + 40;
-    const pillHeight = isCompact ? 28 : 34;
-    const pillX = tokenPadding;
-    const pillY = tokenPadding;
-
-    // Draw pill background
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    
+    // Card background with neon border (like Best Run box)
+    ctx.fillStyle = 'rgba(10, 10, 26, 0.85)';
     ctx.beginPath();
-    ctx.roundRect(pillX, pillY, pillWidth, pillHeight, pillHeight / 2);
+    ctx.roundRect(tokenPadding, tokenPadding, tokenCardWidth, tokenCardHeight, 8);
     ctx.fill();
 
-    // Coin icon (circle with outline)
-    const coinRadius = (pillHeight / 2) - 4;
-    const coinX = pillX + pillHeight / 2;
-    const coinY = pillY + pillHeight / 2;
+    // Neon border with cyan glow effect
+    ctx.strokeStyle = COLORS.NEON_CYAN;
+    ctx.lineWidth = 2;
+    ctx.shadowColor = COLORS.NEON_CYAN;
+    ctx.shadowBlur = 8;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Coin icon (circle with glow) - positioned on left side
+    const coinRadius = isCompact ? 8 : 10;
+    const coinX = tokenPadding + 18;
+    const coinY = tokenPadding + tokenCardHeight / 2 - 2;
 
     ctx.fillStyle = '#F59E0B';
     ctx.shadowColor = '#F59E0B';
-    ctx.shadowBlur = 4;
+    ctx.shadowBlur = 6;
     ctx.beginPath();
     ctx.arc(coinX, coinY, coinRadius, 0, Math.PI * 2);
     ctx.fill();
     ctx.shadowBlur = 0;
 
-    // Token text
+    // Token count - large number next to coin
     ctx.fillStyle = '#ffffff';
+    ctx.font = `bold ${tokenFontSize + 2}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.fillText(`${tokenBalance}`, pillX + pillHeight + 4, pillY + pillHeight / 2);
+    ctx.fillText(`${tokenBalance}`, coinX + coinRadius + 8, coinY);
 
+    // "TOKENS" label - below the coin/number row
     ctx.fillStyle = '#888899';
-    ctx.font = `${tokenFontSize - 2}px ${UI.FONT_FAMILY}`;
-    const numberWidth = ctx.measureText(`${tokenBalance}`).width;
-    ctx.fillText('TOKENS', pillX + pillHeight + 8 + numberWidth, pillY + pillHeight / 2);
+    ctx.font = `${isCompact ? 9 : 11}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText('TOKENS', tokenPadding + tokenCardWidth / 2, tokenPadding + tokenCardHeight - 6);
     ctx.restore();
 
     // Best run display - bottom left corner as a styled card
