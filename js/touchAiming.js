@@ -141,6 +141,9 @@ function isNearTank(x, y, tank) {
  * The angle is inverted from the drag direction (slingshot style).
  * Dragging down-right aims up-left, etc.
  *
+ * Key insight: The trajectory should always be exactly 180° opposite from the pull direction.
+ * This means the angle displayed should match where the projectile will go, not the pull direction.
+ *
  * @param {number} startX - Drag start X (near tank)
  * @param {number} startY - Drag start Y (near tank)
  * @param {number} currentX - Current drag X
@@ -155,17 +158,40 @@ function calculateAngleFromDrag(startX, startY, currentX, currentY, tank) {
     const dragX = currentX - startX;
     const dragY = currentY - startY;
 
-    // Invert the drag direction for slingshot effect
-    // Dragging down-right should aim up-left
-    const aimX = -dragX;
-    const aimY = -dragY;
+    // If drag is too small, maintain current angle
+    const dragLen = Math.sqrt(dragX * dragX + dragY * dragY);
+    if (dragLen < TOUCH_AIM.MIN_DRAG_DISTANCE) {
+        return tank.angle;
+    }
 
-    // Calculate angle (0 = right, 90 = up, 180 = left)
-    // Canvas Y is inverted, so we use aimY directly (negative Y = up)
-    let angle = Math.atan2(-aimY, aimX) * (180 / Math.PI);
+    // For slingshot aiming, we want the fire direction to be opposite to pull direction.
+    // Pull direction: (dragX, dragY)
+    // Fire direction: (-dragX, -dragY)
+    //
+    // We need to calculate the angle of the fire direction in standard artillery coordinates:
+    // - 0° = firing right (positive X)
+    // - 90° = firing straight up (negative Y in screen coords)
+    // - 180° = firing left (negative X)
+    //
+    // The fire vector is (-dragX, -dragY)
+    // In screen coords, Y increases downward, so for atan2 we need to flip Y
+    // Fire angle = atan2(-fireY, fireX) = atan2(-(-dragY), -dragX) = atan2(dragY, -dragX)
 
-    // Clamp to valid range (0-180)
-    angle = Math.max(PHYSICS.MIN_ANGLE, Math.min(PHYSICS.MAX_ANGLE, angle));
+    let angle = Math.atan2(dragY, -dragX) * (180 / Math.PI);
+
+    // atan2 returns -180 to 180. We need 0 to 180 for valid firing angles.
+    // Angles outside this range mean the user is trying to fire "downward" which is invalid.
+    //
+    // When angle < 0: user pulled up-left of center, trying to fire down-right (invalid)
+    //   -> clamp to 0° (rightmost valid angle)
+    // When angle > 180: user pulled up-right of center, trying to fire down-left (invalid)
+    //   -> clamp to 180° (leftmost valid angle)
+
+    if (angle < PHYSICS.MIN_ANGLE) {
+        angle = PHYSICS.MIN_ANGLE;
+    } else if (angle > PHYSICS.MAX_ANGLE) {
+        angle = PHYSICS.MAX_ANGLE;
+    }
 
     return angle;
 }
