@@ -49,6 +49,14 @@ bd update <issue-id> --status in_progress
 
 Use `bd show <issue-id>` to see full details and acceptance criteria.
 
+**IMPORTANT: READ THE COMMENTS!** The `bd show` output includes a Comments section at the bottom. Comments often contain:
+- Design references and mockups
+- Additional requirements not in the main description
+- Clarifications from the issue creator
+- Links to spec files or images
+
+**Do NOT skip the comments section.** If there are comments, read them carefully - they may contain critical information for completing the issue correctly.
+
 ### STEP 2: Research
 
 Before making changes, search the codebase to verify the item needs work (don't assume).
