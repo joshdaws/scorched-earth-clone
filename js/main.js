@@ -350,10 +350,27 @@ function calculateMenuLayout(height, width) {
     // Determine if we're on a compact screen (phone-sized)
     const isCompact = height < 500;
 
+    // Calculate title scale FIRST since it affects titleAreaHeight
+    // "SCORCHED" at 120px is approximately 850px wide (including 3D extrusion and effects)
+    const titleMaxWidth = 850;  // Approximate width of "SCORCHED" at base font size
+    const titleMinMargin = 40;  // Minimum horizontal margin on each side
+    const titleAvailableWidth = width - (titleMinMargin * 2);
+    
+    // Scale based on width when viewport is too narrow for full-size title
+    const widthBasedTitleScale = Math.min(1, titleAvailableWidth / titleMaxWidth);
+    
+    // Scale based on height for compact screens (phones)
+    const heightBasedTitleScale = isCompact ? Math.max(0.5, height / 800) : 1;
+    
+    // Use the smaller of the two scales to ensure title fits both dimensions
+    // Clamp between 0.4 (minimum readable) and 1.0 (maximum, current size)
+    const titleScale = Math.max(0.4, Math.min(widthBasedTitleScale, heightBasedTitleScale));
+
     // Title area - accounts for title text above buttons (SCORCHED, EARTH, SYNTHWAVE EDITION)
-    // Non-compact: subtitle at Y=300 with ~40px font, so bottom is ~340
-    // Compact: subtitle at Y=260, so bottom is ~290
-    const titleAreaHeight = isCompact ? 280 : 360;
+    // Base values: subtitle at Y=300 with ~44px font, so bottom is ~340 (non-compact)
+    // Scale the title area based on titleScale to match the scaled title positions
+    const baseTitleAreaHeight = isCompact ? 280 : 360;
+    const titleAreaHeight = Math.round(baseTitleAreaHeight * titleScale);
 
     // Footer area - for hint text and stats
     const footerAreaHeight = isCompact ? 40 : 80;
@@ -415,9 +432,6 @@ function calculateMenuLayout(height, width) {
     const bottomThirdTop = Math.max(minButtonsTop, height * 0.55);  // Top of bottom 45%
     const bottomThirdCenter = (bottomThirdTop + buttonsAreaBottom) / 2;
     const startY = bottomThirdCenter - actualTotalHeight / 2 + primaryHeight / 2;
-
-    // Title scale for compact screens
-    const titleScale = isCompact ? Math.max(0.5, height / 800) : 1;
 
     return {
         primaryHeight,
@@ -1048,10 +1062,16 @@ function renderMenu(ctx) {
 
     // Title positioning - split into "SCORCHED" and "EARTH" on separate lines
     // to match design reference (start-redesign.png) with chrome synthwave effect
-    // Y positions doubled for larger title text
-    const scorchedY = isCompact ? 100 : 120;
-    const earthY = isCompact ? 190 : 220;
-    const subtitleY = isCompact ? 260 : 300;
+    // Base Y positions (at full scale), then scaled proportionally
+    const baseScorchedY = isCompact ? 100 : 120;
+    const baseEarthY = isCompact ? 190 : 220;
+    const baseSubtitleY = isCompact ? 260 : 300;
+    
+    // Scale Y positions proportionally with titleScale to maintain visual balance
+    // The title block should shrink as a unit, not just the font sizes
+    const scorchedY = Math.round(baseScorchedY * titleScale);
+    const earthY = Math.round(baseEarthY * titleScale);
+    const subtitleY = Math.round(baseSubtitleY * titleScale);
 
     // Font sizes - "SCORCHED" is larger, "EARTH" slightly smaller (using Audiowide font)
     // Font sizes doubled for greater visual impact
