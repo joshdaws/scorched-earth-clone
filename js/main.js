@@ -271,72 +271,84 @@ const MENU_BUTTON_STYLES = {
  * Color scheme per design: left column = cyan, right column = pink, START GAME = gold, OPTIONS = white
  */
 const menuButtons = {
-    start: {
+    start: new Button({
+        text: 'START GAME',
         x: CANVAS.DESIGN_WIDTH / 2,
         y: CANVAS.DESIGN_HEIGHT / 2 - 30,
         width: 350,  // Wide primary button
         height: 50,
-        text: 'START GAME',
-        style: MENU_BUTTON_STYLES.PRIMARY,
-        enabled: true,
-        row: 0,  // First row - centered
-        position: 'center'
-    },
-    highScores: {
+        fontSize: UI.FONT_SIZE_LARGE,
+        bgColor: MENU_BUTTON_STYLES.PRIMARY.bgColor,
+        borderColor: MENU_BUTTON_STYLES.PRIMARY.borderColor,
+        textColor: MENU_BUTTON_STYLES.PRIMARY.textColor,
+        glowColor: MENU_BUTTON_STYLES.PRIMARY.glowColor,
+        autoSize: false
+    }),
+    highScores: new Button({
+        text: 'HIGH SCORES',
         x: CANVAS.DESIGN_WIDTH / 2,
         y: CANVAS.DESIGN_HEIGHT / 2 + 30,
         width: 180,  // Half-width for paired buttons
         height: 45,
-        text: 'HIGH SCORES',
-        style: MENU_BUTTON_STYLES.CYAN,  // Left column = cyan
-        enabled: true,
-        row: 1,  // Second row - left
-        position: 'left'
-    },
-    achievements: {
+        fontSize: UI.FONT_SIZE_MEDIUM,
+        bgColor: MENU_BUTTON_STYLES.CYAN.bgColor,
+        borderColor: MENU_BUTTON_STYLES.CYAN.borderColor,
+        textColor: MENU_BUTTON_STYLES.CYAN.textColor,
+        glowColor: MENU_BUTTON_STYLES.CYAN.glowColor,
+        autoSize: false
+    }),
+    achievements: new Button({
+        text: 'ACHIEVEMENTS',
         x: CANVAS.DESIGN_WIDTH / 2,
         y: CANVAS.DESIGN_HEIGHT / 2 + 30,
         width: 180,
         height: 45,
-        text: 'ACHIEVEMENTS',
-        style: MENU_BUTTON_STYLES.PINK,  // Right column = pink
-        enabled: true,
-        row: 1,  // Second row - right
-        position: 'right'
-    },
-    collection: {
-        x: CANVAS.DESIGN_WIDTH / 2,
-        y: CANVAS.DESIGN_HEIGHT / 2 + 90,
-        width: 180,
-        height: 45,
+        fontSize: UI.FONT_SIZE_MEDIUM,
+        bgColor: MENU_BUTTON_STYLES.PINK.bgColor,
+        borderColor: MENU_BUTTON_STYLES.PINK.borderColor,
+        textColor: MENU_BUTTON_STYLES.PINK.textColor,
+        glowColor: MENU_BUTTON_STYLES.PINK.glowColor,
+        autoSize: false
+    }),
+    collection: new Button({
         text: 'COLLECTION',
-        style: MENU_BUTTON_STYLES.CYAN,  // Left column = cyan
-        enabled: true,
-        row: 2,  // Third row - left
-        position: 'left'
-    },
-    supplyDrop: {
         x: CANVAS.DESIGN_WIDTH / 2,
         y: CANVAS.DESIGN_HEIGHT / 2 + 90,
         width: 180,
         height: 45,
+        fontSize: UI.FONT_SIZE_MEDIUM,
+        bgColor: MENU_BUTTON_STYLES.CYAN.bgColor,
+        borderColor: MENU_BUTTON_STYLES.CYAN.borderColor,
+        textColor: MENU_BUTTON_STYLES.CYAN.textColor,
+        glowColor: MENU_BUTTON_STYLES.CYAN.glowColor,
+        autoSize: false
+    }),
+    supplyDrop: new Button({
         text: 'SUPPLY DROPS',
-        style: MENU_BUTTON_STYLES.PINK,  // Right column = pink
-        enabled: true,
-        row: 2,  // Third row - right
-        position: 'right'
-    },
-    options: {
+        x: CANVAS.DESIGN_WIDTH / 2,
+        y: CANVAS.DESIGN_HEIGHT / 2 + 90,
+        width: 180,
+        height: 45,
+        fontSize: UI.FONT_SIZE_MEDIUM,
+        bgColor: MENU_BUTTON_STYLES.PINK.bgColor,
+        borderColor: MENU_BUTTON_STYLES.PINK.borderColor,
+        textColor: MENU_BUTTON_STYLES.PINK.textColor,
+        glowColor: MENU_BUTTON_STYLES.PINK.glowColor,
+        autoSize: false
+    }),
+    options: new Button({
+        text: 'OPTIONS',
         x: CANVAS.DESIGN_WIDTH / 2,
         y: CANVAS.DESIGN_HEIGHT / 2 + 150,
         width: 200,
         height: 45,
-        text: 'OPTIONS',
-        style: MENU_BUTTON_STYLES.DARK,  // White outline
-        enabled: true,
-        row: 3,  // Fourth row - centered
-        position: 'center'
-    }
+        fontSize: UI.FONT_SIZE_MEDIUM,
+        bgColor: MENU_BUTTON_STYLES.DARK.bgColor,
+        borderColor: MENU_BUTTON_STYLES.DARK.borderColor,
+        textColor: MENU_BUTTON_STYLES.DARK.textColor,
+        glowColor: MENU_BUTTON_STYLES.DARK.glowColor,
+        autoSize: false
+    })
 };
 
 /**
@@ -471,49 +483,37 @@ function updateMenuButtonPositions() {
     currentMenuLayout = layout;
 
     // Row 0: START GAME (centered, wide)
-    menuButtons.start.x = centerX;
-    menuButtons.start.y = layout.startY;
-    menuButtons.start.width = layout.primaryWidth;
-    menuButtons.start.height = layout.primaryHeight;
+    menuButtons.start.setPosition(centerX, layout.startY);
+    menuButtons.start.setSize(layout.primaryWidth, layout.primaryHeight);
     menuButtons.start.fontSize = layout.primaryFontSize;
 
     // Row 1: HIGH SCORES (left) and ACHIEVEMENTS (right)
     const row1Y = layout.startY + layout.rowSpacing;
     const pairOffset = (layout.pairedWidth + layout.pairGap) / 2;
 
-    menuButtons.highScores.x = centerX - pairOffset;
-    menuButtons.highScores.y = row1Y;
-    menuButtons.highScores.width = layout.pairedWidth;
-    menuButtons.highScores.height = layout.secondaryHeight;
+    menuButtons.highScores.setPosition(centerX - pairOffset, row1Y);
+    menuButtons.highScores.setSize(layout.pairedWidth, layout.secondaryHeight);
     menuButtons.highScores.fontSize = layout.secondaryFontSize;
 
-    menuButtons.achievements.x = centerX + pairOffset;
-    menuButtons.achievements.y = row1Y;
-    menuButtons.achievements.width = layout.pairedWidth;
-    menuButtons.achievements.height = layout.secondaryHeight;
+    menuButtons.achievements.setPosition(centerX + pairOffset, row1Y);
+    menuButtons.achievements.setSize(layout.pairedWidth, layout.secondaryHeight);
     menuButtons.achievements.fontSize = layout.secondaryFontSize;
 
     // Row 2: COLLECTION (left) and SUPPLY DROPS (right)
     const row2Y = layout.startY + layout.rowSpacing * 2;
 
-    menuButtons.collection.x = centerX - pairOffset;
-    menuButtons.collection.y = row2Y;
-    menuButtons.collection.width = layout.pairedWidth;
-    menuButtons.collection.height = layout.secondaryHeight;
+    menuButtons.collection.setPosition(centerX - pairOffset, row2Y);
+    menuButtons.collection.setSize(layout.pairedWidth, layout.secondaryHeight);
     menuButtons.collection.fontSize = layout.secondaryFontSize;
 
-    menuButtons.supplyDrop.x = centerX + pairOffset;
-    menuButtons.supplyDrop.y = row2Y;
-    menuButtons.supplyDrop.width = layout.pairedWidth;
-    menuButtons.supplyDrop.height = layout.secondaryHeight;
+    menuButtons.supplyDrop.setPosition(centerX + pairOffset, row2Y);
+    menuButtons.supplyDrop.setSize(layout.pairedWidth, layout.secondaryHeight);
     menuButtons.supplyDrop.fontSize = layout.secondaryFontSize;
 
     // Row 3: OPTIONS (centered)
     const row3Y = layout.startY + layout.rowSpacing * 3;
-    menuButtons.options.x = centerX;
-    menuButtons.options.y = row3Y;
-    menuButtons.options.width = layout.optionsWidth;
-    menuButtons.options.height = layout.secondaryHeight;
+    menuButtons.options.setPosition(centerX, row3Y);
+    menuButtons.options.setSize(layout.optionsWidth, layout.secondaryHeight);
     menuButtons.options.fontSize = layout.secondaryFontSize;
 }
 
@@ -559,7 +559,7 @@ function isInsideButton(x, y, button) {
  * @returns {boolean} True if point is inside button
  */
 function isInsideStartButton(x, y) {
-    return isInsideButton(x, y, menuButtons.start);
+    return menuButtons.start.containsPoint(x, y);
 }
 
 /**
@@ -584,36 +584,36 @@ function handleMenuClick(pos) {
     // Ensure button positions are current for the screen size
     updateMenuButtonPositions();
 
-    if (isInsideButton(pos.x, pos.y, menuButtons.start)) {
+    if (menuButtons.start.containsPoint(pos.x, pos.y)) {
         // Play click sound
         Sound.playClickSound();
         // Start fade-out transition, then go to DIFFICULTY_SELECT state
         startMenuTransition(GAME_STATES.DIFFICULTY_SELECT);
-    } else if (isInsideButton(pos.x, pos.y, menuButtons.highScores)) {
+    } else if (menuButtons.highScores.containsPoint(pos.x, pos.y)) {
         // Play click sound
         Sound.playClickSound();
         // Go to HIGH_SCORES state
         Game.setState(GAME_STATES.HIGH_SCORES);
-    } else if (isInsideButton(pos.x, pos.y, menuButtons.achievements)) {
+    } else if (menuButtons.achievements.containsPoint(pos.x, pos.y)) {
         // Play click sound
         Sound.playClickSound();
         // Mark achievements as viewed when opening the screen
         markAllAchievementsViewed();
         // Go to ACHIEVEMENTS state
         Game.setState(GAME_STATES.ACHIEVEMENTS);
-    } else if (isInsideButton(pos.x, pos.y, menuButtons.collection)) {
+    } else if (menuButtons.collection.containsPoint(pos.x, pos.y)) {
         // Play click sound
         Sound.playClickSound();
         // Mark new tanks as viewed when opening collection
         TankCollection.markAllTanksViewed();
         // Go to COLLECTION state
         Game.setState(GAME_STATES.COLLECTION);
-    } else if (isInsideButton(pos.x, pos.y, menuButtons.supplyDrop)) {
+    } else if (menuButtons.supplyDrop.containsPoint(pos.x, pos.y)) {
         // Play click sound
         Sound.playClickSound();
         // Go to SUPPLY_DROP state
         Game.setState(GAME_STATES.SUPPLY_DROP);
-    } else if (isInsideButton(pos.x, pos.y, menuButtons.options) && menuButtons.options.enabled) {
+    } else if (menuButtons.options.containsPoint(pos.x, pos.y) && !menuButtons.options.disabled) {
         // Play click sound
         Sound.playClickSound();
         // Show options overlay with volume controls
@@ -1093,13 +1093,13 @@ function renderMenu(ctx) {
     const unviewedAchievements = getUnviewedCount();
     const newTanks = TankCollection.getNewTankCount();
 
-    // Render menu buttons with badge counts
-    renderMenuButton(ctx, menuButtons.start, pulseIntensity);
-    renderMenuButton(ctx, menuButtons.highScores, pulseIntensity);
-    renderMenuButton(ctx, menuButtons.achievements, pulseIntensity, unviewedAchievements);
-    renderMenuButton(ctx, menuButtons.collection, pulseIntensity, newTanks);
-    renderMenuButton(ctx, menuButtons.supplyDrop, pulseIntensity);
-    renderMenuButton(ctx, menuButtons.options, pulseIntensity);
+    // Render menu buttons using Button component
+    menuButtons.start.render(ctx, pulseIntensity);
+    menuButtons.highScores.render(ctx, pulseIntensity);
+    menuButtons.achievements.renderWithBadge(ctx, pulseIntensity, unviewedAchievements);
+    menuButtons.collection.renderWithBadge(ctx, pulseIntensity, newTanks);
+    menuButtons.supplyDrop.render(ctx, pulseIntensity);
+    menuButtons.options.render(ctx, pulseIntensity);
 
     // Token balance display - bottom right corner with neon box (mirroring Best Run box on left)
     const tokenBalance = Tokens.getTokenBalance();
