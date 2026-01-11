@@ -266,8 +266,8 @@ const MENU_BUTTON_STYLES = {
 
 /**
  * Button definitions for menu
- * Layout: NEW RUN (wide), then pairs (HIGH SCORES/ACHIEVEMENTS, COLLECTION/SUPPLY DROPS), OPTIONS (centered)
- * Color scheme per design: left column = cyan, right column = pink, NEW RUN = gold, OPTIONS = white
+ * Layout: START GAME (wide), then pairs (HIGH SCORES/ACHIEVEMENTS, COLLECTION/SUPPLY DROPS), OPTIONS (centered)
+ * Color scheme per design: left column = cyan, right column = pink, START GAME = gold, OPTIONS = white
  */
 const menuButtons = {
     start: {
@@ -275,7 +275,7 @@ const menuButtons = {
         y: CANVAS.DESIGN_HEIGHT / 2 - 30,
         width: 350,  // Wide primary button
         height: 50,
-        text: 'NEW RUN',
+        text: 'START GAME',
         style: MENU_BUTTON_STYLES.PRIMARY,
         enabled: true,
         row: 0,  // First row - centered
@@ -341,7 +341,7 @@ const menuButtons = {
 /**
  * Calculate adaptive menu button layout based on screen dimensions.
  * Scales button size and spacing for small screens (phones).
- * New layout: 4 rows (NEW RUN, pair, pair, OPTIONS)
+ * New layout: 4 rows (START GAME, pair, pair, OPTIONS)
  * @param {number} height - Available screen height
  * @param {number} width - Available screen width
  * @returns {Object} Layout configuration
@@ -350,8 +350,10 @@ function calculateMenuLayout(height, width) {
     // Determine if we're on a compact screen (phone-sized)
     const isCompact = height < 500;
 
-    // Title area - accounts for title text above buttons
-    const titleAreaHeight = isCompact ? 100 : 180;
+    // Title area - accounts for title text above buttons (SCORCHED, EARTH, SYNTHWAVE EDITION)
+    // Non-compact: subtitle at Y=300 with ~40px font, so bottom is ~340
+    // Compact: subtitle at Y=260, so bottom is ~290
+    const titleAreaHeight = isCompact ? 280 : 360;
 
     // Footer area - for hint text and stats
     const footerAreaHeight = isCompact ? 40 : 80;
@@ -362,10 +364,10 @@ function calculateMenuLayout(height, width) {
     // Default (desktop) layout values
     const defaultPrimaryHeight = 50;
     const defaultSecondaryHeight = 45;
-    const defaultPrimaryWidth = 350;  // Wide NEW RUN button
+    const defaultPrimaryWidth = 350;  // Wide START GAME button
     const defaultPairedWidth = 200;   // Half-width paired buttons (increased for better text padding)
     const defaultOptionsWidth = 180;  // OPTIONS button
-    const defaultRowSpacing = 70;     // Space between rows (increased for better visual separation)
+    const defaultRowSpacing = 54;     // Space between rows (tighter for cohesive group)
     const defaultPairGap = 16;        // Gap between paired buttons
     const defaultFontSize = UI.FONT_SIZE_LARGE;
 
@@ -376,7 +378,7 @@ function calculateMenuLayout(height, width) {
 
     // Apply scale with minimum values
     const minButtonHeight = 36;
-    const minSpacing = 52;
+    const minSpacing = 44;
 
     const primaryHeight = Math.max(minButtonHeight, Math.round(defaultPrimaryHeight * scaleFactor));
     const secondaryHeight = Math.max(minButtonHeight - 4, Math.round(defaultSecondaryHeight * scaleFactor));
@@ -397,17 +399,22 @@ function calculateMenuLayout(height, width) {
     const optionsWidth = Math.round(defaultOptionsWidth * widthScale);
     const pairGap = Math.max(10, Math.round(defaultPairGap * widthScale));  // Minimum 10px gap
 
-    // Calculate font sizes
+    // Calculate font sizes - primary is larger, secondary is noticeably smaller
     const fontScale = secondaryHeight / defaultSecondaryHeight;
-    const primaryFontSize = Math.max(14, Math.round((defaultFontSize + 2) * fontScale));
-    const secondaryFontSize = Math.max(12, Math.round(defaultFontSize * fontScale));
+    const primaryFontSize = Math.max(14, Math.round((defaultFontSize + 4) * fontScale));  // Larger primary
+    const secondaryFontSize = Math.max(11, Math.round((defaultFontSize - 4) * fontScale));  // Smaller secondary
 
-    // Calculate where buttons start (center buttons in available area)
+    // Calculate where buttons start (bottom-anchored positioning)
+    // Position button group in the bottom portion of the screen for consistent spacing from title
     const actualTotalHeight = (numRows - 1) * rowSpacing + primaryHeight;
-    const buttonsAreaTop = titleAreaHeight;
     const buttonsAreaBottom = height - footerAreaHeight;
-    const buttonsAreaCenter = (buttonsAreaTop + buttonsAreaBottom) / 2;
-    const startY = buttonsAreaCenter - actualTotalHeight / 2 + primaryHeight / 2;
+
+    // Bottom-anchored positioning with minimum top constraint
+    // Ensure buttons never overlap with title area (titleAreaHeight provides minimum clearance)
+    const minButtonsTop = titleAreaHeight + 20;  // Minimum 20px below title area
+    const bottomThirdTop = Math.max(minButtonsTop, height * 0.55);  // Top of bottom 45%
+    const bottomThirdCenter = (bottomThirdTop + buttonsAreaBottom) / 2;
+    const startY = bottomThirdCenter - actualTotalHeight / 2 + primaryHeight / 2;
 
     // Title scale for compact screens
     const titleScale = isCompact ? Math.max(0.5, height / 800) : 1;
@@ -448,7 +455,7 @@ function updateMenuButtonPositions() {
     const layout = calculateMenuLayout(height, width);
     currentMenuLayout = layout;
 
-    // Row 0: NEW RUN (centered, wide)
+    // Row 0: START GAME (centered, wide)
     menuButtons.start.x = centerX;
     menuButtons.start.y = layout.startY;
     menuButtons.start.width = layout.primaryWidth;
