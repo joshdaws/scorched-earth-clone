@@ -365,7 +365,7 @@ function calculateMenuLayout(height, width) {
     const defaultPrimaryWidth = 350;  // Wide NEW RUN button
     const defaultPairedWidth = 200;   // Half-width paired buttons (increased for better text padding)
     const defaultOptionsWidth = 180;  // OPTIONS button
-    const defaultRowSpacing = 55;     // Space between rows
+    const defaultRowSpacing = 70;     // Space between rows (increased for better visual separation)
     const defaultPairGap = 16;        // Gap between paired buttons
     const defaultFontSize = UI.FONT_SIZE_LARGE;
 
@@ -376,7 +376,7 @@ function calculateMenuLayout(height, width) {
 
     // Apply scale with minimum values
     const minButtonHeight = 36;
-    const minSpacing = 42;
+    const minSpacing = 52;
 
     const primaryHeight = Math.max(minButtonHeight, Math.round(defaultPrimaryHeight * scaleFactor));
     const secondaryHeight = Math.max(minButtonHeight - 4, Math.round(defaultSecondaryHeight * scaleFactor));
