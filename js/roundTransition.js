@@ -12,6 +12,7 @@ import * as Renderer from './renderer.js';
 import { playClickSound } from './sound.js';
 import * as AI from './ai.js';
 import * as Game from './game.js';
+import { Button } from './ui/Button.js';
 
 // =============================================================================
 // SCREEN STATE
@@ -111,42 +112,70 @@ let onSupplyDropCallback = null;
 const SUPPLY_DROP_COST = 50;
 
 /**
- * Button configurations.
+ * Button styling for round transition screen.
+ * Uses solid dark backgrounds for visibility against overlay.
+ */
+const ROUND_TRANSITION_BUTTON_STYLES = {
+    bgColor: 'rgba(20, 15, 40, 0.95)'
+};
+
+/**
+ * Button instances using the reusable Button component.
  * Positions are updated dynamically via updateButtonPositions().
  */
 const buttons = {
-    continue: {
+    continue: new Button({
+        text: 'CONTINUE',
         x: 0,
         y: 0,
         width: 200,
         height: 50,
-        text: 'CONTINUE',
-        color: COLORS.NEON_CYAN
-    },
-    shop: {
+        fontSize: UI.FONT_SIZE_MEDIUM,
+        bgColor: ROUND_TRANSITION_BUTTON_STYLES.bgColor,
+        borderColor: COLORS.NEON_CYAN,
+        glowColor: COLORS.NEON_CYAN,
+        textColor: COLORS.TEXT_LIGHT,
+        autoSize: false
+    }),
+    shop: new Button({
+        text: 'SHOP',
         x: 0,
         y: 0,
         width: 140,
         height: 50,
-        text: 'SHOP',
-        color: COLORS.NEON_YELLOW
-    },
-    collection: {
+        fontSize: UI.FONT_SIZE_MEDIUM,
+        bgColor: ROUND_TRANSITION_BUTTON_STYLES.bgColor,
+        borderColor: COLORS.NEON_YELLOW,
+        glowColor: COLORS.NEON_YELLOW,
+        textColor: COLORS.TEXT_LIGHT,
+        autoSize: false
+    }),
+    collection: new Button({
+        text: 'COLLECTION',
         x: 0,
         y: 0,
         width: 200,
         height: 50,
-        text: 'COLLECTION',
-        color: COLORS.NEON_PURPLE
-    },
-    supplyDrop: {
+        fontSize: UI.FONT_SIZE_MEDIUM,
+        bgColor: ROUND_TRANSITION_BUTTON_STYLES.bgColor,
+        borderColor: COLORS.NEON_PURPLE,
+        glowColor: COLORS.NEON_PURPLE,
+        textColor: COLORS.TEXT_LIGHT,
+        autoSize: false
+    }),
+    supplyDrop: new Button({
+        text: 'SUPPLY DROP (50)',
         x: 0,
         y: 0,
         width: 250,
         height: 45,
-        text: 'SUPPLY DROP (50)',
-        color: COLORS.NEON_ORANGE
-    }
+        fontSize: UI.FONT_SIZE_MEDIUM,
+        bgColor: ROUND_TRANSITION_BUTTON_STYLES.bgColor,
+        borderColor: COLORS.NEON_ORANGE,
+        glowColor: COLORS.NEON_ORANGE,
+        textColor: COLORS.TEXT_LIGHT,
+        autoSize: false
+    })
 };
 
 /**
@@ -158,17 +187,10 @@ function updateButtonPositions() {
     const height = Renderer.getHeight();
     const centerX = width / 2;
 
-    buttons.continue.x = centerX - 170;
-    buttons.continue.y = height - 100;
-
-    buttons.shop.x = centerX;
-    buttons.shop.y = height - 100;
-
-    buttons.collection.x = centerX + 170;
-    buttons.collection.y = height - 100;
-
-    buttons.supplyDrop.x = centerX;
-    buttons.supplyDrop.y = height - 160;
+    buttons.continue.setPosition(centerX - 170, height - 100);
+    buttons.shop.setPosition(centerX, height - 100);
+    buttons.collection.setPosition(centerX + 170, height - 100);
+    buttons.supplyDrop.setPosition(centerX, height - 160);
 }
 
 // =============================================================================
@@ -281,25 +303,6 @@ export function isActive() {
 // =============================================================================
 
 /**
- * Check if a point is inside a button.
- * Uses exclusive right/bottom edges to prevent overlap at boundaries.
- * @param {number} x - X coordinate
- * @param {number} y - Y coordinate
- * @param {Object} button - Button definition
- * @returns {boolean} True if point is inside button
- */
-function isInsideButton(x, y, button) {
-    const halfWidth = button.width / 2;
-    const halfHeight = button.height / 2;
-    return (
-        x >= button.x - halfWidth &&
-        x < button.x + halfWidth &&  // Exclusive right edge to prevent overlap
-        y >= button.y - halfHeight &&
-        y < button.y + halfHeight    // Exclusive bottom edge to prevent overlap
-    );
-}
-
-/**
  * Handle click/tap on the round transition screen.
  * @param {number} x - X coordinate in game space
  * @param {number} y - Y coordinate in game space
@@ -312,7 +315,7 @@ export function handleClick(x, y) {
     updateButtonPositions();
 
     // Check Continue button (skip shop, go directly to next round)
-    if (isInsideButton(x, y, buttons.continue)) {
+    if (buttons.continue.containsPoint(x, y)) {
         playClickSound();
         console.log('[RoundTransition] Continue clicked - skip shop, go to next round');
         if (onContinueCallback) {
@@ -322,7 +325,7 @@ export function handleClick(x, y) {
     }
 
     // Check Shop button (go to shop before next round)
-    if (isInsideButton(x, y, buttons.shop)) {
+    if (buttons.shop.containsPoint(x, y)) {
         playClickSound();
         console.log('[RoundTransition] Shop clicked');
         if (onShopCallback) {
@@ -336,7 +339,7 @@ export function handleClick(x, y) {
     }
 
     // Check Collection button
-    if (isInsideButton(x, y, buttons.collection)) {
+    if (buttons.collection.containsPoint(x, y)) {
         playClickSound();
         console.log('[RoundTransition] Collection clicked');
         if (onCollectionCallback) {
@@ -350,7 +353,7 @@ export function handleClick(x, y) {
     }
 
     // Check Supply Drop button (only if can afford)
-    if (tokenBalance >= SUPPLY_DROP_COST && isInsideButton(x, y, buttons.supplyDrop)) {
+    if (tokenBalance >= SUPPLY_DROP_COST && buttons.supplyDrop.containsPoint(x, y)) {
         playClickSound();
         console.log('[RoundTransition] Supply Drop clicked');
         if (onSupplyDropCallback) {
@@ -364,6 +367,30 @@ export function handleClick(x, y) {
     }
 
     return false;
+}
+
+/**
+ * Handle pointer move for hover state updates.
+ * @param {number} x - X coordinate in game space
+ * @param {number} y - Y coordinate in game space
+ */
+export function handlePointerMove(x, y) {
+    if (!contentVisible) return;
+
+    // Ensure button positions are current for the screen size
+    updateButtonPositions();
+
+    // Update hover states for all buttons
+    buttons.continue.handlePointerMove(x, y);
+    buttons.shop.handlePointerMove(x, y);
+    buttons.collection.handlePointerMove(x, y);
+
+    // Only update supply drop hover if it's visible (can afford)
+    if (tokenBalance >= SUPPLY_DROP_COST) {
+        buttons.supplyDrop.handlePointerMove(x, y);
+    } else {
+        buttons.supplyDrop.setHovered(false);
+    }
 }
 
 // =============================================================================
@@ -400,54 +427,6 @@ function getDifficultyColor(difficulty) {
         case 'HARD+': return COLORS.NEON_PINK;
         default: return COLORS.TEXT_LIGHT;
     }
-}
-
-/**
- * Draw a neon-styled button.
- * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
- * @param {Object} button - Button definition
- * @param {number} pulseIntensity - Glow pulse intensity (0-1)
- * @param {boolean} [disabled=false] - Whether button is disabled
- */
-function renderButton(ctx, button, pulseIntensity, disabled = false) {
-    const halfWidth = button.width / 2;
-    const halfHeight = button.height / 2;
-    const btnX = button.x - halfWidth;
-    const btnY = button.y - halfHeight;
-
-    ctx.save();
-
-    // Button background with rounded corners
-    ctx.fillStyle = disabled ? 'rgba(26, 26, 46, 0.5)' : 'rgba(26, 26, 46, 0.9)';
-    ctx.beginPath();
-    ctx.roundRect(btnX, btnY, button.width, button.height, 8);
-    ctx.fill();
-
-    // Neon glow effect (pulsing) - reduced when disabled
-    const glowIntensity = disabled ? 0.3 : 1;
-    ctx.shadowColor = button.color;
-    ctx.shadowBlur = (12 + pulseIntensity * 8) * glowIntensity;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
-
-    // Button border
-    ctx.strokeStyle = disabled ? COLORS.TEXT_MUTED : button.color;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Reset shadow for text
-    ctx.shadowBlur = 0;
-
-    // Button text with glow
-    ctx.shadowColor = button.color;
-    ctx.shadowBlur = disabled ? 0 : (6 + pulseIntensity * 4);
-    ctx.fillStyle = disabled ? COLORS.TEXT_MUTED : COLORS.TEXT_LIGHT;
-    ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(button.text, button.x, button.y);
-
-    ctx.restore();
 }
 
 // =============================================================================
@@ -692,15 +671,15 @@ export function render(ctx) {
     // =========================================================================
     const canAffordSupplyDrop = tokenBalance >= SUPPLY_DROP_COST;
     if (canAffordSupplyDrop) {
-        renderButton(ctx, buttons.supplyDrop, pulseIntensity);
+        buttons.supplyDrop.render(ctx, pulseIntensity);
     }
 
     // =========================================================================
     // BOTTOM BUTTONS: CONTINUE | SHOP | COLLECTION
     // =========================================================================
-    renderButton(ctx, buttons.continue, pulseIntensity);
-    renderButton(ctx, buttons.shop, pulseIntensity);
-    renderButton(ctx, buttons.collection, pulseIntensity);
+    buttons.continue.render(ctx, pulseIntensity);
+    buttons.shop.render(ctx, pulseIntensity);
+    buttons.collection.render(ctx, pulseIntensity);
 
     // =========================================================================
     // DECORATIVE FRAME

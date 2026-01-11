@@ -4008,6 +4008,19 @@ function setupRoundTransitionState() {
         }
     });
 
+    // Register pointer move handlers for hover states
+    Input.onMouseMove((x, y) => {
+        if (Game.getState() === GAME_STATES.ROUND_TRANSITION) {
+            RoundTransition.handlePointerMove(x, y);
+        }
+    });
+
+    Input.onTouchMove((x, y) => {
+        if (Game.getState() === GAME_STATES.ROUND_TRANSITION) {
+            RoundTransition.handlePointerMove(x, y);
+        }
+    });
+
     Game.registerStateHandlers(GAME_STATES.ROUND_TRANSITION, {
         onEnter: (fromState) => {
             console.log('Entered ROUND_TRANSITION state');
