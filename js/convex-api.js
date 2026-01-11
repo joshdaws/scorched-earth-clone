@@ -5,9 +5,13 @@
  * Uses the ConvexHttpClient for non-reactive queries and mutations.
  */
 
-// Convex deployment URL - hardcoded for vanilla JS without build process
-// In production, this could be set via a config file or inline script
-const CONVEX_URL = 'https://clean-avocet-794.convex.cloud';
+// Get Convex URL from runtime config (loaded via config.js before this module)
+// Falls back to empty string if not configured - will fail at runtime with clear error
+const CONVEX_URL = window.SCORCHED_EARTH_CONFIG?.CONVEX_URL || '';
+
+if (!CONVEX_URL) {
+    console.error('[ConvexAPI] No CONVEX_URL configured. Copy config.example.js to config.js and add your deployment URL.');
+}
 
 // LocalStorage keys
 const STORAGE_KEYS = {
