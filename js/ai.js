@@ -7,6 +7,7 @@
  */
 
 import { CANVAS, PHYSICS } from './constants.js';
+import { getScreenWidth } from './screenSize.js';
 import { WEAPON_TYPES, WeaponRegistry } from './weapons.js';
 
 // =============================================================================
@@ -223,7 +224,7 @@ function calculateBallisticAim(aiTank, playerTank) {
 
     // Start with a reasonable power based on distance
     // Scale power: at 300px -> ~50%, at 800px -> ~80%
-    let power = 40 + (distance / CANVAS.DESIGN_WIDTH) * 50;
+    let power = 40 + (distance / getScreenWidth()) * 50;
     power = Math.min(95, Math.max(35, power)); // Clamp to reasonable range
 
     // Convert power to velocity
@@ -367,7 +368,7 @@ function simulateTrajectory(startX, startY, angle, power, windValue, terrain) {
         y += vy;
 
         // Check bounds - projectile went off screen
-        if (x < 0 || x >= CANVAS.DESIGN_WIDTH) {
+        if (x < 0 || x >= getScreenWidth()) {
             return { x, y, hit: false, blocked, blockX, blockY };
         }
 
@@ -426,7 +427,7 @@ function checkTerrainObstruction(aiTank, playerTank, terrain) {
     // Check terrain height along the path
     for (let x = startX + 10; x < endX - 10; x += 5) {
         const terrainHeight = terrain.getHeight(x);
-        const terrainY = CANVAS.DESIGN_HEIGHT - terrainHeight;
+        const terrainY = terrain.getScreenHeight() - terrainHeight;
 
         if (terrainHeight > maxTerrainHeight) {
             maxTerrainHeight = terrainHeight;
@@ -470,7 +471,7 @@ function isPlayerInValley(playerTank, terrain) {
     }
 
     // Check right side
-    for (let x = playerX + 20; x <= Math.min(CANVAS.DESIGN_WIDTH - 1, playerX + checkDistance); x += 10) {
+    for (let x = playerX + 20; x <= Math.min(getScreenWidth() - 1, playerX + checkDistance); x += 10) {
         if (terrain.getHeight(x) > playerTerrainHeight + 30) {
             higherOnRight = true;
             break;
@@ -647,7 +648,7 @@ function calculateBasePower(aiTank, playerTank) {
     // Scale power based on distance relative to canvas width
     // At 0 distance -> 30% power
     // At full canvas width -> 90% power
-    const normalizedDistance = distance / CANVAS.DESIGN_WIDTH;
+    const normalizedDistance = distance / getScreenWidth();
     const basePower = 30 + (normalizedDistance * 60);
 
     // Clamp to valid range
