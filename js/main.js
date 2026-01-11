@@ -53,7 +53,7 @@ import * as PerformanceTracking from './performance-tracking.js';
 import * as PitySystem from './pity-system.js';
 import * as LifetimeStats from './lifetime-stats.js';
 import * as NameEntry from './nameEntry.js';
-import * as TitleScene from './titleScene/titleScene.js?v=20260111d';
+import * as TitleScene from './titleScene/titleScene.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -832,8 +832,8 @@ function renderMenuButton(ctx, button, pulseIntensity, badgeCount = 0) {
 }
 
 /**
- * Render the synthwave chrome-style title text.
- * Creates a gradient pink/magenta title with glow effect matching design reference.
+ * Render the synthwave chrome-style title text for "SCORCHED".
+ * Creates a gradient pink/magenta title with cyan glow effect matching design reference.
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  * @param {string} text - Text to render
  * @param {number} x - Center X position
@@ -841,19 +841,69 @@ function renderMenuButton(ctx, button, pulseIntensity, badgeCount = 0) {
  * @param {number} fontSize - Font size in pixels
  * @param {number} pulseIntensity - Glow pulse intensity (0-1)
  */
-function renderChromeTitle(ctx, text, x, y, fontSize, pulseIntensity) {
+function renderPinkChromeTitle(ctx, text, x, y, fontSize, pulseIntensity) {
     ctx.save();
 
-    // Create gradient for chrome/synthwave effect (pink to magenta with cyan highlights)
+    // Create gradient for chrome/synthwave effect (pink to magenta)
     const gradient = ctx.createLinearGradient(x - 200, y - fontSize / 2, x + 200, y + fontSize / 2);
     gradient.addColorStop(0, '#ff69b4');    // Hot pink
-    gradient.addColorStop(0.3, '#ff1493');  // Deep pink
-    gradient.addColorStop(0.5, '#da70d6');  // Orchid
-    gradient.addColorStop(0.7, '#ff1493');  // Deep pink
+    gradient.addColorStop(0.25, '#ff1493'); // Deep pink
+    gradient.addColorStop(0.5, '#da70d6');  // Orchid (highlight)
+    gradient.addColorStop(0.75, '#ff1493'); // Deep pink
     gradient.addColorStop(1, '#ff69b4');    // Hot pink
 
-    // Outer glow (pink)
-    ctx.shadowColor = '#ff1493';
+    // Outer glow (cyan/blue - stronger for neon effect)
+    ctx.shadowColor = '#05d9e8';
+    ctx.shadowBlur = 30 + pulseIntensity * 20;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+
+    ctx.font = `bold ${fontSize}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // Draw multiple layers for chrome effect
+    // Layer 1: Outer stroke (cyan outline for neon glow)
+    ctx.strokeStyle = '#05d9e8';
+    ctx.lineWidth = 5;
+    ctx.strokeText(text, x, y);
+
+    // Layer 2: Inner stroke (white highlight)
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.strokeText(text, x, y);
+
+    // Layer 3: Fill with gradient
+    ctx.fillStyle = gradient;
+    ctx.fillText(text, x, y);
+
+    ctx.restore();
+}
+
+/**
+ * Render the synthwave chrome-style title text for "EARTH".
+ * Creates a gradient yellow/gold title with warm glow effect matching design reference.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {string} text - Text to render
+ * @param {number} x - Center X position
+ * @param {number} y - Center Y position
+ * @param {number} fontSize - Font size in pixels
+ * @param {number} pulseIntensity - Glow pulse intensity (0-1)
+ */
+function renderGoldChromeTitle(ctx, text, x, y, fontSize, pulseIntensity) {
+    ctx.save();
+
+    // Create gradient for chrome/synthwave effect (gold to yellow with chrome highlights)
+    const gradient = ctx.createLinearGradient(x - 200, y - fontSize / 2, x + 200, y + fontSize / 2);
+    gradient.addColorStop(0, '#ffa500');    // Orange
+    gradient.addColorStop(0.25, '#ffcc00'); // Gold
+    gradient.addColorStop(0.5, '#ffee88');  // Light gold (chrome highlight)
+    gradient.addColorStop(0.75, '#ffcc00'); // Gold
+    gradient.addColorStop(1, '#ffa500');    // Orange
+
+    // Outer glow (warm orange)
+    ctx.shadowColor = '#ff8c00';
     ctx.shadowBlur = 25 + pulseIntensity * 15;
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
@@ -863,12 +913,12 @@ function renderChromeTitle(ctx, text, x, y, fontSize, pulseIntensity) {
     ctx.textBaseline = 'middle';
 
     // Draw multiple layers for chrome effect
-    // Layer 1: Outer stroke (cyan outline)
-    ctx.strokeStyle = '#05d9e8';
+    // Layer 1: Outer stroke (orange/gold outline)
+    ctx.strokeStyle = '#ff6600';
     ctx.lineWidth = 4;
     ctx.strokeText(text, x, y);
 
-    // Layer 2: Inner stroke (white)
+    // Layer 2: Inner stroke (white highlight)
     ctx.shadowBlur = 0;
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 2;
@@ -952,24 +1002,32 @@ function renderMenu(ctx) {
     const isCompact = layout.isCompact;
     const titleScale = layout.titleScale;
 
-    // Title positioning - positioned in upper area
-    const titleY = isCompact ? 55 : 90;
-    const titleFontSize = Math.round(60 * titleScale);
-    const subtitleFontSize = Math.round(22 * titleScale);
-    const subtitleOffset = Math.round(50 * titleScale);
+    // Title positioning - split into "SCORCHED" and "EARTH" on separate lines
+    // to match design reference (start-redesign.png)
+    const scorchedY = isCompact ? 45 : 65;
+    const earthY = isCompact ? 85 : 115;
+    const subtitleY = isCompact ? 115 : 155;
 
-    // Render chrome-style title "SCORCHED EARTH"
-    renderChromeTitle(ctx, 'SCORCHED EARTH', width / 2, titleY, titleFontSize, pulseIntensity);
+    // Font sizes - "SCORCHED" is larger, "EARTH" slightly smaller
+    const scorchedFontSize = Math.round(56 * titleScale);
+    const earthFontSize = Math.round(48 * titleScale);
+    const subtitleFontSize = Math.round(20 * titleScale);
 
-    // Subtitle "SYNTHWAVE EDITION" - gold/yellow color
+    // Render "SCORCHED" - pink/magenta chrome with cyan glow
+    renderPinkChromeTitle(ctx, 'SCORCHED', width / 2, scorchedY, scorchedFontSize, pulseIntensity);
+
+    // Render "EARTH" - gold/yellow chrome with warm glow
+    renderGoldChromeTitle(ctx, 'EARTH', width / 2, earthY, earthFontSize, pulseIntensity);
+
+    // Subtitle "SYNTHWAVE EDITION" - cyan neon color to match design
     ctx.save();
-    ctx.shadowColor = '#F59E0B';
-    ctx.shadowBlur = 10 + pulseIntensity * 6;
+    ctx.shadowColor = '#05d9e8';
+    ctx.shadowBlur = 12 + pulseIntensity * 8;
     ctx.font = `bold ${subtitleFontSize}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#F59E0B';
-    ctx.fillText('SYNTHWAVE EDITION', width / 2, titleY + subtitleOffset);
+    ctx.fillStyle = '#05d9e8';
+    ctx.fillText('SYNTHWAVE EDITION', width / 2, subtitleY);
     ctx.restore();
 
     // Get badge counts for buttons
@@ -1063,13 +1121,6 @@ function renderMenu(ctx) {
     const roundsText = bestRound > 0 ? `${bestRound} rounds` : '--';
     ctx.fillText(roundsText, bestCardPadding + 10, height - bestCardPadding - 6);
     ctx.restore();
-
-    // Instructions text at bottom center
-    ctx.fillStyle = COLORS.TEXT_MUTED;
-    ctx.font = `${isCompact ? UI.FONT_SIZE_SMALL : UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText('Click or tap NEW RUN to begin', width / 2, height - (isCompact ? 10 : 20));
 
     ctx.restore();
 
@@ -5008,7 +5059,6 @@ async function init() {
 
     // Initialize Three.js title scene (animated 3D background for menu)
     TitleScene.init();
-    // Start the title scene immediately since we begin in MENU state
     TitleScene.start();
 
     // Setup state handlers BEFORE starting the loop
