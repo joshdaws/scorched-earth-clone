@@ -16,6 +16,7 @@ import * as Assets from './assets.js';
 import { playPurchaseSound, playErrorSound, playClickSound } from './sound.js';
 import * as ProgressionAchievements from './progression-achievements.js';
 import * as HiddenAchievements from './hidden-achievements.js';
+import { Button } from './ui/Button.js';
 
 // =============================================================================
 // SHOP STATE
@@ -268,17 +269,22 @@ const WEAPON_CATEGORIES = [
 // =============================================================================
 
 /**
- * Done button configuration.
+ * Done button using the reusable Button component.
  * Position is updated dynamically via updateButtonPositions().
  */
-const doneButton = {
+const doneButton = new Button({
+    text: 'DONE',
     x: 0,
     y: 0,
     width: SHOP_LAYOUT.DONE_BUTTON.WIDTH,
     height: SHOP_LAYOUT.DONE_BUTTON.HEIGHT,
-    text: 'DONE',
-    color: COLORS.NEON_CYAN
-};
+    fontSize: UI.FONT_SIZE_LARGE,
+    bgColor: 'rgba(26, 26, 46, 0.9)',
+    borderColor: COLORS.NEON_CYAN,
+    textColor: '#ffffff',
+    glowColor: COLORS.NEON_CYAN,
+    autoSize: false
+});
 
 /**
  * Update button positions based on current screen size.
@@ -288,8 +294,7 @@ function updateButtonPositions() {
     const width = Renderer.getWidth();
     const height = Renderer.getHeight();
 
-    doneButton.x = width / 2;
-    doneButton.y = height / 2 + SHOP_LAYOUT.DONE_BUTTON.Y_OFFSET;
+    doneButton.setPosition(width / 2, height / 2 + SHOP_LAYOUT.DONE_BUTTON.Y_OFFSET);
 }
 
 /**
@@ -563,7 +568,7 @@ export function handlePointerDown(x, y) {
     }
 
     // Check done button
-    if (isInsideButton(x, y, doneButton)) {
+    if (doneButton.containsPoint(x, y)) {
         pressedElementId = 'done';
         return true;
     }
@@ -663,7 +668,7 @@ export function handlePointerUp(x, y) {
     if (!wasPressed) return false;
 
     // Check done button release
-    if (wasPressed === 'done' && isInsideButton(x, y, doneButton)) {
+    if (wasPressed === 'done' && doneButton.containsPoint(x, y)) {
         // Debounce protection: ignore Done clicks that happen immediately after shop opens
         // This prevents race conditions where stale pointer events from the previous
         // state (e.g., clicking Shop button in round transition) accidentally close the shop
@@ -862,7 +867,7 @@ export function handleClick(x, y) {
     updateButtonPositions();
 
     // Check done button
-    if (isInsideButton(x, y, doneButton)) {
+    if (doneButton.containsPoint(x, y)) {
         playClickSound();
         console.log('[Shop] Done clicked');
         if (onDoneCallback) {
@@ -1580,7 +1585,7 @@ export function render(ctx) {
         ctx.restore();
 
         // Render Done button only (skip weapons rendering)
-        renderButton(ctx, doneButton, pulseIntensity);
+        doneButton.render(ctx, pulseIntensity);
 
         // Corner accents
         ctx.save();
@@ -1836,8 +1841,8 @@ export function render(ctx) {
     // Restore from crossfade opacity (so Done button and corners render at full opacity)
     ctx.restore();
 
-    // Render Done button
-    renderButton(ctx, doneButton, pulseIntensity);
+    // Render Done button using Button component
+    doneButton.render(ctx, pulseIntensity);
 
     // Corner accents (synthwave style)
     ctx.save();
