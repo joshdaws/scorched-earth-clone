@@ -12,91 +12,212 @@ import { WeaponRegistry } from './weapons.js';
 import * as Wind from './wind.js';
 import * as Assets from './assets.js';
 import * as Tokens from './tokens.js';
+import { getScreenWidth, getScreenHeight } from './screenSize.js';
+import {
+    fromLeft, fromRight, fromTop, fromBottom,
+    centerX, getUIScale, scaled, scaledTouch, isShortScreen, isVeryShortScreen
+} from './uiPosition.js';
 
 // =============================================================================
-// HUD LAYOUT CONSTANTS
+// HUD LAYOUT HELPERS
 // =============================================================================
 
 /**
- * HUD layout configuration.
- * Positions are in design coordinates (1200x800).
+ * Base layout dimensions (reference sizes before scaling).
+ * These are scaled based on screen size for responsive UI.
  */
-const HUD = {
-    // Health bars positioned near tanks (not at top to avoid wind indicator overlap)
+const HUD_BASE = {
     HEALTH_BAR: {
         WIDTH: 160,
         HEIGHT: 14,
         PADDING: 20,
-        Y: 55,  // Below wind indicator and round indicator
         BORDER_RADIUS: 4
     },
-    // Consolidated player info panel at top-left (below wind and round indicators)
     PLAYER_INFO_PANEL: {
-        X: 20,
-        Y: 95,  // Below round indicator (Y=65, height=24, ends at Y=89)
         WIDTH: 200,
         PADDING: 12,
         SECTION_GAP: 8,
         HEALTH_BAR_HEIGHT: 14,
         BORDER_RADIUS: 10
     },
-
-    // Money display at bottom right
     MONEY_PANEL: {
-        X: CANVAS.DESIGN_WIDTH - 20,
-        Y: CANVAS.DESIGN_HEIGHT - 50,
         WIDTH: 140,
         HEIGHT: 35,
         PADDING: 10
     },
-    // Token display at bottom right (left of money panel)
     TOKEN_PANEL: {
-        X: CANVAS.DESIGN_WIDTH - 170,  // 20 + 140 (money width) + 10 gap
-        Y: CANVAS.DESIGN_HEIGHT - 50,
         WIDTH: 100,
         HEIGHT: 35,
         PADDING: 10
     },
-    // Turn indicator at center top
     TURN_INDICATOR: {
-        X: CANVAS.DESIGN_WIDTH / 2,
-        Y: 20,
         WIDTH: 200,
         HEIGHT: 30
     },
-    // Game state panel at top-center - container for turn indicator, round, wind
-    // Will eventually replace individual top-center elements
     GAME_STATE_PANEL: {
-        X: CANVAS.DESIGN_WIDTH / 2,  // Center X
-        Y: 12,                        // Top padding
-        WIDTH: 360,                   // Wide enough for content
-        MIN_HEIGHT: 100,              // Height to accommodate turn indicator, round, and wind
+        WIDTH: 360,
+        MIN_HEIGHT: 100,
         PADDING: 16,
         BORDER_RADIUS: 12,
-        // Wind bar dimensions (inside the panel)
         WIND_BAR: {
-            HEIGHT: 20,              // Height of the wind bar
-            MARGIN_TOP: 8,           // Space above wind bar
-            ARROW_MIN_LENGTH: 10,    // Minimum arrow length
-            ARROW_MAX_LENGTH: 80     // Maximum arrow length at max wind
+            HEIGHT: 20,
+            MARGIN_TOP: 8,
+            ARROW_MIN_LENGTH: 10,
+            ARROW_MAX_LENGTH: 80
         }
     },
-    // Weapon bar at bottom-center - horizontal selection bar
-    // Positioned to the left of the fire button
     WEAPON_BAR: {
-        // Fire button is at X=1070 (center), width 180, so left edge is at 980
-        // Add 20px gap between weapon bar and fire button
-        RIGHT_EDGE: CANVAS.DESIGN_WIDTH - 130 - 90 - 20,  // 960 (left of fire button)
-        Y: CANVAS.DESIGN_HEIGHT - 75,                      // Aligned with fire button
-        HEIGHT: 70,                                         // Same height as fire button
-        WIDTH: 580,                                         // Wide enough for 6 slots + arrows
-        ARROW_WIDTH: 44,                                   // Navigation arrow width (44pt touch minimum)
-        SLOT_SIZE: 72,                                     // Individual weapon slot size
-        SLOT_GAP: 8,                                       // Gap between slots
+        HEIGHT: 70,
+        ARROW_WIDTH: 44,
+        SLOT_SIZE: 72,
+        SLOT_GAP: 8,
         PADDING: 10,
         BORDER_RADIUS: 12,
-        VISIBLE_SLOTS: 6                                   // Number of visible weapon slots
+        VISIBLE_SLOTS: 6
     }
+};
+
+/**
+ * Get dynamic HUD layout based on current screen dimensions.
+ * All positions are calculated relative to screen edges.
+ * @returns {Object} HUD layout configuration
+ */
+function getHUDLayoutDynamic() {
+    const scale = getUIScale();
+    const screenWidth = getScreenWidth();
+    const screenHeight = getScreenHeight();
+    const shortScreen = isShortScreen();
+    const veryShortScreen = isVeryShortScreen();
+
+    // Calculate scaled dimensions
+    const healthBarWidth = scaled(HUD_BASE.HEALTH_BAR.WIDTH);
+    const healthBarHeight = scaled(HUD_BASE.HEALTH_BAR.HEIGHT);
+    const healthBarPadding = scaled(HUD_BASE.HEALTH_BAR.PADDING);
+
+    const playerPanelWidth = scaled(HUD_BASE.PLAYER_INFO_PANEL.WIDTH);
+    const panelPadding = scaled(HUD_BASE.PLAYER_INFO_PANEL.PADDING);
+
+    const moneyPanelWidth = scaled(HUD_BASE.MONEY_PANEL.WIDTH);
+    const moneyPanelHeight = scaled(HUD_BASE.MONEY_PANEL.HEIGHT);
+
+    const tokenPanelWidth = scaled(HUD_BASE.TOKEN_PANEL.WIDTH);
+    const tokenPanelHeight = scaled(HUD_BASE.TOKEN_PANEL.HEIGHT);
+
+    const gameStatePanelWidth = Math.min(scaled(HUD_BASE.GAME_STATE_PANEL.WIDTH), screenWidth * 0.4);
+    const gameStatePanelMinHeight = veryShortScreen ? scaled(70) : shortScreen ? scaled(85) : scaled(HUD_BASE.GAME_STATE_PANEL.MIN_HEIGHT);
+
+    // Weapon bar: calculate based on available space - more compact on short screens
+    const fireButtonWidth = veryShortScreen ? scaledTouch(140) : scaledTouch(180);
+    const fireButtonOffset = veryShortScreen ? 90 : 130;  // Distance from right edge to fire button center
+    const weaponBarRightMargin = fireButtonOffset + fireButtonWidth / 2 + 20; // Gap from fire button
+    const weaponBarHeight = veryShortScreen ? scaledTouch(50) : scaledTouch(HUD_BASE.WEAPON_BAR.HEIGHT);
+    const arrowWidth = scaledTouch(HUD_BASE.WEAPON_BAR.ARROW_WIDTH);
+    const slotSize = veryShortScreen ? scaledTouch(50) : scaledTouch(HUD_BASE.WEAPON_BAR.SLOT_SIZE);
+    const slotGap = scaled(HUD_BASE.WEAPON_BAR.SLOT_GAP);
+
+    // Calculate visible slots based on available width
+    const availableWidth = screenWidth - weaponBarRightMargin - fromLeft(20);
+    const slotAndArrowSpace = availableWidth - arrowWidth * 2 - scaled(HUD_BASE.WEAPON_BAR.PADDING) * 2;
+    const visibleSlots = Math.max(3, Math.min(6, Math.floor(slotAndArrowSpace / (slotSize + slotGap))));
+    const weaponBarWidth = arrowWidth * 2 + visibleSlots * slotSize + (visibleSlots - 1) * slotGap + scaled(HUD_BASE.WEAPON_BAR.PADDING) * 2;
+
+    return {
+        HEALTH_BAR: {
+            WIDTH: healthBarWidth,
+            HEIGHT: healthBarHeight,
+            PADDING: healthBarPadding,
+            Y: fromTop(55 * scale),  // Below wind indicator and round indicator
+            BORDER_RADIUS: 4
+        },
+        PLAYER_INFO_PANEL: {
+            X: fromLeft(20),
+            Y: fromTop(95 * scale),  // Below round indicator
+            WIDTH: playerPanelWidth,
+            PADDING: panelPadding,
+            SECTION_GAP: scaled(HUD_BASE.PLAYER_INFO_PANEL.SECTION_GAP),
+            HEALTH_BAR_HEIGHT: scaled(HUD_BASE.PLAYER_INFO_PANEL.HEALTH_BAR_HEIGHT),
+            BORDER_RADIUS: 10
+        },
+        MONEY_PANEL: {
+            X: fromRight(20),
+            Y: fromBottom(50),
+            WIDTH: moneyPanelWidth,
+            HEIGHT: moneyPanelHeight,
+            PADDING: scaled(HUD_BASE.MONEY_PANEL.PADDING)
+        },
+        TOKEN_PANEL: {
+            X: fromRight(20 + moneyPanelWidth + 10),  // Left of money panel with gap
+            Y: fromBottom(50),
+            WIDTH: tokenPanelWidth,
+            HEIGHT: tokenPanelHeight,
+            PADDING: scaled(HUD_BASE.TOKEN_PANEL.PADDING)
+        },
+        TURN_INDICATOR: {
+            X: centerX(),
+            Y: fromTop(20),
+            WIDTH: scaled(HUD_BASE.TURN_INDICATOR.WIDTH),
+            HEIGHT: scaled(HUD_BASE.TURN_INDICATOR.HEIGHT)
+        },
+        GAME_STATE_PANEL: {
+            X: centerX(),  // Center X
+            Y: fromTop(12),
+            WIDTH: gameStatePanelWidth,
+            MIN_HEIGHT: gameStatePanelMinHeight,
+            PADDING: scaled(HUD_BASE.GAME_STATE_PANEL.PADDING),
+            BORDER_RADIUS: 12,
+            WIND_BAR: {
+                HEIGHT: scaled(HUD_BASE.GAME_STATE_PANEL.WIND_BAR.HEIGHT),
+                MARGIN_TOP: scaled(HUD_BASE.GAME_STATE_PANEL.WIND_BAR.MARGIN_TOP),
+                ARROW_MIN_LENGTH: scaled(HUD_BASE.GAME_STATE_PANEL.WIND_BAR.ARROW_MIN_LENGTH),
+                ARROW_MAX_LENGTH: scaled(HUD_BASE.GAME_STATE_PANEL.WIND_BAR.ARROW_MAX_LENGTH)
+            }
+        },
+        WEAPON_BAR: {
+            RIGHT_EDGE: fromRight(weaponBarRightMargin),
+            Y: fromBottom(veryShortScreen ? 45 : 75),  // Closer to bottom on short screens
+            HEIGHT: weaponBarHeight,
+            WIDTH: weaponBarWidth,
+            ARROW_WIDTH: arrowWidth,
+            SLOT_SIZE: slotSize,
+            SLOT_GAP: slotGap,
+            PADDING: scaled(HUD_BASE.WEAPON_BAR.PADDING),
+            BORDER_RADIUS: 12,
+            VISIBLE_SLOTS: visibleSlots
+        }
+    };
+}
+
+// Cache for HUD layout (recalculated when screen size changes)
+let cachedHUDLayout = null;
+let cachedScreenWidth = 0;
+let cachedScreenHeight = 0;
+
+/**
+ * Get HUD layout, using cache if screen size hasn't changed.
+ * @returns {Object} HUD layout configuration
+ */
+function getHUD() {
+    const currentWidth = getScreenWidth();
+    const currentHeight = getScreenHeight();
+
+    if (!cachedHUDLayout || currentWidth !== cachedScreenWidth || currentHeight !== cachedScreenHeight) {
+        cachedHUDLayout = getHUDLayoutDynamic();
+        cachedScreenWidth = currentWidth;
+        cachedScreenHeight = currentHeight;
+    }
+
+    return cachedHUDLayout;
+}
+
+// Legacy reference - will be removed in favor of getHUD()
+const HUD = {
+    get HEALTH_BAR() { return getHUD().HEALTH_BAR; },
+    get PLAYER_INFO_PANEL() { return getHUD().PLAYER_INFO_PANEL; },
+    get MONEY_PANEL() { return getHUD().MONEY_PANEL; },
+    get TOKEN_PANEL() { return getHUD().TOKEN_PANEL; },
+    get TURN_INDICATOR() { return getHUD().TURN_INDICATOR; },
+    get GAME_STATE_PANEL() { return getHUD().GAME_STATE_PANEL; },
+    get WEAPON_BAR() { return getHUD().WEAPON_BAR; }
 };
 
 // =============================================================================
@@ -899,10 +1020,11 @@ function adjustColorBrightness(color, amount) {
 export function renderHealthBars(ctx, playerTank, enemyTank) {
     if (!ctx) return;
 
-    const barWidth = HUD.HEALTH_BAR.WIDTH;
-    const barHeight = HUD.HEALTH_BAR.HEIGHT;
-    const padding = HUD.HEALTH_BAR.PADDING;
-    const y = HUD.HEALTH_BAR.Y;
+    const layout = getHUD();
+    const barWidth = layout.HEALTH_BAR.WIDTH;
+    const barHeight = layout.HEALTH_BAR.HEIGHT;
+    const padding = layout.HEALTH_BAR.PADDING;
+    const y = layout.HEALTH_BAR.Y;
 
     // Player health bar (left side)
     // Player always uses standard MAX_HEALTH (100)
@@ -911,7 +1033,7 @@ export function renderHealthBars(ctx, playerTank, enemyTank) {
         const playerPercent = (playerTank.health / playerMaxHealth) * 100;
         drawHealthBar(
             ctx,
-            padding,
+            fromLeft(padding),
             y + 10,  // Add offset for label
             barWidth,
             barHeight,
@@ -928,7 +1050,7 @@ export function renderHealthBars(ctx, playerTank, enemyTank) {
         const enemyPercent = (enemyTank.health / enemyMaxHealth) * 100;
         drawHealthBar(
             ctx,
-            CANVAS.DESIGN_WIDTH - padding - barWidth,
+            fromRight(padding + barWidth),
             y + 10,
             barWidth,
             barHeight,
@@ -948,17 +1070,18 @@ export function renderHealthBars(ctx, playerTank, enemyTank) {
 export function renderEnemyHealthBar(ctx, enemyTank) {
     if (!ctx || !enemyTank) return;
 
-    const barWidth = HUD.HEALTH_BAR.WIDTH;
-    const barHeight = HUD.HEALTH_BAR.HEIGHT;
-    const padding = HUD.HEALTH_BAR.PADDING;
-    const y = HUD.HEALTH_BAR.Y;
+    const layout = getHUD();
+    const barWidth = layout.HEALTH_BAR.WIDTH;
+    const barHeight = layout.HEALTH_BAR.HEIGHT;
+    const padding = layout.HEALTH_BAR.PADDING;
+    const y = layout.HEALTH_BAR.Y;
 
     // Use tank's maxHealth for proper scaling with roguelike health progression
     const maxHealth = enemyTank.maxHealth || TANK.MAX_HEALTH;
     const enemyPercent = (enemyTank.health / maxHealth) * 100;
     drawHealthBar(
         ctx,
-        CANVAS.DESIGN_WIDTH - padding - barWidth,
+        fromRight(padding + barWidth),
         y + 10,
         barWidth,
         barHeight,
@@ -2136,9 +2259,10 @@ export function setCurrentTurn(turn) {
 }
 
 /**
- * Get HUD layout constants for external positioning.
- * @returns {Object} HUD layout constants
+ * Get HUD layout for external positioning.
+ * Returns dynamically calculated layout based on current screen size.
+ * @returns {Object} HUD layout
  */
 export function getHUDLayout() {
-    return { ...HUD };
+    return getHUD();
 }

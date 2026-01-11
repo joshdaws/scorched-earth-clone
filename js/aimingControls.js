@@ -14,51 +14,157 @@
 import { CANVAS, COLORS, UI, PHYSICS, TANK } from './constants.js';
 import { registerSliderZone, queueGameInput, INPUT_EVENTS, isGameInputEnabled } from './input.js';
 import * as Wind from './wind.js';
+import { getScreenWidth, getScreenHeight } from './screenSize.js';
+import {
+    fromLeft, fromRight, fromTop, fromBottom,
+    getUIScale, scaled, scaledTouch, isShortScreen, isVeryShortScreen
+} from './uiPosition.js';
 
 // =============================================================================
-// LAYOUT CONSTANTS
+// LAYOUT HELPERS
 // =============================================================================
 
 /**
- * Aiming controls layout configuration.
- * Designed for touch-friendly sizing (minimum 44px tap targets).
- * UI positioned for comfortable thumb access on mobile devices.
+ * Base layout dimensions (reference sizes before scaling).
+ * These are scaled based on screen size for responsive UI.
  */
-const CONTROLS = {
-    // Power bar on the left side - positioned for left thumb access
+const CONTROLS_BASE = {
     POWER_BAR: {
-        X: 50,              // Slightly inward for better thumb reach
-        Y: 220,             // Positioned in thumb-accessible zone
-        WIDTH: 55,          // Touch-friendly width
-        HEIGHT: 280,        // Slightly shorter for thumb reach
+        WIDTH: 55,
+        HEIGHT: 280,
         PADDING: 10,
-        KNOB_HEIGHT: 48,    // Touch-friendly: exceeds 44px minimum
-        TOUCH_ZONE_PADDING: 24  // Extra padding for touch targets
+        KNOB_HEIGHT: 48,
+        TOUCH_ZONE_PADDING: 24,
+        LEFT_OFFSET: 50,   // Distance from left edge
+        TOP_OFFSET: 220    // Distance from top
     },
-    // Fire button at bottom right - touch-optimized for right thumb access
     FIRE_BUTTON: {
-        X: CANVAS.DESIGN_WIDTH - 130,   // Right side with margin from edge
-        Y: CANVAS.DESIGN_HEIGHT - 80,   // Bottom with margin for thumb reach
-        WIDTH: 180,         // Wide for easy tapping, minimum 44pt
-        HEIGHT: 70,         // Touch-friendly: well over 44px minimum
-        BORDER_RADIUS: 14
+        WIDTH: 180,
+        HEIGHT: 70,
+        BORDER_RADIUS: 14,
+        RIGHT_OFFSET: 130,  // Distance from right edge to center
+        BOTTOM_OFFSET: 80   // Distance from bottom to center
     },
-    // Angle arc around tank turret
     ANGLE_ARC: {
-        RADIUS: 60,           // Arc radius from tank center
-        ARC_WIDTH: 8,         // Width of the arc stroke
-        TICK_LENGTH: 12,      // Length of angle tick marks
-        TOUCH_RADIUS: 80      // Larger radius for touch interaction
+        RADIUS: 60,
+        ARC_WIDTH: 8,
+        TICK_LENGTH: 12,
+        TOUCH_RADIUS: 80
     },
-    // Trajectory preview
     TRAJECTORY: {
-        MAX_POINTS: 100,      // Maximum points to simulate
-        STEP_TIME: 0.03,      // Time step for simulation (seconds)
-        DOT_SPACING: 8,       // Pixels between dots
-        DOT_RADIUS: 3,        // Radius of trajectory dots
-        FADE_START: 0.5,      // Start fading at 50% of visible trajectory
-        PREVIEW_PERCENT: 0.25 // Only show 25% of trajectory (for skill-based aiming)
+        MAX_POINTS: 100,
+        STEP_TIME: 0.03,
+        DOT_SPACING: 8,
+        DOT_RADIUS: 3,
+        FADE_START: 0.5,
+        PREVIEW_PERCENT: 0.25
     }
+};
+
+/**
+ * Get dynamic aiming controls layout based on current screen dimensions.
+ * @returns {Object} Controls layout configuration
+ */
+function getControlsLayoutDynamic() {
+    const scale = getUIScale();
+    const screenHeight = getScreenHeight();
+    const shortScreen = isShortScreen();
+    const veryShortScreen = isVeryShortScreen();
+
+    // Scale dimensions while enforcing minimum touch target sizes
+    const powerBarWidth = scaledTouch(CONTROLS_BASE.POWER_BAR.WIDTH);
+    // More aggressive height reduction for very short screens
+    const powerBarHeight = veryShortScreen
+        ? Math.min(scaled(180), screenHeight * 0.35)  // Very compact
+        : shortScreen
+            ? Math.min(scaled(CONTROLS_BASE.POWER_BAR.HEIGHT), screenHeight * 0.45)
+            : scaled(CONTROLS_BASE.POWER_BAR.HEIGHT);
+    const knobHeight = scaledTouch(CONTROLS_BASE.POWER_BAR.KNOB_HEIGHT);
+
+    // Smaller fire button on very short screens
+    const fireButtonWidth = veryShortScreen
+        ? scaledTouch(140)  // Smaller but still touch-friendly
+        : scaledTouch(CONTROLS_BASE.FIRE_BUTTON.WIDTH);
+    const fireButtonHeight = veryShortScreen
+        ? scaledTouch(50)   // Smaller height
+        : scaledTouch(CONTROLS_BASE.FIRE_BUTTON.HEIGHT);
+
+    // Calculate dynamic positions
+    const powerBarX = fromLeft(scaled(CONTROLS_BASE.POWER_BAR.LEFT_OFFSET));
+    // Adjust power bar Y based on screen height - move it lower on short screens
+    const powerBarY = veryShortScreen
+        ? fromTop(scaled(120))  // Very close to top
+        : shortScreen
+            ? fromTop(scaled(160))  // Closer to top on short screens
+            : fromTop(scaled(CONTROLS_BASE.POWER_BAR.TOP_OFFSET));
+
+    // Fire button position: from right and bottom edges - closer to bottom on short screens
+    const fireButtonBottomOffset = veryShortScreen ? 50 : scaled(CONTROLS_BASE.FIRE_BUTTON.BOTTOM_OFFSET);
+    const fireButtonX = fromRight(veryShortScreen ? 90 : scaled(CONTROLS_BASE.FIRE_BUTTON.RIGHT_OFFSET));
+    const fireButtonY = fromBottom(fireButtonBottomOffset);
+
+    return {
+        POWER_BAR: {
+            X: powerBarX,
+            Y: powerBarY,
+            WIDTH: powerBarWidth,
+            HEIGHT: powerBarHeight,
+            PADDING: scaled(CONTROLS_BASE.POWER_BAR.PADDING),
+            KNOB_HEIGHT: knobHeight,
+            TOUCH_ZONE_PADDING: scaled(CONTROLS_BASE.POWER_BAR.TOUCH_ZONE_PADDING)
+        },
+        FIRE_BUTTON: {
+            X: fireButtonX,
+            Y: fireButtonY,
+            WIDTH: fireButtonWidth,
+            HEIGHT: fireButtonHeight,
+            BORDER_RADIUS: scaled(CONTROLS_BASE.FIRE_BUTTON.BORDER_RADIUS)
+        },
+        ANGLE_ARC: {
+            RADIUS: scaled(CONTROLS_BASE.ANGLE_ARC.RADIUS),
+            ARC_WIDTH: scaled(CONTROLS_BASE.ANGLE_ARC.ARC_WIDTH),
+            TICK_LENGTH: scaled(CONTROLS_BASE.ANGLE_ARC.TICK_LENGTH),
+            TOUCH_RADIUS: scaled(CONTROLS_BASE.ANGLE_ARC.TOUCH_RADIUS)
+        },
+        TRAJECTORY: {
+            MAX_POINTS: CONTROLS_BASE.TRAJECTORY.MAX_POINTS,
+            STEP_TIME: CONTROLS_BASE.TRAJECTORY.STEP_TIME,
+            DOT_SPACING: scaled(CONTROLS_BASE.TRAJECTORY.DOT_SPACING),
+            DOT_RADIUS: scaled(CONTROLS_BASE.TRAJECTORY.DOT_RADIUS),
+            FADE_START: CONTROLS_BASE.TRAJECTORY.FADE_START,
+            PREVIEW_PERCENT: CONTROLS_BASE.TRAJECTORY.PREVIEW_PERCENT
+        }
+    };
+}
+
+// Cache for controls layout
+let cachedControlsLayout = null;
+let cachedScreenWidth = 0;
+let cachedScreenHeight = 0;
+
+/**
+ * Get controls layout, using cache if screen size hasn't changed.
+ * @returns {Object} Controls layout configuration
+ */
+function getControls() {
+    const currentWidth = getScreenWidth();
+    const currentHeight = getScreenHeight();
+
+    if (!cachedControlsLayout || currentWidth !== cachedScreenWidth || currentHeight !== cachedScreenHeight) {
+        cachedControlsLayout = getControlsLayoutDynamic();
+        cachedScreenWidth = currentWidth;
+        cachedScreenHeight = currentHeight;
+    }
+
+    return cachedControlsLayout;
+}
+
+// Legacy reference using dynamic getters
+const CONTROLS = {
+    get POWER_BAR() { return getControls().POWER_BAR; },
+    get FIRE_BUTTON() { return getControls().FIRE_BUTTON; },
+    get ANGLE_ARC() { return getControls().ANGLE_ARC; },
+    get TRAJECTORY() { return getControls().TRAJECTORY; }
 };
 
 // =============================================================================
@@ -427,15 +533,15 @@ function simulateTrajectory(tank, angle, power, windForce, terrain) {
         x += vx;
         y += vy;
 
-        // Check bounds
-        if (x < 0 || x > CANVAS.DESIGN_WIDTH || y > CANVAS.DESIGN_HEIGHT) {
+        // Check bounds using dynamic screen dimensions
+        if (x < 0 || x > getScreenWidth() || y > getScreenHeight()) {
             break;
         }
 
         // Check terrain collision (if terrain is provided)
         if (terrain) {
             const terrainHeight = terrain.getHeight(Math.floor(x));
-            const terrainY = CANVAS.DESIGN_HEIGHT - terrainHeight;
+            const terrainY = getScreenHeight() - terrainHeight;
             if (y >= terrainY) {
                 points.push({ x, y: terrainY });
                 break;
@@ -811,9 +917,10 @@ export function getCurrentTank() {
 }
 
 /**
- * Get control layout constants (for external use).
- * @returns {Object} Control layout constants
+ * Get control layout for external use.
+ * Returns dynamically calculated layout based on current screen size.
+ * @returns {Object} Control layout
  */
 export function getControlLayout() {
-    return { ...CONTROLS };
+    return getControls();
 }
