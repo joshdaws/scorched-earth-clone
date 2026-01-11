@@ -223,42 +223,51 @@ const menuTransition = {
 };
 
 /**
- * Menu button styles to match design reference
+ * Menu button styles to match design reference.
+ * All buttons have solid dark backgrounds for visibility against the synthwave grid.
  */
 const MENU_BUTTON_STYLES = {
-    // Primary action - wide white button with solid dark background for visibility
+    // Primary action - wide yellow/gold bordered button (NEW RUN)
     PRIMARY: {
-        bgColor: 'rgba(20, 20, 40, 0.85)',
-        borderColor: '#ffffff',
+        bgColor: 'rgba(20, 15, 40, 0.95)',
+        borderColor: '#F5D547',
         textColor: '#ffffff',
-        glowColor: '#ffffff'
+        glowColor: '#F5D547'
     },
-    // Secondary pink/magenta buttons
+    // Cyan bordered buttons (left column: HIGH SCORES, COLLECTION)
+    CYAN: {
+        bgColor: 'rgba(20, 15, 40, 0.95)',
+        borderColor: COLORS.NEON_CYAN,
+        textColor: '#ffffff',
+        glowColor: COLORS.NEON_CYAN
+    },
+    // Pink/magenta bordered buttons (right column: ACHIEVEMENTS, SUPPLY DROPS)
     PINK: {
-        bgColor: 'rgba(255, 42, 109, 0.2)',
+        bgColor: 'rgba(20, 15, 40, 0.95)',
         borderColor: COLORS.NEON_PINK,
         textColor: '#ffffff',
         glowColor: COLORS.NEON_PINK
     },
-    // Gold/yellow buttons
+    // Gold/yellow buttons (kept for compatibility)
     GOLD: {
-        bgColor: 'rgba(245, 158, 11, 0.2)',
+        bgColor: 'rgba(20, 15, 40, 0.95)',
         borderColor: '#F59E0B',
         textColor: '#ffffff',
         glowColor: '#F59E0B'
     },
-    // Dark outlined button (OPTIONS)
+    // Dark outlined button (OPTIONS) - white border
     DARK: {
-        bgColor: 'rgba(10, 10, 26, 0.6)',
-        borderColor: 'rgba(255, 255, 255, 0.3)',
-        textColor: 'rgba(255, 255, 255, 0.8)',
-        glowColor: 'rgba(255, 255, 255, 0.2)'
+        bgColor: 'rgba(20, 15, 40, 0.95)',
+        borderColor: 'rgba(255, 255, 255, 0.5)',
+        textColor: 'rgba(255, 255, 255, 0.9)',
+        glowColor: 'rgba(255, 255, 255, 0.3)'
     }
 };
 
 /**
  * Button definitions for menu
  * Layout: NEW RUN (wide), then pairs (HIGH SCORES/ACHIEVEMENTS, COLLECTION/SUPPLY DROPS), OPTIONS (centered)
+ * Color scheme per design: left column = cyan, right column = pink, NEW RUN = gold, OPTIONS = white
  */
 const menuButtons = {
     start: {
@@ -278,7 +287,7 @@ const menuButtons = {
         width: 180,  // Half-width for paired buttons
         height: 45,
         text: 'HIGH SCORES',
-        style: MENU_BUTTON_STYLES.PINK,
+        style: MENU_BUTTON_STYLES.CYAN,  // Left column = cyan
         enabled: true,
         row: 1,  // Second row - left
         position: 'left'
@@ -289,7 +298,7 @@ const menuButtons = {
         width: 180,
         height: 45,
         text: 'ACHIEVEMENTS',
-        style: MENU_BUTTON_STYLES.PINK,
+        style: MENU_BUTTON_STYLES.PINK,  // Right column = pink
         enabled: true,
         row: 1,  // Second row - right
         position: 'right'
@@ -300,7 +309,7 @@ const menuButtons = {
         width: 180,
         height: 45,
         text: 'COLLECTION',
-        style: MENU_BUTTON_STYLES.GOLD,
+        style: MENU_BUTTON_STYLES.CYAN,  // Left column = cyan
         enabled: true,
         row: 2,  // Third row - left
         position: 'left'
@@ -311,7 +320,7 @@ const menuButtons = {
         width: 180,
         height: 45,
         text: 'SUPPLY DROPS',
-        style: MENU_BUTTON_STYLES.GOLD,
+        style: MENU_BUTTON_STYLES.PINK,  // Right column = pink
         enabled: true,
         row: 2,  // Third row - right
         position: 'right'
@@ -322,7 +331,7 @@ const menuButtons = {
         width: 200,
         height: 45,
         text: 'OPTIONS',
-        style: MENU_BUTTON_STYLES.DARK,
+        style: MENU_BUTTON_STYLES.DARK,  // White outline
         enabled: true,
         row: 3,  // Fourth row - centered
         position: 'center'
@@ -374,11 +383,19 @@ function calculateMenuLayout(height, width) {
     const rowSpacing = Math.max(minSpacing, Math.round(defaultRowSpacing * scaleFactor));
 
     // Width scaling based on screen width
-    const widthScale = Math.min(1, (width - 60) / (defaultPrimaryWidth + 40));
+    // Ensure minimum 30px edge margin on each side
+    const minEdgeMargin = 30;
+    const totalPairedWidth = defaultPairedWidth * 2 + defaultPairGap;  // 380px
+    const availableWidth = width - (minEdgeMargin * 2);
+
+    // Scale based on the larger of primary width or paired buttons width
+    const maxContentWidth = Math.max(defaultPrimaryWidth, totalPairedWidth);
+    const widthScale = Math.min(1, availableWidth / maxContentWidth);
+
     const primaryWidth = Math.round(defaultPrimaryWidth * widthScale);
     const pairedWidth = Math.round(defaultPairedWidth * widthScale);
     const optionsWidth = Math.round(defaultOptionsWidth * widthScale);
-    const pairGap = Math.round(defaultPairGap * widthScale);
+    const pairGap = Math.max(10, Math.round(defaultPairGap * widthScale));  // Minimum 10px gap
 
     // Calculate font sizes
     const fontScale = secondaryHeight / defaultSecondaryHeight;
