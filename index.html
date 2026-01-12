@@ -7,12 +7,12 @@
     <meta name="theme-color" content="#0a0a1a">
     <title>Scorched Earth: Synthwave Edition</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Import map for ES module resolution (using CDN for production compatibility) -->
+    <!-- Import map only needed for local dev without Vite; Vite resolves imports during build -->
     <script type="importmap">
         {
             "imports": {
-                "three": "https://unpkg.com/three@0.182.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.182.0/examples/jsm/"
+                "three": "/node_modules/three/build/three.module.js",
+                "three/addons/": "/node_modules/three/examples/jsm/"
             }
         }
     </script>

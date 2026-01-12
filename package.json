@@ -10,7 +10,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "vite",
     "build": "vite build && npm run copy-static",
-    "copy-static": "cp config.js www/ && mkdir -p www/node_modules/convex/dist && cp node_modules/convex/dist/browser.bundle.js www/node_modules/convex/dist/ && cp -r assets www/",
+    "copy-static": "cp config.js www/ && cp -r assets www/",
     "build:ios": "npm run build && npx cap sync ios",
     "ios:sync": "npm run build && npx cap copy ios",
     "open:ios": "npx cap open ios",

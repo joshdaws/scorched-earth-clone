@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "npx convex deploy --cmd 'node scripts/generate-config.js'",
-  "outputDirectory": ".",
+  "buildCommand": "npx convex deploy --cmd 'node scripts/generate-config.js && npm run build'",
+  "outputDirectory": "www",
   "installCommand": "npm install",
   "framework": null,
   "headers": [
