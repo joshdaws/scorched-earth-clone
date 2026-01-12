@@ -166,19 +166,26 @@ function getChangeNameButton(panelX, panelY) {
 
 /**
  * Get Close button bounds.
+ * Positioned to overlap the top-right corner of the modal (partially outside).
  * Touch-optimized: 44x44px for easy tapping on mobile.
  * @param {number} panelX - Panel X position
  * @param {number} panelY - Panel Y position
- * @returns {{x: number, y: number, width: number, height: number}}
+ * @returns {{x: number, y: number, width: number, height: number, radius: number}}
  */
 function getCloseButton(panelX, panelY) {
-    const size = 44; // Touch-friendly minimum size
-    const margin = 8;
+    const radius = 18; // Circle radius
+    const size = radius * 2; // Hit area size
+    // Position so circle overlaps the corner (centered on corner with slight offset inward)
+    const centerX = panelX + VOLUME_PANEL.WIDTH - 12;
+    const centerY = panelY + 12;
     return {
-        x: panelX + VOLUME_PANEL.WIDTH - size - margin,
-        y: panelY + margin,
+        x: centerX - radius,
+        y: centerY - radius,
         width: size,
-        height: size
+        height: size,
+        radius: radius,
+        centerX: centerX,
+        centerY: centerY
     };
 }
 
@@ -237,10 +244,10 @@ export function render(ctx, centerX = Renderer.getWidth() / 2, centerY = Rendere
     // Render Change Name button
     renderChangeNameButton(ctx, getChangeNameButton(panelX, panelY));
 
-    // Render Close button (top right)
-    renderCloseButton(ctx, getCloseButton(panelX, panelY));
-
     ctx.restore();
+
+    // Render Close button AFTER restore so it can overlap the panel corner
+    renderCloseButton(ctx, getCloseButton(panelX, panelY));
 }
 
 /**
@@ -394,29 +401,32 @@ function renderChangeNameButton(ctx, button) {
 
 /**
  * Render the Close (X) button.
+ * Styled as a circle overlapping the modal corner with white X centered inside.
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
- * @param {Object} button - Button bounds
+ * @param {Object} button - Button bounds with centerX, centerY, radius
  */
 function renderCloseButton(ctx, button) {
     ctx.save();
 
-    const centerX = button.x + button.width / 2;
-    const centerY = button.y + button.height / 2;
-    const xSize = 12; // Size of the X lines
+    const { centerX, centerY, radius } = button;
+    const xSize = 7; // Size of the X lines (with padding from circle edge)
 
-    // Button background - subtle circle
-    ctx.fillStyle = 'rgba(255, 42, 109, 0.2)';
+    // Circle background with glow
+    ctx.shadowColor = COLORS.NEON_PINK;
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = COLORS.NEON_PINK;
     ctx.beginPath();
-    ctx.arc(centerX, centerY, button.width / 2 - 4, 0, Math.PI * 2);
+    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
     ctx.fill();
 
-    // Button border
-    ctx.strokeStyle = COLORS.NEON_PINK;
+    // Circle border (white for contrast)
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Draw X
-    ctx.strokeStyle = COLORS.NEON_PINK;
+    // Draw white X with proper padding inside circle
+    ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 3;
     ctx.lineCap = 'round';
 
