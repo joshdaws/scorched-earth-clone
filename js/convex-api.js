@@ -5,7 +5,8 @@
  * Uses the ConvexHttpClient for non-reactive queries and mutations.
  */
 
-import { ConvexHttpClient, anyApi } from "convex/browser";
+import { ConvexHttpClient } from "convex/browser";
+import { api } from "../convex/_generated/api.js";
 
 // Get Convex URL from runtime config (loaded via config.js before this module)
 // Falls back to empty string if not configured - will fail at runtime with clear error
@@ -296,8 +297,8 @@ async function executeQuery(functionPath, args = {}) {
     }
 
     try {
-        // Using anyApi to call functions without generated types
-        const result = await c.query(anyApi[functionPath.split(':')[0]][functionPath.split(':')[1]], args);
+        const [module, func] = functionPath.split(':');
+        const result = await c.query(api[module][func], args);
         connectionError = null;
         return result;
     } catch (e) {
@@ -323,7 +324,8 @@ async function executeMutation(functionPath, args = {}) {
     }
 
     try {
-        const result = await c.mutation(anyApi[functionPath.split(':')[0]][functionPath.split(':')[1]], args);
+        const [module, func] = functionPath.split(':');
+        const result = await c.mutation(api[module][func], args);
         connectionError = null;
         return result;
     } catch (e) {
