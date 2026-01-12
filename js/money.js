@@ -7,6 +7,7 @@
  */
 
 import { GAME, DEBUG } from './constants.js';
+import { recordStat } from './runState.js';
 
 // =============================================================================
 // MONEY CONSTANTS
@@ -14,32 +15,52 @@ import { GAME, DEBUG } from './constants.js';
 
 /**
  * Money system configuration.
+ * Updated for roguelike mode with higher starting money.
  */
 export const MONEY = {
-    /** Starting money for new game */
-    STARTING_AMOUNT: GAME.STARTING_MONEY,
+    /** Starting money for new game (roguelike: $1,500) */
+    STARTING_AMOUNT: 1500,
     /** Base money earned per hit */
     HIT_BASE_REWARD: 50,
     /** Multiplier for damage dealt (damage × this value) */
     DAMAGE_MULTIPLIER: 2,
-    /** Bonus for winning a round */
-    VICTORY_BONUS: 500,
-    /** Consolation prize for losing a round */
+    /** Base bonus for winning a round (scaled by getVictoryBonusForRound) */
+    VICTORY_BONUS_BASE: 500,
+    /** Consolation prize for losing a round (not used in permadeath mode) */
     DEFEAT_CONSOLATION: 100
 };
 
 /**
- * Round-based money multipliers.
- * Higher rounds award more money to encourage progression.
+ * Round-based money multipliers for roguelike mode.
+ * Graduated 6-tier system for smoother progression.
  * - Rounds 1-2: 1.0x (standard rewards)
- * - Rounds 3-4: 1.2x (20% bonus)
- * - Rounds 5+: 1.5x (50% bonus)
+ * - Rounds 3-4: 1.1x (10% bonus)
+ * - Rounds 5-6: 1.2x (20% bonus)
+ * - Rounds 7-8: 1.3x (30% bonus)
+ * - Rounds 9-10: 1.4x (40% bonus)
+ * - Rounds 11+: 1.5x (50% bonus)
  */
-const ROUND_MULTIPLIERS = {
-    EARLY: 1.0,    // Rounds 1-2
-    MEDIUM: 1.2,   // Rounds 3-4
-    LATE: 1.5      // Rounds 5+
-};
+const ROUND_MULTIPLIERS = [
+    { maxRound: 2, multiplier: 1.0 },
+    { maxRound: 4, multiplier: 1.1 },
+    { maxRound: 6, multiplier: 1.2 },
+    { maxRound: 8, multiplier: 1.3 },
+    { maxRound: 10, multiplier: 1.4 },
+    { maxRound: Infinity, multiplier: 1.5 }
+];
+
+/**
+ * Round-based victory bonuses for roguelike mode.
+ * Higher rounds award larger victory bonuses.
+ */
+const VICTORY_BONUSES = [
+    { maxRound: 2, bonus: 500 },
+    { maxRound: 4, bonus: 600 },
+    { maxRound: 6, bonus: 700 },
+    { maxRound: 8, bonus: 850 },
+    { maxRound: 10, bonus: 1000 },
+    { maxRound: Infinity, bonus: 1200 }
+];
 
 // =============================================================================
 // MODULE STATE
@@ -68,7 +89,7 @@ let roundDamage = 0;
  * Updated when startRound() is called with a round number.
  * @type {number}
  */
-let currentMultiplier = ROUND_MULTIPLIERS.EARLY;
+let currentMultiplier = 1.0;
 
 /**
  * Current round number (for display and tracking).
@@ -99,21 +120,38 @@ function logMoneyChange(reason, amount, newTotal) {
 
 /**
  * Get the money multiplier for a given round number.
- * - Rounds 1-2: 1.0x (standard rewards)
- * - Rounds 3-4: 1.2x (20% bonus)
- * - Rounds 5+: 1.5x (50% bonus)
+ * Uses graduated 6-tier system for roguelike mode:
+ * - Rounds 1-2: 1.0x | Rounds 3-4: 1.1x | Rounds 5-6: 1.2x
+ * - Rounds 7-8: 1.3x | Rounds 9-10: 1.4x | Rounds 11+: 1.5x
  *
  * @param {number} roundNumber - Current round (1-based)
  * @returns {number} Money multiplier for the round
  */
 export function getMultiplierForRound(roundNumber) {
-    if (roundNumber <= 2) {
-        return ROUND_MULTIPLIERS.EARLY;
-    } else if (roundNumber <= 4) {
-        return ROUND_MULTIPLIERS.MEDIUM;
-    } else {
-        return ROUND_MULTIPLIERS.LATE;
+    for (const tier of ROUND_MULTIPLIERS) {
+        if (roundNumber <= tier.maxRound) {
+            return tier.multiplier;
+        }
     }
+    return 1.5; // Fallback for very late rounds
+}
+
+/**
+ * Get the victory bonus for a given round number.
+ * Uses graduated 6-tier system for roguelike mode:
+ * - Rounds 1-2: $500 | Rounds 3-4: $600 | Rounds 5-6: $700
+ * - Rounds 7-8: $850 | Rounds 9-10: $1,000 | Rounds 11+: $1,200
+ *
+ * @param {number} roundNumber - Current round (1-based)
+ * @returns {number} Victory bonus amount for the round
+ */
+export function getVictoryBonusForRound(roundNumber) {
+    for (const tier of VICTORY_BONUSES) {
+        if (roundNumber <= tier.maxRound) {
+            return tier.bonus;
+        }
+    }
+    return 1200; // Fallback for very late rounds
 }
 
 /**
@@ -143,11 +181,11 @@ export function init() {
     currentMoney = MONEY.STARTING_AMOUNT;
     roundEarnings = 0;
     roundDamage = 0;
-    currentMultiplier = ROUND_MULTIPLIERS.EARLY;
+    currentMultiplier = getMultiplierForRound(1);
     currentRoundNumber = 1;
 
     if (DEBUG.ENABLED) {
-        console.log(`[Money] Initialized with $${MONEY.STARTING_AMOUNT.toLocaleString()}`);
+        console.log(`[Money] Initialized with $${MONEY.STARTING_AMOUNT.toLocaleString()} (roguelike mode)`);
     }
 }
 
@@ -229,6 +267,10 @@ export function spendMoney(amount, reason = 'Generic expense') {
 
     if (currentMoney >= amount) {
         currentMoney -= amount;
+
+        // Track money spent in run stats
+        recordStat('moneySpent', amount);
+
         logMoneyChange(reason, -amount, currentMoney);
         return true;
     } else {
@@ -266,6 +308,9 @@ export function awardHitReward(damage) {
     roundEarnings += reward;
     roundDamage += damage;
 
+    // Track money earned in run stats
+    recordStat('moneyEarned', reward);
+
     const multiplierInfo = currentMultiplier > 1 ? ` (${currentMultiplier}x)` : '';
     logMoneyChange(`Hit reward (${damage} damage)${multiplierInfo}`, reward, currentMoney);
 
@@ -278,13 +323,16 @@ export function awardHitReward(damage) {
  * @returns {number} Amount awarded
  */
 export function awardVictoryBonus() {
-    const reward = Math.floor(MONEY.VICTORY_BONUS * currentMultiplier);
+    // Use round-based victory bonus instead of fixed amount
+    const reward = getVictoryBonusForRound(currentRoundNumber);
 
     currentMoney += reward;
     roundEarnings += reward;
 
-    const multiplierInfo = currentMultiplier > 1 ? ` (${currentMultiplier}x)` : '';
-    logMoneyChange(`Victory bonus${multiplierInfo}`, reward, currentMoney);
+    // Track money earned in run stats
+    recordStat('moneyEarned', reward);
+
+    logMoneyChange(`Victory bonus (Round ${currentRoundNumber})`, reward, currentMoney);
 
     return reward;
 }

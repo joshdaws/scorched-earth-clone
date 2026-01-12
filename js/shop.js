@@ -8,11 +8,15 @@
  */
 
 import { CANVAS, COLORS, UI, GAME_STATES, DEBUG } from './constants.js';
+import * as Renderer from './renderer.js';
 import { WeaponRegistry, WEAPON_TYPES } from './weapons.js';
 import * as Money from './money.js';
 import * as Game from './game.js';
 import * as Assets from './assets.js';
 import { playPurchaseSound, playErrorSound, playClickSound } from './sound.js';
+import * as ProgressionAchievements from './progression-achievements.js';
+import * as HiddenAchievements from './hidden-achievements.js';
+import { Button } from './ui/Button.js';
 
 // =============================================================================
 // SHOP STATE
@@ -84,6 +88,20 @@ let tabTransition = null;
  * @type {string|null}
  */
 let pressedElementId = null;
+
+/**
+ * Timestamp when shop was shown (for debounce protection).
+ * Prevents accidental immediate Done clicks from stale pointer state.
+ * @type {number}
+ */
+let showTime = 0;
+
+/**
+ * Minimum time (ms) shop must be open before Done button can be clicked.
+ * This prevents race conditions where pointer events from the previous
+ * state accidentally trigger the Done button.
+ */
+const DONE_DEBOUNCE_MS = 150;
 
 /**
  * Currently hovered weapon card for visual feedback.
@@ -184,12 +202,13 @@ const SHOP_TABS = {
  * Shop layout configuration.
  * Centered on screen with weapon cards in a grid layout.
  * Touch-optimized: larger cards and buttons with adequate spacing.
+ * NOTE: PANEL.X and PANEL.Y are placeholders - actual values calculated dynamically
+ * in render() to adapt to current viewport size.
  */
 const SHOP_LAYOUT = {
     // Main shop panel - fills most of the screen to fit all 5 weapon categories
+    // X and Y are calculated dynamically during render for viewport adaptation
     PANEL: {
-        X: CANVAS.DESIGN_WIDTH / 2,
-        Y: CANVAS.DESIGN_HEIGHT / 2,
         WIDTH: 920,
         HEIGHT: 780,
         PADDING: 15
@@ -250,16 +269,33 @@ const WEAPON_CATEGORIES = [
 // =============================================================================
 
 /**
- * Done button configuration.
+ * Done button using the reusable Button component.
+ * Position is updated dynamically via updateButtonPositions().
  */
-const doneButton = {
-    x: CANVAS.DESIGN_WIDTH / 2,
-    y: CANVAS.DESIGN_HEIGHT / 2 + SHOP_LAYOUT.DONE_BUTTON.Y_OFFSET,
+const doneButton = new Button({
+    text: 'DONE',
+    x: 0,
+    y: 0,
     width: SHOP_LAYOUT.DONE_BUTTON.WIDTH,
     height: SHOP_LAYOUT.DONE_BUTTON.HEIGHT,
-    text: 'DONE',
-    color: COLORS.NEON_CYAN
-};
+    fontSize: UI.FONT_SIZE_LARGE,
+    bgColor: 'rgba(26, 26, 46, 0.9)',
+    borderColor: COLORS.NEON_CYAN,
+    textColor: '#ffffff',
+    glowColor: COLORS.NEON_CYAN,
+    autoSize: false
+});
+
+/**
+ * Update button positions based on current screen size.
+ * Called before rendering and hit testing to ensure positions are current.
+ */
+function updateButtonPositions() {
+    const width = Renderer.getWidth();
+    const height = Renderer.getHeight();
+
+    doneButton.setPosition(width / 2, height / 2 + SHOP_LAYOUT.DONE_BUTTON.Y_OFFSET);
+}
 
 /**
  * Weapon card hit areas (populated during render).
@@ -299,6 +335,12 @@ export function show(playerTank) {
     scrollDragState = { active: false, direction: null, categoryType: null, startX: 0, startY: 0, startScrollX: 0, startScrollY: 0, lastX: 0, lastY: 0, velocity: 0, potentialDrag: false };
     momentumState = { active: false, direction: null, categoryType: null, velocityX: 0, velocityY: 0 };
     activeTab = 'weapons';  // Always start on WEAPONS tab
+
+    // Reset pointer state and record show time for debounce protection
+    // This prevents stale pointer events from the previous state from
+    // accidentally triggering the Done button
+    pressedElementId = null;
+    showTime = performance.now();
 
     console.log('[Shop] Opened');
 }
@@ -400,6 +442,12 @@ export function purchaseWeapon(weaponId) {
 
     // Add ammo to player's inventory
     playerTankRef.addAmmo(weaponId, weapon.ammo);
+
+    // Progression achievement: check inventory for Fully Loaded / Stockpile
+    ProgressionAchievements.onInventoryChanged(playerTankRef.inventory);
+
+    // Hidden achievement: track inventory for Minimalist
+    HiddenAchievements.onInventoryChanged(playerTankRef.inventory);
 
     // Play purchase sound effect
     playPurchaseSound();
@@ -504,12 +552,15 @@ function isInVerticalScrollArea(x, y) {
 /**
  * Handle pointer down on the shop screen.
  * Sets pressed state for touch feedback.
- * @param {number} x - X coordinate in design space
- * @param {number} y - Y coordinate in design space
+ * @param {number} x - X coordinate in game space
+ * @param {number} y - Y coordinate in game space
  * @returns {boolean} True if an element was pressed
  */
 export function handlePointerDown(x, y) {
     if (!isVisible) return false;
+
+    // Ensure button positions are current for the screen size
+    updateButtonPositions();
 
     // Stop any active momentum scrolling when user touches
     if (momentumState.active) {
@@ -517,7 +568,7 @@ export function handlePointerDown(x, y) {
     }
 
     // Check done button
-    if (isInsideButton(x, y, doneButton)) {
+    if (doneButton.containsPoint(x, y)) {
         pressedElementId = 'done';
         return true;
     }
@@ -617,7 +668,16 @@ export function handlePointerUp(x, y) {
     if (!wasPressed) return false;
 
     // Check done button release
-    if (wasPressed === 'done' && isInsideButton(x, y, doneButton)) {
+    if (wasPressed === 'done' && doneButton.containsPoint(x, y)) {
+        // Debounce protection: ignore Done clicks that happen immediately after shop opens
+        // This prevents race conditions where stale pointer events from the previous
+        // state (e.g., clicking Shop button in round transition) accidentally close the shop
+        const timeSinceShow = performance.now() - showTime;
+        if (timeSinceShow < DONE_DEBOUNCE_MS) {
+            console.log(`[Shop] Done click ignored (debounce: ${timeSinceShow.toFixed(0)}ms < ${DONE_DEBOUNCE_MS}ms)`);
+            return false;
+        }
+
         playClickSound();
         console.log('[Shop] Done clicked');
         if (onDoneCallback) {
@@ -796,15 +856,18 @@ export function handleWheel(x, y, deltaY, shiftKey = false) {
 /**
  * Handle click/tap on the shop screen (legacy - immediate action).
  * Prefer using handlePointerDown/handlePointerUp for touch feedback.
- * @param {number} x - X coordinate in design space
- * @param {number} y - Y coordinate in design space
+ * @param {number} x - X coordinate in game space
+ * @param {number} y - Y coordinate in game space
  * @returns {boolean} True if a button was clicked
  */
 export function handleClick(x, y) {
     if (!isVisible) return false;
 
+    // Ensure button positions are current for the screen size
+    updateButtonPositions();
+
     // Check done button
-    if (isInsideButton(x, y, doneButton)) {
+    if (doneButton.containsPoint(x, y)) {
         playClickSound();
         console.log('[Shop] Done clicked');
         if (onDoneCallback) {
@@ -1375,6 +1438,9 @@ function renderWeaponCard(ctx, weapon, x, y, currentAmmo, canAfford, pulseIntens
 export function render(ctx) {
     if (!isVisible) return;
 
+    // Update button positions for current screen size
+    updateButtonPositions();
+
     // Clear hit areas for this frame
     weaponCardAreas = [];
 
@@ -1384,21 +1450,27 @@ export function render(ctx) {
     // Calculate pulse intensity (0-1, oscillating)
     const pulseIntensity = (Math.sin(animationTime * 0.003) + 1) / 2;
 
+    // Calculate panel center dynamically based on current viewport
+    const screenWidth = Renderer.getWidth();
+    const screenHeight = Renderer.getHeight();
+    const panelX = screenWidth / 2;
+    const panelY = screenHeight / 2;
+
     const panel = SHOP_LAYOUT.PANEL;
-    const panelLeft = panel.X - panel.WIDTH / 2;
-    const panelTop = panel.Y - panel.HEIGHT / 2;
+    const panelLeft = panelX - panel.WIDTH / 2;
+    const panelTop = panelY - panel.HEIGHT / 2;
 
     ctx.save();
 
     // Semi-transparent dark overlay
     ctx.fillStyle = 'rgba(10, 10, 26, 0.95)';
-    ctx.fillRect(0, 0, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    ctx.fillRect(0, 0, Renderer.getWidth(), Renderer.getHeight());
 
     // Subtle scanlines effect
     ctx.globalAlpha = 0.02;
-    for (let y = 0; y < CANVAS.DESIGN_HEIGHT; y += 4) {
+    for (let y = 0; y < Renderer.getHeight(); y += 4) {
         ctx.fillStyle = '#000000';
-        ctx.fillRect(0, y, CANVAS.DESIGN_WIDTH, 2);
+        ctx.fillRect(0, y, Renderer.getWidth(), 2);
     }
     ctx.globalAlpha = 1;
 
@@ -1424,7 +1496,7 @@ export function render(ctx) {
     ctx.fillStyle = COLORS.NEON_CYAN;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('WEAPON SHOP', panel.X, panel.Y + SHOP_LAYOUT.TITLE.Y_OFFSET);
+    ctx.fillText('WEAPON SHOP', panelX, panelY + SHOP_LAYOUT.TITLE.Y_OFFSET);
     ctx.restore();
 
     // Decorative line under title
@@ -1435,8 +1507,8 @@ export function render(ctx) {
     ctx.lineWidth = 2;
     ctx.beginPath();
     const lineWidth = 150;
-    ctx.moveTo(panel.X - lineWidth, panel.Y + SHOP_LAYOUT.TITLE.Y_OFFSET + 30);
-    ctx.lineTo(panel.X + lineWidth, panel.Y + SHOP_LAYOUT.TITLE.Y_OFFSET + 30);
+    ctx.moveTo(panelX - lineWidth, panelY + SHOP_LAYOUT.TITLE.Y_OFFSET + 30);
+    ctx.lineTo(panelX + lineWidth, panelY + SHOP_LAYOUT.TITLE.Y_OFFSET + 30);
     ctx.stroke();
     ctx.restore();
 
@@ -1470,18 +1542,18 @@ export function render(ctx) {
     ctx.fillStyle = COLORS.TEXT_MUTED;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('YOUR BALANCE', panel.X, panel.Y + SHOP_LAYOUT.BALANCE.Y_OFFSET - 15);
+    ctx.fillText('YOUR BALANCE', panelX, panelY + SHOP_LAYOUT.BALANCE.Y_OFFSET - 15);
 
     // Enhanced glow during balance animation
     ctx.shadowColor = COLORS.NEON_YELLOW;
     ctx.shadowBlur = 10 + pulseIntensity * 5 + balanceGlowIntensity * 15;
     ctx.font = `bold ${UI.FONT_SIZE_TITLE - 8}px ${UI.FONT_FAMILY}`;
     ctx.fillStyle = COLORS.NEON_YELLOW;
-    ctx.fillText(`$${displayMoney.toLocaleString()}`, panel.X, panel.Y + SHOP_LAYOUT.BALANCE.Y_OFFSET + 15);
+    ctx.fillText(`$${displayMoney.toLocaleString()}`, panelX, panelY + SHOP_LAYOUT.BALANCE.Y_OFFSET + 15);
     ctx.restore();
 
     // Tab navigation bar
-    renderTabBar(ctx, panel.X, panel.Y + SHOP_LAYOUT.TABS.Y_OFFSET, pulseIntensity);
+    renderTabBar(ctx, panelX, panelY + SHOP_LAYOUT.TABS.Y_OFFSET, pulseIntensity);
 
     // Calculate tab transition opacity for crossfade effect
     let contentOpacity = 1;
@@ -1507,13 +1579,13 @@ export function render(ctx) {
         ctx.fillStyle = COLORS.TEXT_MUTED;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('ITEMS COMING SOON', panel.X, panel.Y);
+        ctx.fillText('ITEMS COMING SOON', panelX, panelY);
         ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
-        ctx.fillText('Check back in future updates!', panel.X, panel.Y + 35);
+        ctx.fillText('Check back in future updates!', panelX, panelY + 35);
         ctx.restore();
 
         // Render Done button only (skip weapons rendering)
-        renderButton(ctx, doneButton, pulseIntensity);
+        doneButton.render(ctx, pulseIntensity);
 
         // Corner accents
         ctx.save();
@@ -1569,7 +1641,7 @@ export function render(ctx) {
     const cardGap = SHOP_LAYOUT.CARD.GAP;
     const columns = SHOP_LAYOUT.CARD.COLUMNS;
     const totalCardWidth = columns * cardWidth + (columns - 1) * cardGap;
-    const gridStartX = panel.X - totalCardWidth / 2;
+    const gridStartX = panelX - totalCardWidth / 2;
 
     // Category layout constants
     const categoryHeaderHeight = SHOP_LAYOUT.CATEGORY.HEADER_HEIGHT;
@@ -1605,8 +1677,8 @@ export function render(ctx) {
     const visibleRowWidth = totalCardWidth;
 
     // Calculate vertical scroll area bounds
-    const scrollAreaTop = panel.Y + SHOP_LAYOUT.CATEGORY.Y_START;
-    const scrollAreaBottom = panel.Y + SHOP_LAYOUT.DONE_BUTTON.Y_OFFSET - SHOP_LAYOUT.DONE_BUTTON.HEIGHT / 2 - 20; // 20px margin
+    const scrollAreaTop = panelY + SHOP_LAYOUT.CATEGORY.Y_START;
+    const scrollAreaBottom = panelY + SHOP_LAYOUT.DONE_BUTTON.Y_OFFSET - SHOP_LAYOUT.DONE_BUTTON.HEIGHT / 2 - 20; // 20px margin
     const scrollAreaHeight = scrollAreaBottom - scrollAreaTop;
 
     // Store scroll area for hit detection
@@ -1769,8 +1841,8 @@ export function render(ctx) {
     // Restore from crossfade opacity (so Done button and corners render at full opacity)
     ctx.restore();
 
-    // Render Done button
-    renderButton(ctx, doneButton, pulseIntensity);
+    // Render Done button using Button component
+    doneButton.render(ctx, pulseIntensity);
 
     // Corner accents (synthwave style)
     ctx.save();

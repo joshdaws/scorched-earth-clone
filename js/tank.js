@@ -9,6 +9,8 @@
 import { TANK, PHYSICS, CANVAS } from './constants.js';
 import { spawnTankDestructionExplosion } from './effects.js';
 import { playExplosionSound } from './sound.js';
+import { getScreenWidth, getScreenHeight } from './screenSize.js';
+import { getUIScale, scaled, scaledTouch, isVeryShortScreen } from './uiPosition.js';
 
 /**
  * Team identifiers for tanks.
@@ -57,6 +59,14 @@ export class Tank {
          * @type {number}
          */
         this.health = TANK.START_HEALTH;
+
+        /**
+         * Maximum health points for this tank.
+         * Used for health bar rendering. May differ from TANK.MAX_HEALTH
+         * for scaled enemies in roguelike mode.
+         * @type {number}
+         */
+        this.maxHealth = TANK.MAX_HEALTH;
 
         /**
          * Turret angle in degrees.
@@ -208,7 +218,7 @@ export class Tank {
 
     /**
      * Heal the tank by a specified amount.
-     * Health cannot exceed MAX_HEALTH.
+     * Health cannot exceed tank's maxHealth.
      * @param {number} amount - Amount to heal
      * @returns {number} The actual amount healed
      */
@@ -216,7 +226,7 @@ export class Tank {
         const healAmount = Math.max(0, amount);
         const previousHealth = this.health;
 
-        this.health = Math.min(TANK.MAX_HEALTH, this.health + healAmount);
+        this.health = Math.min(this.maxHealth, this.health + healAmount);
 
         return this.health - previousHealth;
     }
@@ -453,6 +463,7 @@ export class Tank {
             x: this.x,
             y: this.y,
             health: this.health,
+            maxHealth: this.maxHealth,
             angle: this.angle,
             power: this.power,
             team: this.team,
@@ -474,6 +485,7 @@ export class Tank {
         });
 
         tank.health = data.health;
+        tank.maxHealth = data.maxHealth || TANK.MAX_HEALTH; // Fallback for old save data
         tank.angle = data.angle;
         tank.power = data.power;
         tank.currentWeapon = data.currentWeapon;
@@ -528,8 +540,107 @@ const PLACEMENT = {
     /** How far to sample for valley detection (each direction from spawn point) */
     VALLEY_SAMPLE_RADIUS: 80,
     /** Maximum attempts to find a suitable spawn position */
-    MAX_PLACEMENT_ATTEMPTS: 20
+    MAX_PLACEMENT_ATTEMPTS: 20,
+    /** Margin to add beyond HUD boundaries for visual clarity */
+    HUD_MARGIN: 30
 };
+
+// =============================================================================
+// HUD SAFE ZONE CALCULATIONS
+// =============================================================================
+
+/**
+ * HUD dimensions for safe zone calculations.
+ * These match the base values from ui.js and aimingControls.js.
+ */
+const HUD_BASE = {
+    // Player info panel (top-left)
+    PLAYER_INFO_PANEL: {
+        WIDTH: 200,
+        LEFT_OFFSET: 20
+    },
+    // Power bar (left side)
+    POWER_BAR: {
+        WIDTH: 55,
+        PADDING: 10,
+        LEFT_OFFSET: 50
+    },
+    // Fire button (bottom-right)
+    FIRE_BUTTON: {
+        WIDTH: 180,
+        RIGHT_OFFSET: 130,   // Normal screens
+        RIGHT_OFFSET_SHORT: 90  // Very short screens
+    },
+    // Money panel (bottom-right)
+    MONEY_PANEL: {
+        WIDTH: 140,
+        RIGHT_OFFSET: 20
+    },
+    // Token panel (bottom-right, left of money panel)
+    TOKEN_PANEL: {
+        WIDTH: 100,
+        GAP: 10  // Gap between token and money panel
+    }
+};
+
+/**
+ * Calculate the minimum X position for player tank to avoid left-side HUD.
+ *
+ * The left side has:
+ * - Player info panel at fromLeft(20), width ~200px
+ * - Power bar at fromLeft(scaled(50)), width ~55px + padding
+ *
+ * We use the player info panel as the primary constraint since it's the widest.
+ *
+ * @returns {number} Minimum X position for player tank
+ */
+function getPlayerMinXForHUD() {
+    const scale = getUIScale();
+
+    // Player info panel is the main constraint on the left
+    const panelWidth = scaled(HUD_BASE.PLAYER_INFO_PANEL.WIDTH);
+    const panelOffset = HUD_BASE.PLAYER_INFO_PANEL.LEFT_OFFSET;
+
+    // The tank center should be beyond the panel right edge + margin + half tank width
+    const minX = panelOffset + panelWidth + PLACEMENT.HUD_MARGIN + TANK.WIDTH / 2;
+
+    return minX;
+}
+
+/**
+ * Calculate the maximum X position for enemy tank to avoid right-side HUD.
+ *
+ * The right side has:
+ * - Fire button at fromRight(90-130), width ~140-180px
+ * - Money panel at fromRight(20), width ~140px
+ * - Token panel adjacent to money panel
+ *
+ * Fire button extends furthest into the play area, so it's the primary constraint.
+ *
+ * @returns {number} Maximum X position for enemy tank
+ */
+function getEnemyMaxXForHUD() {
+    const screenWidth = getScreenWidth();
+    const veryShort = isVeryShortScreen();
+
+    // Fire button is the main constraint on the right
+    // On very short screens it's closer to the edge (90px), otherwise 130px
+    const fireButtonRightOffset = veryShort
+        ? HUD_BASE.FIRE_BUTTON.RIGHT_OFFSET_SHORT
+        : scaled(HUD_BASE.FIRE_BUTTON.RIGHT_OFFSET);
+    const fireButtonWidth = veryShort
+        ? scaledTouch(140)
+        : scaledTouch(HUD_BASE.FIRE_BUTTON.WIDTH);
+
+    // Fire button center is at fromRight(fireButtonRightOffset)
+    // So the left edge of the button is at screenWidth - fireButtonRightOffset - fireButtonWidth/2
+    const fireButtonLeftEdge = screenWidth - fireButtonRightOffset - fireButtonWidth / 2;
+
+    // The tank center should be before the button left edge - margin - half tank width
+    const maxX = fireButtonLeftEdge - PLACEMENT.HUD_MARGIN - TANK.WIDTH / 2;
+
+    return maxX;
+}
 
 /**
  * Calculate the average terrain height over a range centered at x.
@@ -618,12 +729,14 @@ function findBestXInRange(terrain, minX, maxX) {
 /**
  * Convert terrain height to canvas Y coordinate.
  * Terrain heights are stored as distance from bottom, but canvas Y=0 is at top.
+ * Uses the terrain's stored screen height for dynamic screen support.
  *
+ * @param {import('./terrain.js').Terrain} terrain - The terrain instance
  * @param {number} terrainHeight - Height from bottom of canvas
  * @returns {number} Canvas Y coordinate (Y=0 at top)
  */
-function terrainHeightToCanvasY(terrainHeight) {
-    return CANVAS.DESIGN_HEIGHT - terrainHeight;
+function terrainHeightToCanvasY(terrain, terrainHeight) {
+    return terrain.getScreenHeight() - terrainHeight;
 }
 
 /**
@@ -638,16 +751,17 @@ function placeTankAtX(tank, terrain, x) {
     tank.x = x;
     // Tank Y is the canvas Y of the bottom of the tank (where it touches ground)
     const terrainHeight = terrain.getHeight(x);
-    tank.y = terrainHeightToCanvasY(terrainHeight);
+    tank.y = terrainHeightToCanvasY(terrain, terrainHeight);
 }
 
 /**
  * Place player and enemy tanks on terrain at appropriate positions.
- * - Player tank: left third of screen (15-25% x position)
- * - Enemy tank: right third of screen (75-85% x position)
+ * - Player tank: left third of screen (15-25% x position), but avoiding left HUD
+ * - Enemy tank: right third of screen (75-85% x position), but avoiding right HUD
  * - Both tanks sit on top of terrain
  * - Avoids spawning in deep valleys
  * - Enforces minimum distance between tanks
+ * - Ensures tanks don't spawn under HUD elements
  *
  * This function should be called at the start of each round with the new terrain.
  *
@@ -657,23 +771,45 @@ function placeTankAtX(tank, terrain, x) {
 export function placeTanksOnTerrain(terrain) {
     const width = terrain.getWidth();
 
-    // Calculate player X range (15-25% of screen width)
-    const playerMinX = Math.floor(width * PLACEMENT.PLAYER_X_MIN_PERCENT);
-    const playerMaxX = Math.floor(width * PLACEMENT.PLAYER_X_MAX_PERCENT);
+    // Calculate HUD-aware spawn boundaries
+    const hudMinPlayerX = getPlayerMinXForHUD();
+    const hudMaxEnemyX = getEnemyMaxXForHUD();
 
-    // Calculate enemy X range (75-85% of screen width)
-    const enemyMinX = Math.floor(width * PLACEMENT.ENEMY_X_MIN_PERCENT);
-    const enemyMaxX = Math.floor(width * PLACEMENT.ENEMY_X_MAX_PERCENT);
+    // Calculate percentage-based spawn ranges
+    const percentPlayerMinX = Math.floor(width * PLACEMENT.PLAYER_X_MIN_PERCENT);
+    const percentPlayerMaxX = Math.floor(width * PLACEMENT.PLAYER_X_MAX_PERCENT);
+    const percentEnemyMinX = Math.floor(width * PLACEMENT.ENEMY_X_MIN_PERCENT);
+    const percentEnemyMaxX = Math.floor(width * PLACEMENT.ENEMY_X_MAX_PERCENT);
 
-    // Find best positions for each tank
-    const playerX = findBestXInRange(terrain, playerMinX, playerMaxX);
-    const enemyX = findBestXInRange(terrain, enemyMinX, enemyMaxX);
+    // Apply HUD constraints: player minimum X must clear the left HUD
+    // Enemy maximum X must stay clear of the right HUD
+    const playerMinX = Math.max(percentPlayerMinX, hudMinPlayerX);
+    const playerMaxX = percentPlayerMaxX;
+    const enemyMinX = percentEnemyMinX;
+    const enemyMaxX = Math.min(percentEnemyMaxX, hudMaxEnemyX);
+
+    // Validate spawn ranges are still viable
+    // On very narrow screens, ranges might collapse - handle gracefully
+    const effectivePlayerMinX = Math.min(playerMinX, playerMaxX - TANK.WIDTH);
+    const effectivePlayerMaxX = playerMaxX;
+    const effectiveEnemyMinX = enemyMinX;
+    const effectiveEnemyMaxX = Math.max(enemyMaxX, enemyMinX + TANK.WIDTH);
+
+    // Log spawn zone calculations for debugging
+    console.log(`[Tank Spawn] Screen width: ${width}px`);
+    console.log(`[Tank Spawn] HUD constraints: playerMinX=${hudMinPlayerX.toFixed(0)}, enemyMaxX=${hudMaxEnemyX.toFixed(0)}`);
+    console.log(`[Tank Spawn] Player range: ${effectivePlayerMinX.toFixed(0)}-${effectivePlayerMaxX.toFixed(0)}`);
+    console.log(`[Tank Spawn] Enemy range: ${effectiveEnemyMinX.toFixed(0)}-${effectiveEnemyMaxX.toFixed(0)}`);
+
+    // Find best positions for each tank within the constrained ranges
+    const playerX = findBestXInRange(terrain, effectivePlayerMinX, effectivePlayerMaxX);
+    const enemyX = findBestXInRange(terrain, effectiveEnemyMinX, effectiveEnemyMaxX);
 
     // Calculate canvas Y positions from terrain heights
     const playerTerrainHeight = terrain.getHeight(playerX);
     const enemyTerrainHeight = terrain.getHeight(enemyX);
-    const playerY = terrainHeightToCanvasY(playerTerrainHeight);
-    const enemyY = terrainHeightToCanvasY(enemyTerrainHeight);
+    const playerY = terrainHeightToCanvasY(terrain, playerTerrainHeight);
+    const enemyY = terrainHeightToCanvasY(terrain, enemyTerrainHeight);
 
     // Create tanks at the calculated positions
     const playerTank = createPlayerTank(playerX, playerY);
@@ -704,7 +840,7 @@ export function placeTanksOnTerrain(terrain) {
  */
 export function updateTankTerrainPosition(tank, terrain) {
     const terrainHeight = terrain.getHeight(tank.x);
-    const targetY = terrainHeightToCanvasY(terrainHeight);
+    const targetY = terrainHeightToCanvasY(terrain, terrainHeight);
 
     // If tank is already falling, don't restart the fall
     if (tank.isFalling) {

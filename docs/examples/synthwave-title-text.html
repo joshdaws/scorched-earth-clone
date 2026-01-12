@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scorched Earth Synthwave Text</title>
+    <!-- Importing a font that matches the synthwave/techno aesthetic -->
+    <link href="https://fonts.googleapis.com/css2?family=Audiowide&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            background-color: #050011; /* Deep dark purple background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            font-family: 'Audiowide', cursive;
+        }
+        canvas {
+            box-shadow: 0 0 50px rgba(189, 0, 255, 0.2);
+            border: 1px solid #333;
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="synthCanvas"></canvas>
+
+<script>
+    const canvas = document.getElementById('synthCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Config for the text style
+    const TEXT_CONFIG = {
+        mainText: "SCORCHED EARTH",
+        subText: "SYNTHWAVE EDITION",
+        fontFamily: "'Audiowide', cursive", // Fits the theme perfectly
+        fontSize: 160,
+        extrusionDepth: 24, // How "thick" the 3D block is
+        skewX: -0.2, // Slight italic skew for speed
+    };
+
+    // Resize canvas to fit window
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        draw();
+    }
+
+    // Ensure font is loaded before drawing
+    document.fonts.ready.then(function () {
+        resize();
+    });
+
+    window.addEventListener('resize', resize);
+
+    function draw() {
+        // 1. Clear Background
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Optional: Draw a simple Retro Grid Background
+        drawGrid();
+
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+
+        ctx.save();
+
+        // Apply global transform to center text
+        ctx.translate(centerX, centerY);
+
+        // --- DRAW MAIN TITLE (SCORCHED EARTH) ---
+        ctx.save();
+        ctx.transform(1, 0, TEXT_CONFIG.skewX, 1, 0, -60); // Skew and move up
+        drawSynthwaveText(TEXT_CONFIG.mainText, TEXT_CONFIG.fontSize);
+        ctx.restore();
+
+        // --- DRAW SUBTITLE (SYNTHWAVE EDITION) ---
+        ctx.save();
+        ctx.transform(1, 0, TEXT_CONFIG.skewX, 1, 0, 120); // Skew and move down
+        // Make subtitle smaller and slightly different colors
+        drawNeonSubtitle(TEXT_CONFIG.subText, TEXT_CONFIG.fontSize * 0.4);
+        ctx.restore();
+
+        ctx.restore();
+    }
+
+    // Function to draw the heavy chrome/metallic text
+    function drawSynthwaveText(text, size) {
+        ctx.font = `${size}px ${TEXT_CONFIG.fontFamily}`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        const width = ctx.measureText(text).width;
+
+        // A. THE 3D EXTRUSION (The dark blocky sides)
+        // We draw the text repeatedly at offsets moving down-right or down-left
+        ctx.fillStyle = '#2a003b'; // Dark purple shadow color
+        for (let i = TEXT_CONFIG.extrusionDepth; i > 0; i--) {
+            ctx.fillText(text, i * 2, i * 2);
+        }
+
+        // B. THE MAIN TEXT GRADIENT (The Chrome Look)
+        // Create a gradient that spans the height of the text
+        // Top = Sky/Horizon, Bottom = Reflection
+        const gradient = ctx.createLinearGradient(0, -size/2, 0, size/2);
+
+        // Chrome Gradient Stops
+        gradient.addColorStop(0.0, '#00ffff');    // Top: Cyan/Electric Blue
+        gradient.addColorStop(0.45, '#ffffff');   // Middle-Top: White horizon
+        gradient.addColorStop(0.5, '#000000');    // Sharp Horizon Line
+        gradient.addColorStop(0.55, '#bd00ff');   // Middle-Bottom: Deep Purple
+        gradient.addColorStop(1.0, '#ff00cc');    // Bottom: Hot Pink
+
+        // Draw the gradient face
+        ctx.fillStyle = gradient;
+        // Shift slightly to sit on top of extrusion
+        ctx.fillText(text, 0, 0);
+
+        // C. THE OUTLINE & GLOW
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = '#00ffff'; // Cyan outline
+        ctx.shadowColor = '#bd00ff'; // Purple glow
+        ctx.shadowBlur = 35;
+        ctx.strokeText(text, 0, 0);
+
+        // Reset shadow for next draws
+        ctx.shadowBlur = 0;
+
+        // D. REFLECTION (Optional Shine)
+        ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
+        ctx.fillText(text, 0, 0);
+    }
+
+    // Function for the glowing subtitle
+    function drawNeonSubtitle(text, size) {
+        ctx.font = `${size}px ${TEXT_CONFIG.fontFamily}`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        // Neon Red/Orange Glow
+        ctx.shadowColor = '#ff3300';
+        ctx.shadowBlur = 25;
+        ctx.strokeStyle = '#ffcc00';
+        ctx.lineWidth = 3;
+        ctx.strokeText(text, 0, 0);
+
+        // Solid fill inside
+        ctx.fillStyle = '#ff0055';
+        ctx.shadowBlur = 0; // Remove blur for sharp fill
+        ctx.fillText(text, 0, 0);
+    }
+
+    // Simple perspective grid for background ambiance
+    function drawGrid() {
+        ctx.save();
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(189, 0, 255, 0.3)';
+        ctx.lineWidth = 1;
+
+        const horizonY = canvas.height * 0.7; // Lower horizon
+
+        // Vertical lines (perspective)
+        for (let i = -canvas.width; i < canvas.width * 2; i += 80) {
+            ctx.moveTo(i, canvas.height);
+            ctx.lineTo((i - canvas.width/2) * 0.2 + canvas.width/2, 0);
+        }
+
+        // Horizontal lines (scanlines)
+        for (let i = 0; i < canvas.height; i += 40) {
+            ctx.moveTo(0, i);
+            ctx.lineTo(canvas.width, i);
+        }
+        ctx.stroke();
+
+        // Darken the top to fake a sky
+        const bgGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        bgGradient.addColorStop(0, 'rgba(5, 0, 17, 1)');
+        bgGradient.addColorStop(0.6, 'rgba(5, 0, 17, 0.8)');
+        bgGradient.addColorStop(1, 'rgba(40, 0, 60, 0)');
+        ctx.fillStyle = bgGradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.restore();
+    }
+
+</script>
+</body>
+</html>

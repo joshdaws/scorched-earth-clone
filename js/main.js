@@ -19,8 +19,8 @@ import { applyExplosionDamage, applyExplosionToAllTanks, DAMAGE } from './damage
 import * as Wind from './wind.js';
 import { WeaponRegistry, WEAPON_TYPES } from './weapons.js';
 import * as AI from './ai.js';
-import * as HUD from './ui.js';
-import * as AimingControls from './aimingControls.js';
+import * as HUD from './ui.js?v=20260111d';
+import * as AimingControls from './aimingControls.js?v=20260111a';
 import * as VictoryDefeat from './victoryDefeat.js';
 import * as Money from './money.js';
 import * as Shop from './shop.js';
@@ -31,6 +31,30 @@ import * as PauseMenu from './pauseMenu.js';
 import * as TouchAiming from './touchAiming.js';
 import * as Haptics from './haptics.js';
 import * as DebugTools from './debugTools.js';
+import * as GameOver from './gameOver.js';
+import * as RoundTransition from './roundTransition.js';
+import { getEnemyHealthForRound, recordStat, startNewRun as startNewRunState, endRun as endRunState, advanceRound as advanceRunRound } from './runState.js';
+import * as HighScores from './highScores.js';
+import * as AchievementPopup from './achievement-popup.js';
+import * as SupplyDrop from './supply-drop.js';
+import * as ExtractionReveal from './extraction-reveal.js';
+import * as AchievementScreen from './achievement-screen.js';
+import * as CollectionScreen from './collection-screen.js';
+import * as SupplyDropScreen from './supply-drop-screen.js';
+import * as CombatAchievements from './combat-achievements.js';
+import * as PrecisionAchievements from './precision-achievements.js';
+import * as WeaponAchievements from './weapon-achievements.js';
+import * as ProgressionAchievements from './progression-achievements.js';
+import * as HiddenAchievements from './hidden-achievements.js';
+import { onAchievementUnlock, clearRoundAchievements, getRoundAchievements, getUnviewedCount, markAllAchievementsViewed } from './achievements.js';
+import * as Tokens from './tokens.js';
+import * as TankCollection from './tank-collection.js';
+import * as PerformanceTracking from './performance-tracking.js';
+import * as PitySystem from './pity-system.js';
+import * as LifetimeStats from './lifetime-stats.js';
+import * as NameEntry from './nameEntry.js';
+import * as TitleScene from './titleScene/titleScene.js';
+import { Button } from './ui/Button.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -109,7 +133,7 @@ let explosionEffect = null;
 
 /**
  * Pause button dimensions and position.
- * Small button in top-right corner for mouse/touch pause.
+ * Small button in bottom-right corner for mouse/touch pause.
  */
 const pauseButton = {
     x: CANVAS.DESIGN_WIDTH - 50,
@@ -117,6 +141,15 @@ const pauseButton = {
     width: 40,
     height: 40
 };
+
+/**
+ * Update pause button position based on current screen dimensions.
+ * Should be called before rendering or hit testing pause button.
+ */
+function updatePauseButtonPosition() {
+    pauseButton.x = Renderer.getWidth() - 50;
+    pauseButton.y = Renderer.getHeight() - 50;
+}
 
 /**
  * Check if a point is inside the pause button.
@@ -138,6 +171,9 @@ function isInsidePauseButton(x, y) {
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  */
 function renderPauseButton(ctx) {
+    // Update position for current screen size
+    updatePauseButtonPosition();
+
     ctx.save();
 
     // Button background
@@ -188,28 +224,298 @@ const menuTransition = {
 };
 
 /**
- * Button definitions for menu
+ * Menu button styles to match design reference.
+ * All buttons have solid dark backgrounds for visibility against the synthwave grid.
  */
-const menuButtons = {
-    start: {
-        x: CANVAS.DESIGN_WIDTH / 2,
-        y: CANVAS.DESIGN_HEIGHT / 2 + 60,
-        width: 280,
-        height: 60,
-        text: 'START GAME',
-        color: COLORS.NEON_CYAN,
-        enabled: true
+const MENU_BUTTON_STYLES = {
+    // Primary action - wide yellow/gold bordered button (NEW RUN)
+    PRIMARY: {
+        bgColor: 'rgba(20, 15, 40, 0.95)',
+        borderColor: '#F5D547',
+        textColor: '#ffffff',
+        glowColor: '#F5D547'
     },
-    options: {
-        x: CANVAS.DESIGN_WIDTH / 2,
-        y: CANVAS.DESIGN_HEIGHT / 2 + 140,
-        width: 280,
-        height: 60,
-        text: 'OPTIONS',
-        color: COLORS.NEON_PURPLE,
-        enabled: true  // Enabled for volume controls
+    // Cyan bordered buttons (left column: HIGH SCORES, COLLECTION)
+    CYAN: {
+        bgColor: 'rgba(20, 15, 40, 0.95)',
+        borderColor: COLORS.NEON_CYAN,
+        textColor: '#ffffff',
+        glowColor: COLORS.NEON_CYAN
+    },
+    // Pink/magenta bordered buttons (right column: ACHIEVEMENTS, SUPPLY DROPS)
+    PINK: {
+        bgColor: 'rgba(20, 15, 40, 0.95)',
+        borderColor: COLORS.NEON_PINK,
+        textColor: '#ffffff',
+        glowColor: COLORS.NEON_PINK
+    },
+    // Gold/yellow buttons (kept for compatibility)
+    GOLD: {
+        bgColor: 'rgba(20, 15, 40, 0.95)',
+        borderColor: '#F59E0B',
+        textColor: '#ffffff',
+        glowColor: '#F59E0B'
+    },
+    // Dark outlined button (OPTIONS) - subtle cyan border to match reference
+    DARK: {
+        bgColor: 'rgba(20, 15, 40, 0.95)',
+        borderColor: 'rgba(255, 255, 255, 0.6)',
+        textColor: 'rgba(255, 255, 255, 0.9)',
+        glowColor: 'rgba(255, 255, 255, 0.4)'
     }
 };
+
+/**
+ * Button definitions for menu
+ * Layout: START GAME (wide), then pairs (HIGH SCORES/ACHIEVEMENTS, COLLECTION/SUPPLY DROPS), OPTIONS (centered)
+ * Color scheme per design: left column = cyan, right column = pink, START GAME = gold, OPTIONS = white
+ */
+const menuButtons = {
+    start: new Button({
+        text: 'START GAME',
+        x: CANVAS.DESIGN_WIDTH / 2,
+        y: CANVAS.DESIGN_HEIGHT / 2 - 30,
+        width: 350,  // Wide primary button
+        height: 50,
+        fontSize: UI.FONT_SIZE_LARGE,
+        bgColor: MENU_BUTTON_STYLES.PRIMARY.bgColor,
+        borderColor: MENU_BUTTON_STYLES.PRIMARY.borderColor,
+        textColor: MENU_BUTTON_STYLES.PRIMARY.textColor,
+        glowColor: MENU_BUTTON_STYLES.PRIMARY.glowColor,
+        autoSize: false
+    }),
+    highScores: new Button({
+        text: 'HIGH SCORES',
+        x: CANVAS.DESIGN_WIDTH / 2,
+        y: CANVAS.DESIGN_HEIGHT / 2 + 30,
+        width: 180,  // Half-width for paired buttons
+        height: 45,
+        fontSize: UI.FONT_SIZE_MEDIUM,
+        bgColor: MENU_BUTTON_STYLES.CYAN.bgColor,
+        borderColor: MENU_BUTTON_STYLES.CYAN.borderColor,
+        textColor: MENU_BUTTON_STYLES.CYAN.textColor,
+        glowColor: MENU_BUTTON_STYLES.CYAN.glowColor,
+        autoSize: false
+    }),
+    achievements: new Button({
+        text: 'ACHIEVEMENTS',
+        x: CANVAS.DESIGN_WIDTH / 2,
+        y: CANVAS.DESIGN_HEIGHT / 2 + 30,
+        width: 180,
+        height: 45,
+        fontSize: UI.FONT_SIZE_MEDIUM,
+        bgColor: MENU_BUTTON_STYLES.PINK.bgColor,
+        borderColor: MENU_BUTTON_STYLES.PINK.borderColor,
+        textColor: MENU_BUTTON_STYLES.PINK.textColor,
+        glowColor: MENU_BUTTON_STYLES.PINK.glowColor,
+        autoSize: false
+    }),
+    collection: new Button({
+        text: 'COLLECTION',
+        x: CANVAS.DESIGN_WIDTH / 2,
+        y: CANVAS.DESIGN_HEIGHT / 2 + 90,
+        width: 180,
+        height: 45,
+        fontSize: UI.FONT_SIZE_MEDIUM,
+        bgColor: MENU_BUTTON_STYLES.CYAN.bgColor,
+        borderColor: MENU_BUTTON_STYLES.CYAN.borderColor,
+        textColor: MENU_BUTTON_STYLES.CYAN.textColor,
+        glowColor: MENU_BUTTON_STYLES.CYAN.glowColor,
+        autoSize: false
+    }),
+    supplyDrop: new Button({
+        text: 'SUPPLY DROPS',
+        x: CANVAS.DESIGN_WIDTH / 2,
+        y: CANVAS.DESIGN_HEIGHT / 2 + 90,
+        width: 180,
+        height: 45,
+        fontSize: UI.FONT_SIZE_MEDIUM,
+        bgColor: MENU_BUTTON_STYLES.PINK.bgColor,
+        borderColor: MENU_BUTTON_STYLES.PINK.borderColor,
+        textColor: MENU_BUTTON_STYLES.PINK.textColor,
+        glowColor: MENU_BUTTON_STYLES.PINK.glowColor,
+        autoSize: false
+    }),
+    options: new Button({
+        text: 'OPTIONS',
+        x: CANVAS.DESIGN_WIDTH / 2,
+        y: CANVAS.DESIGN_HEIGHT / 2 + 150,
+        width: 200,
+        height: 45,
+        fontSize: UI.FONT_SIZE_MEDIUM,
+        bgColor: MENU_BUTTON_STYLES.DARK.bgColor,
+        borderColor: MENU_BUTTON_STYLES.DARK.borderColor,
+        textColor: MENU_BUTTON_STYLES.DARK.textColor,
+        glowColor: MENU_BUTTON_STYLES.DARK.glowColor,
+        autoSize: false
+    })
+};
+
+/**
+ * Calculate adaptive menu button layout based on screen dimensions.
+ * Scales button size and spacing for small screens (phones).
+ * New layout: 4 rows (START GAME, pair, pair, OPTIONS)
+ * @param {number} height - Available screen height
+ * @param {number} width - Available screen width
+ * @returns {Object} Layout configuration
+ */
+function calculateMenuLayout(height, width) {
+    // Determine if we're on a compact screen (phone-sized)
+    const isCompact = height < 500;
+
+    // Calculate title scale FIRST since it affects titleAreaHeight
+    // "SCORCHED" at 120px is approximately 850px wide (including 3D extrusion and effects)
+    const titleMaxWidth = 850;  // Approximate width of "SCORCHED" at base font size
+    const titleMinMargin = 40;  // Minimum horizontal margin on each side
+    const titleAvailableWidth = width - (titleMinMargin * 2);
+    
+    // Scale based on width when viewport is too narrow for full-size title
+    const widthBasedTitleScale = Math.min(1, titleAvailableWidth / titleMaxWidth);
+    
+    // Scale based on height for compact screens (phones)
+    const heightBasedTitleScale = isCompact ? Math.max(0.5, height / 800) : 1;
+    
+    // Use the smaller of the two scales to ensure title fits both dimensions
+    // Clamp between 0.4 (minimum readable) and 1.0 (maximum, current size)
+    const titleScale = Math.max(0.4, Math.min(widthBasedTitleScale, heightBasedTitleScale));
+
+    // Title area - accounts for title text above buttons (SCORCHED, EARTH, SYNTHWAVE EDITION)
+    // Base values: subtitle at Y=300 with ~44px font, so bottom is ~340 (non-compact)
+    // Scale the title area based on titleScale to match the scaled title positions
+    const baseTitleAreaHeight = isCompact ? 280 : 360;
+    const titleAreaHeight = Math.round(baseTitleAreaHeight * titleScale);
+
+    // Footer area - for hint text and stats
+    const footerAreaHeight = isCompact ? 40 : 80;
+
+    // Calculate available space for buttons (4 rows now, not 6)
+    const availableHeight = height - titleAreaHeight - footerAreaHeight;
+
+    // Default (desktop) layout values
+    const defaultPrimaryHeight = 50;
+    const defaultSecondaryHeight = 45;
+    const defaultPrimaryWidth = 350;  // Wide START GAME button
+    const defaultPairedWidth = 200;   // Half-width paired buttons (increased for better text padding)
+    const defaultOptionsWidth = 180;  // OPTIONS button
+    const defaultRowSpacing = 54;     // Space between rows (tighter for cohesive group)
+    const defaultPairGap = 16;        // Gap between paired buttons
+    const defaultFontSize = UI.FONT_SIZE_LARGE;
+
+    // Calculate scale factor based on available height
+    const numRows = 4;
+    const defaultTotalHeight = (numRows - 1) * defaultRowSpacing + defaultPrimaryHeight;
+    const scaleFactor = Math.min(1, availableHeight / defaultTotalHeight);
+
+    // Apply scale with minimum values
+    const minButtonHeight = 36;
+    const minSpacing = 44;
+
+    const primaryHeight = Math.max(minButtonHeight, Math.round(defaultPrimaryHeight * scaleFactor));
+    const secondaryHeight = Math.max(minButtonHeight - 4, Math.round(defaultSecondaryHeight * scaleFactor));
+    const rowSpacing = Math.max(minSpacing, Math.round(defaultRowSpacing * scaleFactor));
+
+    // Width scaling based on screen width
+    // Ensure minimum 30px edge margin on each side
+    const minEdgeMargin = 30;
+    const totalPairedWidth = defaultPairedWidth * 2 + defaultPairGap;  // 416px (200*2 + 16)
+    const availableWidth = width - (minEdgeMargin * 2);
+
+    // Scale based on the larger of primary width or paired buttons width
+    const maxContentWidth = Math.max(defaultPrimaryWidth, totalPairedWidth);
+    const widthScale = Math.min(1, availableWidth / maxContentWidth);
+
+    const primaryWidth = Math.round(defaultPrimaryWidth * widthScale);
+    const pairedWidth = Math.round(defaultPairedWidth * widthScale);
+    const optionsWidth = Math.round(defaultOptionsWidth * widthScale);
+    const pairGap = Math.max(10, Math.round(defaultPairGap * widthScale));  // Minimum 10px gap
+
+    // Calculate font sizes - primary is larger, secondary is noticeably smaller
+    const fontScale = secondaryHeight / defaultSecondaryHeight;
+    const primaryFontSize = Math.max(14, Math.round((defaultFontSize + 4) * fontScale));  // Larger primary
+    const secondaryFontSize = Math.max(11, Math.round((defaultFontSize - 4) * fontScale));  // Smaller secondary
+
+    // Calculate where buttons start (bottom-anchored positioning)
+    // Position button group in the bottom portion of the screen for consistent spacing from title
+    const actualTotalHeight = (numRows - 1) * rowSpacing + primaryHeight;
+    const buttonsAreaBottom = height - footerAreaHeight;
+
+    // Bottom-anchored positioning with minimum top constraint
+    // Ensure buttons never overlap with title area (titleAreaHeight provides minimum clearance)
+    const minButtonsTop = titleAreaHeight + 20;  // Minimum 20px below title area
+    const bottomThirdTop = Math.max(minButtonsTop, height * 0.55);  // Top of bottom 45%
+    const bottomThirdCenter = (bottomThirdTop + buttonsAreaBottom) / 2;
+    const startY = bottomThirdCenter - actualTotalHeight / 2 + primaryHeight / 2;
+
+    return {
+        primaryHeight,
+        secondaryHeight,
+        primaryWidth,
+        pairedWidth,
+        optionsWidth,
+        pairGap,
+        rowSpacing,
+        startY,
+        primaryFontSize,
+        secondaryFontSize,
+        scaleFactor,
+        isCompact,
+        titleScale,
+        titleAreaHeight
+    };
+}
+
+// Store current menu layout for rendering
+let currentMenuLayout = null;
+
+/**
+ * Update menu button positions based on current screen dimensions.
+ * Adapts layout for small screens by scaling button size and spacing.
+ * New layout: 4 rows with paired buttons in the middle.
+ * Should be called before rendering or hit testing menu buttons.
+ */
+function updateMenuButtonPositions() {
+    const width = Renderer.getWidth();
+    const height = Renderer.getHeight();
+    const centerX = width / 2;
+
+    // Calculate adaptive layout
+    const layout = calculateMenuLayout(height, width);
+    currentMenuLayout = layout;
+
+    // Row 0: START GAME (centered, wide)
+    menuButtons.start.setPosition(centerX, layout.startY);
+    menuButtons.start.setSize(layout.primaryWidth, layout.primaryHeight);
+    menuButtons.start.fontSize = layout.primaryFontSize;
+
+    // Row 1: HIGH SCORES (left) and ACHIEVEMENTS (right)
+    const row1Y = layout.startY + layout.rowSpacing;
+    const pairOffset = (layout.pairedWidth + layout.pairGap) / 2;
+
+    menuButtons.highScores.setPosition(centerX - pairOffset, row1Y);
+    menuButtons.highScores.setSize(layout.pairedWidth, layout.secondaryHeight);
+    menuButtons.highScores.fontSize = layout.secondaryFontSize;
+
+    menuButtons.achievements.setPosition(centerX + pairOffset, row1Y);
+    menuButtons.achievements.setSize(layout.pairedWidth, layout.secondaryHeight);
+    menuButtons.achievements.fontSize = layout.secondaryFontSize;
+
+    // Row 2: COLLECTION (left) and SUPPLY DROPS (right)
+    const row2Y = layout.startY + layout.rowSpacing * 2;
+
+    menuButtons.collection.setPosition(centerX - pairOffset, row2Y);
+    menuButtons.collection.setSize(layout.pairedWidth, layout.secondaryHeight);
+    menuButtons.collection.fontSize = layout.secondaryFontSize;
+
+    menuButtons.supplyDrop.setPosition(centerX + pairOffset, row2Y);
+    menuButtons.supplyDrop.setSize(layout.pairedWidth, layout.secondaryHeight);
+    menuButtons.supplyDrop.fontSize = layout.secondaryFontSize;
+
+    // Row 3: OPTIONS (centered)
+    const row3Y = layout.startY + layout.rowSpacing * 3;
+    menuButtons.options.setPosition(centerX, row3Y);
+    menuButtons.options.setSize(layout.optionsWidth, layout.secondaryHeight);
+    menuButtons.options.fontSize = layout.secondaryFontSize;
+}
 
 // =============================================================================
 // OPTIONS OVERLAY STATE
@@ -253,7 +559,7 @@ function isInsideButton(x, y, button) {
  * @returns {boolean} True if point is inside button
  */
 function isInsideStartButton(x, y) {
-    return isInsideButton(x, y, menuButtons.start);
+    return menuButtons.start.containsPoint(x, y);
 }
 
 /**
@@ -269,18 +575,45 @@ function startMenuTransition(targetState) {
 
 /**
  * Handle click on menu - check if buttons were clicked
- * @param {{x: number, y: number}} pos - Click position in design coordinates
+ * @param {{x: number, y: number}} pos - Click position in game coordinates
  */
 function handleMenuClick(pos) {
     if (Game.getState() !== GAME_STATES.MENU) return;
     if (menuTransition.active) return;  // Don't allow clicks during transition
 
-    if (isInsideButton(pos.x, pos.y, menuButtons.start)) {
+    // Ensure button positions are current for the screen size
+    updateMenuButtonPositions();
+
+    if (menuButtons.start.containsPoint(pos.x, pos.y)) {
         // Play click sound
         Sound.playClickSound();
         // Start fade-out transition, then go to DIFFICULTY_SELECT state
         startMenuTransition(GAME_STATES.DIFFICULTY_SELECT);
-    } else if (isInsideButton(pos.x, pos.y, menuButtons.options) && menuButtons.options.enabled) {
+    } else if (menuButtons.highScores.containsPoint(pos.x, pos.y)) {
+        // Play click sound
+        Sound.playClickSound();
+        // Go to HIGH_SCORES state
+        Game.setState(GAME_STATES.HIGH_SCORES);
+    } else if (menuButtons.achievements.containsPoint(pos.x, pos.y)) {
+        // Play click sound
+        Sound.playClickSound();
+        // Mark achievements as viewed when opening the screen
+        markAllAchievementsViewed();
+        // Go to ACHIEVEMENTS state
+        Game.setState(GAME_STATES.ACHIEVEMENTS);
+    } else if (menuButtons.collection.containsPoint(pos.x, pos.y)) {
+        // Play click sound
+        Sound.playClickSound();
+        // Mark new tanks as viewed when opening collection
+        TankCollection.markAllTanksViewed();
+        // Go to COLLECTION state
+        Game.setState(GAME_STATES.COLLECTION);
+    } else if (menuButtons.supplyDrop.containsPoint(pos.x, pos.y)) {
+        // Play click sound
+        Sound.playClickSound();
+        // Go to SUPPLY_DROP state
+        Game.setState(GAME_STATES.SUPPLY_DROP);
+    } else if (menuButtons.options.containsPoint(pos.x, pos.y) && !menuButtons.options.disabled) {
         // Play click sound
         Sound.playClickSound();
         // Show options overlay with volume controls
@@ -305,8 +638,8 @@ function handleOptionsOverlayClick(pos) {
 
     // Click outside panel - close overlay
     const panelDims = VolumeControls.getPanelDimensions();
-    const panelX = CANVAS.DESIGN_WIDTH / 2 - panelDims.width / 2;
-    const panelY = CANVAS.DESIGN_HEIGHT / 2 - panelDims.height / 2;
+    const panelX = Renderer.getWidth() / 2 - panelDims.width / 2;
+    const panelY = Renderer.getHeight() / 2 - panelDims.height / 2;
 
     const isInsidePanel = (
         pos.x >= panelX &&
@@ -339,8 +672,8 @@ function closeOptionsOverlay() {
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  */
 function renderMenuBackground(ctx) {
-    const width = CANVAS.DESIGN_WIDTH;
-    const height = CANVAS.DESIGN_HEIGHT;
+    const width = Renderer.getWidth();
+    const height = Renderer.getHeight();
     const horizonY = height * 0.6;  // Horizon line at 60% down
 
     ctx.save();
@@ -432,12 +765,13 @@ function renderMenuBackground(ctx) {
 }
 
 /**
- * Render a neon-styled menu button with glow effect
+ * Render a styled menu button matching the design reference
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
- * @param {Object} button - Button definition
+ * @param {Object} button - Button definition with style property
  * @param {number} pulseIntensity - Glow pulse intensity (0-1)
+ * @param {number} badgeCount - Badge count to display (0 = no badge)
  */
-function renderMenuButton(ctx, button, pulseIntensity) {
+function renderMenuButton(ctx, button, pulseIntensity, badgeCount = 0) {
     const halfWidth = button.width / 2;
     const halfHeight = button.height / 2;
     const btnX = button.x - halfWidth;
@@ -447,40 +781,64 @@ function renderMenuButton(ctx, button, pulseIntensity) {
 
     // Determine if button is disabled
     const isDisabled = !button.enabled;
-    const buttonColor = isDisabled ? COLORS.TEXT_MUTED : button.color;
+
+    // Get style from button (fall back to legacy color-based style)
+    const style = button.style || {
+        bgColor: 'rgba(26, 26, 46, 0.8)',
+        borderColor: button.color || COLORS.NEON_CYAN,
+        textColor: COLORS.TEXT_LIGHT,
+        glowColor: button.color || COLORS.NEON_CYAN
+    };
+
     const glowIntensity = isDisabled ? 0 : pulseIntensity;
 
     // Button background with rounded corners
-    ctx.fillStyle = isDisabled ? 'rgba(26, 26, 46, 0.5)' : 'rgba(26, 26, 46, 0.8)';
+    ctx.fillStyle = isDisabled ? 'rgba(26, 26, 46, 0.5)' : style.bgColor;
     ctx.beginPath();
     ctx.roundRect(btnX, btnY, button.width, button.height, 8);
     ctx.fill();
 
-    // Neon glow effect (pulsing)
+    // Neon border effect with outer glow (matching reference design)
     if (!isDisabled) {
-        ctx.shadowColor = buttonColor;
+        // Outer glow layer - softer, wider glow
+        ctx.shadowColor = style.glowColor;
         ctx.shadowBlur = 15 + glowIntensity * 10;
         ctx.shadowOffsetX = 0;
         ctx.shadowOffsetY = 0;
-    }
+        ctx.strokeStyle = style.borderColor;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(btnX, btnY, button.width, button.height, 8);
+        ctx.stroke();
 
-    // Button border (neon outline)
-    ctx.strokeStyle = buttonColor;
-    ctx.lineWidth = isDisabled ? 2 : 3;
-    ctx.beginPath();
-    ctx.roundRect(btnX, btnY, button.width, button.height, 8);
-    ctx.stroke();
+        // Inner border - crisp line without shadow
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = style.borderColor;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(btnX, btnY, button.width, button.height, 8);
+        ctx.stroke();
+    } else {
+        // Disabled button border
+        ctx.strokeStyle = COLORS.TEXT_MUTED;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(btnX, btnY, button.width, button.height, 8);
+        ctx.stroke();
+    }
 
     // Reset shadow for text
     ctx.shadowBlur = 0;
 
-    // Button text with glow
+    // Button text with subtle glow
     if (!isDisabled) {
-        ctx.shadowColor = buttonColor;
-        ctx.shadowBlur = 8 + glowIntensity * 5;
+        ctx.shadowColor = style.glowColor;
+        ctx.shadowBlur = 4 + glowIntensity * 2;
     }
-    ctx.fillStyle = isDisabled ? COLORS.TEXT_MUTED : COLORS.TEXT_LIGHT;
-    ctx.font = `bold ${UI.FONT_SIZE_LARGE}px ${UI.FONT_FAMILY}`;
+    ctx.fillStyle = isDisabled ? COLORS.TEXT_MUTED : style.textColor;
+    // Use button-specific font size if available (for adaptive layouts)
+    const fontSize = button.fontSize || UI.FONT_SIZE_LARGE;
+    ctx.font = `bold ${fontSize}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(button.text, button.x, button.y);
@@ -492,19 +850,159 @@ function renderMenuButton(ctx, button, pulseIntensity) {
         ctx.fillText('(Coming Soon)', button.x, button.y + 35);
     }
 
+    // Render badge if count > 0
+    if (badgeCount > 0 && !isDisabled) {
+        const badgeRadius = 12;
+        const badgeX = btnX + button.width - 8;
+        const badgeY = btnY + 8;
+
+        // Badge background (red circle with glow)
+        ctx.save();
+        ctx.shadowColor = '#ff4444';
+        ctx.shadowBlur = 10 + pulseIntensity * 5;
+        ctx.fillStyle = '#ff4444';
+        ctx.beginPath();
+        ctx.arc(badgeX, badgeY, badgeRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Badge border
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Badge text
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `bold ${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const badgeText = badgeCount > 9 ? '9+' : String(badgeCount);
+        ctx.fillText(badgeText, badgeX, badgeY);
+        ctx.restore();
+    }
+
+    ctx.restore();
+}
+
+/**
+ * Configuration for synthwave title text effect.
+ * Based on docs/examples/synthwave-title-text.html
+ */
+const TITLE_TEXT_CONFIG = {
+    extrusionDepth: 16,   // How "thick" the 3D block shadow is (doubled for larger title)
+    skewX: -0.15,         // Slight italic skew for dynamic feel
+    extrusionColor: '#2a003b', // Dark purple shadow color
+};
+
+/**
+ * Render synthwave chrome-style title text with 3D extrusion effect.
+ * Creates a chrome gradient (cyan → white → black horizon → purple → pink)
+ * with 3D depth, cyan outline, and purple glow.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {string} text - Text to render
+ * @param {number} x - Center X position
+ * @param {number} y - Center Y position
+ * @param {number} fontSize - Font size in pixels
+ * @param {number} pulseIntensity - Glow pulse intensity (0-1)
+ */
+function drawSynthwaveText(ctx, text, x, y, fontSize, pulseIntensity) {
+    ctx.save();
+    
+    // Apply skew transform for dynamic appearance
+    ctx.translate(x, y);
+    ctx.transform(1, 0, TITLE_TEXT_CONFIG.skewX, 1, 0, 0);
+    
+    ctx.font = `${fontSize}px ${UI.TITLE_FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // Scale extrusion depth based on font size
+    const extrusionDepth = Math.round(TITLE_TEXT_CONFIG.extrusionDepth * (fontSize / 80));
+
+    // A. THE 3D EXTRUSION (dark purple blocky shadow)
+    ctx.fillStyle = TITLE_TEXT_CONFIG.extrusionColor;
+    for (let i = extrusionDepth; i > 0; i--) {
+        ctx.fillText(text, i * 1.5, i * 1.5);
+    }
+
+    // B. THE CHROME GRADIENT (vertical gradient spanning text height)
+    const gradient = ctx.createLinearGradient(0, -fontSize / 2, 0, fontSize / 2);
+    gradient.addColorStop(0.0, '#00ffff');    // Top: Cyan/Electric Blue
+    gradient.addColorStop(0.45, '#ffffff');   // Middle-Top: White horizon
+    gradient.addColorStop(0.5, '#000000');    // Sharp Horizon Line
+    gradient.addColorStop(0.55, '#bd00ff');   // Middle-Bottom: Deep Purple
+    gradient.addColorStop(1.0, '#ff00cc');    // Bottom: Hot Pink
+
+    // Draw the gradient face
+    ctx.fillStyle = gradient;
+    ctx.fillText(text, 0, 0);
+
+    // C. THE OUTLINE & GLOW
+    ctx.lineWidth = 2 + (fontSize / 40);
+    ctx.strokeStyle = '#00ffff'; // Cyan outline
+    ctx.shadowColor = '#bd00ff'; // Purple glow
+    ctx.shadowBlur = 15 + pulseIntensity * 10;
+    ctx.strokeText(text, 0, 0);
+
+    // Reset shadow
+    ctx.shadowBlur = 0;
+
+    // D. REFLECTION/SHINE (subtle white overlay)
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.fillText(text, 0, 0);
+
+    ctx.restore();
+}
+
+/**
+ * Render the glowing neon subtitle.
+ * Creates a hot pink/red glow effect with yellow stroke.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {string} text - Text to render
+ * @param {number} x - Center X position
+ * @param {number} y - Center Y position
+ * @param {number} fontSize - Font size in pixels
+ * @param {number} pulseIntensity - Glow pulse intensity (0-1)
+ */
+function drawNeonSubtitle(ctx, text, x, y, fontSize, pulseIntensity) {
+    ctx.save();
+    
+    // Apply same skew as main title for consistency
+    ctx.translate(x, y);
+    ctx.transform(1, 0, TITLE_TEXT_CONFIG.skewX, 1, 0, 0);
+    
+    ctx.font = `${fontSize}px ${UI.TITLE_FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // Neon Red/Orange Glow
+    ctx.shadowColor = '#ff3300';
+    ctx.shadowBlur = 12 + pulseIntensity * 8;
+    ctx.strokeStyle = '#ffcc00'; // Yellow stroke
+    ctx.lineWidth = 2;
+    ctx.strokeText(text, 0, 0);
+
+    // Solid fill inside
+    ctx.fillStyle = '#ff0055'; // Hot pink/red
+    ctx.shadowBlur = 0; // Remove blur for sharp fill
+    ctx.fillText(text, 0, 0);
+
     ctx.restore();
 }
 
 /**
  * Render the menu screen with full synthwave styling.
- * Features:
- * - Sunset gradient background with grid
- * - Neon title with glow effect
- * - Animated pulsing buttons
- * - Full-screen overlay
+ * Updated to match design reference with chrome title, paired buttons, and corner stats.
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  */
 function renderMenu(ctx) {
+    // Update button positions for current screen size
+    updateMenuButtonPositions();
+
+    // Get dynamic screen dimensions
+    const width = Renderer.getWidth();
+    const height = Renderer.getHeight();
+
     // Update animation time
     menuAnimationTime += 16;  // Approximate 60fps frame time
 
@@ -537,117 +1035,162 @@ function renderMenu(ctx) {
         }
     }
 
-    // Render synthwave background (visible behind everything)
-    renderMenuBackground(ctx);
+    // If Three.js title scene is active, skip the 2D background
+    // and let the 3D animation show through. Otherwise render 2D fallback.
+    if (TitleScene.isActive()) {
+        // Clear to transparent so Three.js shows through
+        ctx.clearRect(0, 0, width, height);
+    } else {
+        // Render 2D synthwave background as fallback
+        renderMenuBackground(ctx);
+    }
 
-    // Semi-transparent overlay for menu content area
-    const overlayGradient = ctx.createLinearGradient(0, 0, 0, CANVAS.DESIGN_HEIGHT);
-    overlayGradient.addColorStop(0, 'rgba(10, 10, 26, 0.7)');
-    overlayGradient.addColorStop(0.5, 'rgba(10, 10, 26, 0.3)');
-    overlayGradient.addColorStop(1, 'rgba(10, 10, 26, 0.7)');
-    ctx.fillStyle = overlayGradient;
-    ctx.fillRect(0, 0, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    // Subtle vignette overlay for better readability over 3D background
+    const vignetteGradient = ctx.createRadialGradient(
+        width / 2, height / 2, 0,
+        width / 2, height / 2, Math.max(width, height) * 0.7
+    );
+    vignetteGradient.addColorStop(0, 'rgba(10, 10, 26, 0)');
+    vignetteGradient.addColorStop(0.7, 'rgba(10, 10, 26, 0.2)');
+    vignetteGradient.addColorStop(1, 'rgba(10, 10, 26, 0.5)');
+    ctx.fillStyle = vignetteGradient;
+    ctx.fillRect(0, 0, width, height);
 
-    // Title with neon glow effect
-    const titleY = CANVAS.DESIGN_HEIGHT / 3 - 20;
+    // Get layout configuration
+    const layout = currentMenuLayout || calculateMenuLayout(height, width);
+    const isCompact = layout.isCompact;
+    const titleScale = layout.titleScale;
 
-    // Title shadow/glow layers
+    // Title positioning - split into "SCORCHED" and "EARTH" on separate lines
+    // to match design reference (start-redesign.png) with chrome synthwave effect
+    // Base Y positions (at full scale), then scaled proportionally
+    const baseScorchedY = isCompact ? 100 : 120;
+    const baseEarthY = isCompact ? 190 : 220;
+    const baseSubtitleY = isCompact ? 260 : 300;
+    
+    // Scale Y positions proportionally with titleScale to maintain visual balance
+    // The title block should shrink as a unit, not just the font sizes
+    const scorchedY = Math.round(baseScorchedY * titleScale);
+    const earthY = Math.round(baseEarthY * titleScale);
+    const subtitleY = Math.round(baseSubtitleY * titleScale);
+
+    // Font sizes - "SCORCHED" is larger, "EARTH" slightly smaller (using Audiowide font)
+    // Font sizes doubled for greater visual impact
+    const scorchedFontSize = Math.round(120 * titleScale);
+    const earthFontSize = Math.round(100 * titleScale);
+    const subtitleFontSize = Math.round(44 * titleScale);
+
+    // Render "SCORCHED" - chrome synthwave effect with 3D extrusion
+    drawSynthwaveText(ctx, 'SCORCHED', width / 2, scorchedY, scorchedFontSize, pulseIntensity);
+
+    // Render "EARTH" - same chrome synthwave effect
+    drawSynthwaveText(ctx, 'EARTH', width / 2, earthY, earthFontSize, pulseIntensity);
+
+    // Subtitle "SYNTHWAVE EDITION" - neon glow effect
+    drawNeonSubtitle(ctx, 'SYNTHWAVE EDITION', width / 2, subtitleY, subtitleFontSize, pulseIntensity);
+
+    // Get badge counts for buttons
+    const unviewedAchievements = getUnviewedCount();
+    const newTanks = TankCollection.getNewTankCount();
+
+    // Render menu buttons using Button component
+    menuButtons.start.render(ctx, pulseIntensity);
+    menuButtons.highScores.render(ctx, pulseIntensity);
+    menuButtons.achievements.renderWithBadge(ctx, pulseIntensity, unviewedAchievements);
+    menuButtons.collection.renderWithBadge(ctx, pulseIntensity, newTanks);
+    menuButtons.supplyDrop.render(ctx, pulseIntensity);
+    menuButtons.options.render(ctx, pulseIntensity);
+
+    // Token balance display - bottom right corner with neon box (mirroring Best Run box on left)
+    const tokenBalance = Tokens.getTokenBalance();
+    const tokenPadding = isCompact ? 15 : 25;
+    const tokenFontSize = isCompact ? UI.FONT_SIZE_SMALL : UI.FONT_SIZE_MEDIUM;
+    const tokenCardWidth = isCompact ? 75 : 90;
+    const tokenCardHeight = isCompact ? 50 : 60;
+
+    // Position: bottom right corner (mirroring Best Run's bottom left position)
+    const tokenCardX = width - tokenPadding - tokenCardWidth;
+    const tokenCardY = height - tokenPadding - tokenCardHeight;
+
     ctx.save();
-    ctx.shadowColor = COLORS.NEON_CYAN;
-    ctx.shadowBlur = 30 + pulseIntensity * 20;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
 
-    ctx.font = `bold 72px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = COLORS.NEON_CYAN;
-    ctx.fillText('SCORCHED EARTH', CANVAS.DESIGN_WIDTH / 2, titleY);
-
-    // Title outline for extra depth
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 1;
-    ctx.strokeText('SCORCHED EARTH', CANVAS.DESIGN_WIDTH / 2, titleY);
-    ctx.restore();
-
-    // Subtitle with different color glow
-    ctx.save();
-    ctx.shadowColor = COLORS.NEON_PINK;
-    ctx.shadowBlur = 15 + pulseIntensity * 10;
-    ctx.font = `bold ${UI.FONT_SIZE_LARGE + 4}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = COLORS.NEON_PINK;
-    ctx.fillText('SYNTHWAVE EDITION', CANVAS.DESIGN_WIDTH / 2, titleY + 55);
-    ctx.restore();
-
-    // Render menu buttons
-    renderMenuButton(ctx, menuButtons.start, pulseIntensity);
-    renderMenuButton(ctx, menuButtons.options, pulseIntensity);
-
-    // Instructions text at bottom
-    ctx.fillStyle = COLORS.TEXT_MUTED;
-    ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('Click or tap START GAME to begin', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT - 80);
-    ctx.fillText('Press D to toggle debug mode', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT - 55);
-
-    // Decorative line under title
-    ctx.save();
-    ctx.strokeStyle = COLORS.NEON_PURPLE;
-    ctx.shadowColor = COLORS.NEON_PURPLE;
-    ctx.shadowBlur = 10;
-    ctx.lineWidth = 2;
+    // Card background with neon border (like Best Run box)
+    ctx.fillStyle = 'rgba(10, 10, 26, 0.85)';
     ctx.beginPath();
-    const lineWidth = 200;
-    ctx.moveTo(CANVAS.DESIGN_WIDTH / 2 - lineWidth, titleY + 80);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH / 2 + lineWidth, titleY + 80);
-    ctx.stroke();
-    ctx.restore();
+    ctx.roundRect(tokenCardX, tokenCardY, tokenCardWidth, tokenCardHeight, 8);
+    ctx.fill();
 
-    // Neon frame around the screen
-    ctx.save();
+    // Neon border with cyan glow effect
     ctx.strokeStyle = COLORS.NEON_CYAN;
+    ctx.lineWidth = 2;
     ctx.shadowColor = COLORS.NEON_CYAN;
-    ctx.shadowBlur = 15;
-    ctx.lineWidth = 3;
-    ctx.strokeRect(20, 20, CANVAS.DESIGN_WIDTH - 40, CANVAS.DESIGN_HEIGHT - 40);
-
-    // Corner accents
-    const cornerSize = 30;
-    ctx.strokeStyle = COLORS.NEON_PINK;
-    ctx.shadowColor = COLORS.NEON_PINK;
-    ctx.lineWidth = 4;
-
-    // Top-left corner
-    ctx.beginPath();
-    ctx.moveTo(20, 20 + cornerSize);
-    ctx.lineTo(20, 20);
-    ctx.lineTo(20 + cornerSize, 20);
+    ctx.shadowBlur = 8;
     ctx.stroke();
+    ctx.shadowBlur = 0;
 
-    // Top-right corner
+    // Coin icon (circle with glow) - positioned on left side of card
+    const coinRadius = isCompact ? 8 : 10;
+    const coinX = tokenCardX + 18;
+    const coinY = tokenCardY + tokenCardHeight / 2 - 2;
+
+    ctx.fillStyle = '#F59E0B';
+    ctx.shadowColor = '#F59E0B';
+    ctx.shadowBlur = 6;
     ctx.beginPath();
-    ctx.moveTo(CANVAS.DESIGN_WIDTH - 20 - cornerSize, 20);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH - 20, 20);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH - 20, 20 + cornerSize);
-    ctx.stroke();
+    ctx.arc(coinX, coinY, coinRadius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
 
-    // Bottom-left corner
+    // Token count - large number next to coin
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `bold ${tokenFontSize + 2}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${tokenBalance}`, coinX + coinRadius + 8, coinY);
+
+    // "TOKENS" label - below the coin/number row
+    ctx.fillStyle = '#888899';
+    ctx.font = `${isCompact ? 9 : 11}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText('TOKENS', tokenCardX + tokenCardWidth / 2, tokenCardY + tokenCardHeight - 6);
+    ctx.restore();
+
+    // Best run display - bottom left corner as a styled card
+    const bestRound = HighScores.getBestRoundCount();
+    const bestRunFontSize = isCompact ? UI.FONT_SIZE_SMALL - 2 : UI.FONT_SIZE_SMALL;
+    const bestCardPadding = isCompact ? 15 : 25;
+    const bestCardHeight = isCompact ? 40 : 50;
+    const bestCardWidth = isCompact ? 90 : 110;
+
+    ctx.save();
+    // Card background
+    ctx.fillStyle = 'rgba(10, 10, 26, 0.85)';
     ctx.beginPath();
-    ctx.moveTo(20, CANVAS.DESIGN_HEIGHT - 20 - cornerSize);
-    ctx.lineTo(20, CANVAS.DESIGN_HEIGHT - 20);
-    ctx.lineTo(20 + cornerSize, CANVAS.DESIGN_HEIGHT - 20);
-    ctx.stroke();
+    ctx.roundRect(bestCardPadding, height - bestCardPadding - bestCardHeight, bestCardWidth, bestCardHeight, 8);
+    ctx.fill();
 
-    // Bottom-right corner
-    ctx.beginPath();
-    ctx.moveTo(CANVAS.DESIGN_WIDTH - 20 - cornerSize, CANVAS.DESIGN_HEIGHT - 20);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH - 20, CANVAS.DESIGN_HEIGHT - 20);
-    ctx.lineTo(CANVAS.DESIGN_WIDTH - 20, CANVAS.DESIGN_HEIGHT - 20 - cornerSize);
+    // Neon border with glow effect
+    ctx.strokeStyle = COLORS.NEON_YELLOW;
+    ctx.lineWidth = 2;
+    ctx.shadowColor = COLORS.NEON_YELLOW;
+    ctx.shadowBlur = 8;
     ctx.stroke();
+    ctx.shadowBlur = 0;
 
+    // Best Run label
+    ctx.fillStyle = '#888899';
+    ctx.font = `${bestRunFontSize}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText('Best Run:', bestCardPadding + 10, height - bestCardPadding - bestCardHeight + 8);
+
+    // Best Run value
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `bold ${bestRunFontSize + 4}px ${UI.FONT_FAMILY}`;
+    ctx.textBaseline = 'bottom';
+    const roundsText = bestRound > 0 ? `${bestRound} rounds` : '--';
+    ctx.fillText(roundsText, bestCardPadding + 10, height - bestCardPadding - 6);
     ctx.restore();
 
     ctx.restore();
@@ -658,7 +1201,7 @@ function renderMenu(ctx) {
     }
 
     // Render CRT effects as final post-processing overlay
-    renderCrtEffects(ctx, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    renderCrtEffects(ctx, width, height);
 }
 
 /**
@@ -666,11 +1209,14 @@ function renderMenu(ctx) {
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  */
 function renderOptionsOverlay(ctx) {
+    const width = Renderer.getWidth();
+    const height = Renderer.getHeight();
+
     ctx.save();
 
     // Semi-transparent dark overlay
     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(0, 0, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    ctx.fillRect(0, 0, width, height);
 
     // Render volume controls panel
     VolumeControls.render(ctx);
@@ -680,7 +1226,7 @@ function renderOptionsOverlay(ctx) {
     ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
-    ctx.fillText('Press ESC or click outside to close', CANVAS.DESIGN_WIDTH / 2, CANVAS.DESIGN_HEIGHT - 30);
+    ctx.fillText('Press ESC or click outside to close', width / 2, height - 30);
 
     ctx.restore();
 }
@@ -695,6 +1241,8 @@ function setupMenuState() {
             console.log('Entered MENU state');
             // Play menu music
             Music.playForState(GAME_STATES.MENU);
+            // Start animated 3D title scene
+            TitleScene.start();
         },
         onExit: (toState) => {
             console.log('Exiting MENU state');
@@ -702,6 +1250,11 @@ function setupMenuState() {
             if (optionsOverlayVisible) {
                 optionsOverlayVisible = false;
                 VolumeControls.reset();
+            }
+            // Keep TitleScene running for difficulty select (seamless visual transition)
+            // Stop it only when going to other states
+            if (toState !== GAME_STATES.DIFFICULTY_SELECT) {
+                TitleScene.stop();
             }
         },
         render: renderMenu
@@ -712,7 +1265,13 @@ function setupMenuState() {
     Input.onMouseDown((x, y, button) => {
         if (Game.getState() !== GAME_STATES.MENU) return;
 
-        // Check options overlay first
+        // Check name entry modal first (has highest priority)
+        if (NameEntry.isOpen()) {
+            NameEntry.handleClick({ x, y });
+            return;
+        }
+
+        // Check options overlay next
         if (optionsOverlayVisible) {
             handleOptionsOverlayClick({ x, y });
             return;
@@ -725,7 +1284,13 @@ function setupMenuState() {
     Input.onTouchStart((x, y) => {
         if (Game.getState() !== GAME_STATES.MENU) return;
 
-        // Check options overlay first
+        // Check name entry modal first (has highest priority)
+        if (NameEntry.isOpen()) {
+            NameEntry.handleClick({ x, y });
+            return;
+        }
+
+        // Check options overlay next
         if (optionsOverlayVisible) {
             handleOptionsOverlayClick({ x, y });
             return;
@@ -788,53 +1353,100 @@ function setupMenuState() {
 let selectedDifficulty = null;
 
 /**
- * Difficulty selection button definitions.
- * Centered vertically on screen with consistent spacing.
+ * Difficulty selection button definitions using Button component.
+ * Each entry includes the Button instance plus metadata (difficulty level, description).
  */
-const difficultyButtons = {
+const difficultyButtonConfigs = {
     easy: {
-        x: CANVAS.DESIGN_WIDTH / 2,
-        y: CANVAS.DESIGN_HEIGHT / 2 - 70,
-        width: 280,
-        height: 60,
-        text: 'EASY',
-        color: '#00ff88',  // Green
         difficulty: 'easy',
-        description: 'Relaxed gameplay • AI makes more mistakes'
+        title: 'EASY',
+        description: 'Relaxed gameplay • AI makes more mistakes',
+        color: '#00ff88'  // Green - for description text
     },
     medium: {
-        x: CANVAS.DESIGN_WIDTH / 2,
-        y: CANVAS.DESIGN_HEIGHT / 2 + 10,
-        width: 280,
-        height: 60,
-        text: 'MEDIUM',
-        color: '#ffff00',  // Yellow
         difficulty: 'medium',
-        description: 'Balanced challenge • AI compensates for wind'
+        title: 'MEDIUM',
+        description: 'Balanced challenge • AI compensates for wind',
+        color: '#ffff00'  // Yellow - for description text
     },
     hard: {
-        x: CANVAS.DESIGN_WIDTH / 2,
-        y: CANVAS.DESIGN_HEIGHT / 2 + 90,
-        width: 280,
-        height: 60,
-        text: 'HARD',
-        color: '#ff4444',  // Red
         difficulty: 'hard',
-        description: 'Brutal precision • AI rarely misses'
+        title: 'HARD',
+        description: 'Brutal precision • AI rarely misses',
+        color: '#ff4444'  // Red - for description text
     }
 };
 
 /**
- * Back button for difficulty selection screen.
+ * Button component instances for difficulty selection.
+ * Created once, positions updated dynamically.
  */
-const difficultyBackButton = {
+const difficultyButtons = {
+    easy: new Button({
+        text: '',  // Empty - we render custom two-line text in renderDifficultyButton
+        x: CANVAS.DESIGN_WIDTH / 2,
+        y: CANVAS.DESIGN_HEIGHT / 2 - 90,
+        width: 380,
+        height: 80,
+        fontSize: UI.FONT_SIZE_LARGE,
+        borderColor: '#00ff88',
+        glowColor: '#00ff88',
+        textColor: COLORS.TEXT_LIGHT
+    }),
+    medium: new Button({
+        text: '',  // Empty - we render custom two-line text in renderDifficultyButton
+        x: CANVAS.DESIGN_WIDTH / 2,
+        y: CANVAS.DESIGN_HEIGHT / 2,
+        width: 380,
+        height: 80,
+        fontSize: UI.FONT_SIZE_LARGE,
+        borderColor: '#ffff00',
+        glowColor: '#ffff00',
+        textColor: COLORS.TEXT_LIGHT
+    }),
+    hard: new Button({
+        text: '',  // Empty - we render custom two-line text in renderDifficultyButton
+        x: CANVAS.DESIGN_WIDTH / 2,
+        y: CANVAS.DESIGN_HEIGHT / 2 + 90,
+        width: 380,
+        height: 80,
+        fontSize: UI.FONT_SIZE_LARGE,
+        borderColor: '#ff4444',
+        glowColor: '#ff4444',
+        textColor: COLORS.TEXT_LIGHT
+    })
+};
+
+/**
+ * Back button for difficulty selection screen using Button component.
+ */
+const difficultyBackButton = new Button({
+    text: '← BACK',
     x: CANVAS.DESIGN_WIDTH / 2,
     y: CANVAS.DESIGN_HEIGHT - 80,
     width: 200,
     height: 50,
-    text: '← BACK',
-    color: COLORS.TEXT_MUTED
-};
+    fontSize: UI.FONT_SIZE_MEDIUM,
+    borderColor: COLORS.TEXT_MUTED,
+    glowColor: COLORS.TEXT_MUTED,
+    textColor: COLORS.TEXT_MUTED
+});
+
+/**
+ * Update difficulty button positions based on current screen dimensions.
+ * Should be called before rendering or hit testing difficulty buttons.
+ */
+function updateDifficultyButtonPositions() {
+    const width = Renderer.getWidth();
+    const height = Renderer.getHeight();
+    const centerX = width / 2;
+    const centerY = height / 2;
+
+    difficultyButtons.easy.setPosition(centerX, centerY - 90);
+    difficultyButtons.medium.setPosition(centerX, centerY);
+    difficultyButtons.hard.setPosition(centerX, centerY + 90);
+    difficultyBackButton.setPosition(centerX, height - 80);
+}
 
 /**
  * Animation time for difficulty selection screen.
@@ -843,19 +1455,22 @@ let difficultyAnimationTime = 0;
 
 /**
  * Handle click on difficulty selection screen.
- * @param {{x: number, y: number}} pos - Click position in design coordinates
+ * @param {{x: number, y: number}} pos - Click position in game coordinates
  */
 function handleDifficultyClick(pos) {
     if (Game.getState() !== GAME_STATES.DIFFICULTY_SELECT) return;
 
-    // Check difficulty buttons
+    // Ensure button positions are current for the screen size
+    updateDifficultyButtonPositions();
+
+    // Check difficulty buttons (using Button component's containsPoint)
     for (const key of Object.keys(difficultyButtons)) {
         const button = difficultyButtons[key];
-        if (isInsideButton(pos.x, pos.y, button)) {
+        if (button.containsPoint(pos.x, pos.y)) {
             // Play click sound
             Sound.playClickSound();
-            // Set the selected difficulty
-            selectedDifficulty = button.difficulty;
+            // Set the selected difficulty from config
+            selectedDifficulty = difficultyButtonConfigs[key].difficulty;
             console.log(`[Main] Player selected difficulty: ${selectedDifficulty}`);
             // Start the game
             Game.setState(GAME_STATES.PLAYING);
@@ -863,64 +1478,51 @@ function handleDifficultyClick(pos) {
         }
     }
 
-    // Check back button
-    if (isInsideButton(pos.x, pos.y, difficultyBackButton)) {
+    // Check back button (using Button component's containsPoint)
+    if (difficultyBackButton.containsPoint(pos.x, pos.y)) {
         Sound.playClickSound();
         Game.setState(GAME_STATES.MENU);
     }
 }
 
 /**
- * Render a difficulty selection button with glow effect.
+ * Render a difficulty selection button with title and description text.
+ * Uses Button component for background/border, then custom text layout for two-line content.
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
- * @param {Object} button - Button definition
+ * @param {string} key - Button key (easy, medium, hard)
  * @param {number} pulseIntensity - Glow pulse intensity (0-1)
  */
-function renderDifficultyButton(ctx, button, pulseIntensity) {
-    const halfWidth = button.width / 2;
-    const halfHeight = button.height / 2;
-    const btnX = button.x - halfWidth;
-    const btnY = button.y - halfHeight;
+function renderDifficultyButton(ctx, key, pulseIntensity) {
+    const button = difficultyButtons[key];
+    const config = difficultyButtonConfigs[key];
 
+    // Render button background and border (but text will be overwritten)
+    button.render(ctx, pulseIntensity);
+
+    // Render title text (shifted up from center to make room for description)
     ctx.save();
-
-    // Button background with rounded corners
-    ctx.fillStyle = 'rgba(26, 26, 46, 0.8)';
-    ctx.beginPath();
-    ctx.roundRect(btnX, btnY, button.width, button.height, 8);
-    ctx.fill();
-
-    // Neon glow effect (pulsing)
-    ctx.shadowColor = button.color;
-    ctx.shadowBlur = 15 + pulseIntensity * 10;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
-
-    // Button border (neon outline)
-    ctx.strokeStyle = button.color;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.roundRect(btnX, btnY, button.width, button.height, 8);
-    ctx.stroke();
-
-    // Reset shadow for text
-    ctx.shadowBlur = 0;
-
-    // Button text with glow
-    ctx.shadowColor = button.color;
-    ctx.shadowBlur = 8 + pulseIntensity * 5;
     ctx.fillStyle = COLORS.TEXT_LIGHT;
     ctx.font = `bold ${UI.FONT_SIZE_LARGE}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(button.text, button.x, button.y - 5);
+    // Subtle glow on title text
+    ctx.shadowColor = button.glowColor;
+    ctx.shadowBlur = 4 + pulseIntensity * 2;
+    ctx.fillText(config.title, button.x, button.y - 12);
+    ctx.restore();
 
-    // Description text below button text
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = COLORS.TEXT_MUTED;
-    ctx.font = `${UI.FONT_SIZE_SMALL - 2}px ${UI.FONT_FAMILY}`;
-    ctx.fillText(button.description, button.x, button.y + 18);
-
+    // Render description text below title (inside button bounds)
+    ctx.save();
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.font = `${UI.FONT_SIZE_SMALL + 2}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    // Add subtle shadow for contrast
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetX = 1;
+    ctx.shadowOffsetY = 1;
+    ctx.fillText(config.description, button.x, button.y + 16);
     ctx.restore();
 }
 
@@ -930,6 +1532,13 @@ function renderDifficultyButton(ctx, button, pulseIntensity) {
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  */
 function renderDifficultySelect(ctx) {
+    // Update button positions for current screen size
+    updateDifficultyButtonPositions();
+
+    // Get dynamic screen dimensions
+    const width = Renderer.getWidth();
+    const height = Renderer.getHeight();
+
     // Update animation time
     difficultyAnimationTime += 16;  // Approximate 60fps frame time
 
@@ -938,16 +1547,14 @@ function renderDifficultySelect(ctx) {
 
     ctx.save();
 
-    // Render synthwave background (same as menu)
-    renderMenuBackground(ctx);
-
-    // Semi-transparent overlay for content area
-    const overlayGradient = ctx.createLinearGradient(0, 0, 0, CANVAS.DESIGN_HEIGHT);
-    overlayGradient.addColorStop(0, 'rgba(10, 10, 26, 0.7)');
-    overlayGradient.addColorStop(0.5, 'rgba(10, 10, 26, 0.3)');
-    overlayGradient.addColorStop(1, 'rgba(10, 10, 26, 0.7)');
+    // TitleScene provides the 3D animated background (same as menu screen)
+    // We only need a subtle overlay to improve readability of UI elements
+    const overlayGradient = ctx.createLinearGradient(0, 0, 0, height);
+    overlayGradient.addColorStop(0, 'rgba(10, 10, 26, 0.5)');
+    overlayGradient.addColorStop(0.5, 'rgba(10, 10, 26, 0.2)');
+    overlayGradient.addColorStop(1, 'rgba(10, 10, 26, 0.5)');
     ctx.fillStyle = overlayGradient;
-    ctx.fillRect(0, 0, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    ctx.fillRect(0, 0, width, height);
 
     // Title with neon glow effect
     const titleY = 120;
@@ -962,46 +1569,16 @@ function renderDifficultySelect(ctx) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = COLORS.NEON_CYAN;
-    ctx.fillText('SELECT DIFFICULTY', CANVAS.DESIGN_WIDTH / 2, titleY);
+    ctx.fillText('SELECT DIFFICULTY', width / 2, titleY);
     ctx.restore();
 
-    // Subtitle
-    ctx.fillStyle = COLORS.TEXT_MUTED;
-    ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('Choose your challenge level', CANVAS.DESIGN_WIDTH / 2, titleY + 45);
-
-    // Render difficulty buttons
+    // Render difficulty buttons using Button component
     for (const key of Object.keys(difficultyButtons)) {
-        renderDifficultyButton(ctx, difficultyButtons[key], pulseIntensity);
+        renderDifficultyButton(ctx, key, pulseIntensity);
     }
 
-    // Render back button (simpler style)
-    const backBtn = difficultyBackButton;
-    const backHalfWidth = backBtn.width / 2;
-    const backHalfHeight = backBtn.height / 2;
-    const backBtnX = backBtn.x - backHalfWidth;
-    const backBtnY = backBtn.y - backHalfHeight;
-
-    ctx.save();
-    ctx.fillStyle = 'rgba(26, 26, 46, 0.6)';
-    ctx.beginPath();
-    ctx.roundRect(backBtnX, backBtnY, backBtn.width, backBtn.height, 6);
-    ctx.fill();
-
-    ctx.strokeStyle = COLORS.TEXT_MUTED;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.roundRect(backBtnX, backBtnY, backBtn.width, backBtn.height, 6);
-    ctx.stroke();
-
-    ctx.fillStyle = COLORS.TEXT_MUTED;
-    ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(backBtn.text, backBtn.x, backBtn.y);
-    ctx.restore();
+    // Render back button using Button component
+    difficultyBackButton.render(ctx, pulseIntensity);
 
     // Neon frame around the screen (same as menu)
     ctx.save();
@@ -1009,13 +1586,13 @@ function renderDifficultySelect(ctx) {
     ctx.shadowColor = COLORS.NEON_CYAN;
     ctx.shadowBlur = 15;
     ctx.lineWidth = 3;
-    ctx.strokeRect(20, 20, CANVAS.DESIGN_WIDTH - 40, CANVAS.DESIGN_HEIGHT - 40);
+    ctx.strokeRect(20, 20, width - 40, height - 40);
     ctx.restore();
 
     ctx.restore();
 
     // Render CRT effects as final post-processing overlay
-    renderCrtEffects(ctx, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    renderCrtEffects(ctx, width, height);
 }
 
 /**
@@ -1027,9 +1604,18 @@ function setupDifficultySelectState() {
         onEnter: (fromState) => {
             console.log('Entered DIFFICULTY_SELECT state');
             difficultyAnimationTime = 0;
+            // Ensure TitleScene is running (in case we arrived from non-MENU state)
+            if (!TitleScene.isActive()) {
+                TitleScene.start();
+            }
         },
         onExit: (toState) => {
             console.log('Exiting DIFFICULTY_SELECT state');
+            // Keep TitleScene running if going back to MENU (seamless transition)
+            // Stop it when going to PLAYING or other states
+            if (toState !== GAME_STATES.MENU) {
+                TitleScene.stop();
+            }
         },
         render: renderDifficultySelect
     });
@@ -1121,6 +1707,23 @@ function fireProjectile(tank) {
 
     activeProjectiles = [projectile]; // Clear and set new projectile
 
+    // Record stats for player shots only
+    if (tank === playerTank) {
+        recordStat('shotFired');
+        recordStat('weaponUsed', firedWeaponId);
+
+        // Track nuclear weapon launches specifically
+        if (weapon && weapon.type === WEAPON_TYPES.NUCLEAR) {
+            recordStat('nukeLaunched');
+        }
+
+        // Precision achievement: track shot fired
+        PrecisionAchievements.onPlayerShotFired();
+
+        // Weapon achievement: track weapon used
+        WeaponAchievements.onWeaponFired(firedWeaponId);
+    }
+
     // Play fire sound
     Sound.playFireSound();
 
@@ -1155,25 +1758,99 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
     // Track who fired this projectile for money awards
     const isPlayerShot = projectile.owner === 'player';
 
+    // Track if player shot hit enemy for shotHit stat
+    let playerHitEnemy = false;
+    let wasDirectHit = false; // For precision achievement detection
+
     if (directHitTank) {
+        // Store health before damage for achievement detection (Overkill)
+        const healthBeforeDamage = directHitTank.health;
+
         // Apply explosion damage to the directly hit tank
         const damageResult = applyExplosionDamage(explosion, directHitTank, weapon);
 
-        // Award money if player hit the enemy tank
+        // Award money and record stats if player hit the enemy tank
         if (isPlayerShot && directHitTank.team === 'enemy' && damageResult.actualDamage > 0) {
-            Money.awardHitReward(damageResult.actualDamage);
+            const hitReward = Money.awardHitReward(damageResult.actualDamage);
+            ProgressionAchievements.onMoneyEarned(hitReward);
+            LifetimeStats.recordMoneyEarned(hitReward);
+            recordStat('damageDealt', damageResult.actualDamage);
+            playerHitEnemy = true;
+            wasDirectHit = damageResult.isDirectHit;
+
+            // Lifetime stats: record damage dealt
+            LifetimeStats.recordDamageDealt(damageResult.actualDamage);
+
+            // Combat achievement detection: damage dealt to enemy
+            CombatAchievements.onDamageDealt(damageResult, directHitTank, healthBeforeDamage);
+
+            // Weapon achievement: track damage dealt by weapon (for kill credit)
+            WeaponAchievements.onDamageDealtToEnemy(weaponId, damageResult.actualDamage, directHitTank.health);
+        }
+
+        // Track damage taken by player
+        if (directHitTank.team === 'player' && damageResult.actualDamage > 0) {
+            recordStat('damageTaken', damageResult.actualDamage);
+
+            // Lifetime stats: record damage taken
+            LifetimeStats.recordDamageTaken(damageResult.actualDamage);
+
+            // Performance tracking: player took damage (affects flawless status and heavy damage penalty)
+            PerformanceTracking.onDamageTaken(damageResult.actualDamage, TANK.START_HEALTH);
+
+            // Combat achievement detection: player took damage
+            CombatAchievements.onPlayerDamageTaken(damageResult.actualDamage, directHitTank.health);
+
+            // Hidden achievement detection: check for self-inflicted damage
+            HiddenAchievements.onPlayerSelfDamage(isPlayerShot, directHitTank.health, damageResult.actualDamage);
         }
 
         // Also check for splash damage to other tanks
         const allTanks = [playerTank, enemyTank].filter(t => t !== null && t !== directHitTank);
+
+        // Store health before splash damage for achievement detection
+        const splashHealthBefore = {};
+        for (const tank of allTanks) {
+            splashHealthBefore[tank.team] = tank.health;
+        }
+
         const splashResults = applyExplosionToAllTanks(explosion, allTanks, weapon);
 
-        // Award money for splash damage on enemy if player shot
+        // Award money and record stats for splash damage
         if (isPlayerShot) {
             for (const result of splashResults) {
                 if (result.tank.team === 'enemy' && result.actualDamage > 0) {
-                    Money.awardHitReward(result.actualDamage);
+                    const splashReward = Money.awardHitReward(result.actualDamage);
+                    ProgressionAchievements.onMoneyEarned(splashReward);
+                    LifetimeStats.recordMoneyEarned(splashReward);
+                    recordStat('damageDealt', result.actualDamage);
+                    playerHitEnemy = true;
+
+                    // Lifetime stats: record splash damage dealt
+                    LifetimeStats.recordDamageDealt(result.actualDamage);
+
+                    // Combat achievement detection: splash damage dealt to enemy
+                    CombatAchievements.onDamageDealt(result, result.tank, splashHealthBefore[result.tank.team]);
+
+                    // Weapon achievement: track splash damage dealt by weapon (for kill credit)
+                    WeaponAchievements.onDamageDealtToEnemy(weaponId, result.actualDamage, result.tank.health);
                 }
+            }
+        }
+
+        // Track splash damage taken by player
+        for (const result of splashResults) {
+            if (result.tank.team === 'player' && result.actualDamage > 0) {
+                recordStat('damageTaken', result.actualDamage);
+
+                // Lifetime stats: record splash damage taken
+                LifetimeStats.recordDamageTaken(result.actualDamage);
+
+                // Combat achievement detection: player took splash damage
+                CombatAchievements.onPlayerDamageTaken(result.actualDamage, result.tank.health);
+
+                // Hidden achievement detection: check for self-inflicted splash damage
+                HiddenAchievements.onPlayerSelfDamage(isPlayerShot, result.tank.health, result.actualDamage);
             }
         }
 
@@ -1181,20 +1858,89 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
     } else {
         // Apply splash damage to all tanks near the explosion
         const allTanks = [playerTank, enemyTank].filter(t => t !== null);
+
+        // Store health before damage for achievement detection
+        const healthBefore = {};
+        for (const tank of allTanks) {
+            healthBefore[tank.team] = tank.health;
+        }
+
         const damageResults = applyExplosionToAllTanks(explosion, allTanks, weapon);
 
-        // Award money for any damage on enemy if player shot
+        // Award money and record stats for any damage on enemy if player shot
         if (isPlayerShot) {
             for (const result of damageResults) {
                 if (result.tank.team === 'enemy' && result.actualDamage > 0) {
-                    Money.awardHitReward(result.actualDamage);
+                    const terrainHitReward = Money.awardHitReward(result.actualDamage);
+                    ProgressionAchievements.onMoneyEarned(terrainHitReward);
+                    LifetimeStats.recordMoneyEarned(terrainHitReward);
+                    recordStat('damageDealt', result.actualDamage);
+                    playerHitEnemy = true;
+
+                    // Lifetime stats: record terrain splash damage dealt
+                    LifetimeStats.recordDamageDealt(result.actualDamage);
+
+                    // Combat achievement detection: damage dealt to enemy
+                    CombatAchievements.onDamageDealt(result, result.tank, healthBefore[result.tank.team]);
+
+                    // Weapon achievement: track damage dealt by weapon (for kill credit)
+                    WeaponAchievements.onDamageDealtToEnemy(weaponId, result.actualDamage, result.tank.health);
                 }
             }
         }
 
+        // Track damage taken by player
         for (const result of damageResults) {
+            if (result.tank.team === 'player' && result.actualDamage > 0) {
+                recordStat('damageTaken', result.actualDamage);
+
+                // Lifetime stats: record terrain splash damage taken
+                LifetimeStats.recordDamageTaken(result.actualDamage);
+
+                // Performance tracking: player took splash damage
+                PerformanceTracking.onDamageTaken(result.actualDamage, TANK.START_HEALTH);
+
+                // Combat achievement detection: player took damage
+                CombatAchievements.onPlayerDamageTaken(result.actualDamage, result.tank.health);
+
+                // Hidden achievement detection: check for self-inflicted damage
+                HiddenAchievements.onPlayerSelfDamage(isPlayerShot, result.tank.health, result.actualDamage);
+            }
             console.log(`Splash damage: ${result.tank.team} tank took ${result.actualDamage} damage, health: ${result.tank.health}`);
         }
+    }
+
+    // Record shotHit if player shot hit the enemy (only once per projectile)
+    if (isPlayerShot && playerHitEnemy) {
+        recordStat('shotHit');
+
+        // Lifetime stats: record shot that hit
+        LifetimeStats.recordShot(true);
+
+        // Performance tracking: player hit enemy
+        PerformanceTracking.updateAccuracy(true);
+
+        // Precision achievement detection: player hit enemy
+        PrecisionAchievements.onPlayerHitEnemy({
+            isDirectHit: wasDirectHit,
+            playerTank: playerTank,
+            enemyTank: enemyTank
+        });
+
+        // Hidden achievement detection: player hit enemy (resets consecutive misses)
+        HiddenAchievements.onPlayerHitEnemy();
+    } else if (isPlayerShot) {
+        // Lifetime stats: record shot that missed
+        LifetimeStats.recordShot(false);
+
+        // Performance tracking: player missed
+        PerformanceTracking.updateAccuracy(false);
+
+        // Precision achievement detection: player missed
+        PrecisionAchievements.onPlayerMissed();
+
+        // Hidden achievement detection: player missed (tracks consecutive misses)
+        HiddenAchievements.onPlayerMissed();
     }
 
     // Trigger explosion visual effect for all weapons (before terrain destruction)
@@ -1312,7 +2058,10 @@ function updateProjectile() {
         if (projectile.isRolling) {
             // Check for tank collision while rolling
             const pos = projectile.getPosition();
-            const tankHit = checkTankCollision(pos.x, pos.y, tanks);
+            const tankHit = checkTankCollision(pos.x, pos.y, tanks, {
+                owner: projectile.owner,
+                canHitOwner: projectile.canHitOwner()
+            });
             if (tankHit) {
                 const { tank } = tankHit;
                 console.log(`Roller hit ${tank.team} tank!`);
@@ -1336,7 +2085,10 @@ function updateProjectile() {
 
             // Check for tank collision again after moving
             const newPos = projectile.getPosition();
-            const tankHitAfterMove = checkTankCollision(newPos.x, newPos.y, tanks);
+            const tankHitAfterMove = checkTankCollision(newPos.x, newPos.y, tanks, {
+                owner: projectile.owner,
+                canHitOwner: projectile.canHitOwner()
+            });
             if (tankHitAfterMove) {
                 const { tank } = tankHitAfterMove;
                 console.log(`Roller hit ${tank.team} tank after moving!`);
@@ -1389,7 +2141,11 @@ function updateProjectile() {
         const pos = projectile.getPosition();
 
         // Check for tank collision
-        const tankHit = checkTankCollision(pos.x, pos.y, tanks);
+        // Pass owner info to prevent immediate self-collision at low angles
+        const tankHit = checkTankCollision(pos.x, pos.y, tanks, {
+            owner: projectile.owner,
+            canHitOwner: projectile.canHitOwner()
+        });
         if (tankHit) {
             const { tank } = tankHit;
             handleProjectileExplosion(projectile, pos, tank);
@@ -1409,6 +2165,12 @@ function updateProjectile() {
                 if (projectile.shouldRoll()) {
                     console.log(`Roller hit terrain at (${collision.x}, ${collision.y.toFixed(1)}) - starting roll!`);
                     projectile.startRolling(collision.y);
+
+                    // Precision achievement: projectile touched terrain (for Trick Shot)
+                    if (projectile.owner === 'player') {
+                        PrecisionAchievements.onProjectileTouchedTerrain();
+                    }
+
                     continue; // Continue to next frame, don't explode yet
                 }
 
@@ -1450,54 +2212,157 @@ function updateProjectile() {
 }
 
 /**
- * Check if the round has ended (one tank destroyed).
- * Transitions to VICTORY or DEFEAT state if so, otherwise continues to next turn.
+ * Check if the round has ended (one or both tanks destroyed).
+ * Implements permadeath: player destruction ends the run immediately.
+ * - Draw (both destroyed): GAME_OVER (player tank destroyed = run ends)
+ * - Player only destroyed: GAME_OVER (run ends)
+ * - Enemy only destroyed: VICTORY (continue to next round)
  */
 function checkRoundEnd() {
     const playerDestroyed = playerTank && playerTank.health <= 0;
     const enemyDestroyed = enemyTank && enemyTank.health <= 0;
 
-    if (enemyDestroyed) {
-        // Player wins!
-        console.log('[Main] Enemy destroyed - VICTORY!');
+    // Check for draw condition first (both tanks destroyed)
+    // In roguelike mode, draw counts as player loss since player tank is destroyed
+    if (playerDestroyed && enemyDestroyed) {
+        console.log('[Main] Both tanks destroyed - MUTUAL DESTRUCTION (GAME OVER)!');
 
-        // Award victory bonus (hit rewards already given during combat)
-        Money.awardVictoryBonus();
+        // Hidden achievement detection: both tanks destroyed (Mutual Destruction)
+        HiddenAchievements.onRoundEndCheck(playerDestroyed, enemyDestroyed);
 
-        // Get total round earnings for display
-        const roundEarnings = Money.getRoundEarnings();
-        const roundDamage = Money.getRoundDamage();
+        // Combat achievement detection: round lost (draw counts as loss)
+        CombatAchievements.onRoundLost();
 
-        // Show victory screen after short delay
-        VictoryDefeat.showVictory(roundEarnings, roundDamage, 1200);
+        // Token system: round loss resets win streak
+        Tokens.onRoundLoss();
 
-        // Haptic feedback for victory (mobile devices)
-        Haptics.hapticVictory();
+        // Performance tracking: round lost (draw counts as loss)
+        PerformanceTracking.onRoundEnd(false);
 
-        // Transition to victory state
-        Game.setState(GAME_STATES.VICTORY);
-        return;
-    }
+        // Lifetime stats: record loss (draw counts as loss)
+        LifetimeStats.recordLoss({ roundNumber: currentRound });
 
-    if (playerDestroyed) {
-        // Player loses
-        console.log('[Main] Player destroyed - DEFEAT!');
+        // End the run and finalize stats (draw counts as loss)
+        endRunState(true);
 
-        // Award consolation prize
-        Money.awardDefeatConsolation();
-
-        // Get total round earnings for display
-        const roundEarnings = Money.getRoundEarnings();
-        const roundDamage = Money.getRoundDamage();
-
-        // Show defeat screen after short delay
-        VictoryDefeat.showDefeat(roundEarnings, roundDamage, 1200);
+        // Show game over screen with draw indicator
+        // Stats are fetched from runState module automatically
+        GameOver.show({
+            rounds: currentRound,
+            draw: true,
+            delay: 1200
+        });
 
         // Haptic feedback for defeat (mobile devices)
         Haptics.hapticDefeat();
 
-        // Transition to defeat state
-        Game.setState(GAME_STATES.DEFEAT);
+        // Transition to game over state (terminal - run has ended)
+        Game.setState(GAME_STATES.GAME_OVER);
+        return;
+    }
+
+    if (enemyDestroyed) {
+        // Player wins this round!
+        console.log('[Main] Enemy destroyed - VICTORY!');
+
+        // Combat achievement detection: enemy destroyed and round won
+        CombatAchievements.onEnemyDestroyed(enemyTank);
+        CombatAchievements.onRoundWon(playerTank ? playerTank.health : 0);
+
+        // Weapon achievement: enemy killed (for weapon kill credit)
+        WeaponAchievements.onEnemyKilled(enemyTank);
+
+        // Weapon achievement: round won (for Basic Training detection)
+        WeaponAchievements.onRoundWon();
+
+        // Hidden achievement: round won (Patient Zero, Against All Odds, Minimalist)
+        HiddenAchievements.onRoundWon(currentRound, playerTank ? playerTank.inventory : null);
+
+        // Token system: award tokens for round win
+        const combatState = CombatAchievements.getState();
+        const isFlawless = combatState.roundState.damageTakenThisRound === 0;
+        const tokenResult = Tokens.onRoundWin({ isFlawless, roundNumber: currentRound });
+
+        // Get achievements unlocked during this round
+        const roundAchievements = getRoundAchievements();
+
+        // Performance tracking: round won (updates win streak)
+        PerformanceTracking.onRoundEnd(true);
+
+        // Lifetime stats: record win
+        LifetimeStats.recordWin({
+            isFlawless,
+            roundNumber: currentRound
+        });
+
+        // Lifetime stats: record kill (enemy destroyed)
+        // Get the weapon that made the killing blow from combat state
+        const lastWeaponUsed = combatState.roundState.lastWeaponUsed || 'basic-shot';
+        LifetimeStats.recordKill(lastWeaponUsed);
+
+        // Record enemy destroyed stat
+        recordStat('enemyDestroyed');
+
+        // Award victory bonus (hit rewards already given during combat)
+        const victoryBonus = Money.awardVictoryBonus();
+        ProgressionAchievements.onMoneyEarned(victoryBonus);
+        LifetimeStats.recordMoneyEarned(victoryBonus);
+
+        // Get total round earnings for display
+        const roundEarnings = Money.getRoundEarnings();
+        const roundDamage = Money.getRoundDamage();
+
+        // Show round transition screen (replaces victory screen)
+        RoundTransition.show({
+            round: currentRound,
+            damage: roundDamage,
+            money: roundEarnings,
+            tokenResult: tokenResult,
+            tokenBalance: Tokens.getTokenBalance(),
+            achievements: roundAchievements,
+            delay: 1200
+        });
+
+        // Haptic feedback for victory (mobile devices)
+        Haptics.hapticVictory();
+
+        // Transition to round transition state
+        Game.setState(GAME_STATES.ROUND_TRANSITION);
+        return;
+    }
+
+    if (playerDestroyed) {
+        // Player loses - GAME OVER (permadeath)
+        console.log('[Main] Player destroyed - GAME OVER!');
+
+        // Combat achievement detection: round lost
+        CombatAchievements.onRoundLost();
+
+        // Token system: round loss resets win streak
+        Tokens.onRoundLoss();
+
+        // Performance tracking: round lost (resets win streak)
+        PerformanceTracking.onRoundEnd(false);
+
+        // Lifetime stats: record loss
+        LifetimeStats.recordLoss({ roundNumber: currentRound });
+
+        // End the run and finalize stats
+        endRunState(false);
+
+        // Show game over screen
+        // Stats are fetched from runState module automatically
+        GameOver.show({
+            rounds: currentRound,
+            draw: false,
+            delay: 1200
+        });
+
+        // Haptic feedback for defeat (mobile devices)
+        Haptics.hapticDefeat();
+
+        // Transition to game over state (terminal - run has ended)
+        Game.setState(GAME_STATES.GAME_OVER);
         return;
     }
 
@@ -1658,23 +2523,24 @@ function renderTerrain(ctx) {
 
     const terrain = currentTerrain;
     const width = terrain.getWidth();
+    const screenHeight = terrain.getScreenHeight();
 
     // Build terrain path once and reuse for fill and stroke
     ctx.beginPath();
 
     // Start at bottom-left corner
-    ctx.moveTo(0, CANVAS.DESIGN_HEIGHT);
+    ctx.moveTo(0, screenHeight);
 
     // Draw terrain profile
-    // Heights are distance from bottom, so canvas Y = DESIGN_HEIGHT - terrainHeight
+    // Heights are distance from bottom, so canvas Y = screenHeight - terrainHeight
     for (let x = 0; x < width; x++) {
         const terrainHeight = terrain.getHeight(x);
-        const canvasY = CANVAS.DESIGN_HEIGHT - terrainHeight;
+        const canvasY = screenHeight - terrainHeight;
         ctx.lineTo(x, canvasY);
     }
 
     // Close the path at bottom-right corner
-    ctx.lineTo(width - 1, CANVAS.DESIGN_HEIGHT);
+    ctx.lineTo(width - 1, screenHeight);
     ctx.closePath();
 
     // Fill terrain with solid dark purple
@@ -1697,7 +2563,7 @@ function renderTerrain(ctx) {
     ctx.beginPath();
     for (let x = 0; x < width; x++) {
         const terrainHeight = terrain.getHeight(x);
-        const canvasY = CANVAS.DESIGN_HEIGHT - terrainHeight;
+        const canvasY = screenHeight - terrainHeight;
         if (x === 0) {
             ctx.moveTo(x, canvasY);
         } else {
@@ -1714,9 +2580,43 @@ function renderTerrain(ctx) {
 // =============================================================================
 
 /**
+ * Darken a hex color by a given factor.
+ * Used to create tank body colors from glow colors.
+ *
+ * @param {string} hex - Hex color string (e.g., '#FF00FF' or '#F0F')
+ * @param {number} factor - Darkening factor (0-1, where 0.15 = 15% brightness)
+ * @returns {string} Darkened hex color
+ */
+function darkenColor(hex, factor) {
+    // Remove # if present
+    hex = hex.replace(/^#/, '');
+
+    // Handle shorthand hex (e.g., #F0F -> #FF00FF)
+    if (hex.length === 3) {
+        hex = hex.split('').map(c => c + c).join('');
+    }
+
+    // Parse RGB values
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+
+    // Apply darkening factor
+    const newR = Math.round(r * factor);
+    const newG = Math.round(g * factor);
+    const newB = Math.round(b * factor);
+
+    // Convert back to hex
+    return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
+}
+
+/**
  * Render a single tank.
  * First attempts to render sprite assets if available.
  * Falls back to geometric placeholder (64x24 body with rotating turret).
+ *
+ * For player tanks, uses the equipped skin's glow color.
+ * For enemy tanks, uses the default pink color.
  *
  * Placeholder consists of:
  * - A rectangular body (dark fill with neon outline, 64x24)
@@ -1734,6 +2634,15 @@ function renderTank(ctx, tank) {
 
     const { x, y, team, angle } = tank;
 
+    // Get equipped skin glow color for player tank
+    let glowColor = null;
+    if (team === 'player') {
+        const equippedSkin = TankCollection.getEquippedTank();
+        if (equippedSkin && equippedSkin.glowColor) {
+            glowColor = equippedSkin.glowColor;
+        }
+    }
+
     // Try to use sprite asset if available
     const spriteKey = team === 'player' ? 'tanks.player' : 'tanks.enemy';
     const sprite = Assets.get(spriteKey);
@@ -1750,13 +2659,13 @@ function renderTank(ctx, tank) {
         const isRealSprite = !sprite.src.startsWith('data:'); // Placeholders use data URLs
 
         if (isRealSprite) {
-            renderTankSprite(ctx, tank, sprite);
+            renderTankSprite(ctx, tank, sprite, glowColor);
             return;
         }
     }
 
     // Fall back to geometric placeholder rendering
-    renderTankPlaceholder(ctx, tank);
+    renderTankPlaceholder(ctx, tank, glowColor);
 }
 
 /**
@@ -1767,8 +2676,9 @@ function renderTank(ctx, tank) {
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  * @param {import('./tank.js').Tank} tank - The tank to render
  * @param {HTMLImageElement} sprite - The tank sprite image
+ * @param {string|null} skinGlowColor - Optional glow color override from equipped skin
  */
-function renderTankSprite(ctx, tank, sprite) {
+function renderTankSprite(ctx, tank, sprite, skinGlowColor = null) {
     const { x, y, team, angle } = tank;
 
     ctx.save();
@@ -1778,11 +2688,35 @@ function renderTankSprite(ctx, tank, sprite) {
     const spriteX = x - sprite.width / 2;
     const spriteY = y - sprite.height;
 
+    // Use skin glow color for player if provided, otherwise default team colors
+    const outlineColor = skinGlowColor || (team === 'player' ? COLORS.NEON_CYAN : COLORS.NEON_PINK);
+
+    // Apply glow effect around the sprite
+    ctx.shadowColor = outlineColor;
+    ctx.shadowBlur = 12;
+
+    // Draw the sprite
     ctx.drawImage(sprite, spriteX, spriteY);
+
+    // If player has a non-default skin equipped, apply color tint overlay
+    // This uses globalCompositeOperation to colorize the sprite
+    if (skinGlowColor && team === 'player') {
+        // Save current state again for tint operation
+        ctx.save();
+
+        // Draw the sprite again as a mask
+        ctx.globalCompositeOperation = 'source-atop';
+
+        // Create a semi-transparent color overlay
+        ctx.fillStyle = skinGlowColor;
+        ctx.globalAlpha = 0.35;  // Subtle tint, not full recolor
+        ctx.fillRect(spriteX, spriteY, sprite.width, sprite.height);
+
+        ctx.restore();
+    }
 
     // Draw turret barrel on top of sprite
     // Turret pivot point is at center-top of tank
-    const outlineColor = team === 'player' ? COLORS.NEON_CYAN : COLORS.NEON_PINK;
     const turretPivotX = x;
     const turretPivotY = y - sprite.height;
 
@@ -1809,19 +2743,30 @@ function renderTankSprite(ctx, tank, sprite) {
 /**
  * Render tank as geometric placeholder.
  * Body is 64x24 rectangle with neon outline.
- * Player tank is cyan (#05d9e8), enemy is pink (#ff2a6d).
+ * Player tank uses equipped skin glow color (default cyan), enemy is pink.
  *
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  * @param {import('./tank.js').Tank} tank - The tank to render
+ * @param {string|null} skinGlowColor - Optional glow color override from equipped skin
  */
-function renderTankPlaceholder(ctx, tank) {
+function renderTankPlaceholder(ctx, tank, skinGlowColor = null) {
     const { x, y, team, angle } = tank;
 
     // Choose colors based on team
+    // Use skin glow color for player if provided, otherwise default team colors
     // Body fill is dark with team-tinted hue
     // Outline is full neon color for visibility
-    const bodyColor = team === 'player' ? '#0a1a2a' : '#2a0a1a';
-    const outlineColor = team === 'player' ? COLORS.NEON_CYAN : COLORS.NEON_PINK;
+    const outlineColor = skinGlowColor || (team === 'player' ? COLORS.NEON_CYAN : COLORS.NEON_PINK);
+
+    // Generate body color from outline color (darkened version)
+    // For player with skin, derive body color from glow color
+    let bodyColor;
+    if (skinGlowColor && team === 'player') {
+        // Parse the hex color and create a dark version
+        bodyColor = darkenColor(skinGlowColor, 0.15);
+    } else {
+        bodyColor = team === 'player' ? '#0a1a2a' : '#2a0a1a';
+    }
 
     ctx.save();
 
@@ -2336,6 +3281,22 @@ function handlePowerChange(delta) {
 }
 
 /**
+ * Handle absolute angle set input event (for touch aiming)
+ * @param {number} angle - Target angle in degrees
+ */
+function handleAngleSet(angle) {
+    playerAim.angle = Math.max(PHYSICS.MIN_ANGLE, Math.min(PHYSICS.MAX_ANGLE, angle));
+}
+
+/**
+ * Handle absolute power set input event (for touch aiming)
+ * @param {number} power - Target power percentage
+ */
+function handlePowerSet(power) {
+    playerAim.power = Math.max(PHYSICS.MIN_POWER, Math.min(PHYSICS.MAX_POWER, power));
+}
+
+/**
  * Handle fire input event
  */
 function handleFire() {
@@ -2472,7 +3433,7 @@ function renderPlaying(ctx) {
     }
 
     // Render synthwave background (behind everything)
-    renderBackground(ctx, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    renderBackground(ctx, Renderer.getWidth(), Renderer.getHeight());
 
     // Render terrain (in front of background)
     renderTerrain(ctx);
@@ -2539,10 +3500,10 @@ function renderPlaying(ctx) {
     }
 
     // Render screen flash on top of everything (not affected by shake)
-    renderScreenFlash(ctx, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    renderScreenFlash(ctx, Renderer.getWidth(), Renderer.getHeight());
 
     // Render CRT effects as final post-processing overlay
-    renderCrtEffects(ctx, CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    renderCrtEffects(ctx, Renderer.getWidth(), Renderer.getHeight());
 }
 
 /**
@@ -2564,14 +3525,13 @@ function handlePlayingPointerDown(pos) {
     // Only process other interactions in PLAYING state
     if (state !== GAME_STATES.PLAYING) return;
 
-    // Check aiming controls first (power bar, angle arc, fire button)
+    // Check aiming controls first (angle arc, fire button)
     if (Turn.canPlayerAim()) {
-        // Fire button, power bar, or angle arc
+        // Fire button or angle arc
         AimingControls.handlePointerDown(pos.x, pos.y, playerTank, Turn.canPlayerFire());
 
         // Check if any control was activated - don't process other clicks
         if (AimingControls.isInsideFireButton(pos.x, pos.y) ||
-            AimingControls.isInsidePowerBar(pos.x, pos.y) ||
             AimingControls.isInsideAngleArc(pos.x, pos.y, playerTank)) {
             return;
         }
@@ -2640,6 +3600,8 @@ function setupPlayingState() {
     // Register game input event handlers
     Input.onGameInput(INPUT_EVENTS.ANGLE_CHANGE, handleAngleChange);
     Input.onGameInput(INPUT_EVENTS.POWER_CHANGE, handlePowerChange);
+    Input.onGameInput(INPUT_EVENTS.ANGLE_SET, handleAngleSet);
+    Input.onGameInput(INPUT_EVENTS.POWER_SET, handlePowerSet);
     Input.onGameInput(INPUT_EVENTS.FIRE, handleFire);
     Input.onGameInput(INPUT_EVENTS.SELECT_WEAPON, handleSelectWeapon);
     Input.onGameInput(INPUT_EVENTS.SELECT_PREV_WEAPON, handleSelectPrevWeapon);
@@ -2704,13 +3666,56 @@ function setupPlayingState() {
             // New game comes from MENU or DIFFICULTY_SELECT (since difficulty selection is part of new game flow)
             const isNewGame = fromState === GAME_STATES.MENU || fromState === GAME_STATES.DIFFICULTY_SELECT;
 
-            // Initialize money system if this is a new game
+            // Initialize game systems if this is a new game
             if (isNewGame) {
+                startNewRunState(); // Reset run state and stats for new run
                 Money.init();
+
+                // Lifetime stats: record new run started
+                LifetimeStats.recordRunStarted();
+
+                // Combat achievement: notify new run started
+                CombatAchievements.onRunStart();
+
+                // Precision achievement: notify new run started
+                PrecisionAchievements.onRunStart();
+
+                // Weapon achievement: notify new run started
+                WeaponAchievements.onRunStart();
+
+                // Hidden achievement: notify new run started
+                HiddenAchievements.onRunStart();
+
+                // Token system: notify new run started
+                Tokens.onRunStart();
+
+                // Performance tracking: reset stats for new run
+                PerformanceTracking.resetPerformanceOnNewRun();
             }
             // Start round earnings tracking with round number for multiplier
             // Rounds 1-2: 1.0x, Rounds 3-4: 1.2x, Rounds 5+: 1.5x
             Money.startRound(currentRound);
+
+            // Clear round achievements tracker for new round
+            clearRoundAchievements();
+
+            // Reset combat achievement round state for new round
+            CombatAchievements.resetRoundState();
+
+            // Reset precision achievement round state for new round
+            PrecisionAchievements.resetRoundState();
+
+            // Reset weapon achievement round state for new round
+            WeaponAchievements.resetRoundState();
+
+            // Reset hidden achievement round state for new round
+            HiddenAchievements.resetRoundState();
+
+            // Performance tracking: start new round
+            PerformanceTracking.onRoundStart(currentRound);
+
+            // Progression achievement: check for round milestone achievements
+            ProgressionAchievements.onRoundReached(currentRound);
 
             // Save player inventory before creating new tanks (for round continuation)
             // Inventory persists across rounds when transitioning from SHOP or DEFEAT
@@ -2722,10 +3727,11 @@ function setupPlayingState() {
 
             // Generate new terrain for this game
             // Uses midpoint displacement algorithm for natural-looking hills and valleys
-            currentTerrain = generateTerrain(CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT, {
+            // Terrain adapts to dynamic screen dimensions (no fixed width/height)
+            currentTerrain = generateTerrain(undefined, undefined, {
                 roughness: 0.5,  // Balanced jaggedness (0.4-0.6 recommended)
-                minHeightPercent: 0.2,  // Terrain starts at 20% of canvas height minimum
-                maxHeightPercent: 0.7   // Terrain peaks at 70% of canvas height maximum
+                minHeightPercent: 0.2,  // Terrain starts at 20% of screen height minimum
+                maxHeightPercent: 0.7   // Terrain peaks at 70% of screen height maximum
             });
 
             // Place tanks on the generated terrain
@@ -2735,6 +3741,13 @@ function setupPlayingState() {
             playerTank = tanks.player;
             enemyTank = tanks.enemy;
 
+            // Apply enemy health scaling based on round number (roguelike progression)
+            // Enemy tanks become more durable in later rounds: 100 HP → up to 180 HP
+            const scaledEnemyHealth = getEnemyHealthForRound(currentRound);
+            enemyTank.health = scaledEnemyHealth;
+            enemyTank.maxHealth = scaledEnemyHealth; // Set max for proper health bar display
+            console.log(`Round ${currentRound}: Enemy health scaled to ${scaledEnemyHealth} HP`);
+
             // Restore player inventory from previous round (if continuing)
             // For new games, tank starts with default inventory (basic-shot only)
             if (savedPlayerInventory) {
@@ -2743,6 +3756,9 @@ function setupPlayingState() {
             }
             // Note: New games start with only basic-shot (default tank inventory)
             // Additional weapons must be purchased from the shop
+
+            // Hidden achievement: track initial inventory for Minimalist detection
+            HiddenAchievements.onInventoryChanged(playerTank.inventory);
 
             // Set up AI for this round with player-selected difficulty
             // If player selected a difficulty, use that; otherwise fall back to round-based progression
@@ -2754,8 +3770,9 @@ function setupPlayingState() {
             console.log(`Round ${currentRound}: AI difficulty is ${difficultyName} (player selected: ${selectedDifficulty ? 'yes' : 'no'})`);
 
             // Generate random wind for this round
-            // Wind value -10 to +10: negative = left, positive = right
-            Wind.generateRandomWind();
+            // Wind range scales with round number for roguelike difficulty progression
+            const windRange = Wind.getWindRangeForRound(currentRound);
+            Wind.generateRandomWind(windRange);
 
             // Initialize the turn system when entering playing state
             Turn.init();
@@ -2835,6 +3852,7 @@ function updateVictoryDefeat(deltaTime) {
  */
 function startNextRound() {
     currentRound++;
+    advanceRunRound(); // Track round progression in run state
     // Note: Money.startRound(currentRound) is called in PLAYING state's onEnter handler
     // after the round counter is already incremented
     console.log(`[Main] Starting round ${currentRound}`);
@@ -2942,6 +3960,827 @@ function setupDefeatState() {
         },
         update: updateVictoryDefeat,
         render: renderVictoryDefeatState
+    });
+}
+
+// =============================================================================
+// ROUND TRANSITION STATE
+// =============================================================================
+
+/**
+ * Handle click on the round transition screen.
+ * @param {{x: number, y: number}} pos - Click position in design coordinates
+ */
+function handleRoundTransitionClick(pos) {
+    if (Game.getState() !== GAME_STATES.ROUND_TRANSITION) return;
+    RoundTransition.handleClick(pos.x, pos.y);
+}
+
+/**
+ * Render the round transition screen overlay.
+ * Shows the current game state underneath with the overlay on top.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ */
+function renderRoundTransitionState(ctx) {
+    // First render the game state underneath (terrain, tanks, etc.)
+    renderPlaying(ctx);
+
+    // Then render the round transition overlay on top
+    RoundTransition.render(ctx);
+}
+
+/**
+ * Update round transition screen animations.
+ * @param {number} deltaTime - Time since last frame in ms
+ */
+function updateRoundTransition(deltaTime) {
+    RoundTransition.update(deltaTime);
+}
+
+/**
+ * Set up round transition state handlers.
+ * Round transition shows after winning a round, before going to shop.
+ */
+function setupRoundTransitionState() {
+    // Register callback for Continue button - skip shop, go directly to next round
+    RoundTransition.onContinue(() => {
+        console.log('[Main] Continue from round transition - going directly to next round');
+        RoundTransition.hide();
+        startNextRound();
+    });
+
+    // Register callback for Shop button - go to shop before next round
+    RoundTransition.onShop(() => {
+        console.log('[Main] Shop from round transition - going to shop');
+        RoundTransition.hide();
+        Game.setState(GAME_STATES.SHOP);
+    });
+
+    // Register click handlers
+    Input.onMouseDown((x, y, button) => {
+        if (button === 0 && Game.getState() === GAME_STATES.ROUND_TRANSITION) {
+            handleRoundTransitionClick({ x, y });
+        }
+    });
+
+    Input.onTouchStart((x, y) => {
+        if (Game.getState() === GAME_STATES.ROUND_TRANSITION) {
+            handleRoundTransitionClick({ x, y });
+        }
+    });
+
+    // Register pointer move handlers for hover states
+    Input.onMouseMove((x, y) => {
+        if (Game.getState() === GAME_STATES.ROUND_TRANSITION) {
+            RoundTransition.handlePointerMove(x, y);
+        }
+    });
+
+    Input.onTouchMove((x, y) => {
+        if (Game.getState() === GAME_STATES.ROUND_TRANSITION) {
+            RoundTransition.handlePointerMove(x, y);
+        }
+    });
+
+    Game.registerStateHandlers(GAME_STATES.ROUND_TRANSITION, {
+        onEnter: (fromState) => {
+            console.log('Entered ROUND_TRANSITION state');
+            // Cancel any pending AI turn
+            AI.cancelTurn();
+            // Disable game input
+            Input.disableGameInput();
+            // Play victory music/stinger (reuse victory music)
+            Music.playForState(GAME_STATES.VICTORY);
+        },
+        onExit: (toState) => {
+            console.log('Exiting ROUND_TRANSITION state');
+            RoundTransition.hide();
+        },
+        update: updateRoundTransition,
+        render: renderRoundTransitionState
+    });
+}
+
+// =============================================================================
+// GAME OVER STATE (PERMADEATH)
+// =============================================================================
+
+/**
+ * Handle click on the game over screen.
+ * @param {{x: number, y: number}} pos - Click position in design coordinates
+ */
+function handleGameOverClick(pos) {
+    if (Game.getState() !== GAME_STATES.GAME_OVER) return;
+    GameOver.handleClick(pos.x, pos.y);
+}
+
+/**
+ * Render the game over screen overlay.
+ * Shows the current game state underneath with the overlay on top.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ */
+function renderGameOverState(ctx) {
+    // First render the game state underneath (terrain, tanks, etc.)
+    renderPlaying(ctx);
+
+    // Then render the game over overlay on top
+    GameOver.render(ctx);
+}
+
+/**
+ * Update game over screen animations.
+ * @param {number} deltaTime - Time since last frame in ms
+ */
+function updateGameOver(deltaTime) {
+    GameOver.update(deltaTime);
+}
+
+/**
+ * Start a completely new run (reset everything).
+ * Called when "New Run" is clicked on game over screen.
+ */
+function startNewRun() {
+    console.log('[Main] Starting new run');
+    // Reset round counter
+    currentRound = 1;
+    // Reset money system (init resets to starting amount)
+    Money.init();
+    // Hide game over screen
+    GameOver.hide();
+    // Return to menu for now (later this will start directly into a new run)
+    Game.setState(GAME_STATES.MENU);
+}
+
+/**
+ * Set up game over state handlers.
+ * Game Over is a terminal state - the run has ended (permadeath).
+ */
+function setupGameOverState() {
+    // Register click handlers
+    Input.onMouseDown((x, y, button) => {
+        if (button === 0 && Game.getState() === GAME_STATES.GAME_OVER) {
+            handleGameOverClick({ x, y });
+        }
+    });
+
+    Input.onTouchStart((x, y) => {
+        if (Game.getState() === GAME_STATES.GAME_OVER) {
+            handleGameOverClick({ x, y });
+        }
+    });
+
+    // Register callback for "New Run" button
+    GameOver.onNewRun(() => {
+        startNewRun();
+    });
+
+    // Register callback for "Main Menu" button
+    GameOver.onMainMenu(() => {
+        GameOver.hide();
+        Game.setState(GAME_STATES.MENU);
+    });
+
+    // Register state handlers
+    Game.registerStateHandlers(GAME_STATES.GAME_OVER, {
+        onEnter: (fromState) => {
+            console.log('Entered GAME_OVER state (run ended)');
+            // Cancel any pending AI turn
+            AI.cancelTurn();
+            // Disable game input
+            Input.disableGameInput();
+            // Play defeat music/stinger
+            Music.playForState(GAME_STATES.DEFEAT); // Reuse defeat music for now
+        },
+        onExit: (toState) => {
+            console.log('Exiting GAME_OVER state');
+            GameOver.hide();
+        },
+        update: updateGameOver,
+        render: renderGameOverState
+    });
+}
+
+// =============================================================================
+// HIGH SCORES STATE
+// =============================================================================
+
+/**
+ * High scores screen button definition.
+ */
+const highScoresBackButton = {
+    x: CANVAS.DESIGN_WIDTH / 2,
+    y: CANVAS.DESIGN_HEIGHT - 100,
+    width: 180,
+    height: 50,
+    text: 'BACK',
+    color: COLORS.NEON_CYAN
+};
+
+/**
+ * Animation time for high scores screen.
+ * @type {number}
+ */
+let highScoresAnimationTime = 0;
+
+/**
+ * Current tab selection for high scores screen.
+ * 'local' = player's local scores, 'global' = global leaderboard
+ * @type {string}
+ */
+let highScoresActiveTab = 'global';
+
+/**
+ * Tab button definitions for high scores screen.
+ */
+const highScoresTabs = {
+    global: {
+        x: CANVAS.DESIGN_WIDTH / 2 - 100,
+        y: 110,
+        width: 180,
+        height: 36,
+        text: 'GLOBAL',
+        color: COLORS.NEON_CYAN
+    },
+    local: {
+        x: CANVAS.DESIGN_WIDTH / 2 + 100,
+        y: 110,
+        width: 180,
+        height: 36,
+        text: 'MY SCORES',
+        color: COLORS.NEON_PURPLE
+    }
+};
+
+/**
+ * Refresh button for leaderboard
+ */
+const highScoresRefreshButton = {
+    x: CANVAS.DESIGN_WIDTH - 100,
+    y: 100,
+    width: 40,
+    height: 40,
+    text: '↻',
+    color: COLORS.NEON_CYAN
+};
+
+/**
+ * Update high scores button positions based on current screen dimensions.
+ * Should be called before rendering or hit testing high scores buttons.
+ */
+function updateHighScoresButtonPositions() {
+    const width = Renderer.getWidth();
+    const height = Renderer.getHeight();
+    const centerX = width / 2;
+
+    highScoresBackButton.x = centerX;
+    highScoresBackButton.y = height - 100;
+
+    highScoresTabs.global.x = centerX - 100;
+    highScoresTabs.local.x = centerX + 100;
+
+    highScoresRefreshButton.x = width - 100;
+}
+
+/**
+ * Render the high scores screen.
+ * Shows global leaderboard or local scores with tabs.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ */
+function renderHighScores(ctx) {
+    // Update button positions for current screen size
+    updateHighScoresButtonPositions();
+
+    // Get dynamic screen dimensions
+    const width = Renderer.getWidth();
+    const height = Renderer.getHeight();
+
+    // Update animation time
+    highScoresAnimationTime += 16;
+
+    // Calculate pulse intensity for glowing effects (0-1, oscillating)
+    const pulseIntensity = (Math.sin(highScoresAnimationTime * 0.003) + 1) / 2;
+
+    ctx.save();
+
+    // Render synthwave background (reuse menu background)
+    renderMenuBackground(ctx);
+
+    // Semi-transparent overlay for content area
+    ctx.fillStyle = 'rgba(10, 10, 26, 0.85)';
+    ctx.fillRect(0, 0, width, height);
+
+    // Title
+    ctx.save();
+    ctx.shadowColor = COLORS.NEON_YELLOW;
+    ctx.shadowBlur = 20 + pulseIntensity * 10;
+    ctx.font = `bold 48px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = COLORS.NEON_YELLOW;
+    ctx.fillText('LEADERBOARD', width / 2, 55);
+    ctx.restore();
+
+    // Render tab buttons
+    renderHighScoresTabButton(ctx, highScoresTabs.global, highScoresActiveTab === 'global', pulseIntensity);
+    renderHighScoresTabButton(ctx, highScoresTabs.local, highScoresActiveTab === 'local', pulseIntensity);
+
+    // Get scores based on active tab
+    const scores = highScoresActiveTab === 'global'
+        ? HighScores.getGlobalLeaderboard()
+        : HighScores.getHighScores();
+    const lifetimeStats = HighScores.getFormattedLifetimeStats();
+
+    // Connection status indicator for global tab
+    if (highScoresActiveTab === 'global') {
+        const status = HighScores.getConnectionStatus();
+        ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+        ctx.textAlign = 'right';
+        if (status.isOnline) {
+            ctx.fillStyle = '#00ff88';
+            ctx.fillText('● ONLINE', width - 50, 55);
+        } else {
+            ctx.fillStyle = COLORS.NEON_PINK;
+            ctx.fillText('○ OFFLINE', width - 50, 55);
+        }
+    }
+
+    // Table layout - adjusted Y to account for tabs
+    const tableX = width / 2 - 280;
+    const tableWidth = 560;
+    const tableY = 155;
+    const headerHeight = 40;
+    const rowHeight = 36;
+
+    // Table background
+    ctx.fillStyle = 'rgba(20, 20, 40, 0.7)';
+    ctx.beginPath();
+    ctx.roundRect(tableX - 20, tableY - 10, tableWidth + 40, headerHeight + rowHeight * 10 + 30, 12);
+    ctx.fill();
+
+    // Table border - color based on active tab
+    const borderColor = highScoresActiveTab === 'global' ? COLORS.NEON_CYAN : COLORS.NEON_PURPLE;
+    ctx.strokeStyle = borderColor;
+    ctx.lineWidth = 2;
+    ctx.shadowColor = borderColor;
+    ctx.shadowBlur = 8;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Table header - different columns for global vs local
+    ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+    ctx.fillStyle = borderColor;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+
+    const colRank = tableX;
+    const colName = tableX + 50;
+    const colRounds = highScoresActiveTab === 'global' ? tableX + 220 : tableX + 70;
+    const colDamage = highScoresActiveTab === 'global' ? tableX + 320 : tableX + 200;
+    const colDate = highScoresActiveTab === 'global' ? tableX + 440 : tableX + 350;
+
+    const headerY = tableY + headerHeight / 2;
+    ctx.fillText('#', colRank, headerY);
+    if (highScoresActiveTab === 'global') {
+        ctx.fillText('PLAYER', colName, headerY);
+    }
+    ctx.fillText('ROUNDS', colRounds, headerY);
+    ctx.fillText('DAMAGE', colDamage, headerY);
+    ctx.fillText('DATE', colDate, headerY);
+
+    // Header separator line
+    ctx.strokeStyle = `${borderColor}60`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(tableX - 10, tableY + headerHeight);
+    ctx.lineTo(tableX + tableWidth + 10, tableY + headerHeight);
+    ctx.stroke();
+
+    // Get current player's device ID for highlighting
+    const currentDeviceId = highScoresActiveTab === 'global' ? HighScores.getCurrentDeviceId() : null;
+
+    // Table rows
+    ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+
+    for (let i = 0; i < 10; i++) {
+        const rowY = tableY + headerHeight + rowHeight * i + rowHeight / 2;
+        const score = scores[i];
+
+        // Check if this is the current player's row
+        const isCurrentPlayer = highScoresActiveTab === 'global' && score && score.deviceId === currentDeviceId;
+
+        // Highlight current player's row with a subtle background
+        if (isCurrentPlayer) {
+            ctx.fillStyle = 'rgba(0, 255, 255, 0.15)';
+            ctx.fillRect(tableX - 15, rowY - rowHeight / 2 + 2, tableWidth + 30, rowHeight - 4);
+        }
+
+        if (score) {
+            // Rank with special styling for top 3 or current player
+            if (isCurrentPlayer) {
+                ctx.fillStyle = COLORS.NEON_CYAN;
+            } else {
+                ctx.fillStyle = i === 0 ? COLORS.NEON_YELLOW :
+                               i === 1 ? '#c0c0c0' :
+                               i === 2 ? '#cd7f32' :
+                               COLORS.TEXT_LIGHT;
+            }
+            ctx.fillText(`${i + 1}`, colRank, rowY);
+
+            // Player name (global only)
+            if (highScoresActiveTab === 'global') {
+                ctx.fillStyle = isCurrentPlayer ? COLORS.NEON_CYAN : COLORS.TEXT_LIGHT;
+                const playerName = score.displayName || score.playerName || 'Anonymous';
+                // Truncate long names
+                const truncatedName = playerName.length > 14 ? playerName.substring(0, 12) + '...' : playerName;
+                // Add (YOU) indicator for current player
+                ctx.fillText(isCurrentPlayer ? `${truncatedName} ★` : truncatedName, colName, rowY);
+            }
+
+            // Rounds
+            ctx.fillStyle = isCurrentPlayer ? COLORS.NEON_CYAN : COLORS.TEXT_LIGHT;
+            const rounds = score.roundsSurvived || score.rounds || 0;
+            ctx.fillText(`${rounds}`, colRounds, rowY);
+
+            // Damage
+            const damage = score.totalDamage || score.damage || 0;
+            ctx.fillText(damage ? damage.toLocaleString() : '0', colDamage, rowY);
+
+            // Date
+            const timestamp = score.timestamp || score._creationTime;
+            if (timestamp) {
+                const date = new Date(timestamp);
+                const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                ctx.fillStyle = isCurrentPlayer ? COLORS.NEON_CYAN : COLORS.TEXT_MUTED;
+                ctx.fillText(dateStr, colDate, rowY);
+            } else {
+                ctx.fillStyle = isCurrentPlayer ? COLORS.NEON_CYAN : COLORS.TEXT_MUTED;
+                ctx.fillText('-', colDate, rowY);
+            }
+        } else {
+            // Empty row
+            ctx.fillStyle = COLORS.TEXT_MUTED;
+            ctx.fillText(`${i + 1}`, colRank, rowY);
+            if (highScoresActiveTab === 'global') {
+                ctx.fillText('-', colName, rowY);
+            }
+            ctx.fillText('-', colRounds, rowY);
+            ctx.fillText('-', colDamage, rowY);
+            ctx.fillText('-', colDate, rowY);
+        }
+    }
+
+    // Show loading indicator for global tab
+    const isLoading = highScoresActiveTab === 'global' && HighScores.isLoadingLeaderboard();
+    if (highScoresActiveTab === 'global') {
+        const status = HighScores.getConnectionStatus();
+
+        // Show loading overlay when fetching with data
+        if (isLoading && scores.length > 0) {
+            // Show subtle loading indicator at top
+            ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+            ctx.fillStyle = COLORS.NEON_CYAN;
+            ctx.textAlign = 'center';
+            ctx.fillText('Refreshing...', width / 2, tableY - 20);
+        }
+
+        // Show message when no scores
+        if (scores.length === 0) {
+            ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+            ctx.fillStyle = COLORS.TEXT_MUTED;
+            ctx.textAlign = 'center';
+            const message = isLoading ? 'Loading leaderboard...' :
+                           status.isOnline ? 'No scores yet - play to be the first!' :
+                           'Offline - connect to see global scores';
+            ctx.fillText(message, width / 2, tableY + headerHeight + rowHeight * 4);
+        }
+
+        // Render refresh button (only when online)
+        if (status.isOnline) {
+            const refreshBtn = highScoresRefreshButton;
+            const isRefreshing = isLoading;
+
+            // Button background
+            ctx.fillStyle = 'rgba(20, 20, 40, 0.8)';
+            ctx.beginPath();
+            ctx.roundRect(refreshBtn.x - refreshBtn.width / 2, refreshBtn.y - refreshBtn.height / 2, refreshBtn.width, refreshBtn.height, 8);
+            ctx.fill();
+
+            // Button border with glow
+            ctx.strokeStyle = isRefreshing ? COLORS.TEXT_MUTED : COLORS.NEON_CYAN;
+            ctx.lineWidth = 2;
+            ctx.shadowColor = isRefreshing ? 'transparent' : COLORS.NEON_CYAN;
+            ctx.shadowBlur = isRefreshing ? 0 : 5;
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+
+            // Refresh icon with rotation when loading
+            ctx.font = `bold 24px ${UI.FONT_FAMILY}`;
+            ctx.fillStyle = isRefreshing ? COLORS.TEXT_MUTED : COLORS.NEON_CYAN;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            if (isRefreshing) {
+                // Animate the refresh icon
+                ctx.save();
+                ctx.translate(refreshBtn.x, refreshBtn.y);
+                ctx.rotate(highScoresAnimationTime * 0.01);
+                ctx.fillText('↻', 0, 0);
+                ctx.restore();
+            } else {
+                ctx.fillText('↻', refreshBtn.x, refreshBtn.y);
+            }
+        }
+    }
+
+    // Lifetime stats section
+    const statsY = tableY + headerHeight + rowHeight * 10 + 50;
+
+    // Stats background
+    ctx.fillStyle = 'rgba(20, 20, 40, 0.7)';
+    ctx.beginPath();
+    ctx.roundRect(tableX - 20, statsY - 10, tableWidth + 40, 70, 12);
+    ctx.fill();
+
+    // Stats border
+    ctx.strokeStyle = COLORS.NEON_PURPLE;
+    ctx.lineWidth = 2;
+    ctx.shadowColor = COLORS.NEON_PURPLE;
+    ctx.shadowBlur = 8;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Stats label
+    ctx.font = `bold ${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+    ctx.fillStyle = COLORS.TEXT_MUTED;
+    ctx.textAlign = 'left';
+    ctx.fillText('LIFETIME STATS', tableX, statsY + 15);
+
+    // Stats values
+    ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+
+    const stat1X = tableX;
+    const stat2X = tableX + 180;
+    const stat3X = tableX + 360;
+    const statValueY = statsY + 42;
+
+    // Total Runs
+    ctx.fillText(`Total Runs: `, stat1X, statValueY);
+    ctx.fillStyle = COLORS.NEON_CYAN;
+    ctx.fillText(`${lifetimeStats.totalRuns}`, stat1X + 90, statValueY);
+
+    // Avg Rounds
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.fillText(`Avg Rounds: `, stat2X, statValueY);
+    ctx.fillStyle = COLORS.NEON_CYAN;
+    ctx.fillText(`${lifetimeStats.averageRoundsPerRun.toFixed(1)}`, stat2X + 95, statValueY);
+
+    // Best
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.fillText(`Best: `, stat3X, statValueY);
+    ctx.fillStyle = COLORS.NEON_YELLOW;
+    ctx.fillText(`${lifetimeStats.bestRound}`, stat3X + 45, statValueY);
+
+    // Back button
+    renderHighScoresButton(ctx, highScoresBackButton, pulseIntensity);
+
+    // Neon frame around the screen (reuse from menu)
+    ctx.save();
+    ctx.strokeStyle = COLORS.NEON_CYAN;
+    ctx.shadowColor = COLORS.NEON_CYAN;
+    ctx.shadowBlur = 15;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(20, 20, width - 40, height - 40);
+
+    // Corner accents
+    const cornerSize = 30;
+    ctx.strokeStyle = COLORS.NEON_YELLOW;
+    ctx.shadowColor = COLORS.NEON_YELLOW;
+    ctx.lineWidth = 4;
+
+    // Top-left corner
+    ctx.beginPath();
+    ctx.moveTo(20, 20 + cornerSize);
+    ctx.lineTo(20, 20);
+    ctx.lineTo(20 + cornerSize, 20);
+    ctx.stroke();
+
+    // Top-right corner
+    ctx.beginPath();
+    ctx.moveTo(width - 20 - cornerSize, 20);
+    ctx.lineTo(width - 20, 20);
+    ctx.lineTo(width - 20, 20 + cornerSize);
+    ctx.stroke();
+
+    // Bottom-left corner
+    ctx.beginPath();
+    ctx.moveTo(20, height - 20 - cornerSize);
+    ctx.lineTo(20, height - 20);
+    ctx.lineTo(20 + cornerSize, height - 20);
+    ctx.stroke();
+
+    // Bottom-right corner
+    ctx.beginPath();
+    ctx.moveTo(width - 20 - cornerSize, height - 20);
+    ctx.lineTo(width - 20, height - 20);
+    ctx.lineTo(width - 20, height - 20 - cornerSize);
+    ctx.stroke();
+
+    ctx.restore();
+
+    ctx.restore();
+
+    // Render CRT effects as final post-processing overlay
+    renderCrtEffects(ctx, width, height);
+}
+
+/**
+ * Render a button for the high scores screen.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {Object} button - Button definition
+ * @param {number} pulseIntensity - Glow pulse intensity (0-1)
+ */
+function renderHighScoresTabButton(ctx, tab, isActive, pulseIntensity) {
+    const halfWidth = tab.width / 2;
+    const halfHeight = tab.height / 2;
+    const tabX = tab.x - halfWidth;
+    const tabY = tab.y - halfHeight;
+
+    ctx.save();
+
+    // Tab background
+    if (isActive) {
+        ctx.fillStyle = 'rgba(26, 26, 46, 0.9)';
+    } else {
+        ctx.fillStyle = 'rgba(20, 20, 40, 0.5)';
+    }
+    ctx.beginPath();
+    ctx.roundRect(tabX, tabY, tab.width, tab.height, 6);
+    ctx.fill();
+
+    // Tab border with glow if active
+    ctx.strokeStyle = isActive ? tab.color : `${tab.color}60`;
+    ctx.lineWidth = isActive ? 2 : 1;
+    if (isActive) {
+        ctx.shadowColor = tab.color;
+        ctx.shadowBlur = 8 + pulseIntensity * 5;
+    }
+    ctx.beginPath();
+    ctx.roundRect(tabX, tabY, tab.width, tab.height, 6);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Tab text
+    ctx.fillStyle = isActive ? COLORS.TEXT_LIGHT : COLORS.TEXT_MUTED;
+    ctx.font = `bold ${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(tab.text, tab.x, tab.y);
+
+    ctx.restore();
+}
+
+/**
+ * Render a button for the high scores screen.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {Object} button - Button definition
+ * @param {number} pulseIntensity - Glow pulse intensity (0-1)
+ */
+function renderHighScoresButton(ctx, button, pulseIntensity) {
+    const halfWidth = button.width / 2;
+    const halfHeight = button.height / 2;
+    const btnX = button.x - halfWidth;
+    const btnY = button.y - halfHeight;
+
+    ctx.save();
+
+    // Button background with rounded corners
+    ctx.fillStyle = 'rgba(26, 26, 46, 0.8)';
+    ctx.beginPath();
+    ctx.roundRect(btnX, btnY, button.width, button.height, 8);
+    ctx.fill();
+
+    // Neon glow effect (pulsing)
+    ctx.shadowColor = button.color;
+    ctx.shadowBlur = 15 + pulseIntensity * 10;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+
+    // Button border (neon outline)
+    ctx.strokeStyle = button.color;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.roundRect(btnX, btnY, button.width, button.height, 8);
+    ctx.stroke();
+
+    // Reset shadow for text
+    ctx.shadowBlur = 0;
+
+    // Button text with glow
+    ctx.shadowColor = button.color;
+    ctx.shadowBlur = 8 + pulseIntensity * 5;
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.font = `bold ${UI.FONT_SIZE_LARGE}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(button.text, button.x, button.y);
+
+    ctx.restore();
+}
+
+/**
+ * Handle click on the high scores screen.
+ * @param {{x: number, y: number}} pos - Click position in game coordinates
+ */
+function handleHighScoresClick(pos) {
+    if (Game.getState() !== GAME_STATES.HIGH_SCORES) return;
+
+    // Ensure button positions are current for the screen size
+    updateHighScoresButtonPositions();
+
+    // Check tab clicks
+    if (isInsideButton(pos.x, pos.y, highScoresTabs.global)) {
+        if (highScoresActiveTab !== 'global') {
+            Sound.playClickSound();
+            highScoresActiveTab = 'global';
+            // Trigger leaderboard refresh
+            HighScores.fetchGlobalLeaderboard(true).catch(() => {});
+        }
+        return;
+    }
+
+    if (isInsideButton(pos.x, pos.y, highScoresTabs.local)) {
+        if (highScoresActiveTab !== 'local') {
+            Sound.playClickSound();
+            highScoresActiveTab = 'local';
+        }
+        return;
+    }
+
+    // Check refresh button click (global tab only)
+    if (highScoresActiveTab === 'global' && isInsideButton(pos.x, pos.y, highScoresRefreshButton)) {
+        // Only refresh if not already loading
+        if (!HighScores.isLoadingLeaderboard()) {
+            Sound.playClickSound();
+            HighScores.fetchGlobalLeaderboard(true).catch(() => {});
+        }
+        return;
+    }
+
+    if (isInsideButton(pos.x, pos.y, highScoresBackButton)) {
+        Sound.playClickSound();
+        Game.setState(GAME_STATES.MENU);
+    }
+}
+
+/**
+ * Handle keyboard input on the high scores screen.
+ * @param {string} keyCode - Key code from KeyboardEvent
+ */
+function handleHighScoresKeyDown(keyCode) {
+    if (Game.getState() !== GAME_STATES.HIGH_SCORES) return;
+
+    if (keyCode === 'Escape') {
+        Sound.playClickSound();
+        Game.setState(GAME_STATES.MENU);
+    }
+}
+
+/**
+ * Set up high scores state handlers.
+ */
+function setupHighScoresState() {
+    // Register click handlers
+    Input.onMouseDown((x, y, button) => {
+        if (button === 0 && Game.getState() === GAME_STATES.HIGH_SCORES) {
+            handleHighScoresClick({ x, y });
+        }
+    });
+
+    Input.onTouchStart((x, y) => {
+        if (Game.getState() === GAME_STATES.HIGH_SCORES) {
+            handleHighScoresClick({ x, y });
+        }
+    });
+
+    Input.onKeyDown((keyCode) => {
+        if (Game.getState() === GAME_STATES.HIGH_SCORES) {
+            handleHighScoresKeyDown(keyCode);
+        }
+    });
+
+    // Register state handlers
+    Game.registerStateHandlers(GAME_STATES.HIGH_SCORES, {
+        onEnter: (fromState) => {
+            console.log('Entered HIGH_SCORES state');
+            highScoresAnimationTime = 0;
+            // Play menu music (reuse)
+            Music.playForState(GAME_STATES.MENU);
+        },
+        onExit: (toState) => {
+            console.log('Exiting HIGH_SCORES state');
+        },
+        render: renderHighScores
     });
 }
 
@@ -3308,17 +5147,36 @@ async function init() {
     // Initialize debug module
     Debug.init();
 
+    // Preload Audiowide font to prevent flash of unstyled text (FOUT) on title screen
+    // Use document.fonts.load() to explicitly load the font before rendering
+    try {
+        await document.fonts.load(`120px ${UI.TITLE_FONT_FAMILY}`);
+        console.log('Audiowide font loaded successfully');
+    } catch (err) {
+        console.warn('Font preloading failed, title may flash:', err);
+    }
+
     // Initialize synthwave background (static layer behind gameplay)
-    initBackground(CANVAS.DESIGN_WIDTH, CANVAS.DESIGN_HEIGHT);
+    initBackground(Renderer.getWidth(), Renderer.getHeight());
+
+    // Initialize Three.js title scene (animated 3D background for menu)
+    TitleScene.init();
+    TitleScene.start();
 
     // Setup state handlers BEFORE starting the loop
     // These register the update/render functions for each state
     setupMenuState();
     setupDifficultySelectState();
+    setupHighScoresState();
+    AchievementScreen.setup();
+    CollectionScreen.setup();
+    SupplyDropScreen.setup();
     setupPlayingState();
     setupPausedState();
     setupVictoryState();
     setupDefeatState();
+    setupRoundTransitionState();
+    setupGameOverState();
     setupShopState();
 
     // Register 'D' key to toggle debug mode
@@ -3338,8 +5196,100 @@ async function init() {
 
     // Register debug keyboard shortcuts (Shift+1-9 when debug mode is on)
     document.addEventListener('keydown', (event) => {
+        // Name entry modal has priority for keyboard input
+        if (NameEntry.isOpen()) {
+            NameEntry.handleKeyDown(event);
+            return;
+        }
         DebugTools.handleKeyDown(event);
     });
+
+    // Initialize achievement popup system
+    AchievementPopup.init();
+
+    // Initialize supply drop animation system
+    SupplyDrop.init();
+
+    // Initialize extraction reveal animation system (for Legendary tanks)
+    ExtractionReveal.init();
+
+    // Initialize combat achievement detection
+    CombatAchievements.init();
+
+    // Initialize precision achievement detection
+    PrecisionAchievements.init();
+
+    // Initialize weapon mastery achievement detection
+    WeaponAchievements.init();
+
+    // Initialize progression and economy achievement detection
+    ProgressionAchievements.init();
+
+    // Initialize hidden achievement detection
+    HiddenAchievements.init();
+
+    // Initialize token system (for supply drop currency)
+    Tokens.init();
+
+    // Initialize tank collection system
+    TankCollection.init();
+
+    // Initialize performance tracking system (for supply drop odds)
+    PerformanceTracking.init();
+
+    // Initialize pity system (bad luck protection for supply drops)
+    PitySystem.init();
+
+    // Initialize lifetime statistics tracking
+    LifetimeStats.init();
+
+    // Initialize name entry module
+    NameEntry.init();
+
+    // Set up VolumeControls callback for Change Name button
+    VolumeControls.setChangeNameCallback(() => {
+        // Close options overlay first
+        optionsOverlayVisible = false;
+        VolumeControls.reset();
+        // Show name entry modal
+        NameEntry.show({
+            isFirstTime: false,
+            onConfirm: (name) => {
+                console.log('[Main] Player name changed to:', name);
+            }
+        });
+    });
+
+    // Set up VolumeControls callback for Close button
+    VolumeControls.setCloseCallback(() => {
+        closeOptionsOverlay();
+    });
+
+    // Check if first-time name entry is needed
+    if (NameEntry.needsNameEntry()) {
+        // Show name entry modal after a brief delay to let the menu render
+        setTimeout(() => {
+            NameEntry.show({
+                isFirstTime: true,
+                onConfirm: (name) => {
+                    console.log('[Main] Player name set:', name);
+                }
+            });
+        }, 500);
+    }
+
+    // Register performance tracking callback for achievement unlocks (grants +15% bonus)
+    onAchievementUnlock(() => {
+        PerformanceTracking.onAchievementUnlocked();
+    });
+
+    // Register lifetime stats callback for achievement unlocks
+    onAchievementUnlock(() => {
+        LifetimeStats.recordAchievementUnlocked();
+    });
+
+    // Register post-render callback for achievement popups (renders on top of all game content)
+    Game.setPostRenderCallback(postRender);
 
     console.log('Scorched Earth initialized');
 
@@ -3349,7 +5299,15 @@ async function init() {
     window.Shop = Shop;
     window.Money = Money;
     window.VictoryDefeat = VictoryDefeat;
+    window.RoundTransition = RoundTransition;
     window.DebugTools = DebugTools;
+    window.AchievementPopup = AchievementPopup;
+    window.TankCollection = TankCollection;
+    window.PerformanceTracking = PerformanceTracking;
+    window.PitySystem = PitySystem;
+    window.SupplyDrop = SupplyDrop;
+    window.ExtractionReveal = ExtractionReveal;
+    window.LifetimeStats = LifetimeStats;
     // Expose DebugTools as 'Debug' for convenience (e.g., Debug.skipToShop())
     // This creates a merged object with both Debug module and DebugTools functions
     window.Debug = { ...Debug, ...DebugTools };
@@ -3392,6 +5350,15 @@ function update(deltaTime) {
     // Update background animation (star twinkle)
     updateBackground(deltaTime);
 
+    // Update achievement popup animations
+    AchievementPopup.update(deltaTime);
+
+    // Update supply drop animation
+    SupplyDrop.update(deltaTime);
+
+    // Update name entry modal (cursor blink, etc.)
+    NameEntry.update(deltaTime);
+
     // Clear single-fire input state at end of frame
     // This must be done after all game logic that checks wasKeyPressed()
     Input.clearFrameState();
@@ -3402,13 +5369,54 @@ function update(deltaTime) {
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D rendering context
  */
 function render(ctx) {
-    // Clear canvas
-    Renderer.clear();
+    // For menu states with TitleScene background, use transparent clear
+    // so the 3D background shows through. For gameplay, use opaque clear.
+    const currentState = Game.getState();
+    const useTransparentClear = currentState === GAME_STATES.MENU ||
+                                 currentState === GAME_STATES.DIFFICULTY_SELECT;
+
+    if (useTransparentClear) {
+        // Clear to transparent so TitleScene (3D WebGL) shows through
+        ctx.clearRect(0, 0, Renderer.getWidth(), Renderer.getHeight());
+    } else {
+        // Normal opaque clear for gameplay states
+        Renderer.clear();
+    }
 
     // Render game elements will go here
+    // Note: Achievement popups are rendered in postRender() which is called after state-specific renders
 
     // Render debug overlay last (on top of everything)
-    Debug.render(ctx);
+    // Skip on menu screens to avoid visual clutter
+    const isMenuState = currentState === GAME_STATES.MENU ||
+                        currentState === GAME_STATES.DIFFICULTY_SELECT ||
+                        currentState === GAME_STATES.HIGH_SCORES ||
+                        currentState === GAME_STATES.ACHIEVEMENTS ||
+                        currentState === GAME_STATES.COLLECTION ||
+                        currentState === GAME_STATES.SUPPLY_DROP;
+    if (!isMenuState) {
+        Debug.render(ctx);
+    }
+}
+
+/**
+ * Post-render function called after state-specific renders.
+ * Used for overlay elements that should appear on top of all game content.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D rendering context
+ */
+function postRender(ctx) {
+    // Render achievement popup notifications (on top of all game content)
+    AchievementPopup.render(ctx);
+
+    // Render supply drop animation (covers everything when active)
+    if (SupplyDrop.isAnimating()) {
+        SupplyDrop.render(ctx);
+    }
+
+    // Render name entry modal (on top of everything)
+    if (NameEntry.isOpen()) {
+        NameEntry.render(ctx);
+    }
 }
 
 // Initialize when DOM is ready

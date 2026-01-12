@@ -34,3 +34,11 @@ ios/App/*.xcworkspace
 xcuserdata/
 .playwright-mcp/
 .vercel
+
+.env.local
+
+# Runtime config (generated from env vars during deployment)
+config.js
+
+# Convex
+convex/_generated/

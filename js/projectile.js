@@ -6,8 +6,9 @@
  * Projectiles spawn from tank barrel and follow parabolic arcs.
  */
 
-import { PHYSICS, PROJECTILE, CANVAS, DEBUG } from './constants.js';
+import { PHYSICS, PROJECTILE, DEBUG } from './constants.js';
 import { WeaponRegistry, WEAPON_TYPES } from './weapons.js';
+import { getScreenWidth, getScreenHeight } from './screenSize.js';
 
 /**
  * Projectile entity for the game.
@@ -214,6 +215,20 @@ export class Projectile {
          */
         this.digEntryPoint = null;
 
+        /**
+         * Distance traveled since spawn (in pixels).
+         * Used to prevent immediate self-collision at low angles.
+         * @type {number}
+         */
+        this.distanceTraveled = 0;
+
+        /**
+         * Minimum distance before self-collision is possible.
+         * Projectile must travel this far before it can hit the tank that fired it.
+         * @type {number}
+         */
+        this.safeDistance = PROJECTILE.SELF_COLLISION_SAFE_DISTANCE || 50;
+
         // Calculate initial velocity from power and angle
         this._calculateInitialVelocity(angle, power);
 
@@ -285,9 +300,18 @@ export class Projectile {
         // Gravity is a constant acceleration downward (positive Y in canvas)
         this.vy += PHYSICS.GRAVITY;
 
+        // Store previous position for distance calculation
+        const prevX = this.x;
+        const prevY = this.y;
+
         // Update position based on velocity
         this.x += this.vx;
         this.y += this.vy;
+
+        // Track distance traveled (for self-collision prevention)
+        const dx = this.x - prevX;
+        const dy = this.y - prevY;
+        this.distanceTraveled += Math.sqrt(dx * dx + dy * dy);
 
         // Check if projectile has left the playable area
         this._checkBounds();
@@ -298,8 +322,8 @@ export class Projectile {
      *
      * Out of bounds conditions:
      * - X < 0 (left of screen)
-     * - X > canvas width (right of screen)
-     * - Y > canvas height (below screen)
+     * - X > screen width (right of screen) - uses dynamic screen width
+     * - Y > screen height (below screen) - uses dynamic screen height
      *
      * Note: Y < 0 (above screen) is NOT out of bounds - projectiles
      * can arc high and come back down.
@@ -307,6 +331,10 @@ export class Projectile {
      * @private
      */
     _checkBounds() {
+        // Get dynamic screen dimensions for bounds checking
+        const screenWidth = getScreenWidth();
+        const screenHeight = getScreenHeight();
+
         // Left boundary
         if (this.x < 0) {
             this.active = false;
@@ -314,15 +342,15 @@ export class Projectile {
             return;
         }
 
-        // Right boundary
-        if (this.x > CANVAS.DESIGN_WIDTH) {
+        // Right boundary (uses dynamic screen width)
+        if (this.x > screenWidth) {
             this.active = false;
-            console.log('Projectile went out of bounds (right)');
+            console.log(`Projectile went out of bounds (right at x=${this.x.toFixed(0)}, screenWidth=${screenWidth})`);
             return;
         }
 
-        // Bottom boundary (below terrain floor)
-        if (this.y > CANVAS.DESIGN_HEIGHT) {
+        // Bottom boundary (below terrain floor, uses dynamic screen height)
+        if (this.y > screenHeight) {
             this.active = false;
             console.log('Projectile went out of bounds (bottom)');
             return;
@@ -338,6 +366,17 @@ export class Projectile {
      */
     isActive() {
         return this.active;
+    }
+
+    /**
+     * Check if the projectile can hit its owner tank.
+     * Returns false until the projectile has traveled a safe distance,
+     * preventing immediate self-collision at low firing angles.
+     *
+     * @returns {boolean} True if projectile can collide with owner tank
+     */
+    canHitOwner() {
+        return this.distanceTraveled >= this.safeDistance;
     }
 
     /**
@@ -531,8 +570,10 @@ export class Projectile {
         }
 
         // Get current terrain height at position
+        // Use terrain's screen height for dynamic screen support
+        const screenHeight = terrain.getScreenHeight();
         const currentTerrainHeight = terrain.getHeight(Math.floor(this.x));
-        const currentSurfaceY = CANVAS.DESIGN_HEIGHT - currentTerrainHeight;
+        const currentSurfaceY = screenHeight - currentTerrainHeight;
 
         // Calculate slope at current position
         // Look ahead in roll direction to find slope
@@ -545,7 +586,7 @@ export class Projectile {
         }
 
         const nextTerrainHeight = terrain.getHeight(nextX);
-        const nextSurfaceY = CANVAS.DESIGN_HEIGHT - nextTerrainHeight;
+        const nextSurfaceY = screenHeight - nextTerrainHeight;
 
         // Calculate slope angle (positive = going downhill, negative = going uphill)
         // In canvas coords: lower Y = higher on screen
@@ -597,7 +638,7 @@ export class Projectile {
         const newX = Math.floor(this.x);
         if (newX >= 0 && newX < terrain.getWidth()) {
             const newTerrainHeight = terrain.getHeight(newX);
-            this.y = CANVAS.DESIGN_HEIGHT - newTerrainHeight;
+            this.y = screenHeight - newTerrainHeight;
         }
 
         // Update rotation for visual effect
@@ -741,7 +782,7 @@ export class Projectile {
         const flooredX = Math.floor(this.x);
         if (flooredX >= 0 && flooredX < terrain.getWidth()) {
             const terrainHeight = terrain.getHeight(flooredX);
-            const terrainSurfaceY = CANVAS.DESIGN_HEIGHT - terrainHeight;
+            const terrainSurfaceY = terrain.getScreenHeight() - terrainHeight;
 
             // We've emerged if we're above the terrain surface
             // Add a small buffer to prevent immediate re-triggering
@@ -764,8 +805,8 @@ export class Projectile {
             return { explode: true, reason: 'wall' };
         }
 
-        // Check for out of bounds (bottom)
-        if (this.y >= CANVAS.DESIGN_HEIGHT) {
+        // Check for out of bounds (bottom) - use dynamic screen height
+        if (this.y >= terrain.getScreenHeight()) {
             return { explode: true, reason: 'bottom' };
         }
 
@@ -937,7 +978,8 @@ export function calculateTrajectory(startX, startY, angle, power, wind = 0, maxS
         points.push({ x: proj.x, y: proj.y });
 
         // Early exit if below screen (terrain collision will be checked elsewhere)
-        if (proj.y > CANVAS.DESIGN_HEIGHT) {
+        // Use dynamic screen height for proper bounds on all screen sizes
+        if (proj.y > getScreenHeight()) {
             break;
         }
     }
@@ -964,23 +1006,34 @@ const DIRECT_HIT_DISTANCE = 5;
  *
  * Important edge cases handled:
  * - Destroyed tanks are skipped (no collision with dead tanks)
+ * - Owner tank is skipped if projectile hasn't traveled safe distance
  * - When tanks overlap, returns the first hit tank in array order
  * - Returns null if no collision detected
  *
  * @param {number} x - X coordinate of projectile position
  * @param {number} y - Y coordinate of projectile position
  * @param {import('./tank.js').Tank[]} tanks - Array of tanks to check collision against
+ * @param {Object} [options] - Optional collision options
+ * @param {string} [options.owner] - Team name of the tank that fired (e.g., 'player', 'enemy')
+ * @param {boolean} [options.canHitOwner=true] - Whether the projectile can hit its owner
  * @returns {{tank: import('./tank.js').Tank, directHit: boolean}|null} Hit info or null if no collision
  */
-export function checkTankCollision(x, y, tanks) {
+export function checkTankCollision(x, y, tanks, options = {}) {
     if (!tanks || tanks.length === 0) {
         return null;
     }
+
+    const { owner, canHitOwner = true } = options;
 
     // Check each tank in order (handles overlapping tanks by returning first hit)
     for (const tank of tanks) {
         // Skip destroyed tanks - no collision with dead tanks
         if (tank.isDestroyed()) {
+            continue;
+        }
+
+        // Skip owner tank if projectile hasn't traveled safe distance yet
+        if (owner && tank.team === owner && !canHitOwner) {
             continue;
         }
 

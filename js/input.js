@@ -24,6 +24,8 @@ import { CANVAS, GAME_KEYS, KEYS, PHYSICS } from './constants.js';
 export const INPUT_EVENTS = {
     ANGLE_CHANGE: 'angle_change',
     POWER_CHANGE: 'power_change',
+    ANGLE_SET: 'angle_set',      // Set angle to absolute value (for touch aiming)
+    POWER_SET: 'power_set',      // Set power to absolute value (for touch aiming)
     FIRE: 'fire',
     SELECT_WEAPON: 'select_weapon',
     SELECT_PREV_WEAPON: 'select_prev_weapon'
@@ -48,6 +50,8 @@ let inputEnabled = true;
 const gameInputCallbacks = {
     [INPUT_EVENTS.ANGLE_CHANGE]: [],
     [INPUT_EVENTS.POWER_CHANGE]: [],
+    [INPUT_EVENTS.ANGLE_SET]: [],
+    [INPUT_EVENTS.POWER_SET]: [],
     [INPUT_EVENTS.FIRE]: [],
     [INPUT_EVENTS.SELECT_WEAPON]: [],
     [INPUT_EVENTS.SELECT_PREV_WEAPON]: []
@@ -167,20 +171,20 @@ function handleKeyUp(e) {
 }
 
 /**
- * Convert screen coordinates (relative to canvas) to design space coordinates.
- * Design space is CANVAS.DESIGN_WIDTH x CANVAS.DESIGN_HEIGHT (1200x800).
+ * Convert screen coordinates (relative to canvas) to game coordinate space.
+ * With dynamic screen sizing, CSS pixels = game coordinates (1:1 mapping).
+ * The canvas fills the available screen space, so no aspect ratio scaling needed.
  * @param {number} screenX - X coordinate relative to canvas CSS rect
  * @param {number} screenY - Y coordinate relative to canvas CSS rect
- * @param {DOMRect} rect - Canvas bounding client rect
- * @returns {{x: number, y: number}} Coordinates in design space
+ * @param {DOMRect} rect - Canvas bounding client rect (unused with 1:1 mapping)
+ * @returns {{x: number, y: number}} Coordinates in game space
  */
 function screenToDesign(screenX, screenY, rect) {
-    // Convert CSS coordinates to design space
-    // rect.width is the CSS display width, DESIGN_WIDTH is our target coordinate space
-    const cssToDesign = CANVAS.DESIGN_WIDTH / rect.width;
+    // With dynamic screen sizing, CSS coordinates = game coordinates directly
+    // No scaling needed since the canvas fills the screen at 1:1 pixel ratio
     return {
-        x: screenX * cssToDesign,
-        y: screenY * cssToDesign
+        x: screenX,
+        y: screenY
     };
 }
 
@@ -755,7 +759,7 @@ function handleSliderPointerUp() {
  * Called automatically during init().
  */
 function setupSliderBindings() {
-    // Mouse events
+    // Mouse events - coordinates are already in game space from the callback
     mouseDownCallbacks.push((x, y, button) => {
         if (button === 0) { // Left click only
             handleSliderPointerDown(x, y);
@@ -763,35 +767,22 @@ function setupSliderBindings() {
     });
 
     mouseMoveCallbacks.push((x, y) => {
-        // Convert raw mouse coords to design space for move events
-        if (canvasRef) {
-            const rect = canvasRef.getBoundingClientRect();
-            const design = screenToDesign(x, y, rect);
-            handleSliderPointerMove(design.x, design.y);
-        }
+        // Coordinates are already converted to game space by updatePointerFromMouse
+        handleSliderPointerMove(x, y);
     });
 
     mouseUpCallbacks.push(() => {
         handleSliderPointerUp();
     });
 
-    // Touch events
+    // Touch events - coordinates are already in game space from the callback
     touchStartCallbacks.push((x, y) => {
-        // Convert raw touch coords to design space
-        if (canvasRef) {
-            const rect = canvasRef.getBoundingClientRect();
-            const design = screenToDesign(x, y, rect);
-            handleSliderPointerDown(design.x, design.y);
-        }
+        handleSliderPointerDown(x, y);
     });
 
     touchMoveCallbacks.push((x, y) => {
-        // Convert raw touch coords to design space
-        if (canvasRef) {
-            const rect = canvasRef.getBoundingClientRect();
-            const design = screenToDesign(x, y, rect);
-            handleSliderPointerMove(design.x, design.y);
-        }
+        // Coordinates are already converted to game space by updatePointerFromTouch
+        handleSliderPointerMove(x, y);
     });
 
     touchEndCallbacks.push(() => {

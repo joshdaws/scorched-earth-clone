@@ -84,6 +84,23 @@ Finalized and implemented. See `docs/architecture/tech-stack.md` for detailed ra
 - Touch events handled with proper passive flags
 - Design coordinates (1200x800) independent of actual resolution
 
+### iOS Development
+
+The `www/` directory is the build output for Capacitor. Web files live in root and get synced to `www/` before iOS builds.
+
+```bash
+# Quick sync for fast iteration (use while developing)
+npm run ios:sync
+
+# Full clean rebuild
+npm run build:ios
+
+# Open Xcode
+npm run open:ios
+```
+
+After syncing, rebuild in Xcode with **Cmd+R**.
+
 ## Code Style
 
 - Vanilla JavaScript (ES6+ modules)

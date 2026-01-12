@@ -55,12 +55,25 @@ body {
     display: block;
     background-color: var(--bg-dark);
     /* Width, height, and position set dynamically by renderer.js */
+    /* z-index ensures 2D UI overlays Three.js background */
+    z-index: 1;
 
     /* iOS Safari: Prevent all default touch behaviors on canvas */
     touch-action: none;
     -webkit-touch-callout: none;  /* Prevent callout menu on long press */
     -webkit-user-select: none;    /* Prevent text selection */
     user-select: none;
+}
+
+/* Three.js title scene canvas - renders behind game canvas */
+#titleScene {
+    display: none;  /* Hidden by default, shown only during MENU state */
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 0;  /* Behind the game canvas */
+    pointer-events: none;  /* Let clicks pass through to game canvas */
+    background-color: transparent;
 }
 
 /* iOS Safari: Prevent rubber-banding/bounce scroll */

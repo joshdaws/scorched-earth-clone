@@ -87,16 +87,42 @@ function getHandlers(state) {
 const validTransitions = {
     [GAME_STATES.MENU]: [
         GAME_STATES.DIFFICULTY_SELECT,  // Go to difficulty selection first
+        GAME_STATES.HIGH_SCORES,        // View high scores
+        GAME_STATES.ACHIEVEMENTS,       // View achievements
+        GAME_STATES.COLLECTION,         // View tank collection
+        GAME_STATES.SUPPLY_DROP,        // Open supply drop crates
         GAME_STATES.PLAYING,
-        GAME_STATES.AIMING  // Can also start directly into aiming
+        GAME_STATES.AIMING,  // Can also start directly into aiming
+        GAME_STATES.ROUND_TRANSITION  // For debug/testing
     ],
     [GAME_STATES.DIFFICULTY_SELECT]: [
         GAME_STATES.PLAYING,  // Start game after selecting difficulty
         GAME_STATES.MENU      // Can go back to menu
     ],
+    [GAME_STATES.HIGH_SCORES]: [
+        GAME_STATES.MENU      // Can go back to menu
+    ],
+    [GAME_STATES.ACHIEVEMENTS]: [
+        GAME_STATES.MENU      // Can go back to menu
+    ],
+    [GAME_STATES.COLLECTION]: [
+        GAME_STATES.MENU,           // Can go back to menu
+        GAME_STATES.ROUND_TRANSITION, // Return to round end screen
+        GAME_STATES.SHOP,           // Go to shop after viewing collection
+        GAME_STATES.PLAYING,        // Go directly to next round
+        GAME_STATES.AIMING          // Go directly to next round (aiming)
+    ],
+    [GAME_STATES.SUPPLY_DROP]: [
+        GAME_STATES.MENU,           // Can go back to menu
+        GAME_STATES.ROUND_TRANSITION, // Return to round end screen
+        GAME_STATES.SHOP,           // Go to shop after supply drop
+        GAME_STATES.PLAYING,        // Go directly to next round
+        GAME_STATES.AIMING          // Go directly to next round (aiming)
+    ],
     [GAME_STATES.PLAYING]: [
         GAME_STATES.AIMING,
         GAME_STATES.PAUSED,
+        GAME_STATES.ROUND_TRANSITION,  // After winning a round
         GAME_STATES.VICTORY,
         GAME_STATES.DEFEAT,
         GAME_STATES.GAME_OVER,
@@ -112,6 +138,7 @@ const validTransitions = {
         GAME_STATES.AIMING,     // Next player's turn
         GAME_STATES.PLAYING,    // Back to playing state
         GAME_STATES.ROUND_END,  // Round finished
+        GAME_STATES.ROUND_TRANSITION,  // After winning a round
         GAME_STATES.VICTORY,
         GAME_STATES.DEFEAT,
         GAME_STATES.PAUSED,
@@ -136,8 +163,17 @@ const validTransitions = {
         GAME_STATES.AIMING,
         GAME_STATES.MENU
     ],
+    [GAME_STATES.ROUND_TRANSITION]: [
+        GAME_STATES.SHOP,       // Continue to shop after round transition
+        GAME_STATES.PLAYING,    // Skip shop and go directly to next round
+        GAME_STATES.AIMING,     // Skip shop and start aiming on next round
+        GAME_STATES.COLLECTION, // View tank collection from round end
+        GAME_STATES.SUPPLY_DROP,// Open supply drop from round end
+        GAME_STATES.MENU        // Can quit to menu
+    ],
     [GAME_STATES.VICTORY]: [
         GAME_STATES.MENU,
+        GAME_STATES.ROUND_TRANSITION, // Go to round transition screen
         GAME_STATES.SHOP,       // Could allow shop after victory
         GAME_STATES.GAME_OVER
     ],
@@ -250,6 +286,18 @@ export function isState(state) {
 // GAME LOOP
 // =============================================================================
 
+/** @type {Function|null} Post-render callback for overlay elements */
+let postRenderCallback = null;
+
+/**
+ * Register a post-render callback that runs after all state rendering.
+ * Useful for overlay elements like achievement popups that should appear on top.
+ * @param {Function} callback - Function to call with ctx after state render
+ */
+export function setPostRenderCallback(callback) {
+    postRenderCallback = callback;
+}
+
 /**
  * Start the game loop.
  * Uses a fixed timestep for physics updates to ensure consistent behavior
@@ -275,13 +323,6 @@ export function startLoop(updateFn, renderFn, ctx) {
     accumulator = 0;
 
     function loop(currentTime) {
-        // Debug: log every 60 frames to see if loop is running
-        if (!window._loopFrameCount) window._loopFrameCount = 0;
-        window._loopFrameCount++;
-        if (window._loopFrameCount % 60 === 1) {
-            console.log('[GameLoop] Frame', window._loopFrameCount, 'isRunning:', isRunning, 'isPaused:', isPaused);
-        }
-
         if (!isRunning) return;
 
         // Skip updates while paused but keep rendering for pause menu overlay
@@ -294,13 +335,13 @@ export function startLoop(updateFn, renderFn, ctx) {
                 renderFn(ctx);
             }
             const handlers = getHandlers(currentState);
-            // Only log once per pause to avoid flooding console
-            if (!window._pauseLoggedOnce) {
-                window._pauseLoggedOnce = true;
-                console.log('[GameLoop] Paused render ONCE, state:', currentState, 'hasRender:', !!handlers.render);
-            }
             if (handlers.render) {
                 handlers.render(ctx);
+            }
+
+            // Call post-render callback for overlays (even when paused)
+            if (postRenderCallback) {
+                postRenderCallback(ctx);
             }
 
             requestAnimationFrame(loop);
@@ -358,6 +399,11 @@ export function startLoop(updateFn, renderFn, ctx) {
         const handlers = getHandlers(currentState);
         if (handlers.render) {
             handlers.render(ctx);
+        }
+
+        // Call post-render callback for overlays
+        if (postRenderCallback) {
+            postRenderCallback(ctx);
         }
 
         requestAnimationFrame(loop);

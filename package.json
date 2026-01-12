@@ -8,10 +8,14 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build:web": "rm -rf www && mkdir -p www && cp -r index.html style.css js assets www/",
-    "build:ios": "npm run build:web && npx cap sync ios",
+    "dev": "vite",
+    "build": "vite build && npm run copy-static",
+    "copy-static": "cp config.js www/ && mkdir -p www/node_modules/convex/dist && cp node_modules/convex/dist/browser.bundle.js www/node_modules/convex/dist/ && cp -r assets www/",
+    "build:ios": "npm run build && npx cap sync ios",
+    "ios:sync": "npm run build && npx cap copy ios",
     "open:ios": "npx cap open ios",
-    "serve": "python3 -m http.server 8000"
+    "preview": "vite preview",
+    "generate-config": "node scripts/generate-config.js"
   },
   "repository": {
     "type": "git",
@@ -35,9 +39,13 @@
     "@capacitor/core": "^8.0.0",
     "@capacitor/haptics": "^8.0.0",
     "@capacitor/ios": "^8.0.0",
-    "sharp": "^0.34.5"
+    "convex": "^1.31.3",
+    "sharp": "^0.34.5",
+    "three": "^0.182.0"
   },
   "devDependencies": {
-    "canvas": "^3.2.0"
+    "canvas": "^3.2.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1"
   }
 }

@@ -324,30 +324,45 @@ export function setSfxVolume(volume) {
 /**
  * Get current master volume.
  * Returns the configured volume even when muted (not 0).
- * @returns {number} Volume level from 0 to 1, or 0 if not initialized
+ * Before audio is initialized, loads from localStorage to avoid UI flash.
+ * @returns {number} Volume level from 0 to 1
  */
 export function getMasterVolume() {
     // Return the pre-mute volume if muted, so UI shows correct slider position
     if (isMuted) {
         return preMuteVolume;
     }
-    return masterGain ? masterGain.gain.value : 0;
+    // Before init, load from localStorage to avoid slider flash
+    if (!masterGain) {
+        return loadVolumeSetting(STORAGE_KEY_MASTER_VOLUME, DEFAULT_MASTER_VOLUME);
+    }
+    return masterGain.gain.value;
 }
 
 /**
  * Get current music volume.
- * @returns {number} Volume level from 0 to 1, or 0 if not initialized
+ * Before audio is initialized, loads from localStorage to avoid UI flash.
+ * @returns {number} Volume level from 0 to 1
  */
 export function getMusicVolume() {
-    return musicGain ? musicGain.gain.value : 0;
+    // Before init, load from localStorage to avoid slider flash
+    if (!musicGain) {
+        return loadVolumeSetting(STORAGE_KEY_MUSIC_VOLUME, DEFAULT_MUSIC_VOLUME);
+    }
+    return musicGain.gain.value;
 }
 
 /**
  * Get current SFX volume.
- * @returns {number} Volume level from 0 to 1, or 0 if not initialized
+ * Before audio is initialized, loads from localStorage to avoid UI flash.
+ * @returns {number} Volume level from 0 to 1
  */
 export function getSfxVolume() {
-    return sfxGain ? sfxGain.gain.value : 0;
+    // Before init, load from localStorage to avoid slider flash
+    if (!sfxGain) {
+        return loadVolumeSetting(STORAGE_KEY_SFX_VOLUME, DEFAULT_SFX_VOLUME);
+    }
+    return sfxGain.gain.value;
 }
 
 // =============================================================================
@@ -389,9 +404,14 @@ export function setMuted(muted) {
 
 /**
  * Check if audio is currently muted.
+ * Before audio is initialized, loads from localStorage to avoid UI flash.
  * @returns {boolean} True if muted
  */
 export function getMuted() {
+    // Before init, load from localStorage to avoid button state flash
+    if (!initialized) {
+        return loadMuteSetting();
+    }
     return isMuted;
 }
 
@@ -1548,4 +1568,1012 @@ function createNoiseBuffer(duration) {
     }
 
     return buffer;
+}
+
+// =============================================================================
+// ACHIEVEMENT & TOKEN SOUNDS
+// =============================================================================
+
+/**
+ * Play a synthesized token earn sound.
+ * Creates a satisfying coin-like chime for when tokens are earned.
+ * Subtle but rewarding, distinct from the full achievement unlock sound.
+ * @param {number} [volume=0.3] - Volume multiplier (0-1)
+ */
+export function playTokenEarnSound(volume = 0.3) {
+    if (!audioContext || !sfxGain) {
+        return; // Silently fail - don't spam warnings for optional sounds
+    }
+
+    try {
+        const now = audioContext.currentTime;
+
+        // Two quick high notes for a coin-like sound
+        const osc1 = audioContext.createOscillator();
+        const gain1 = audioContext.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(1046, now); // C6
+        osc1.frequency.exponentialRampToValueAtTime(1319, now + 0.08); // E6
+        gain1.gain.setValueAtTime(0, now);
+        gain1.gain.linearRampToValueAtTime(volume * 0.5, now + 0.01);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+        osc1.connect(gain1);
+        gain1.connect(sfxGain);
+        osc1.start(now);
+        osc1.stop(now + 0.15);
+
+        // Higher overtone for shimmer
+        const osc2 = audioContext.createOscillator();
+        const gain2 = audioContext.createGain();
+        osc2.type = 'triangle';
+        osc2.frequency.setValueAtTime(2093, now + 0.02); // C7
+        gain2.gain.setValueAtTime(0, now + 0.02);
+        gain2.gain.linearRampToValueAtTime(volume * 0.25, now + 0.04);
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+        osc2.connect(gain2);
+        gain2.connect(sfxGain);
+        osc2.start(now + 0.02);
+        osc2.stop(now + 0.15);
+    } catch (error) {
+        // Silently fail for UI sounds
+    }
+}
+
+// =============================================================================
+// SUPPLY DROP SOUNDS
+// =============================================================================
+
+/**
+ * Play plane approach sound (distant engine rumble).
+ * Low frequency engine drone building up.
+ * @param {number} [volume=0.4] - Volume multiplier (0-1)
+ */
+export function playPlaneApproachSound(volume = 0.4) {
+    if (!audioContext || !sfxGain) {
+        return;
+    }
+
+    try {
+        const now = audioContext.currentTime;
+        const duration = 1.5;
+
+        // Low frequency drone
+        const osc = audioContext.createOscillator();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(60, now);
+        osc.frequency.linearRampToValueAtTime(80, now + duration);
+
+        // Second oscillator for engine throb
+        const osc2 = audioContext.createOscillator();
+        osc2.type = 'sawtooth';
+        osc2.frequency.setValueAtTime(62, now);
+        osc2.frequency.linearRampToValueAtTime(82, now + duration);
+
+        // Low pass filter for muffled distant sound
+        const filter = audioContext.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(200, now);
+        filter.frequency.linearRampToValueAtTime(400, now + duration);
+
+        // Tremolo effect (propeller rhythm)
+        const tremolo = audioContext.createGain();
+        const lfo = audioContext.createOscillator();
+        const lfoGain = audioContext.createGain();
+        lfo.frequency.value = 15;
+        lfoGain.gain.value = 0.3;
+        lfo.connect(lfoGain);
+        lfoGain.connect(tremolo.gain);
+
+        // Main envelope - builds up
+        const gainNode = audioContext.createGain();
+        gainNode.gain.setValueAtTime(0, now);
+        gainNode.gain.linearRampToValueAtTime(volume * 0.6, now + duration * 0.7);
+        gainNode.gain.linearRampToValueAtTime(volume * 0.8, now + duration);
+
+        // Connect
+        osc.connect(filter);
+        osc2.connect(filter);
+        filter.connect(tremolo);
+        tremolo.connect(gainNode);
+        gainNode.connect(sfxGain);
+
+        lfo.start(now);
+        osc.start(now);
+        osc2.start(now);
+        lfo.stop(now + duration);
+        osc.stop(now + duration);
+        osc2.stop(now + duration);
+    } catch (error) {
+        console.warn('Error playing plane approach sound:', error);
+    }
+}
+
+/**
+ * Play plane flyover sound (engine pass with doppler effect).
+ * Simulates plane passing overhead.
+ * @param {number} [volume=0.5] - Volume multiplier (0-1)
+ */
+export function playPlaneFlyoverSound(volume = 0.5) {
+    if (!audioContext || !sfxGain) {
+        return;
+    }
+
+    try {
+        const now = audioContext.currentTime;
+        const duration = 1.0;
+
+        // Engine drone with doppler pitch shift
+        const osc = audioContext.createOscillator();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(120, now);
+        osc.frequency.exponentialRampToValueAtTime(90, now + duration); // Doppler down
+
+        const osc2 = audioContext.createOscillator();
+        osc2.type = 'sawtooth';
+        osc2.frequency.setValueAtTime(122, now);
+        osc2.frequency.exponentialRampToValueAtTime(92, now + duration);
+
+        // Filter also drops for doppler effect
+        const filter = audioContext.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(600, now);
+        filter.frequency.exponentialRampToValueAtTime(300, now + duration);
+        filter.Q.value = 1;
+
+        // Propeller rhythm
+        const tremolo = audioContext.createGain();
+        tremolo.gain.value = 1;
+        const lfo = audioContext.createOscillator();
+        const lfoGain = audioContext.createGain();
+        lfo.frequency.value = 20;
+        lfoGain.gain.value = 0.2;
+        lfo.connect(lfoGain);
+        lfoGain.connect(tremolo.gain);
+
+        // Volume envelope - loud in middle, fades at ends
+        const gainNode = audioContext.createGain();
+        gainNode.gain.setValueAtTime(volume * 0.5, now);
+        gainNode.gain.linearRampToValueAtTime(volume, now + duration * 0.4);
+        gainNode.gain.linearRampToValueAtTime(volume * 0.3, now + duration);
+
+        osc.connect(filter);
+        osc2.connect(filter);
+        filter.connect(tremolo);
+        tremolo.connect(gainNode);
+        gainNode.connect(sfxGain);
+
+        lfo.start(now);
+        osc.start(now);
+        osc2.start(now);
+        lfo.stop(now + duration);
+        osc.stop(now + duration);
+        osc2.stop(now + duration);
+    } catch (error) {
+        console.warn('Error playing plane flyover sound:', error);
+    }
+}
+
+/**
+ * Play crate drop sound (wind whistle as crate falls).
+ * Descending whistle effect.
+ * @param {number} [volume=0.35] - Volume multiplier (0-1)
+ */
+export function playCrateDropSound(volume = 0.35) {
+    if (!audioContext || !sfxGain) {
+        return;
+    }
+
+    try {
+        const now = audioContext.currentTime;
+        const duration = 0.8;
+
+        // High pitched whistle descending
+        const osc = audioContext.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1200, now);
+        osc.frequency.exponentialRampToValueAtTime(400, now + duration);
+
+        // Noise for wind
+        const noiseBuffer = createNoiseBuffer(duration);
+        const noiseSource = audioContext.createBufferSource();
+        noiseSource.buffer = noiseBuffer;
+
+        const noiseFilter = audioContext.createBiquadFilter();
+        noiseFilter.type = 'bandpass';
+        noiseFilter.frequency.setValueAtTime(2000, now);
+        noiseFilter.frequency.exponentialRampToValueAtTime(800, now + duration);
+        noiseFilter.Q.value = 1;
+
+        const oscGain = audioContext.createGain();
+        oscGain.gain.setValueAtTime(volume * 0.3, now);
+        oscGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+        const noiseGain = audioContext.createGain();
+        noiseGain.gain.setValueAtTime(volume * 0.4, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+        osc.connect(oscGain);
+        oscGain.connect(sfxGain);
+        noiseSource.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
+        noiseGain.connect(sfxGain);
+
+        osc.start(now);
+        noiseSource.start(now);
+        osc.stop(now + duration);
+        noiseSource.stop(now + duration);
+    } catch (error) {
+        console.warn('Error playing crate drop sound:', error);
+    }
+}
+
+/**
+ * Play parachute deploy sound (fabric pop/whoosh).
+ * Quick snap followed by fluttering.
+ * @param {number} [volume=0.4] - Volume multiplier (0-1)
+ */
+export function playParachuteDeploySound(volume = 0.4) {
+    if (!audioContext || !sfxGain) {
+        return;
+    }
+
+    try {
+        const now = audioContext.currentTime;
+
+        // Initial pop/snap
+        const noiseBuffer = createNoiseBuffer(0.15);
+        const popSource = audioContext.createBufferSource();
+        popSource.buffer = noiseBuffer;
+
+        const popFilter = audioContext.createBiquadFilter();
+        popFilter.type = 'bandpass';
+        popFilter.frequency.value = 1500;
+        popFilter.Q.value = 2;
+
+        const popGain = audioContext.createGain();
+        popGain.gain.setValueAtTime(volume * 0.8, now);
+        popGain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+
+        popSource.connect(popFilter);
+        popFilter.connect(popGain);
+        popGain.connect(sfxGain);
+        popSource.start(now);
+        popSource.stop(now + 0.15);
+
+        // Fabric flutter/whoosh after pop
+        const flutterBuffer = createNoiseBuffer(0.4);
+        const flutterSource = audioContext.createBufferSource();
+        flutterSource.buffer = flutterBuffer;
+
+        const flutterFilter = audioContext.createBiquadFilter();
+        flutterFilter.type = 'lowpass';
+        flutterFilter.frequency.setValueAtTime(3000, now + 0.05);
+        flutterFilter.frequency.exponentialRampToValueAtTime(500, now + 0.4);
+
+        const flutterGain = audioContext.createGain();
+        flutterGain.gain.setValueAtTime(0, now + 0.05);
+        flutterGain.gain.linearRampToValueAtTime(volume * 0.5, now + 0.1);
+        flutterGain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+
+        flutterSource.connect(flutterFilter);
+        flutterFilter.connect(flutterGain);
+        flutterGain.connect(sfxGain);
+        flutterSource.start(now + 0.05);
+        flutterSource.stop(now + 0.5);
+    } catch (error) {
+        console.warn('Error playing parachute deploy sound:', error);
+    }
+}
+
+/**
+ * Play crate landing sound (thud + dust).
+ * Heavy impact on ground.
+ * @param {number} [volume=0.5] - Volume multiplier (0-1)
+ */
+export function playCrateLandSound(volume = 0.5) {
+    if (!audioContext || !sfxGain) {
+        return;
+    }
+
+    try {
+        const now = audioContext.currentTime;
+
+        // Deep thud
+        const osc = audioContext.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(80, now);
+        osc.frequency.exponentialRampToValueAtTime(40, now + 0.2);
+
+        const filter = audioContext.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 200;
+
+        const thudGain = audioContext.createGain();
+        thudGain.gain.setValueAtTime(0, now);
+        thudGain.gain.linearRampToValueAtTime(volume * 0.8, now + 0.02);
+        thudGain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+
+        osc.connect(filter);
+        filter.connect(thudGain);
+        thudGain.connect(sfxGain);
+
+        // Creak/wood sound
+        const creakOsc = audioContext.createOscillator();
+        creakOsc.type = 'triangle';
+        creakOsc.frequency.setValueAtTime(200, now + 0.02);
+        creakOsc.frequency.exponentialRampToValueAtTime(150, now + 0.15);
+
+        const creakGain = audioContext.createGain();
+        creakGain.gain.setValueAtTime(0, now + 0.02);
+        creakGain.gain.linearRampToValueAtTime(volume * 0.2, now + 0.05);
+        creakGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+        creakOsc.connect(creakGain);
+        creakGain.connect(sfxGain);
+
+        // Dust scatter noise
+        const dustBuffer = createNoiseBuffer(0.2);
+        const dustSource = audioContext.createBufferSource();
+        dustSource.buffer = dustBuffer;
+
+        const dustFilter = audioContext.createBiquadFilter();
+        dustFilter.type = 'lowpass';
+        dustFilter.frequency.value = 400;
+
+        const dustGain = audioContext.createGain();
+        dustGain.gain.setValueAtTime(volume * 0.3, now + 0.03);
+        dustGain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+
+        dustSource.connect(dustFilter);
+        dustFilter.connect(dustGain);
+        dustGain.connect(sfxGain);
+
+        osc.start(now);
+        creakOsc.start(now + 0.02);
+        dustSource.start(now + 0.03);
+        osc.stop(now + 0.35);
+        creakOsc.stop(now + 0.2);
+        dustSource.stop(now + 0.3);
+    } catch (error) {
+        console.warn('Error playing crate land sound:', error);
+    }
+}
+
+/**
+ * Play supply drop reveal sound based on rarity.
+ * Each rarity has a unique reveal sound from simple to epic.
+ * @param {string} rarity - Tank rarity: 'common', 'uncommon', 'rare', 'epic', 'legendary'
+ * @param {number} [volume=0.5] - Volume multiplier (0-1)
+ */
+export function playRevealSound(rarity, volume = 0.5) {
+    if (!audioContext || !sfxGain) {
+        return;
+    }
+
+    switch (rarity) {
+        case 'common':
+            playCommonRevealSound(volume);
+            break;
+        case 'uncommon':
+            playUncommonRevealSound(volume);
+            break;
+        case 'rare':
+            playRareRevealSound(volume);
+            break;
+        case 'epic':
+            playEpicRevealSound(volume);
+            break;
+        case 'legendary':
+            playLegendaryRevealSound(volume);
+            break;
+        default:
+            playCommonRevealSound(volume);
+    }
+}
+
+/**
+ * Common reveal - Basic synth hit.
+ */
+function playCommonRevealSound(volume) {
+    try {
+        const now = audioContext.currentTime;
+
+        const osc = audioContext.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.exponentialRampToValueAtTime(220, now + 0.15);
+
+        const gainNode = audioContext.createGain();
+        gainNode.gain.setValueAtTime(0, now);
+        gainNode.gain.linearRampToValueAtTime(volume * 0.5, now + 0.02);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+
+        osc.connect(gainNode);
+        gainNode.connect(sfxGain);
+
+        osc.start(now);
+        osc.stop(now + 0.25);
+    } catch (error) {
+        console.warn('Error playing common reveal sound:', error);
+    }
+}
+
+/**
+ * Uncommon reveal - Ascending synth.
+ */
+function playUncommonRevealSound(volume) {
+    try {
+        const now = audioContext.currentTime;
+
+        // Ascending two-note pattern
+        const osc1 = audioContext.createOscillator();
+        osc1.type = 'sawtooth';
+        osc1.frequency.setValueAtTime(330, now); // E4
+        const osc1Gain = audioContext.createGain();
+        osc1Gain.gain.setValueAtTime(0, now);
+        osc1Gain.gain.linearRampToValueAtTime(volume * 0.4, now + 0.02);
+        osc1Gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+        osc1.connect(osc1Gain);
+        osc1Gain.connect(sfxGain);
+
+        const osc2 = audioContext.createOscillator();
+        osc2.type = 'sawtooth';
+        osc2.frequency.setValueAtTime(440, now + 0.1); // A4
+        const osc2Gain = audioContext.createGain();
+        osc2Gain.gain.setValueAtTime(0, now + 0.1);
+        osc2Gain.gain.linearRampToValueAtTime(volume * 0.5, now + 0.12);
+        osc2Gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+        osc2.connect(osc2Gain);
+        osc2Gain.connect(sfxGain);
+
+        osc1.start(now);
+        osc2.start(now + 0.1);
+        osc1.stop(now + 0.2);
+        osc2.stop(now + 0.35);
+    } catch (error) {
+        console.warn('Error playing uncommon reveal sound:', error);
+    }
+}
+
+/**
+ * Rare reveal - Power chord.
+ */
+function playRareRevealSound(volume) {
+    try {
+        const now = audioContext.currentTime;
+
+        // Power chord: root + fifth
+        const root = audioContext.createOscillator();
+        root.type = 'sawtooth';
+        root.frequency.setValueAtTime(196, now); // G3
+
+        const fifth = audioContext.createOscillator();
+        fifth.type = 'sawtooth';
+        fifth.frequency.setValueAtTime(294, now); // D4
+
+        const octave = audioContext.createOscillator();
+        octave.type = 'sawtooth';
+        octave.frequency.setValueAtTime(392, now); // G4
+
+        // Distortion-like filter
+        const filter = audioContext.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 2000;
+        filter.Q.value = 2;
+
+        const gainNode = audioContext.createGain();
+        gainNode.gain.setValueAtTime(0, now);
+        gainNode.gain.linearRampToValueAtTime(volume * 0.5, now + 0.02);
+        gainNode.gain.setValueAtTime(volume * 0.5, now + 0.3);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+
+        root.connect(filter);
+        fifth.connect(filter);
+        octave.connect(filter);
+        filter.connect(gainNode);
+        gainNode.connect(sfxGain);
+
+        root.start(now);
+        fifth.start(now);
+        octave.start(now);
+        root.stop(now + 0.65);
+        fifth.stop(now + 0.65);
+        octave.stop(now + 0.65);
+    } catch (error) {
+        console.warn('Error playing rare reveal sound:', error);
+    }
+}
+
+/**
+ * Epic reveal - Full synth riff (3-4 seconds).
+ */
+function playEpicRevealSound(volume) {
+    try {
+        const now = audioContext.currentTime;
+
+        // Dramatic ascending arpeggio with synthwave character
+        const notes = [
+            { freq: 196, time: 0 },      // G3
+            { freq: 247, time: 0.15 },   // B3
+            { freq: 294, time: 0.3 },    // D4
+            { freq: 392, time: 0.45 },   // G4
+            { freq: 494, time: 0.6 },    // B4
+            { freq: 587, time: 0.8 },    // D5
+            { freq: 784, time: 1.0 },    // G5 - hold
+        ];
+
+        notes.forEach(note => {
+            const osc = audioContext.createOscillator();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(note.freq, now + note.time);
+
+            const osc2 = audioContext.createOscillator();
+            osc2.type = 'square';
+            osc2.frequency.setValueAtTime(note.freq * 2, now + note.time);
+
+            const filter = audioContext.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(3000, now + note.time);
+            filter.frequency.exponentialRampToValueAtTime(1000, now + note.time + 0.5);
+
+            const noteGain = audioContext.createGain();
+            const isLastNote = note.freq === 784;
+            const duration = isLastNote ? 2.0 : 0.25;
+
+            noteGain.gain.setValueAtTime(0, now + note.time);
+            noteGain.gain.linearRampToValueAtTime(volume * 0.4, now + note.time + 0.02);
+            if (isLastNote) {
+                noteGain.gain.setValueAtTime(volume * 0.5, now + note.time + 0.1);
+                noteGain.gain.exponentialRampToValueAtTime(0.001, now + note.time + duration);
+            } else {
+                noteGain.gain.exponentialRampToValueAtTime(0.001, now + note.time + duration);
+            }
+
+            const osc2Gain = audioContext.createGain();
+            osc2Gain.gain.value = 0.3;
+
+            osc.connect(filter);
+            osc2.connect(osc2Gain);
+            osc2Gain.connect(filter);
+            filter.connect(noteGain);
+            noteGain.connect(sfxGain);
+
+            osc.start(now + note.time);
+            osc2.start(now + note.time);
+            osc.stop(now + note.time + duration + 0.1);
+            osc2.stop(now + note.time + duration + 0.1);
+        });
+
+        // Add shimmer/sparkle effect
+        const shimmer = audioContext.createOscillator();
+        shimmer.type = 'triangle';
+        shimmer.frequency.setValueAtTime(1568, now + 1.2);
+        shimmer.frequency.exponentialRampToValueAtTime(2093, now + 2.5);
+
+        const shimmerGain = audioContext.createGain();
+        shimmerGain.gain.setValueAtTime(0, now + 1.2);
+        shimmerGain.gain.linearRampToValueAtTime(volume * 0.2, now + 1.5);
+        shimmerGain.gain.exponentialRampToValueAtTime(0.001, now + 3.0);
+
+        shimmer.connect(shimmerGain);
+        shimmerGain.connect(sfxGain);
+        shimmer.start(now + 1.2);
+        shimmer.stop(now + 3.0);
+    } catch (error) {
+        console.warn('Error playing epic reveal sound:', error);
+    }
+}
+
+/**
+ * Legendary reveal - Epic 80s anthem sting.
+ * Full dramatic fanfare worthy of a legendary unlock.
+ */
+function playLegendaryRevealSound(volume) {
+    try {
+        const now = audioContext.currentTime;
+
+        // Dramatic intro hit
+        const introHit = audioContext.createOscillator();
+        introHit.type = 'sawtooth';
+        introHit.frequency.setValueAtTime(98, now); // G2
+
+        const introHit2 = audioContext.createOscillator();
+        introHit2.type = 'sawtooth';
+        introHit2.frequency.setValueAtTime(196, now); // G3
+
+        const introFilter = audioContext.createBiquadFilter();
+        introFilter.type = 'lowpass';
+        introFilter.frequency.value = 1500;
+
+        const introGain = audioContext.createGain();
+        introGain.gain.setValueAtTime(0, now);
+        introGain.gain.linearRampToValueAtTime(volume * 0.7, now + 0.02);
+        introGain.gain.setValueAtTime(volume * 0.7, now + 0.2);
+        introGain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+
+        introHit.connect(introFilter);
+        introHit2.connect(introFilter);
+        introFilter.connect(introGain);
+        introGain.connect(sfxGain);
+
+        introHit.start(now);
+        introHit2.start(now);
+        introHit.stop(now + 0.8);
+        introHit2.stop(now + 0.8);
+
+        // Main fanfare melody
+        const melody = [
+            { freq: 392, time: 0.3, dur: 0.2 },   // G4
+            { freq: 494, time: 0.5, dur: 0.2 },   // B4
+            { freq: 587, time: 0.7, dur: 0.2 },   // D5
+            { freq: 784, time: 0.9, dur: 0.8 },   // G5 (long)
+            { freq: 740, time: 1.7, dur: 0.2 },   // F#5
+            { freq: 784, time: 1.9, dur: 0.2 },   // G5
+            { freq: 880, time: 2.1, dur: 1.5 },   // A5 (triumphant hold)
+        ];
+
+        melody.forEach(note => {
+            // Lead synth
+            const lead = audioContext.createOscillator();
+            lead.type = 'sawtooth';
+            lead.frequency.setValueAtTime(note.freq, now + note.time);
+
+            // Detuned for fatness
+            const lead2 = audioContext.createOscillator();
+            lead2.type = 'sawtooth';
+            lead2.frequency.setValueAtTime(note.freq * 1.005, now + note.time);
+
+            // Square for punch
+            const square = audioContext.createOscillator();
+            square.type = 'square';
+            square.frequency.setValueAtTime(note.freq, now + note.time);
+
+            const filter = audioContext.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(4000, now + note.time);
+            filter.frequency.exponentialRampToValueAtTime(2000, now + note.time + note.dur);
+
+            const noteGain = audioContext.createGain();
+            noteGain.gain.setValueAtTime(0, now + note.time);
+            noteGain.gain.linearRampToValueAtTime(volume * 0.5, now + note.time + 0.02);
+            noteGain.gain.setValueAtTime(volume * 0.5, now + note.time + note.dur * 0.7);
+            noteGain.gain.exponentialRampToValueAtTime(0.001, now + note.time + note.dur);
+
+            const squareGain = audioContext.createGain();
+            squareGain.gain.value = 0.2;
+
+            lead.connect(filter);
+            lead2.connect(filter);
+            square.connect(squareGain);
+            squareGain.connect(filter);
+            filter.connect(noteGain);
+            noteGain.connect(sfxGain);
+
+            lead.start(now + note.time);
+            lead2.start(now + note.time);
+            square.start(now + note.time);
+            lead.stop(now + note.time + note.dur + 0.1);
+            lead2.stop(now + note.time + note.dur + 0.1);
+            square.stop(now + note.time + note.dur + 0.1);
+        });
+
+        // Sustained pad underneath
+        const pad = audioContext.createOscillator();
+        pad.type = 'sine';
+        pad.frequency.setValueAtTime(196, now + 0.3); // G3
+
+        const pad2 = audioContext.createOscillator();
+        pad2.type = 'sine';
+        pad2.frequency.setValueAtTime(294, now + 0.3); // D4
+
+        const padGain = audioContext.createGain();
+        padGain.gain.setValueAtTime(0, now + 0.3);
+        padGain.gain.linearRampToValueAtTime(volume * 0.25, now + 0.8);
+        padGain.gain.setValueAtTime(volume * 0.25, now + 3.0);
+        padGain.gain.exponentialRampToValueAtTime(0.001, now + 4.0);
+
+        pad.connect(padGain);
+        pad2.connect(padGain);
+        padGain.connect(sfxGain);
+
+        pad.start(now + 0.3);
+        pad2.start(now + 0.3);
+        pad.stop(now + 4.0);
+        pad2.stop(now + 4.0);
+
+        // Final shimmer/sparkle
+        const shimmer = audioContext.createOscillator();
+        shimmer.type = 'triangle';
+        shimmer.frequency.setValueAtTime(2093, now + 2.3);
+        shimmer.frequency.linearRampToValueAtTime(4186, now + 3.5);
+
+        const shimmerGain = audioContext.createGain();
+        shimmerGain.gain.setValueAtTime(0, now + 2.3);
+        shimmerGain.gain.linearRampToValueAtTime(volume * 0.15, now + 2.6);
+        shimmerGain.gain.exponentialRampToValueAtTime(0.001, now + 4.0);
+
+        shimmer.connect(shimmerGain);
+        shimmerGain.connect(sfxGain);
+        shimmer.start(now + 2.3);
+        shimmer.stop(now + 4.0);
+    } catch (error) {
+        console.warn('Error playing legendary reveal sound:', error);
+    }
+}
+
+// =============================================================================
+// EXTRACTION REVEAL SOUNDS (LEGENDARY ALTERNATIVE)
+// =============================================================================
+
+/**
+ * Play radio static/interference sound.
+ * Used during the "INCOMING TRANSMISSION" phase.
+ * @param {number} [volume=0.3] - Volume multiplier (0-1)
+ * @param {number} [duration=1.5] - Duration in seconds
+ * @returns {AudioBufferSourceNode|null} The noise source for stopping later
+ */
+export function playRadioStaticSound(volume = 0.3, duration = 1.5) {
+    if (!audioContext || !sfxGain) {
+        return null;
+    }
+
+    try {
+        const now = audioContext.currentTime;
+
+        // White noise base
+        const noiseBuffer = createNoiseBuffer(duration);
+        const noiseSource = audioContext.createBufferSource();
+        noiseSource.buffer = noiseBuffer;
+
+        // Bandpass filter for radio character
+        const filter = audioContext.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.value = 2000;
+        filter.Q.value = 1;
+
+        // Crackling modulation
+        const lfo = audioContext.createOscillator();
+        lfo.frequency.value = 8;
+        const lfoGain = audioContext.createGain();
+        lfoGain.gain.value = 0.5;
+
+        const gainNode = audioContext.createGain();
+        gainNode.gain.setValueAtTime(volume * 0.5, now);
+        gainNode.gain.linearRampToValueAtTime(volume, now + duration * 0.3);
+        gainNode.gain.setValueAtTime(volume, now + duration * 0.7);
+        gainNode.gain.linearRampToValueAtTime(0, now + duration);
+
+        lfo.connect(lfoGain);
+        lfoGain.connect(gainNode.gain);
+
+        noiseSource.connect(filter);
+        filter.connect(gainNode);
+        gainNode.connect(sfxGain);
+
+        lfo.start(now);
+        noiseSource.start(now);
+        lfo.stop(now + duration);
+        noiseSource.stop(now + duration);
+
+        return noiseSource;
+    } catch (error) {
+        console.warn('Error playing radio static sound:', error);
+        return null;
+    }
+}
+
+/**
+ * Play helicopter rotor sound.
+ * Continuous chopping sound for helicopter approach.
+ * @param {number} [volume=0.4] - Volume multiplier (0-1)
+ * @param {number} [duration=3.0] - Duration in seconds
+ * @returns {Object|null} Object with stop() method to end the sound
+ */
+export function playHelicopterRotorSound(volume = 0.4, duration = 3.0) {
+    if (!audioContext || !sfxGain) {
+        return null;
+    }
+
+    try {
+        const now = audioContext.currentTime;
+
+        // Low frequency rotor chop
+        const osc = audioContext.createOscillator();
+        osc.type = 'sawtooth';
+        osc.frequency.value = 40;
+
+        // Blade whoosh noise
+        const noiseBuffer = createNoiseBuffer(duration);
+        const noiseSource = audioContext.createBufferSource();
+        noiseSource.buffer = noiseBuffer;
+
+        const noiseFilter = audioContext.createBiquadFilter();
+        noiseFilter.type = 'lowpass';
+        noiseFilter.frequency.value = 600;
+
+        // Chopping modulation (rotor rhythm)
+        const chopLfo = audioContext.createOscillator();
+        chopLfo.frequency.value = 6; // ~6 Hz for helicopter rotor
+        const chopGain = audioContext.createGain();
+        chopGain.gain.value = 0.8;
+
+        const modGain = audioContext.createGain();
+        modGain.gain.value = 0.2;
+
+        chopLfo.connect(chopGain);
+        chopGain.connect(modGain.gain);
+
+        // Master gain envelope
+        const gainNode = audioContext.createGain();
+        gainNode.gain.setValueAtTime(0, now);
+        gainNode.gain.linearRampToValueAtTime(volume, now + 0.5);
+        gainNode.gain.setValueAtTime(volume, now + duration - 0.5);
+        gainNode.gain.linearRampToValueAtTime(0, now + duration);
+
+        osc.connect(modGain);
+        noiseSource.connect(noiseFilter);
+        noiseFilter.connect(modGain);
+        modGain.connect(gainNode);
+        gainNode.connect(sfxGain);
+
+        chopLfo.start(now);
+        osc.start(now);
+        noiseSource.start(now);
+        chopLfo.stop(now + duration);
+        osc.stop(now + duration);
+        noiseSource.stop(now + duration);
+
+        return {
+            stop: () => {
+                try {
+                    osc.stop();
+                    noiseSource.stop();
+                    chopLfo.stop();
+                } catch (e) {
+                    // Already stopped
+                }
+            }
+        };
+    } catch (error) {
+        console.warn('Error playing helicopter rotor sound:', error);
+        return null;
+    }
+}
+
+/**
+ * Play rotor wash/wind sound.
+ * Intense wind effect from helicopter downdraft.
+ * @param {number} [volume=0.35] - Volume multiplier (0-1)
+ * @param {number} [duration=2.0] - Duration in seconds
+ */
+export function playRotorWashSound(volume = 0.35, duration = 2.0) {
+    if (!audioContext || !sfxGain) {
+        return;
+    }
+
+    try {
+        const now = audioContext.currentTime;
+
+        // Heavy wind noise
+        const noiseBuffer = createNoiseBuffer(duration);
+        const noiseSource = audioContext.createBufferSource();
+        noiseSource.buffer = noiseBuffer;
+
+        // Low rumble component
+        const lowFilter = audioContext.createBiquadFilter();
+        lowFilter.type = 'lowpass';
+        lowFilter.frequency.value = 300;
+
+        // Higher wind component
+        const highFilter = audioContext.createBiquadFilter();
+        highFilter.type = 'bandpass';
+        highFilter.frequency.value = 1500;
+        highFilter.Q.value = 0.5;
+
+        const lowGain = audioContext.createGain();
+        lowGain.gain.value = volume * 0.6;
+
+        const highGain = audioContext.createGain();
+        highGain.gain.value = volume * 0.4;
+
+        // Master envelope
+        const gainNode = audioContext.createGain();
+        gainNode.gain.setValueAtTime(0, now);
+        gainNode.gain.linearRampToValueAtTime(1, now + 0.3);
+        gainNode.gain.setValueAtTime(1, now + duration - 0.3);
+        gainNode.gain.linearRampToValueAtTime(0, now + duration);
+
+        noiseSource.connect(lowFilter);
+        noiseSource.connect(highFilter);
+        lowFilter.connect(lowGain);
+        highFilter.connect(highGain);
+        lowGain.connect(gainNode);
+        highGain.connect(gainNode);
+        gainNode.connect(sfxGain);
+
+        noiseSource.start(now);
+        noiseSource.stop(now + duration);
+    } catch (error) {
+        console.warn('Error playing rotor wash sound:', error);
+    }
+}
+
+/**
+ * Play cable release sound.
+ * Mechanical click/clunk of cable detaching.
+ * @param {number} [volume=0.45] - Volume multiplier (0-1)
+ */
+export function playCableReleaseSound(volume = 0.45) {
+    if (!audioContext || !sfxGain) {
+        return;
+    }
+
+    try {
+        const now = audioContext.currentTime;
+
+        // Metallic clunk
+        const osc = audioContext.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(400, now);
+        osc.frequency.exponentialRampToValueAtTime(150, now + 0.1);
+
+        // Higher metallic ping
+        const ping = audioContext.createOscillator();
+        ping.type = 'sine';
+        ping.frequency.setValueAtTime(1200, now);
+        ping.frequency.exponentialRampToValueAtTime(800, now + 0.08);
+
+        const oscGain = audioContext.createGain();
+        oscGain.gain.setValueAtTime(volume * 0.6, now);
+        oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+        const pingGain = audioContext.createGain();
+        pingGain.gain.setValueAtTime(volume * 0.3, now);
+        pingGain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+
+        // Short noise burst
+        const noiseBuffer = createNoiseBuffer(0.05);
+        const noiseSource = audioContext.createBufferSource();
+        noiseSource.buffer = noiseBuffer;
+
+        const noiseFilter = audioContext.createBiquadFilter();
+        noiseFilter.type = 'highpass';
+        noiseFilter.frequency.value = 2000;
+
+        const noiseGain = audioContext.createGain();
+        noiseGain.gain.setValueAtTime(volume * 0.4, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+
+        osc.connect(oscGain);
+        ping.connect(pingGain);
+        noiseSource.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
+        oscGain.connect(sfxGain);
+        pingGain.connect(sfxGain);
+        noiseGain.connect(sfxGain);
+
+        osc.start(now);
+        ping.start(now);
+        noiseSource.start(now);
+        osc.stop(now + 0.2);
+        ping.stop(now + 0.15);
+        noiseSource.stop(now + 0.1);
+    } catch (error) {
+        console.warn('Error playing cable release sound:', error);
+    }
+}
+
+/**
+ * Play extraction fanfare.
+ * Triumphant military-style fanfare for legendary extraction complete.
+ * @param {number} [volume=0.55] - Volume multiplier (0-1)
+ */
+export function playExtractionFanfareSound(volume = 0.55) {
+    if (!audioContext || !sfxGain) {
+        return;
+    }
+
+    // The legendary reveal sound already has a full fanfare
+    // Use it for the extraction as well, possibly with slight variation
+    playLegendaryRevealSound(volume);
 }

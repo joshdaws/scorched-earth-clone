@@ -141,8 +141,12 @@ function isNearTank(x, y, tank) {
  * The angle is inverted from the drag direction (slingshot style).
  * Dragging down-right aims up-left, etc.
  *
- * @param {number} startX - Drag start X (near tank)
- * @param {number} startY - Drag start Y (near tank)
+ * IMPORTANT: Uses tank center as reference point, NOT the drag start position.
+ * This prevents erratic angle changes when dragging close to the start point,
+ * because the angle always corresponds to the direction from tank to touch.
+ *
+ * @param {number} startX - Drag start X (unused, kept for API compatibility)
+ * @param {number} startY - Drag start Y (unused, kept for API compatibility)
  * @param {number} currentX - Current drag X
  * @param {number} currentY - Current drag Y
  * @param {import('./tank.js').Tank} tank - Player tank
@@ -151,14 +155,20 @@ function isNearTank(x, y, tank) {
 function calculateAngleFromDrag(startX, startY, currentX, currentY, tank) {
     if (!tank) return 45;
 
-    // Calculate drag vector (from start to current)
-    const dragX = currentX - startX;
-    const dragY = currentY - startY;
+    // Use tank center as reference point, not start position
+    // This ensures angle is always relative to the tank, preventing
+    // erratic behavior when touch is close to start position
+    const tankCenterX = tank.x;
+    const tankCenterY = tank.y - TANK.HEIGHT / 2;
 
-    // Invert the drag direction for slingshot effect
-    // Dragging down-right should aim up-left
-    const aimX = -dragX;
-    const aimY = -dragY;
+    // Vector from tank center to current touch position
+    const toTouchX = currentX - tankCenterX;
+    const toTouchY = currentY - tankCenterY;
+
+    // Invert for slingshot effect (aim opposite of drag direction)
+    // Dragging down-right from tank should aim up-left
+    const aimX = -toTouchX;
+    const aimY = -toTouchY;
 
     // Calculate angle (0 = right, 90 = up, 180 = left)
     // Canvas Y is inverted, so we use aimY directly (negative Y = up)
@@ -240,17 +250,10 @@ function handlePointerMove(x, y) {
         const newAngle = calculateAngleFromDrag(state.startX, state.startY, x, y, state.playerTank);
         const newPower = calculatePowerFromDrag(state.startX, state.startY, x, y);
 
-        // Calculate deltas
-        const angleDelta = newAngle - state.playerTank.angle;
-        const powerDelta = newPower - state.playerTank.power;
-
-        // Queue input events for significant changes
-        if (Math.abs(angleDelta) > 0.5) {
-            queueGameInput(INPUT_EVENTS.ANGLE_CHANGE, angleDelta);
-        }
-        if (Math.abs(powerDelta) > 0.5) {
-            queueGameInput(INPUT_EVENTS.POWER_CHANGE, powerDelta);
-        }
+        // Queue absolute input events (not deltas) to avoid accumulation bugs
+        // when multiple move events occur between render frames
+        queueGameInput(INPUT_EVENTS.ANGLE_SET, newAngle);
+        queueGameInput(INPUT_EVENTS.POWER_SET, newPower);
 
         // Store calculated values for rendering
         state.calculatedAngle = newAngle;

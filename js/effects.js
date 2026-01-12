@@ -1286,7 +1286,7 @@ let vhsGlitchState = {
 /**
  * CRT effects state
  */
-let crtEnabled = false;
+let crtEnabled = true;
 
 /**
  * Cached scanline pattern for performance

@@ -21,27 +21,62 @@ import { PHYSICS, COLORS, UI, CANVAS } from './constants.js';
 let currentWind = 0;
 
 // =============================================================================
+// WIND RANGE SCALING
+// =============================================================================
+
+/**
+ * Current maximum wind range for the active round.
+ * Updated by generateRandomWind() when called with a custom range.
+ * Used for normalizing the wind indicator display.
+ * @type {number}
+ */
+let currentMaxRange = PHYSICS.WIND_RANGE;
+
+/**
+ * Get the wind range for a given round number.
+ * Wind becomes more extreme in later rounds, making shots harder to land.
+ *
+ * Wind Scaling Table:
+ * - Rounds 1-3:  ±5  (Light wind)
+ * - Rounds 4-6:  ±8  (Moderate wind)
+ * - Rounds 7-9:  ±10 (Strong wind - default max)
+ * - Rounds 10+:  ±12 (Extreme wind - extended range)
+ *
+ * @param {number} roundNumber - Current round (1-based)
+ * @returns {number} Maximum wind range for this round
+ */
+export function getWindRangeForRound(roundNumber) {
+    if (roundNumber <= 3) return 5;
+    if (roundNumber <= 6) return 8;
+    if (roundNumber <= 9) return 10;
+    return 12; // Extended range for late game
+}
+
+// =============================================================================
 // WIND MANAGEMENT
 // =============================================================================
 
 /**
  * Generate a new random wind value for the round.
- * Wind ranges from -WIND_RANGE to +WIND_RANGE (default: -10 to +10).
+ * Wind ranges from -maxRange to +maxRange.
  * Can produce both left (negative) and right (positive) wind.
  *
+ * @param {number} [maxRange=PHYSICS.WIND_RANGE] - Maximum wind range (default: 10)
  * @returns {number} The new wind value
  */
-export function generateRandomWind() {
-    // Generate random value from -WIND_RANGE to +WIND_RANGE
+export function generateRandomWind(maxRange = PHYSICS.WIND_RANGE) {
+    // Store the current max range for wind indicator normalization
+    currentMaxRange = maxRange;
+
+    // Generate random value from -maxRange to +maxRange
     // Math.random() gives 0-1, multiply by 2 * range and subtract range
     // to get the full range from -range to +range
-    const range = PHYSICS.WIND_RANGE;
-    currentWind = (Math.random() * 2 * range) - range;
+    currentWind = (Math.random() * 2 * maxRange) - maxRange;
 
     // Round to 1 decimal place for cleaner display
     currentWind = Math.round(currentWind * 10) / 10;
 
-    console.log(`Wind generated: ${currentWind > 0 ? '+' : ''}${currentWind.toFixed(1)} (${getWindDirectionText()})`);
+    console.log(`Wind generated: ${currentWind > 0 ? '+' : ''}${currentWind.toFixed(1)} (${getWindDirectionText()}, range: ±${maxRange})`);
 
     return currentWind;
 }
@@ -66,10 +101,11 @@ export function getWindForce() {
 
 /**
  * Set the wind to a specific value (for testing or special scenarios).
- * @param {number} value - Wind value to set (-10 to +10)
+ * Clamps to the current round's max range.
+ * @param {number} value - Wind value to set
  */
 export function setWind(value) {
-    currentWind = Math.max(-PHYSICS.WIND_RANGE, Math.min(PHYSICS.WIND_RANGE, value));
+    currentWind = Math.max(-currentMaxRange, Math.min(currentMaxRange, value));
 }
 
 /**
@@ -95,24 +131,37 @@ export function getWindDirectionText() {
 
 /**
  * Get the wind strength as a descriptive string.
+ * Thresholds scale with the current max range.
  * @returns {string} 'CALM', 'LIGHT', 'MODERATE', 'STRONG', or 'GALE'
  */
 export function getWindStrengthText() {
     const absWind = Math.abs(currentWind);
+    // Scale thresholds based on current max range
+    const scale = currentMaxRange / 10;
     if (absWind < 0.5) return 'CALM';
-    if (absWind < 2.5) return 'LIGHT';
-    if (absWind < 5) return 'MODERATE';
-    if (absWind < 7.5) return 'STRONG';
+    if (absWind < 2.5 * scale) return 'LIGHT';
+    if (absWind < 5 * scale) return 'MODERATE';
+    if (absWind < 7.5 * scale) return 'STRONG';
     return 'GALE';
 }
 
 /**
  * Get the normalized wind strength (0-1 scale).
  * Used for scaling visual indicators.
+ * Uses the current round's max range for proper normalization.
  * @returns {number} Normalized strength (0 = calm, 1 = max wind)
  */
 export function getNormalizedStrength() {
-    return Math.abs(currentWind) / PHYSICS.WIND_RANGE;
+    return Math.abs(currentWind) / currentMaxRange;
+}
+
+/**
+ * Get the current maximum wind range.
+ * Useful for UI display to show the possible range.
+ * @returns {number} Current maximum wind range
+ */
+export function getCurrentMaxRange() {
+    return currentMaxRange;
 }
 
 // =============================================================================

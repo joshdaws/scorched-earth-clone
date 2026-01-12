@@ -2,11 +2,12 @@
  * Scorched Earth: Synthwave Edition
  * Aiming Controls UI Module
  *
- * Provides visual controls for adjusting angle and power:
+ * Provides visual controls for aiming:
  * - Angle indicator: arc display around tank turret
- * - Power bar: vertical slider on the left side
  * - Fire button: large, prominent, neon styled
  * - Trajectory preview: dotted line showing projected path
+ *
+ * Power is controlled via the slingshot/drag mechanic in touchAiming.js.
  *
  * All coordinates are in design space (1200x800).
  */
@@ -14,51 +15,122 @@
 import { CANVAS, COLORS, UI, PHYSICS, TANK } from './constants.js';
 import { registerSliderZone, queueGameInput, INPUT_EVENTS, isGameInputEnabled } from './input.js';
 import * as Wind from './wind.js';
+import { getScreenWidth, getScreenHeight } from './screenSize.js';
+import {
+    fromRight, fromBottom,
+    scaled, scaledTouch, isVeryShortScreen, isMobileDevice
+} from './uiPosition.js?v=20260111a';
 
 // =============================================================================
-// LAYOUT CONSTANTS
+// LAYOUT HELPERS
 // =============================================================================
 
 /**
- * Aiming controls layout configuration.
- * Designed for touch-friendly sizing (minimum 44px tap targets).
- * UI positioned for comfortable thumb access on mobile devices.
+ * Base layout dimensions (reference sizes before scaling).
+ * These are scaled based on screen size for responsive UI.
  */
-const CONTROLS = {
-    // Power bar on the left side - positioned for left thumb access
-    POWER_BAR: {
-        X: 50,              // Slightly inward for better thumb reach
-        Y: 220,             // Positioned in thumb-accessible zone
-        WIDTH: 55,          // Touch-friendly width
-        HEIGHT: 280,        // Slightly shorter for thumb reach
-        PADDING: 10,
-        KNOB_HEIGHT: 48,    // Touch-friendly: exceeds 44px minimum
-        TOUCH_ZONE_PADDING: 24  // Extra padding for touch targets
-    },
-    // Fire button at bottom right - touch-optimized for right thumb access
+const CONTROLS_BASE = {
     FIRE_BUTTON: {
-        X: CANVAS.DESIGN_WIDTH - 130,   // Right side with margin from edge
-        Y: CANVAS.DESIGN_HEIGHT - 80,   // Bottom with margin for thumb reach
-        WIDTH: 180,         // Wide for easy tapping, minimum 44pt
-        HEIGHT: 70,         // Touch-friendly: well over 44px minimum
-        BORDER_RADIUS: 14
+        WIDTH: 180,
+        HEIGHT: 70,
+        BORDER_RADIUS: 14,
+        RIGHT_OFFSET: 130,  // Distance from right edge to center
+        BOTTOM_OFFSET: 80   // Distance from bottom to center
     },
-    // Angle arc around tank turret
     ANGLE_ARC: {
-        RADIUS: 60,           // Arc radius from tank center
-        ARC_WIDTH: 8,         // Width of the arc stroke
-        TICK_LENGTH: 12,      // Length of angle tick marks
-        TOUCH_RADIUS: 80      // Larger radius for touch interaction
+        RADIUS: 60,
+        ARC_WIDTH: 8,
+        TICK_LENGTH: 12,
+        TOUCH_RADIUS: 80
     },
-    // Trajectory preview
     TRAJECTORY: {
-        MAX_POINTS: 100,      // Maximum points to simulate
-        STEP_TIME: 0.03,      // Time step for simulation (seconds)
-        DOT_SPACING: 8,       // Pixels between dots
-        DOT_RADIUS: 3,        // Radius of trajectory dots
-        FADE_START: 0.5,      // Start fading at 50% of visible trajectory
-        PREVIEW_PERCENT: 0.25 // Only show 25% of trajectory (for skill-based aiming)
+        MAX_POINTS: 100,
+        STEP_TIME: 0.03,
+        DOT_SPACING: 8,
+        DOT_RADIUS: 3,
+        FADE_START: 0.5,
+        PREVIEW_PERCENT: 0.25
     }
+};
+
+/**
+ * Get dynamic aiming controls layout based on current screen dimensions.
+ * @returns {Object} Controls layout configuration
+ */
+function getControlsLayoutDynamic() {
+    const veryShortScreen = isVeryShortScreen();
+    const mobile = isMobileDevice();
+
+    // Smaller fire button on mobile/very short screens - use smaller min sizes on mobile
+    const compactMode = mobile || veryShortScreen;
+    const fireButtonWidth = compactMode
+        ? scaledTouch(110, 36)  // Smaller but still touch-friendly, lower min on mobile
+        : scaledTouch(CONTROLS_BASE.FIRE_BUTTON.WIDTH);
+    const fireButtonHeight = compactMode
+        ? scaledTouch(44, 36)   // Smaller height, matches Apple HIG minimum
+        : scaledTouch(CONTROLS_BASE.FIRE_BUTTON.HEIGHT);
+
+    // Fire button position: from right and bottom edges - closer to edges on mobile
+    const fireButtonBottomOffset = compactMode ? 40 : scaled(CONTROLS_BASE.FIRE_BUTTON.BOTTOM_OFFSET);
+    const fireButtonRightOffset = compactMode ? 70 : scaled(CONTROLS_BASE.FIRE_BUTTON.RIGHT_OFFSET);
+    const fireButtonX = fromRight(fireButtonRightOffset);
+    const fireButtonY = fromBottom(fireButtonBottomOffset);
+
+    // Scale factors for mobile
+    const mobileScale = mobile ? 0.75 : 1;
+
+    return {
+        FIRE_BUTTON: {
+            X: fireButtonX,
+            Y: fireButtonY,
+            WIDTH: fireButtonWidth,
+            HEIGHT: fireButtonHeight,
+            BORDER_RADIUS: scaled(CONTROLS_BASE.FIRE_BUTTON.BORDER_RADIUS * (mobile ? 0.7 : 1))
+        },
+        ANGLE_ARC: {
+            RADIUS: scaled(CONTROLS_BASE.ANGLE_ARC.RADIUS * mobileScale),
+            ARC_WIDTH: scaled(CONTROLS_BASE.ANGLE_ARC.ARC_WIDTH * mobileScale),
+            TICK_LENGTH: scaled(CONTROLS_BASE.ANGLE_ARC.TICK_LENGTH * mobileScale),
+            TOUCH_RADIUS: scaled(CONTROLS_BASE.ANGLE_ARC.TOUCH_RADIUS)  // Keep touch area same for usability
+        },
+        TRAJECTORY: {
+            MAX_POINTS: CONTROLS_BASE.TRAJECTORY.MAX_POINTS,
+            STEP_TIME: CONTROLS_BASE.TRAJECTORY.STEP_TIME,
+            DOT_SPACING: scaled(CONTROLS_BASE.TRAJECTORY.DOT_SPACING * mobileScale),
+            DOT_RADIUS: scaled(CONTROLS_BASE.TRAJECTORY.DOT_RADIUS * mobileScale),
+            FADE_START: CONTROLS_BASE.TRAJECTORY.FADE_START,
+            PREVIEW_PERCENT: CONTROLS_BASE.TRAJECTORY.PREVIEW_PERCENT
+        }
+    };
+}
+
+// Cache for controls layout
+let cachedControlsLayout = null;
+let cachedScreenWidth = 0;
+let cachedScreenHeight = 0;
+
+/**
+ * Get controls layout, using cache if screen size hasn't changed.
+ * @returns {Object} Controls layout configuration
+ */
+function getControls() {
+    const currentWidth = getScreenWidth();
+    const currentHeight = getScreenHeight();
+
+    if (!cachedControlsLayout || currentWidth !== cachedScreenWidth || currentHeight !== cachedScreenHeight) {
+        cachedControlsLayout = getControlsLayoutDynamic();
+        cachedScreenWidth = currentWidth;
+        cachedScreenHeight = currentHeight;
+    }
+
+    return cachedControlsLayout;
+}
+
+// Legacy reference using dynamic getters
+const CONTROLS = {
+    get FIRE_BUTTON() { return getControls().FIRE_BUTTON; },
+    get ANGLE_ARC() { return getControls().ANGLE_ARC; },
+    get TRAJECTORY() { return getControls().TRAJECTORY; }
 };
 
 // =============================================================================
@@ -70,11 +142,7 @@ const CONTROLS = {
  */
 const controlState = {
     // Which control is being interacted with
-    activeControl: null,  // 'power', 'angle', or null
-
-    // Power bar drag state
-    powerDragStartY: 0,
-    powerDragStartValue: 0,
+    activeControl: null,  // 'angle' or null
 
     // Angle arc drag state
     angleDragStartAngle: 0,
@@ -103,94 +171,6 @@ let controlsEnabled = false;
  * @type {number}
  */
 let animationTime = 0;
-
-// =============================================================================
-// POWER BAR RENDERING
-// =============================================================================
-
-/**
- * Render the power bar control.
- * A vertical slider on the left side of the screen.
- *
- * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
- * @param {number} power - Current power value (0-100)
- */
-function renderPowerBar(ctx, power) {
-    const bar = CONTROLS.POWER_BAR;
-    const isActive = controlState.activeControl === 'power';
-    const accentColor = isActive ? COLORS.NEON_PINK : COLORS.NEON_CYAN;
-
-    ctx.save();
-
-    // Background panel
-    ctx.fillStyle = 'rgba(10, 10, 26, 0.85)';
-    ctx.beginPath();
-    ctx.roundRect(bar.X - bar.PADDING, bar.Y - bar.PADDING,
-                  bar.WIDTH + bar.PADDING * 2, bar.HEIGHT + bar.PADDING * 2 + 30, 8);
-    ctx.fill();
-
-    // Glowing border
-    ctx.strokeStyle = accentColor;
-    ctx.lineWidth = 2;
-    ctx.shadowColor = accentColor;
-    ctx.shadowBlur = isActive ? 12 : 6;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-
-    // Track background
-    const trackX = bar.X + (bar.WIDTH - 20) / 2;
-    const trackWidth = 20;
-    ctx.fillStyle = 'rgba(30, 30, 60, 0.8)';
-    ctx.beginPath();
-    ctx.roundRect(trackX, bar.Y, trackWidth, bar.HEIGHT, 4);
-    ctx.fill();
-
-    // Power fill with gradient
-    const fillHeight = (power / 100) * bar.HEIGHT;
-    const fillY = bar.Y + bar.HEIGHT - fillHeight;
-
-    const gradient = ctx.createLinearGradient(trackX, fillY, trackX, bar.Y + bar.HEIGHT);
-    gradient.addColorStop(0, COLORS.NEON_PINK);
-    gradient.addColorStop(0.5, COLORS.NEON_ORANGE);
-    gradient.addColorStop(1, COLORS.NEON_YELLOW);
-
-    ctx.fillStyle = gradient;
-    ctx.beginPath();
-    ctx.roundRect(trackX + 2, fillY + 2, trackWidth - 4, fillHeight - 4, 2);
-    ctx.fill();
-
-    // Knob at current position
-    const knobY = fillY - bar.KNOB_HEIGHT / 2;
-    ctx.fillStyle = 'rgba(10, 10, 26, 0.95)';
-    ctx.beginPath();
-    ctx.roundRect(bar.X, Math.max(bar.Y - bar.KNOB_HEIGHT / 2, knobY),
-                  bar.WIDTH, bar.KNOB_HEIGHT, 6);
-    ctx.fill();
-
-    ctx.strokeStyle = accentColor;
-    ctx.lineWidth = 3;
-    ctx.shadowColor = accentColor;
-    ctx.shadowBlur = 8;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-
-    // Power value on knob
-    ctx.fillStyle = COLORS.TEXT_LIGHT;
-    ctx.font = `bold ${UI.FONT_SIZE_LARGE}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`${Math.round(power)}`, bar.X + bar.WIDTH / 2,
-                 Math.max(bar.Y, knobY + bar.KNOB_HEIGHT / 2));
-
-    // Label
-    ctx.fillStyle = COLORS.TEXT_LIGHT;
-    ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    ctx.fillText('POWER', bar.X + bar.WIDTH / 2, bar.Y + bar.HEIGHT + bar.PADDING + 5);
-
-    ctx.restore();
-}
 
 // =============================================================================
 // ANGLE ARC RENDERING
@@ -427,15 +407,15 @@ function simulateTrajectory(tank, angle, power, windForce, terrain) {
         x += vx;
         y += vy;
 
-        // Check bounds
-        if (x < 0 || x > CANVAS.DESIGN_WIDTH || y > CANVAS.DESIGN_HEIGHT) {
+        // Check bounds using dynamic screen dimensions
+        if (x < 0 || x > getScreenWidth() || y > getScreenHeight()) {
             break;
         }
 
         // Check terrain collision (if terrain is provided)
         if (terrain) {
             const terrainHeight = terrain.getHeight(Math.floor(x));
-            const terrainY = CANVAS.DESIGN_HEIGHT - terrainHeight;
+            const terrainY = getScreenHeight() - terrainHeight;
             if (y >= terrainY) {
                 points.push({ x, y: terrainY });
                 break;
@@ -553,23 +533,6 @@ export function isInsideFireButton(x, y) {
 }
 
 /**
- * Check if a point is inside the power bar area.
- * @param {number} x - X coordinate
- * @param {number} y - Y coordinate
- * @returns {boolean} True if inside power bar
- */
-export function isInsidePowerBar(x, y) {
-    const bar = CONTROLS.POWER_BAR;
-    const padding = bar.TOUCH_ZONE_PADDING;
-    return (
-        x >= bar.X - padding &&
-        x <= bar.X + bar.WIDTH + padding &&
-        y >= bar.Y - padding - bar.KNOB_HEIGHT / 2 &&
-        y <= bar.Y + bar.HEIGHT + padding
-    );
-}
-
-/**
  * Check if a point is inside the angle arc area.
  * @param {number} x - X coordinate
  * @param {number} y - Y coordinate
@@ -621,21 +584,6 @@ function calculateAngleFromPoint(x, y, tank) {
 }
 
 /**
- * Calculate power from Y position on power bar.
- * @param {number} y - Y coordinate
- * @returns {number} Power value (0-100)
- */
-function calculatePowerFromY(y) {
-    const bar = CONTROLS.POWER_BAR;
-
-    // Invert: top of bar = 100, bottom = 0
-    const relativeY = y - bar.Y;
-    const power = 100 - (relativeY / bar.HEIGHT) * 100;
-
-    return Math.max(0, Math.min(100, power));
-}
-
-/**
  * Handle pointer down on aiming controls.
  * @param {number} x - X coordinate
  * @param {number} y - Y coordinate
@@ -648,14 +596,6 @@ export function handlePointerDown(x, y, tank, canFire) {
     // Check fire button
     if (canFire && isInsideFireButton(x, y)) {
         controlState.fireButtonPressed = true;
-        return;
-    }
-
-    // Check power bar
-    if (isInsidePowerBar(x, y)) {
-        controlState.activeControl = 'power';
-        controlState.powerDragStartY = y;
-        controlState.powerDragStartValue = tank ? tank.power : 50;
         return;
     }
 
@@ -681,14 +621,7 @@ export function handlePointerMove(x, y, tank) {
 
     if (!controlsEnabled || !isGameInputEnabled()) return;
 
-    if (controlState.activeControl === 'power') {
-        // Calculate new power from Y position
-        const newPower = calculatePowerFromY(y);
-        const delta = newPower - (tank ? tank.power : 50);
-        if (Math.abs(delta) > 0.5) {
-            queueGameInput(INPUT_EVENTS.POWER_CHANGE, delta);
-        }
-    } else if (controlState.activeControl === 'angle') {
+    if (controlState.activeControl === 'angle') {
         // Calculate new angle from pointer position
         const newAngle = calculateAngleFromPoint(x, y, tank);
         const delta = newAngle - (tank ? tank.angle : 90);
@@ -790,9 +723,6 @@ export function renderAimingControls(ctx, state) {
         renderTrajectoryPreview(ctx, playerTank, angle, power, terrain);
     }
 
-    // Render power bar
-    renderPowerBar(ctx, power);
-
     // Render angle arc (around tank)
     if (playerTank) {
         renderAngleArc(ctx, playerTank, angle);
@@ -811,9 +741,10 @@ export function getCurrentTank() {
 }
 
 /**
- * Get control layout constants (for external use).
- * @returns {Object} Control layout constants
+ * Get control layout for external use.
+ * Returns dynamically calculated layout based on current screen size.
+ * @returns {Object} Control layout
  */
 export function getControlLayout() {
-    return { ...CONTROLS };
+    return getControls();
 }

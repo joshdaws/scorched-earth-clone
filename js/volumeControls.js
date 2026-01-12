@@ -7,6 +7,7 @@
  */
 
 import { COLORS, UI, CANVAS } from './constants.js';
+import * as Renderer from './renderer.js';
 import * as Sound from './sound.js';
 import { isCrtEnabled, toggleCrt } from './effects.js';
 
@@ -21,7 +22,7 @@ import { isCrtEnabled, toggleCrt } from './effects.js';
  */
 const VOLUME_PANEL = {
     WIDTH: 340,
-    HEIGHT: 330,               // Increased to fit CRT toggle
+    HEIGHT: 400,               // Increased to fit Change Name button
     PADDING: 24,
     SLIDER_HEIGHT: 12,         // Thicker track for easier tapping
     SLIDER_WIDTH: 260,
@@ -32,6 +33,32 @@ const VOLUME_PANEL = {
     BUTTON_HEIGHT: 48,         // Touch-friendly height
     BUTTON_SPACING: 12         // Space between buttons
 };
+
+// =============================================================================
+// CALLBACKS
+// =============================================================================
+
+/** @type {Function|null} Callback when Change Name button is clicked */
+let onChangeNameCallback = null;
+
+/** @type {Function|null} Callback when Close button is clicked */
+let onCloseCallback = null;
+
+/**
+ * Set callback for Change Name button.
+ * @param {Function} callback - Function to call when Change Name is clicked
+ */
+export function setChangeNameCallback(callback) {
+    onChangeNameCallback = callback;
+}
+
+/**
+ * Set callback for Close button.
+ * @param {Function} callback - Function to call when Close is clicked
+ */
+export function setCloseCallback(callback) {
+    onCloseCallback = callback;
+}
 
 // =============================================================================
 // INTERACTION STATE
@@ -97,7 +124,7 @@ function getMuteButton(panelX, panelY) {
     const startX = panelX + (VOLUME_PANEL.WIDTH - totalWidth) / 2;
     return {
         x: startX,
-        y: panelY + VOLUME_PANEL.HEIGHT - 70,
+        y: panelY + VOLUME_PANEL.HEIGHT - 130,
         width: VOLUME_PANEL.BUTTON_WIDTH,
         height: VOLUME_PANEL.BUTTON_HEIGHT
     };
@@ -114,9 +141,51 @@ function getCrtButton(panelX, panelY) {
     const startX = panelX + (VOLUME_PANEL.WIDTH - totalWidth) / 2;
     return {
         x: startX + VOLUME_PANEL.BUTTON_WIDTH + VOLUME_PANEL.BUTTON_SPACING,
-        y: panelY + VOLUME_PANEL.HEIGHT - 70,
+        y: panelY + VOLUME_PANEL.HEIGHT - 130,
         width: VOLUME_PANEL.BUTTON_WIDTH,
         height: VOLUME_PANEL.BUTTON_HEIGHT
+    };
+}
+
+/**
+ * Get Change Name button bounds.
+ * @param {number} panelX - Panel X position
+ * @param {number} panelY - Panel Y position
+ * @returns {{x: number, y: number, width: number, height: number}}
+ */
+function getChangeNameButton(panelX, panelY) {
+    // Centered, full width-ish button at the bottom
+    const buttonWidth = VOLUME_PANEL.WIDTH - VOLUME_PANEL.PADDING * 2;
+    return {
+        x: panelX + VOLUME_PANEL.PADDING,
+        y: panelY + VOLUME_PANEL.HEIGHT - 70,
+        width: buttonWidth,
+        height: VOLUME_PANEL.BUTTON_HEIGHT
+    };
+}
+
+/**
+ * Get Close button bounds.
+ * Positioned to overlap the top-right corner of the modal (partially outside).
+ * Touch-optimized: 44x44px for easy tapping on mobile.
+ * @param {number} panelX - Panel X position
+ * @param {number} panelY - Panel Y position
+ * @returns {{x: number, y: number, width: number, height: number, radius: number}}
+ */
+function getCloseButton(panelX, panelY) {
+    const radius = 18; // Circle radius
+    const size = radius * 2; // Hit area size
+    // Position so circle overlaps the corner (centered on corner with slight offset inward)
+    const centerX = panelX + VOLUME_PANEL.WIDTH - 12;
+    const centerY = panelY + 12;
+    return {
+        x: centerX - radius,
+        y: centerY - radius,
+        width: size,
+        height: size,
+        radius: radius,
+        centerX: centerX,
+        centerY: centerY
     };
 }
 
@@ -130,7 +199,7 @@ function getCrtButton(panelX, panelY) {
  * @param {number} [centerX] - Center X position (defaults to canvas center)
  * @param {number} [centerY] - Center Y position (defaults to canvas center)
  */
-export function render(ctx, centerX = CANVAS.DESIGN_WIDTH / 2, centerY = CANVAS.DESIGN_HEIGHT / 2) {
+export function render(ctx, centerX = Renderer.getWidth() / 2, centerY = Renderer.getHeight() / 2) {
     if (!ctx) return;
 
     const panelX = centerX - VOLUME_PANEL.WIDTH / 2;
@@ -172,7 +241,13 @@ export function render(ctx, centerX = CANVAS.DESIGN_WIDTH / 2, centerY = CANVAS.
     // Render CRT effects toggle button
     renderCrtButton(ctx, getCrtButton(panelX, panelY));
 
+    // Render Change Name button
+    renderChangeNameButton(ctx, getChangeNameButton(panelX, panelY));
+
     ctx.restore();
+
+    // Render Close button AFTER restore so it can overlap the panel corner
+    renderCloseButton(ctx, getCloseButton(panelX, panelY));
 }
 
 /**
@@ -295,6 +370,81 @@ function renderCrtButton(ctx, button) {
     ctx.restore();
 }
 
+/**
+ * Render the Change Name button.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {Object} button - Button bounds
+ */
+function renderChangeNameButton(ctx, button) {
+    ctx.save();
+
+    // Button background - yellow/gold theme for profile actions
+    ctx.fillStyle = 'rgba(255, 215, 0, 0.15)';
+    ctx.beginPath();
+    ctx.roundRect(button.x, button.y, button.width, button.height, 6);
+    ctx.fill();
+
+    // Button border
+    ctx.strokeStyle = COLORS.NEON_YELLOW;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Button text
+    ctx.fillStyle = COLORS.NEON_YELLOW;
+    ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('CHANGE NAME', button.x + button.width / 2, button.y + button.height / 2);
+
+    ctx.restore();
+}
+
+/**
+ * Render the Close (X) button.
+ * Styled as a circle overlapping the modal corner with white X centered inside.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {Object} button - Button bounds with centerX, centerY, radius
+ */
+function renderCloseButton(ctx, button) {
+    ctx.save();
+
+    const { centerX, centerY, radius } = button;
+    const xSize = 7; // Size of the X lines (with padding from circle edge)
+
+    // Circle background with glow
+    ctx.shadowColor = COLORS.NEON_PINK;
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = COLORS.NEON_PINK;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Circle border (white for contrast)
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Draw white X with proper padding inside circle
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+
+    // First line of X (top-left to bottom-right)
+    ctx.beginPath();
+    ctx.moveTo(centerX - xSize, centerY - xSize);
+    ctx.lineTo(centerX + xSize, centerY + xSize);
+    ctx.stroke();
+
+    // Second line of X (top-right to bottom-left)
+    ctx.beginPath();
+    ctx.moveTo(centerX + xSize, centerY - xSize);
+    ctx.lineTo(centerX - xSize, centerY + xSize);
+    ctx.stroke();
+
+    ctx.restore();
+}
+
 // =============================================================================
 // INPUT HANDLING
 // =============================================================================
@@ -333,6 +483,26 @@ export function handlePointerDown(x, y) {
     if (isInsideButton(x, y, crtBtn)) {
         toggleCrt();
         Sound.playClickSound();
+        return true;
+    }
+
+    // Check Change Name button
+    const changeNameBtn = getChangeNameButton(panelPosition.x, panelPosition.y);
+    if (isInsideButton(x, y, changeNameBtn)) {
+        Sound.playClickSound();
+        if (onChangeNameCallback) {
+            onChangeNameCallback();
+        }
+        return true;
+    }
+
+    // Check Close button
+    const closeBtn = getCloseButton(panelPosition.x, panelPosition.y);
+    if (isInsideButton(x, y, closeBtn)) {
+        Sound.playClickSound();
+        if (onCloseCallback) {
+            onCloseCallback();
+        }
         return true;
     }
 

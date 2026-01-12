@@ -1,0 +1,753 @@
+/**
+ * Scorched Earth: Synthwave Edition
+ * Supply Drop Purchase Screen
+ *
+ * Screen for purchasing supply drop crates using tokens.
+ * Three purchase tiers: Standard, Premium, and Guaranteed Rare+.
+ */
+
+import { GAME_STATES, CANVAS } from './constants.js';
+import * as Renderer from './renderer.js';
+import * as Game from './game.js';
+import * as Input from './input.js';
+import * as Music from './music.js';
+import * as SupplyDrop from './supply-drop.js';
+import * as ExtractionReveal from './extraction-reveal.js';
+import { getTokenBalance, spendTokens, canAfford } from './tokens.js';
+import {
+    RARITY,
+    DROP_RATES,
+    RARITY_COLORS
+} from './tank-skins.js';
+import {
+    processDrop,
+    DROP_TYPES,
+    getDropRatesForDisplay,
+    getCurrentPerformanceBonus
+} from './drop-rates.js';
+import * as LifetimeStats from './lifetime-stats.js';
+import * as ScrapTutorial from './scrap-tutorial.js';
+import { shouldShowScrapTutorial } from './tank-collection.js';
+
+// =============================================================================
+// CONFIGURATION
+// =============================================================================
+
+const CONFIG = {
+    // Layout
+    HEADER_HEIGHT: 80,
+    CARD_WIDTH: 280,
+    CARD_HEIGHT: 380,
+    CARD_GAP: 40,
+    CARD_Y: 180,
+
+    // Purchase options - now linked to DROP_TYPES from drop-rates.js
+    PURCHASE_OPTIONS: [
+        {
+            id: 'standard',
+            dropType: DROP_TYPES.STANDARD,
+            name: 'STANDARD DROP',
+            cost: 50,
+            description: 'Standard drop rates',
+            glowColor: '#00FFFF'
+        },
+        {
+            id: 'premium',
+            dropType: DROP_TYPES.PREMIUM,
+            name: 'PREMIUM DROP',
+            cost: 100,
+            description: '+10% Rare or better',
+            glowColor: '#FF00FF'
+        },
+        {
+            id: 'guaranteed',
+            dropType: DROP_TYPES.GUARANTEED_RARE,
+            name: 'RARE+ DROP',
+            cost: 250,
+            description: 'Guaranteed Rare or better',
+            glowColor: '#F59E0B'
+        }
+    ],
+
+    // Button styling
+    BUTTON_HEIGHT: 50,
+    BUTTON_MARGIN: 20,
+
+    // Colors
+    COLORS: {
+        BACKGROUND: '#0a0a1a',
+        CARD_BG: 'rgba(20, 20, 40, 0.9)',
+        CARD_BORDER: '#333366',
+        TEXT_PRIMARY: '#FFFFFF',
+        TEXT_SECONDARY: '#9CA3AF',
+        TEXT_DISABLED: '#4B5563',
+        BUTTON_ENABLED: '#10B981',
+        BUTTON_DISABLED: '#374151',
+        TOKEN_COLOR: '#F59E0B'
+    },
+
+    // Back button
+    BACK_BUTTON: {
+        x: 30,
+        y: 30,
+        width: 120,
+        height: 40
+    }
+};
+
+// =============================================================================
+// MODULE STATE
+// =============================================================================
+
+let state = {
+    hoveredCard: -1,
+    isAnimating: false,
+    selectedOption: null,
+    lastDropResult: null
+};
+
+/** State to return to when exiting (if came from round transition) */
+let returnToState = GAME_STATES.MENU;
+
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
+
+/**
+ * Get card position by index
+ */
+function getCardPosition(index) {
+    const totalWidth = (CONFIG.CARD_WIDTH * 3) + (CONFIG.CARD_GAP * 2);
+    const startX = (Renderer.getWidth() - totalWidth) / 2;
+    return {
+        x: startX + (index * (CONFIG.CARD_WIDTH + CONFIG.CARD_GAP)),
+        y: CONFIG.CARD_Y
+    };
+}
+
+/**
+ * Check if a point is inside a rectangle
+ */
+function isPointInRect(px, py, rx, ry, rw, rh) {
+    return px >= rx && px <= rx + rw && py >= ry && py <= ry + rh;
+}
+
+
+/**
+ * Attempt to purchase a supply drop.
+ * Uses the drop-rates module for proper rate calculation and duplicate handling.
+ */
+function attemptPurchase(optionIndex) {
+    if (state.isAnimating) return;
+
+    const option = CONFIG.PURCHASE_OPTIONS[optionIndex];
+
+    // Check if can afford
+    if (!canAfford(option.cost)) {
+        console.log(`Cannot afford ${option.name} (need ${option.cost} tokens)`);
+        return;
+    }
+
+    // Deduct tokens
+    const success = spendTokens(option.cost);
+    if (!success) {
+        console.log('Failed to spend tokens');
+        return;
+    }
+
+    console.log(`Purchased ${option.name} for ${option.cost} tokens`);
+
+    // Lifetime stats: record tokens spent
+    LifetimeStats.recordTokensSpent(option.cost);
+
+    // Process the drop using the drop-rates module
+    // This handles: rate calculation, rarity roll, tank selection,
+    // consecutive duplicate protection, and collection/scrap management
+    const dropResult = processDrop(option.dropType);
+
+    if (!dropResult.tank) {
+        console.error('Drop failed - no tank returned');
+        return;
+    }
+
+    // Lifetime stats: record supply drop opened (with rarity)
+    LifetimeStats.recordSupplyDrop(dropResult.rarity);
+
+    // Lifetime stats: record new tank unlocked (if applicable)
+    if (dropResult.isNew) {
+        LifetimeStats.recordTankUnlocked();
+    }
+
+    console.log(`Rolled: ${dropResult.tank.name} (${dropResult.rarity})`, {
+        isNew: dropResult.isNew,
+        isDuplicate: dropResult.isDuplicate,
+        scrapAwarded: dropResult.scrapAwarded
+    });
+
+    // Start animation
+    state.isAnimating = true;
+    state.selectedOption = option;
+    state.lastDropResult = dropResult;
+
+    // Use Extraction reveal for Legendary tanks, standard supply drop for others
+    const onAnimationComplete = () => {
+        // Animation complete - tank was already added by processDrop
+        if (dropResult.isNew) {
+            console.log(`Added NEW tank to collection: ${dropResult.tank.name}`);
+        } else if (dropResult.isDuplicate) {
+            console.log(`Duplicate tank: ${dropResult.tank.name} (+${dropResult.scrapAwarded} scrap)`);
+
+            // Show scrap tutorial on first duplicate
+            if (shouldShowScrapTutorial(dropResult)) {
+                ScrapTutorial.show({
+                    scrapAwarded: dropResult.scrapAwarded,
+                    onDismiss: () => {
+                        console.log('[SupplyDropScreen] Scrap tutorial dismissed');
+                    },
+                    onGoToShop: () => {
+                        console.log('[SupplyDropScreen] Going to scrap shop');
+                        Game.setState('COLLECTION');
+                    }
+                });
+            }
+        }
+
+        state.isAnimating = false;
+        state.selectedOption = null;
+        state.lastDropResult = null;
+    };
+
+    if (dropResult.rarity === RARITY.LEGENDARY) {
+        console.log('Triggering EXTRACTION reveal for Legendary tank!');
+        ExtractionReveal.play(dropResult.tank, onAnimationComplete);
+    } else {
+        SupplyDrop.play(dropResult.tank, onAnimationComplete);
+    }
+}
+
+// =============================================================================
+// INPUT HANDLING
+// =============================================================================
+
+/**
+ * Handle click/tap events
+ */
+function handleClick(pos) {
+    // Check scrap tutorial first (blocks other input)
+    if (ScrapTutorial.isOpen()) {
+        ScrapTutorial.handleClick(pos);
+        return;
+    }
+
+    if (state.isAnimating) {
+        // During animation, check for skip/continue
+        if (SupplyDrop.isShowingResultCard()) {
+            SupplyDrop.continueFromSkip();
+        }
+        return;
+    }
+
+    // Check back button
+    const bb = CONFIG.BACK_BUTTON;
+    if (isPointInRect(pos.x, pos.y, bb.x, bb.y, bb.width, bb.height)) {
+        // Return to the state we came from (menu or round transition)
+        Game.setState(returnToState);
+        return;
+    }
+
+    // Check purchase cards
+    for (let i = 0; i < CONFIG.PURCHASE_OPTIONS.length; i++) {
+        const cardPos = getCardPosition(i);
+        const buttonY = cardPos.y + CONFIG.CARD_HEIGHT - CONFIG.BUTTON_HEIGHT - CONFIG.BUTTON_MARGIN;
+
+        // Check if click is on the button area
+        if (isPointInRect(
+            pos.x, pos.y,
+            cardPos.x + CONFIG.BUTTON_MARGIN,
+            buttonY,
+            CONFIG.CARD_WIDTH - (CONFIG.BUTTON_MARGIN * 2),
+            CONFIG.BUTTON_HEIGHT
+        )) {
+            attemptPurchase(i);
+            return;
+        }
+    }
+}
+
+/**
+ * Handle mouse move for hover effects
+ */
+function handleMouseMove(pos) {
+    if (state.isAnimating) return;
+
+    state.hoveredCard = -1;
+
+    for (let i = 0; i < CONFIG.PURCHASE_OPTIONS.length; i++) {
+        const cardPos = getCardPosition(i);
+        if (isPointInRect(pos.x, pos.y, cardPos.x, cardPos.y, CONFIG.CARD_WIDTH, CONFIG.CARD_HEIGHT)) {
+            state.hoveredCard = i;
+            break;
+        }
+    }
+}
+
+/**
+ * Handle keyboard input
+ */
+function handleKeyDown(key) {
+    // Check scrap tutorial first (blocks other input)
+    if (ScrapTutorial.isOpen()) {
+        ScrapTutorial.handleKeyDown(key);
+        return;
+    }
+
+    if (state.isAnimating) {
+        // Space to skip/continue during animation
+        if (key === ' ' || key === 'Space') {
+            if (SupplyDrop.isShowingResultCard()) {
+                SupplyDrop.continueFromSkip();
+            } else {
+                SupplyDrop.startSkipHold();
+            }
+        }
+        return;
+    }
+
+    // Escape to go back - return to the state we came from
+    if (key === 'Escape') {
+        Game.setState(returnToState);
+    }
+
+    // Number keys for quick purchase
+    if (key === 'Digit1') attemptPurchase(0);
+    if (key === 'Digit2') attemptPurchase(1);
+    if (key === 'Digit3') attemptPurchase(2);
+}
+
+/**
+ * Handle key up
+ */
+function handleKeyUp(key) {
+    if (key === ' ' || key === 'Space') {
+        SupplyDrop.stopSkipHold();
+    }
+}
+
+// =============================================================================
+// RENDERING
+// =============================================================================
+
+/**
+ * Convert performance bonus to star rating (0-5 stars).
+ * @param {number} bonus - Performance bonus percentage (0-50)
+ * @returns {number} Star count (0-5)
+ */
+function getPerformanceStars(bonus) {
+    // 0-10%: 1 star, 10-20%: 2 stars, 20-30%: 3 stars, 30-40%: 4 stars, 40%+: 5 stars
+    if (bonus <= 0) return 0;
+    if (bonus < 10) return 1;
+    if (bonus < 20) return 2;
+    if (bonus < 30) return 3;
+    if (bonus < 40) return 4;
+    return 5;
+}
+
+/**
+ * Draw the header with token balance and performance rating
+ */
+function drawHeader(ctx) {
+    // Title
+    ctx.font = 'bold 36px "Orbitron", monospace';
+    ctx.fillStyle = CONFIG.COLORS.TEXT_PRIMARY;
+    ctx.textAlign = 'center';
+    ctx.fillText('SUPPLY DROPS', Renderer.getWidth() / 2, 55);
+
+    // Token balance (top right)
+    const balance = getTokenBalance();
+    ctx.font = 'bold 24px "Orbitron", monospace';
+    ctx.textAlign = 'right';
+    ctx.fillStyle = CONFIG.COLORS.TOKEN_COLOR;
+    ctx.fillText(`${balance}`, Renderer.getWidth() - 40, 50);
+
+    // Token icon (simple circle)
+    ctx.beginPath();
+    ctx.arc(Renderer.getWidth() - 60 - ctx.measureText(`${balance}`).width, 44, 12, 0, Math.PI * 2);
+    ctx.strokeStyle = CONFIG.COLORS.TOKEN_COLOR;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = CONFIG.COLORS.TOKEN_COLOR;
+    ctx.font = 'bold 14px "Orbitron", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('T', Renderer.getWidth() - 60 - ctx.measureText(`${balance}`).width, 49);
+}
+
+/**
+ * Draw performance rating display below header
+ */
+function drawPerformanceRating(ctx) {
+    const performanceData = getCurrentPerformanceBonus();
+    const bonus = performanceData.total;
+
+    // Performance rating label
+    ctx.font = '14px "Orbitron", monospace';
+    ctx.fillStyle = CONFIG.COLORS.TEXT_SECONDARY;
+    ctx.textAlign = 'center';
+    ctx.fillText('PERFORMANCE RATING', Renderer.getWidth() / 2, 95);
+
+    // Star rating display
+    const stars = getPerformanceStars(bonus);
+    const starWidth = 24;
+    const totalStarsWidth = 5 * starWidth;
+    const startX = (Renderer.getWidth() - totalStarsWidth) / 2;
+    const starY = 115;
+
+    ctx.font = '20px "Orbitron", monospace';
+    for (let i = 0; i < 5; i++) {
+        if (i < stars) {
+            // Filled star - cyan glow
+            ctx.fillStyle = '#00FFFF';
+            ctx.shadowColor = '#00FFFF';
+            ctx.shadowBlur = 8;
+        } else {
+            // Empty star - dim
+            ctx.fillStyle = '#333366';
+            ctx.shadowBlur = 0;
+        }
+        ctx.textAlign = 'center';
+        ctx.fillText('★', startX + i * starWidth + starWidth / 2, starY);
+    }
+    ctx.shadowBlur = 0;
+
+    // Bonus percentage
+    if (bonus > 0) {
+        ctx.font = '12px "Orbitron", monospace';
+        ctx.fillStyle = '#00FF88';
+        ctx.textAlign = 'center';
+        ctx.fillText(`+${bonus}% RARE+ CHANCE`, Renderer.getWidth() / 2, 138);
+    } else {
+        ctx.font = '12px "Orbitron", monospace';
+        ctx.fillStyle = CONFIG.COLORS.TEXT_SECONDARY;
+        ctx.textAlign = 'center';
+        ctx.fillText('Win rounds to boost odds!', Renderer.getWidth() / 2, 138);
+    }
+
+    // Tooltip hint - show breakdown on hover (simplified for now)
+    if (bonus > 0 && Object.keys(performanceData.breakdown).length > 0) {
+        ctx.font = '10px "Orbitron", monospace';
+        ctx.fillStyle = '#666699';
+        ctx.fillText('(Win streaks, accuracy, flawless rounds boost chances)', Renderer.getWidth() / 2, 155);
+    }
+}
+
+/**
+ * Draw back button
+ */
+function drawBackButton(ctx) {
+    const bb = CONFIG.BACK_BUTTON;
+
+    // Button background
+    ctx.fillStyle = 'rgba(30, 30, 50, 0.8)';
+    ctx.strokeStyle = '#666699';
+    ctx.lineWidth = 2;
+
+    ctx.beginPath();
+    ctx.roundRect(bb.x, bb.y, bb.width, bb.height, 8);
+    ctx.fill();
+    ctx.stroke();
+
+    // Arrow and text
+    ctx.fillStyle = CONFIG.COLORS.TEXT_PRIMARY;
+    ctx.font = '16px "Orbitron", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('< BACK', bb.x + bb.width / 2, bb.y + 26);
+}
+
+/**
+ * Draw a purchase card
+ */
+function drawPurchaseCard(ctx, index) {
+    const option = CONFIG.PURCHASE_OPTIONS[index];
+    const pos = getCardPosition(index);
+    const isHovered = state.hoveredCard === index;
+    const affordable = canAfford(option.cost);
+
+    // Card background with glow on hover
+    if (isHovered && affordable) {
+        ctx.shadowColor = option.glowColor;
+        ctx.shadowBlur = 20;
+    }
+
+    ctx.fillStyle = CONFIG.COLORS.CARD_BG;
+    ctx.strokeStyle = isHovered ? option.glowColor : CONFIG.COLORS.CARD_BORDER;
+    ctx.lineWidth = isHovered ? 3 : 2;
+
+    ctx.beginPath();
+    ctx.roundRect(pos.x, pos.y, CONFIG.CARD_WIDTH, CONFIG.CARD_HEIGHT, 12);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+
+    // Card title
+    ctx.font = 'bold 20px "Orbitron", monospace';
+    ctx.fillStyle = option.glowColor;
+    ctx.textAlign = 'center';
+    ctx.fillText(option.name, pos.x + CONFIG.CARD_WIDTH / 2, pos.y + 40);
+
+    // Crate icon placeholder (simple box)
+    const iconSize = 80;
+    const iconX = pos.x + (CONFIG.CARD_WIDTH - iconSize) / 2;
+    const iconY = pos.y + 60;
+
+    ctx.strokeStyle = option.glowColor;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(iconX, iconY, iconSize, iconSize);
+
+    // Cross pattern on crate
+    ctx.beginPath();
+    ctx.moveTo(iconX, iconY + iconSize / 2);
+    ctx.lineTo(iconX + iconSize, iconY + iconSize / 2);
+    ctx.moveTo(iconX + iconSize / 2, iconY);
+    ctx.lineTo(iconX + iconSize / 2, iconY + iconSize);
+    ctx.stroke();
+
+    // Description
+    ctx.font = '14px "Orbitron", monospace';
+    ctx.fillStyle = CONFIG.COLORS.TEXT_SECONDARY;
+    ctx.fillText(option.description, pos.x + CONFIG.CARD_WIDTH / 2, pos.y + 170);
+
+    // Drop rates breakdown - get rates from drop-rates module (including performance bonus)
+    const baseRates = getDropRatesForDisplay(option.dropType, false);
+    const modifiedRates = getDropRatesForDisplay(option.dropType, true);
+    const rateY = pos.y + 200;
+    ctx.font = '12px "Orbitron", monospace';
+    ctx.textAlign = 'left';
+
+    const rarities = [RARITY.COMMON, RARITY.UNCOMMON, RARITY.RARE, RARITY.EPIC, RARITY.LEGENDARY];
+    const rarityNames = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
+
+    rarities.forEach((rarity, i) => {
+        const baseRate = baseRates[rarity];
+        const modifiedRate = modifiedRates[rarity];
+        const hasBonus = Math.abs(modifiedRate - baseRate) > 0.01;
+
+        if (modifiedRate > 0 || baseRate > 0) {
+            ctx.fillStyle = RARITY_COLORS[rarity];
+            ctx.fillText(`${rarityNames[i]}:`, pos.x + 30, rateY + (i * 20));
+            ctx.textAlign = 'right';
+
+            // Show modified rate with bonus indicator if different from base
+            if (hasBonus && modifiedRate > baseRate) {
+                // Bonus - show in green with glow
+                ctx.fillStyle = '#00FF88';
+                ctx.shadowColor = '#00FF88';
+                ctx.shadowBlur = 4;
+                ctx.fillText(`${modifiedRate.toFixed(1)}%`, pos.x + CONFIG.CARD_WIDTH - 30, rateY + (i * 20));
+                ctx.shadowBlur = 0;
+            } else if (hasBonus && modifiedRate < baseRate) {
+                // Reduced (common gets reduced) - show in dimmer color
+                ctx.fillStyle = CONFIG.COLORS.TEXT_SECONDARY;
+                ctx.fillText(`${modifiedRate.toFixed(1)}%`, pos.x + CONFIG.CARD_WIDTH - 30, rateY + (i * 20));
+            } else {
+                // No change
+                ctx.fillStyle = RARITY_COLORS[rarity];
+                ctx.fillText(`${modifiedRate}%`, pos.x + CONFIG.CARD_WIDTH - 30, rateY + (i * 20));
+            }
+            ctx.textAlign = 'left';
+        } else {
+            ctx.fillStyle = CONFIG.COLORS.TEXT_DISABLED;
+            ctx.fillText(`${rarityNames[i]}:`, pos.x + 30, rateY + (i * 20));
+            ctx.textAlign = 'right';
+            ctx.fillText('--', pos.x + CONFIG.CARD_WIDTH - 30, rateY + (i * 20));
+            ctx.textAlign = 'left';
+        }
+    });
+
+    // Purchase button
+    const buttonY = pos.y + CONFIG.CARD_HEIGHT - CONFIG.BUTTON_HEIGHT - CONFIG.BUTTON_MARGIN;
+    const buttonX = pos.x + CONFIG.BUTTON_MARGIN;
+    const buttonW = CONFIG.CARD_WIDTH - (CONFIG.BUTTON_MARGIN * 2);
+
+    ctx.fillStyle = affordable ? CONFIG.COLORS.BUTTON_ENABLED : CONFIG.COLORS.BUTTON_DISABLED;
+    ctx.beginPath();
+    ctx.roundRect(buttonX, buttonY, buttonW, CONFIG.BUTTON_HEIGHT, 8);
+    ctx.fill();
+
+    // Button text
+    ctx.font = 'bold 16px "Orbitron", monospace';
+    ctx.fillStyle = affordable ? '#FFFFFF' : CONFIG.COLORS.TEXT_DISABLED;
+    ctx.textAlign = 'center';
+    ctx.fillText(`OPEN - ${option.cost}`, pos.x + CONFIG.CARD_WIDTH / 2, buttonY + 32);
+
+    // Token icon on button
+    const textWidth = ctx.measureText(`OPEN - ${option.cost}`).width;
+    ctx.beginPath();
+    ctx.arc(pos.x + CONFIG.CARD_WIDTH / 2 + textWidth / 2 + 15, buttonY + 26, 8, 0, Math.PI * 2);
+    ctx.strokeStyle = affordable ? '#FFFFFF' : CONFIG.COLORS.TEXT_DISABLED;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+}
+
+/**
+ * Draw keyboard hints
+ */
+function drawHints(ctx) {
+    ctx.font = '12px "Orbitron", monospace';
+    ctx.fillStyle = CONFIG.COLORS.TEXT_SECONDARY;
+    ctx.textAlign = 'center';
+    ctx.fillText('Press 1, 2, or 3 to quick-purchase  |  ESC to return', Renderer.getWidth() / 2, Renderer.getHeight() - 30);
+}
+
+/**
+ * Main render function
+ */
+function render(ctx) {
+    // If animation is playing, let supply drop or extraction reveal render
+    if (state.isAnimating) {
+        // Draw dark background
+        ctx.fillStyle = CONFIG.COLORS.BACKGROUND;
+        ctx.fillRect(0, 0, Renderer.getWidth(), Renderer.getHeight());
+
+        // Check which animation system is active and render it
+        if (ExtractionReveal.isAnimating()) {
+            ExtractionReveal.render(ctx);
+        } else {
+            SupplyDrop.render(ctx);
+        }
+        return;
+    }
+
+    // Clear with background
+    ctx.fillStyle = CONFIG.COLORS.BACKGROUND;
+    ctx.fillRect(0, 0, Renderer.getWidth(), Renderer.getHeight());
+
+    // Draw synthwave grid (simple version)
+    drawGrid(ctx);
+
+    // Draw UI elements
+    drawHeader(ctx);
+    drawPerformanceRating(ctx);
+    drawBackButton(ctx);
+
+    // Draw purchase cards
+    for (let i = 0; i < CONFIG.PURCHASE_OPTIONS.length; i++) {
+        drawPurchaseCard(ctx, i);
+    }
+
+    drawHints(ctx);
+
+    // Draw scrap tutorial popup (on top of everything)
+    ScrapTutorial.render(ctx);
+}
+
+/**
+ * Draw simple synthwave grid background
+ */
+function drawGrid(ctx) {
+    ctx.strokeStyle = 'rgba(255, 0, 255, 0.1)';
+    ctx.lineWidth = 1;
+
+    // Horizontal lines
+    for (let y = 0; y < Renderer.getHeight(); y += 40) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(Renderer.getWidth(), y);
+        ctx.stroke();
+    }
+
+    // Vertical lines
+    for (let x = 0; x < Renderer.getWidth(); x += 40) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, Renderer.getHeight());
+        ctx.stroke();
+    }
+}
+
+/**
+ * Update function (for animations)
+ */
+function update(deltaTime) {
+    if (state.isAnimating) {
+        // Update whichever animation system is active
+        if (ExtractionReveal.isAnimating()) {
+            ExtractionReveal.update(deltaTime);
+        } else {
+            SupplyDrop.update(deltaTime);
+        }
+    }
+}
+
+// =============================================================================
+// INITIALIZATION
+// =============================================================================
+
+/**
+ * Initialize the screen state
+ */
+function init() {
+    state.hoveredCard = -1;
+    state.isAnimating = false;
+    state.selectedOption = null;
+}
+
+/**
+ * Setup input handlers and register with game state machine
+ */
+export function setup() {
+    // Register click handlers
+    Input.onMouseDown((x, y, button) => {
+        if (button === 0 && Game.getState() === GAME_STATES.SUPPLY_DROP) {
+            handleClick({ x, y });
+        }
+    });
+
+    Input.onMouseMove((x, y) => {
+        if (Game.getState() === GAME_STATES.SUPPLY_DROP) {
+            handleMouseMove({ x, y });
+        }
+    });
+
+    Input.onTouchStart((x, y) => {
+        if (Game.getState() === GAME_STATES.SUPPLY_DROP) {
+            handleClick({ x, y });
+        }
+    });
+
+    Input.onKeyDown((key) => {
+        if (Game.getState() === GAME_STATES.SUPPLY_DROP) {
+            handleKeyDown(key);
+        }
+    });
+
+    Input.onKeyUp((key) => {
+        if (Game.getState() === GAME_STATES.SUPPLY_DROP) {
+            handleKeyUp(key);
+        }
+    });
+
+    // Register state handlers
+    Game.registerStateHandlers(GAME_STATES.SUPPLY_DROP, {
+        onEnter: (fromState) => {
+            console.log('Entered SUPPLY_DROP state from', fromState);
+            // Track where we came from to return there on exit
+            // If we came from round transition, go back there; otherwise go to menu
+            returnToState = (fromState === GAME_STATES.ROUND_TRANSITION)
+                ? GAME_STATES.ROUND_TRANSITION
+                : GAME_STATES.MENU;
+            init();
+            Music.playForState(GAME_STATES.MENU);
+        },
+        onExit: (toState) => {
+            console.log('Exiting SUPPLY_DROP state');
+            state.isAnimating = false;
+        },
+        update: update,
+        render: render
+    });
+
+    console.log('[SupplyDropScreen] Setup complete');
+}
+
+// Export for testing
+export { attemptPurchase };

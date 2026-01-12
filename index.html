@@ -7,9 +7,28 @@
     <meta name="theme-color" content="#0a0a1a">
     <title>Scorched Earth: Synthwave Edition</title>
     <link rel="stylesheet" href="style.css">
+    <!-- Import map for ES module resolution -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "./node_modules/three/build/three.module.js",
+                "three/addons/": "./node_modules/three/examples/jsm/"
+            }
+        }
+    </script>
+    <!-- Audiowide font for synthwave title text -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Audiowide&display=swap" rel="stylesheet">
 </head>
 <body>
     <canvas id="game"></canvas>
+    <!-- Three.js background canvas for title screen animation -->
+    <canvas id="titleScene"></canvas>
+    <!-- Runtime configuration - must load before other scripts -->
+    <script src="config.js"></script>
+    <!-- Convex browser client bundle - provides global 'convex' object -->
+    <script src="node_modules/convex/dist/browser.bundle.js"></script>
     <script type="module" src="js/main.js"></script>
 </body>
 </html>

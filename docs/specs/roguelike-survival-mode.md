@@ -550,6 +550,8 @@ Accessible from main menu:
 
 ## Meta-Progression (Future)
 
+> **See Also:** [Achievements & Unlockables Spec](achievements-and-unlocks.md) - The comprehensive achievements and unlocks system specification supersedes this section. The details below are preserved for context but the achievements spec is the source of truth.
+
 **Note:** This section describes features for future enhancement beyond the initial roguelike survival mode implementation.
 
 ### Unlockables Concept
@@ -558,28 +560,27 @@ Persistent unlockables that carry across runs:
 
 | Category | Examples | Unlock Condition |
 |----------|----------|------------------|
-| **Cosmetics** | Tank skins, explosion colors | Reach round X |
-| **Starting Bonuses** | +$200 start, +1 Missile | Cumulative achievements |
+| **Tank Skins** | Color schemes, themed designs | Supply drops (token-based) |
+| **Starting Bonuses** | +$200 start, +1 Missile | Specific achievements |
+| **Weapon Unlocks** | New weapon types | Milestone achievements |
 | **Challenges** | "Naked Run" (Basic only) | Complete specific feats |
 
-### Achievement System
+### Achievement Integration
 
-Track accomplishments:
+The achievements system (see [achievements-and-unlocks.md](achievements-and-unlocks.md)) integrates with roguelike mode:
 
-| Achievement | Requirement | Reward |
-|-------------|-------------|--------|
-| "First Steps" | Complete Round 1 | Unlock: Blue tank skin |
-| "Veteran" | Reach Round 10 | Unlock: +$100 starting bonus |
-| "Artillery Master" | 95%+ hit rate in a run | Unlock: Golden crosshair |
-| "Nuclear Option" | Win a round with a Nuke | Unlock: Mushroom cloud emote |
-| "Pacifist Run" | Win Round 1 with 1 shot | Unlock: "Efficient" title |
+- **Progression achievements** (Survivor, Veteran, Legend) tie directly to rounds survived
+- **Combat achievements** track skill milestones across runs
+- **Token economy** rewards good performance with unlock currency
+- **Supply drops** provide the dramatic reveal experience for unlocks
 
 ### Implementation Priority for Meta-Progression
 
 1. **Phase 1 (MVP):** No meta-progression, pure roguelike
-2. **Phase 2:** Cosmetic unlocks based on rounds reached
-3. **Phase 3:** Starting bonuses and achievements
-4. **Phase 4:** Challenge modes and special runs
+2. **Phase 2:** Achievements system with token rewards
+3. **Phase 3:** Tank collection with supply drop unlocks
+4. **Phase 4:** Starting bonuses and weapon unlocks via achievements
+5. **Phase 5:** Challenge modes and special runs
 
 ---
 

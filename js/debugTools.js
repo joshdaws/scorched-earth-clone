@@ -17,6 +17,7 @@ import * as Debug from './debug.js';
 import * as Game from './game.js';
 import * as Money from './money.js';
 import { WeaponRegistry } from './weapons.js';
+import { getRunStats, isRunActive, getRoundNumber } from './runState.js';
 
 // =============================================================================
 // MODULE STATE
@@ -488,9 +489,61 @@ export function handleKeyDown(event) {
         case 'Digit9':
             setRound(5);
             return true;
+        case 'Digit0':
+            showStats();
+            return true;
         default:
             return false;
     }
+}
+
+// =============================================================================
+// RUN STATS
+// =============================================================================
+
+/**
+ * Show current run statistics in the console.
+ * Displays all tracked stats for the current run.
+ */
+export function showStats() {
+    if (!requireDebugMode()) return;
+
+    if (!isRunActive()) {
+        console.warn('[DebugTools] No active run - start a game first');
+        return;
+    }
+
+    const stats = getRunStats();
+    const round = getRoundNumber();
+
+    console.log(`
+╔════════════════════════════════════════════════════════════════╗
+║                    CURRENT RUN STATS                           ║
+╠════════════════════════════════════════════════════════════════╣
+║  Current Round:        ${String(round).padStart(6)}                             ║
+║  Rounds Survived:      ${String(stats.roundsSurvived).padStart(6)}                             ║
+║  Enemies Destroyed:    ${String(stats.enemiesDestroyed).padStart(6)}                             ║
+╠════════════════════════════════════════════════════════════════╣
+║  COMBAT STATS:                                                 ║
+║    Shots Fired:        ${String(stats.shotsFired).padStart(6)}                             ║
+║    Shots Hit:          ${String(stats.shotsHit).padStart(6)}                             ║
+║    Hit Rate:           ${String(stats.hitRate + '%').padStart(6)}                             ║
+║    Total Damage Dealt: ${String(stats.totalDamageDealt).padStart(6)}                             ║
+║    Total Damage Taken: ${String(stats.totalDamageTaken).padStart(6)}                             ║
+║    Biggest Hit:        ${String(stats.biggestHit).padStart(6)}                             ║
+╠════════════════════════════════════════════════════════════════╣
+║  ECONOMY STATS:                                                ║
+║    Money Earned:     $${String(stats.moneyEarned).padStart(7)}                             ║
+║    Money Spent:      $${String(stats.moneySpent).padStart(7)}                             ║
+╠════════════════════════════════════════════════════════════════╣
+║  WEAPONS USED:                                                 ║
+║    Unique Weapons:     ${String(stats.uniqueWeaponsCount).padStart(6)}                             ║
+║    Nukes Launched:     ${String(stats.nukesLaunched).padStart(6)}                             ║
+║    Weapons: ${stats.weaponsUsed.join(', ') || 'None'}
+╚════════════════════════════════════════════════════════════════╝
+`);
+
+    return stats;
 }
 
 // =============================================================================
@@ -526,6 +579,9 @@ export function help() {
 ║   Debug.setRound(n)        - Set round number                  ║
 ║   Debug.getRound()         - Show current round info           ║
 ║                                                                ║
+║ STATS COMMANDS:                                                ║
+║   Debug.showStats()        - Show current run statistics       ║
+║                                                                ║
 ║ COMBAT COMMANDS:                                               ║
 ║   Debug.killEnemy()        - Instantly destroy enemy           ║
 ║   Debug.killSelf()         - Instantly destroy player          ║
@@ -545,6 +601,7 @@ export function help() {
 ║   Shift+7  Kill enemy                                          ║
 ║   Shift+8  Toggle god mode                                     ║
 ║   Shift+9  Set round to 5                                      ║
+║   Shift+0  Show run statistics                                 ║
 ║                                                                ║
 ║ Note: Press 'D' to toggle debug mode first!                    ║
 ╚════════════════════════════════════════════════════════════════╝

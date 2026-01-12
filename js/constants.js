@@ -104,12 +104,17 @@ export const GAME = {
 export const GAME_STATES = {
     MENU: 'menu',
     DIFFICULTY_SELECT: 'difficulty_select',
+    HIGH_SCORES: 'high_scores',
+    ACHIEVEMENTS: 'achievements',
+    COLLECTION: 'collection',
+    SUPPLY_DROP: 'supply_drop',
     PLAYING: 'playing',
     AIMING: 'aiming',
     FIRING: 'firing',
     PAUSED: 'paused',
     SHOP: 'shop',
     ROUND_END: 'round_end',
+    ROUND_TRANSITION: 'round_transition',
     VICTORY: 'victory',
     DEFEAT: 'defeat',
     GAME_OVER: 'game_over'
@@ -234,7 +239,9 @@ export const PROJECTILE = {
     DEFAULT_RADIUS: 4,
     DEFAULT_DAMAGE: 25,
     TRAIL_LENGTH: 10,
-    TRAIL_FADE: 0.9
+    TRAIL_FADE: 0.9,
+    /** Minimum distance projectile must travel before it can hit its owner tank */
+    SELF_COLLISION_SAFE_DISTANCE: 60
 };
 
 // =============================================================================
@@ -253,6 +260,7 @@ export const UI = {
     FONT_SIZE_LARGE: 24,
     FONT_SIZE_TITLE: 48,
     FONT_FAMILY: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+    TITLE_FONT_FAMILY: "'Audiowide', cursive",
     // Wind indicator settings
     WIND_INDICATOR_X: 100,     // X position from left edge
     WIND_INDICATOR_Y: 30,      // Y position from top
