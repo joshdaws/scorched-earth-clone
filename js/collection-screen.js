@@ -209,6 +209,17 @@ function updateFilteredList() {
     scrollY = Math.max(0, Math.min(scrollY, maxScrollY));
 }
 
+/**
+ * Calculate the left position for the centered grid.
+ * Grid width = columns * cardWidth + (columns - 1) * gap
+ * @returns {number} The x position where the grid should start
+ */
+function getGridLeft() {
+    const gridWidth = CONFIG.GRID_COLUMNS * CONFIG.CARD_WIDTH +
+                      (CONFIG.GRID_COLUMNS - 1) * CONFIG.CARD_GAP;
+    return (Renderer.getWidth() - gridWidth) / 2;
+}
+
 // =============================================================================
 // INPUT HANDLING
 // =============================================================================
@@ -317,7 +328,7 @@ function handleClick(pos) {
  */
 function getTankAtPosition(x, y) {
     const gridTop = CONFIG.HEADER_HEIGHT + CONFIG.FILTER_HEIGHT + CONFIG.GRID_TOP_PADDING;
-    const gridLeft = CONFIG.GRID_PADDING;
+    const gridLeft = getGridLeft();
 
     // Adjust for scroll
     const adjustedY = y + scrollY - gridTop;
@@ -346,12 +357,22 @@ function getTankAtPosition(x, y) {
 }
 
 /**
+ * Calculate the right edge of the centered grid.
+ * @returns {number} The x position of the grid's right edge
+ */
+function getGridRight() {
+    const gridWidth = CONFIG.GRID_COLUMNS * CONFIG.CARD_WIDTH +
+                      (CONFIG.GRID_COLUMNS - 1) * CONFIG.CARD_GAP;
+    return getGridLeft() + gridWidth;
+}
+
+/**
  * Get the equip button rectangle.
  */
 function getEquipButtonRect() {
     const detailsTop = Renderer.getHeight() - CONFIG.DETAILS_HEIGHT - CONFIG.FOOTER_HEIGHT;
     return {
-        x: Renderer.getWidth() - CONFIG.GRID_PADDING - CONFIG.EQUIP_BUTTON.width,
+        x: getGridRight() - CONFIG.EQUIP_BUTTON.width,
         y: detailsTop + 50,
         width: CONFIG.EQUIP_BUTTON.width,
         height: CONFIG.EQUIP_BUTTON.height
@@ -365,7 +386,7 @@ function getEquipButtonRect() {
 function getPurchaseButtonRect() {
     const detailsTop = Renderer.getHeight() - CONFIG.DETAILS_HEIGHT - CONFIG.FOOTER_HEIGHT;
     return {
-        x: Renderer.getWidth() - CONFIG.GRID_PADDING - CONFIG.PURCHASE_BUTTON.width,
+        x: getGridRight() - CONFIG.PURCHASE_BUTTON.width,
         y: detailsTop + 50,
         width: CONFIG.PURCHASE_BUTTON.width,
         height: CONFIG.PURCHASE_BUTTON.height
@@ -576,7 +597,7 @@ function renderFilters(ctx) {
 function renderTankGrid(ctx) {
     const gridTop = CONFIG.HEADER_HEIGHT + CONFIG.FILTER_HEIGHT + CONFIG.GRID_TOP_PADDING;
     const gridBottom = Renderer.getHeight() - CONFIG.DETAILS_HEIGHT - CONFIG.FOOTER_HEIGHT;
-    const gridLeft = CONFIG.GRID_PADDING;
+    const gridLeft = getGridLeft();
 
     ctx.save();
 
@@ -837,7 +858,8 @@ function renderDetailsPanel(ctx) {
             ctx.shadowColor = rarityColor;
             ctx.shadowBlur = 6;
         }
-        ctx.fillText(tank.name.toUpperCase(), CONFIG.GRID_PADDING, detailsTop + 18);
+        const detailsLeft = getGridLeft();
+        ctx.fillText(tank.name.toUpperCase(), detailsLeft, detailsTop + 18);
         ctx.shadowBlur = 0;
 
         // Rarity label with stars
@@ -851,19 +873,19 @@ function renderDetailsPanel(ctx) {
 
         ctx.fillStyle = rarityColor;
         ctx.font = `bold 14px ${UI.FONT_FAMILY}`;
-        ctx.fillText(`${rarityStars[tank.rarity]} ${tank.rarity.toUpperCase()}`, CONFIG.GRID_PADDING, detailsTop + 50);
+        ctx.fillText(`${rarityStars[tank.rarity]} ${tank.rarity.toUpperCase()}`, detailsLeft, detailsTop + 50);
 
         // Description - show in shop mode too
         ctx.fillStyle = COLORS.TEXT_MUTED;
         ctx.font = `italic 15px ${UI.FONT_FAMILY}`;
         const description = (isScrapShopMode || isOwned) ? `"${tank.description}"` : '"???"';
-        ctx.fillText(description, CONFIG.GRID_PADDING, detailsTop + 78);
+        ctx.fillText(description, detailsLeft, detailsTop + 78);
 
         // Special effects (if owned and has them)
         if (isOwned && tank.specialEffects && tank.specialEffects.length > 0) {
             ctx.fillStyle = COLORS.NEON_CYAN;
             ctx.font = `12px ${UI.FONT_FAMILY}`;
-            ctx.fillText(`Special: ${tank.specialEffects.join(', ')}`, CONFIG.GRID_PADDING, detailsTop + 105);
+            ctx.fillText(`Special: ${tank.specialEffects.join(', ')}`, detailsLeft, detailsTop + 105);
         }
 
         if (isScrapShopMode) {
