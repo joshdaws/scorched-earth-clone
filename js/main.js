@@ -1386,7 +1386,7 @@ const difficultyButtons = {
         text: '',  // Empty - we render custom two-line text in renderDifficultyButton
         x: CANVAS.DESIGN_WIDTH / 2,
         y: CANVAS.DESIGN_HEIGHT / 2 - 90,
-        width: 280,
+        width: 380,
         height: 80,
         fontSize: UI.FONT_SIZE_LARGE,
         borderColor: '#00ff88',
@@ -1397,7 +1397,7 @@ const difficultyButtons = {
         text: '',  // Empty - we render custom two-line text in renderDifficultyButton
         x: CANVAS.DESIGN_WIDTH / 2,
         y: CANVAS.DESIGN_HEIGHT / 2,
-        width: 280,
+        width: 380,
         height: 80,
         fontSize: UI.FONT_SIZE_LARGE,
         borderColor: '#ffff00',
@@ -1408,7 +1408,7 @@ const difficultyButtons = {
         text: '',  // Empty - we render custom two-line text in renderDifficultyButton
         x: CANVAS.DESIGN_WIDTH / 2,
         y: CANVAS.DESIGN_HEIGHT / 2 + 90,
-        width: 280,
+        width: 380,
         height: 80,
         fontSize: UI.FONT_SIZE_LARGE,
         borderColor: '#ff4444',
