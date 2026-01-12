@@ -1359,16 +1359,19 @@ let selectedDifficulty = null;
 const difficultyButtonConfigs = {
     easy: {
         difficulty: 'easy',
+        title: 'EASY',
         description: 'Relaxed gameplay • AI makes more mistakes',
         color: '#00ff88'  // Green - for description text
     },
     medium: {
         difficulty: 'medium',
+        title: 'MEDIUM',
         description: 'Balanced challenge • AI compensates for wind',
         color: '#ffff00'  // Yellow - for description text
     },
     hard: {
         difficulty: 'hard',
+        title: 'HARD',
         description: 'Brutal precision • AI rarely misses',
         color: '#ff4444'  // Red - for description text
     }
@@ -1380,33 +1383,33 @@ const difficultyButtonConfigs = {
  */
 const difficultyButtons = {
     easy: new Button({
-        text: 'EASY',
+        text: '',  // Empty - we render custom two-line text in renderDifficultyButton
         x: CANVAS.DESIGN_WIDTH / 2,
-        y: CANVAS.DESIGN_HEIGHT / 2 - 70,
+        y: CANVAS.DESIGN_HEIGHT / 2 - 90,
         width: 280,
-        height: 60,
+        height: 80,
         fontSize: UI.FONT_SIZE_LARGE,
         borderColor: '#00ff88',
         glowColor: '#00ff88',
         textColor: COLORS.TEXT_LIGHT
     }),
     medium: new Button({
-        text: 'MEDIUM',
+        text: '',  // Empty - we render custom two-line text in renderDifficultyButton
         x: CANVAS.DESIGN_WIDTH / 2,
-        y: CANVAS.DESIGN_HEIGHT / 2 + 10,
+        y: CANVAS.DESIGN_HEIGHT / 2,
         width: 280,
-        height: 60,
+        height: 80,
         fontSize: UI.FONT_SIZE_LARGE,
         borderColor: '#ffff00',
         glowColor: '#ffff00',
         textColor: COLORS.TEXT_LIGHT
     }),
     hard: new Button({
-        text: 'HARD',
+        text: '',  // Empty - we render custom two-line text in renderDifficultyButton
         x: CANVAS.DESIGN_WIDTH / 2,
         y: CANVAS.DESIGN_HEIGHT / 2 + 90,
         width: 280,
-        height: 60,
+        height: 80,
         fontSize: UI.FONT_SIZE_LARGE,
         borderColor: '#ff4444',
         glowColor: '#ff4444',
@@ -1439,8 +1442,8 @@ function updateDifficultyButtonPositions() {
     const centerX = width / 2;
     const centerY = height / 2;
 
-    difficultyButtons.easy.setPosition(centerX, centerY - 70);
-    difficultyButtons.medium.setPosition(centerX, centerY + 10);
+    difficultyButtons.easy.setPosition(centerX, centerY - 90);
+    difficultyButtons.medium.setPosition(centerX, centerY);
     difficultyButtons.hard.setPosition(centerX, centerY + 90);
     difficultyBackButton.setPosition(centerX, height - 80);
 }
@@ -1483,7 +1486,8 @@ function handleDifficultyClick(pos) {
 }
 
 /**
- * Render a difficulty selection button using Button component with description text.
+ * Render a difficulty selection button with title and description text.
+ * Uses Button component for background/border, then custom text layout for two-line content.
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  * @param {string} key - Button key (easy, medium, hard)
  * @param {number} pulseIntensity - Glow pulse intensity (0-1)
@@ -1492,22 +1496,33 @@ function renderDifficultyButton(ctx, key, pulseIntensity) {
     const button = difficultyButtons[key];
     const config = difficultyButtonConfigs[key];
 
-    // Render the button using Button component
+    // Render button background and border (but text will be overwritten)
     button.render(ctx, pulseIntensity);
 
-    // Render description text below the button
+    // Render title text (shifted up from center to make room for description)
     ctx.save();
-    // Use lighter color with text shadow for better readability
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.font = `bold ${UI.FONT_SIZE_LARGE}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    // Subtle glow on title text
+    ctx.shadowColor = button.glowColor;
+    ctx.shadowBlur = 4 + pulseIntensity * 2;
+    ctx.fillText(config.title, button.x, button.y - 12);
+    ctx.restore();
+
+    // Render description text below title (inside button bounds)
+    ctx.save();
     ctx.fillStyle = COLORS.TEXT_LIGHT;
     ctx.font = `${UI.FONT_SIZE_SMALL + 2}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    // Add subtle shadow for contrast against varying backgrounds
+    // Add subtle shadow for contrast
     ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
     ctx.shadowBlur = 4;
     ctx.shadowOffsetX = 1;
     ctx.shadowOffsetY = 1;
-    ctx.fillText(config.description, button.x, button.y + 18);
+    ctx.fillText(config.description, button.x, button.y + 16);
     ctx.restore();
 }
 
