@@ -5245,6 +5245,11 @@ async function init() {
         });
     });
 
+    // Set up VolumeControls callback for Close button
+    VolumeControls.setCloseCallback(() => {
+        closeOptionsOverlay();
+    });
+
     // Check if first-time name entry is needed
     if (NameEntry.needsNameEntry()) {
         // Show name entry modal after a brief delay to let the menu render

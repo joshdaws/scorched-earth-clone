@@ -41,12 +41,23 @@ const VOLUME_PANEL = {
 /** @type {Function|null} Callback when Change Name button is clicked */
 let onChangeNameCallback = null;
 
+/** @type {Function|null} Callback when Close button is clicked */
+let onCloseCallback = null;
+
 /**
  * Set callback for Change Name button.
  * @param {Function} callback - Function to call when Change Name is clicked
  */
 export function setChangeNameCallback(callback) {
     onChangeNameCallback = callback;
+}
+
+/**
+ * Set callback for Close button.
+ * @param {Function} callback - Function to call when Close is clicked
+ */
+export function setCloseCallback(callback) {
+    onCloseCallback = callback;
 }
 
 // =============================================================================
@@ -153,6 +164,24 @@ function getChangeNameButton(panelX, panelY) {
     };
 }
 
+/**
+ * Get Close button bounds.
+ * Touch-optimized: 44x44px for easy tapping on mobile.
+ * @param {number} panelX - Panel X position
+ * @param {number} panelY - Panel Y position
+ * @returns {{x: number, y: number, width: number, height: number}}
+ */
+function getCloseButton(panelX, panelY) {
+    const size = 44; // Touch-friendly minimum size
+    const margin = 8;
+    return {
+        x: panelX + VOLUME_PANEL.WIDTH - size - margin,
+        y: panelY + margin,
+        width: size,
+        height: size
+    };
+}
+
 // =============================================================================
 // RENDERING
 // =============================================================================
@@ -207,6 +236,9 @@ export function render(ctx, centerX = Renderer.getWidth() / 2, centerY = Rendere
 
     // Render Change Name button
     renderChangeNameButton(ctx, getChangeNameButton(panelX, panelY));
+
+    // Render Close button (top right)
+    renderCloseButton(ctx, getCloseButton(panelX, panelY));
 
     ctx.restore();
 }
@@ -360,6 +392,49 @@ function renderChangeNameButton(ctx, button) {
     ctx.restore();
 }
 
+/**
+ * Render the Close (X) button.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {Object} button - Button bounds
+ */
+function renderCloseButton(ctx, button) {
+    ctx.save();
+
+    const centerX = button.x + button.width / 2;
+    const centerY = button.y + button.height / 2;
+    const xSize = 12; // Size of the X lines
+
+    // Button background - subtle circle
+    ctx.fillStyle = 'rgba(255, 42, 109, 0.2)';
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, button.width / 2 - 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Button border
+    ctx.strokeStyle = COLORS.NEON_PINK;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Draw X
+    ctx.strokeStyle = COLORS.NEON_PINK;
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+
+    // First line of X (top-left to bottom-right)
+    ctx.beginPath();
+    ctx.moveTo(centerX - xSize, centerY - xSize);
+    ctx.lineTo(centerX + xSize, centerY + xSize);
+    ctx.stroke();
+
+    // Second line of X (top-right to bottom-left)
+    ctx.beginPath();
+    ctx.moveTo(centerX + xSize, centerY - xSize);
+    ctx.lineTo(centerX - xSize, centerY + xSize);
+    ctx.stroke();
+
+    ctx.restore();
+}
+
 // =============================================================================
 // INPUT HANDLING
 // =============================================================================
@@ -407,6 +482,16 @@ export function handlePointerDown(x, y) {
         Sound.playClickSound();
         if (onChangeNameCallback) {
             onChangeNameCallback();
+        }
+        return true;
+    }
+
+    // Check Close button
+    const closeBtn = getCloseButton(panelPosition.x, panelPosition.y);
+    if (isInsideButton(x, y, closeBtn)) {
+        Sound.playClickSound();
+        if (onCloseCallback) {
+            onCloseCallback();
         }
         return true;
     }
