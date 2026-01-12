@@ -13,7 +13,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const CONVEX_URL = process.env.CONVEX_URL;
+const CONVEX_URL = process.env.CONVEX_URL || process.env.VITE_CONVEX_URL;
 
 if (!CONVEX_URL) {
     console.error('ERROR: CONVEX_URL environment variable is not set.');
