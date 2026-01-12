@@ -70,42 +70,8 @@ export function init(canvasId = 'game') {
         resizeCanvas();
     });
 
-    // Render black rectangle as initialization test
-    renderTestRectangle();
-
     console.log('Renderer initialized');
     return ctx;
-}
-
-/**
- * Render a black rectangle as a test to verify canvas is working.
- * Uses dynamic screen dimensions since canvas now adapts to viewport.
- */
-function renderTestRectangle() {
-    if (!ctx || !canvas) return;
-
-    const screenW = getScreenWidth();
-    const screenH = getScreenHeight();
-
-    // Clear with background color (use dynamic dimensions)
-    ctx.fillStyle = COLORS.BACKGROUND;
-    ctx.fillRect(0, 0, screenW, screenH);
-
-    // Draw a black test rectangle in center using dynamic coordinates
-    const rectWidth = 200;
-    const rectHeight = 100;
-    const x = (screenW - rectWidth) / 2;
-    const y = (screenH - rectHeight) / 2;
-
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(x, y, rectWidth, rectHeight);
-
-    // Draw border for visibility
-    ctx.strokeStyle = COLORS.NEON_CYAN;
-    ctx.lineWidth = 2;
-    ctx.strokeRect(x, y, rectWidth, rectHeight);
-
-    console.log(`Test rectangle rendered at center of ${Math.round(screenW)}x${Math.round(screenH)} screen`);
 }
 
 /**
