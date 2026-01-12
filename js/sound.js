@@ -324,30 +324,45 @@ export function setSfxVolume(volume) {
 /**
  * Get current master volume.
  * Returns the configured volume even when muted (not 0).
- * @returns {number} Volume level from 0 to 1, or 0 if not initialized
+ * Before audio is initialized, loads from localStorage to avoid UI flash.
+ * @returns {number} Volume level from 0 to 1
  */
 export function getMasterVolume() {
     // Return the pre-mute volume if muted, so UI shows correct slider position
     if (isMuted) {
         return preMuteVolume;
     }
-    return masterGain ? masterGain.gain.value : 0;
+    // Before init, load from localStorage to avoid slider flash
+    if (!masterGain) {
+        return loadVolumeSetting(STORAGE_KEY_MASTER_VOLUME, DEFAULT_MASTER_VOLUME);
+    }
+    return masterGain.gain.value;
 }
 
 /**
  * Get current music volume.
- * @returns {number} Volume level from 0 to 1, or 0 if not initialized
+ * Before audio is initialized, loads from localStorage to avoid UI flash.
+ * @returns {number} Volume level from 0 to 1
  */
 export function getMusicVolume() {
-    return musicGain ? musicGain.gain.value : 0;
+    // Before init, load from localStorage to avoid slider flash
+    if (!musicGain) {
+        return loadVolumeSetting(STORAGE_KEY_MUSIC_VOLUME, DEFAULT_MUSIC_VOLUME);
+    }
+    return musicGain.gain.value;
 }
 
 /**
  * Get current SFX volume.
- * @returns {number} Volume level from 0 to 1, or 0 if not initialized
+ * Before audio is initialized, loads from localStorage to avoid UI flash.
+ * @returns {number} Volume level from 0 to 1
  */
 export function getSfxVolume() {
-    return sfxGain ? sfxGain.gain.value : 0;
+    // Before init, load from localStorage to avoid slider flash
+    if (!sfxGain) {
+        return loadVolumeSetting(STORAGE_KEY_SFX_VOLUME, DEFAULT_SFX_VOLUME);
+    }
+    return sfxGain.gain.value;
 }
 
 // =============================================================================
@@ -389,9 +404,14 @@ export function setMuted(muted) {
 
 /**
  * Check if audio is currently muted.
+ * Before audio is initialized, loads from localStorage to avoid UI flash.
  * @returns {boolean} True if muted
  */
 export function getMuted() {
+    // Before init, load from localStorage to avoid button state flash
+    if (!initialized) {
+        return loadMuteSetting();
+    }
     return isMuted;
 }
 
