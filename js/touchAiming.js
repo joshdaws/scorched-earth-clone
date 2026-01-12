@@ -240,17 +240,10 @@ function handlePointerMove(x, y) {
         const newAngle = calculateAngleFromDrag(state.startX, state.startY, x, y, state.playerTank);
         const newPower = calculatePowerFromDrag(state.startX, state.startY, x, y);
 
-        // Calculate deltas
-        const angleDelta = newAngle - state.playerTank.angle;
-        const powerDelta = newPower - state.playerTank.power;
-
-        // Queue input events for significant changes
-        if (Math.abs(angleDelta) > 0.5) {
-            queueGameInput(INPUT_EVENTS.ANGLE_CHANGE, angleDelta);
-        }
-        if (Math.abs(powerDelta) > 0.5) {
-            queueGameInput(INPUT_EVENTS.POWER_CHANGE, powerDelta);
-        }
+        // Queue absolute input events (not deltas) to avoid accumulation bugs
+        // when multiple move events occur between render frames
+        queueGameInput(INPUT_EVENTS.ANGLE_SET, newAngle);
+        queueGameInput(INPUT_EVENTS.POWER_SET, newPower);
 
         // Store calculated values for rendering
         state.calculatedAngle = newAngle;
