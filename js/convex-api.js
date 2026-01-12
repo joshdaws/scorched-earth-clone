@@ -5,6 +5,8 @@
  * Uses the ConvexHttpClient for non-reactive queries and mutations.
  */
 
+import { ConvexHttpClient, anyApi } from "convex/browser";
+
 // Get Convex URL from runtime config (loaded via config.js before this module)
 // Falls back to empty string if not configured - will fail at runtime with clear error
 const CONVEX_URL = window.SCORCHED_EARTH_CONFIG?.CONVEX_URL || '';
@@ -246,18 +248,8 @@ async function processOfflineQueue() {
 function initClient() {
     if (client) return client;
 
-    // Check that the convex global is available (loaded from browser.bundle.js)
-    if (typeof convex === 'undefined' || !convex.ConvexHttpClient) {
-        console.error('[ConvexAPI] Convex library not loaded. Make sure browser.bundle.js is loaded first.');
-        connectionError = new Error('Convex library not loaded');
-        return null;
-    }
-
     try {
-        client = new convex.ConvexHttpClient(CONVEX_URL, {
-            // Disable verbose logging in production
-            logger: false
-        });
+        client = new ConvexHttpClient(CONVEX_URL);
         console.log('[ConvexAPI] Client initialized successfully');
         connectionError = null;
         return client;
@@ -305,7 +297,7 @@ async function executeQuery(functionPath, args = {}) {
 
     try {
         // Using anyApi to call functions without generated types
-        const result = await c.query(convex.anyApi[functionPath.split(':')[0]][functionPath.split(':')[1]], args);
+        const result = await c.query(anyApi[functionPath.split(':')[0]][functionPath.split(':')[1]], args);
         connectionError = null;
         return result;
     } catch (e) {
@@ -331,7 +323,7 @@ async function executeMutation(functionPath, args = {}) {
     }
 
     try {
-        const result = await c.mutation(convex.anyApi[functionPath.split(':')[0]][functionPath.split(':')[1]], args);
+        const result = await c.mutation(anyApi[functionPath.split(':')[0]][functionPath.split(':')[1]], args);
         connectionError = null;
         return result;
     } catch (e) {
