@@ -7,12 +7,12 @@
     <meta name="theme-color" content="#0a0a1a">
     <title>Scorched Earth: Synthwave Edition</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Import map for ES module resolution -->
+    <!-- Import map for ES module resolution (using CDN for production compatibility) -->
     <script type="importmap">
         {
             "imports": {
-                "three": "./node_modules/three/build/three.module.js",
-                "three/addons/": "./node_modules/three/examples/jsm/"
+                "three": "https://unpkg.com/three@0.182.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.182.0/examples/jsm/"
             }
         }
     </script>
@@ -28,7 +28,7 @@
     <!-- Runtime configuration - must load before other scripts -->
     <script src="config.js"></script>
     <!-- Convex browser client bundle - provides global 'convex' object -->
-    <script src="node_modules/convex/dist/browser.bundle.js"></script>
+    <script src="https://unpkg.com/convex@1.31.3/dist/browser.bundle.js"></script>
     <script type="module" src="js/main.js"></script>
 </body>
 </html>
