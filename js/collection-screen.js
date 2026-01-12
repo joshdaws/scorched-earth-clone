@@ -229,8 +229,8 @@ function getGridLeft() {
  * @param {{x: number, y: number}} pos - Click position in design coordinates
  */
 function handleClick(pos) {
-    // Check back button
-    if (isInsideRect(pos, CONFIG.BACK_BUTTON)) {
+    // Check back button (uses dynamic positioning)
+    if (isInsideRect(pos, getBackButtonRect())) {
         Sound.playClickSound();
         if (isScrapShopMode) {
             // Go back to normal collection view
@@ -245,8 +245,8 @@ function handleClick(pos) {
         return;
     }
 
-    // Check scrap shop button
-    if (isInsideRect(pos, CONFIG.SCRAP_SHOP_BUTTON)) {
+    // Check scrap shop button (uses dynamic positioning)
+    if (isInsideRect(pos, getScrapShopButtonRect())) {
         Sound.playClickSound();
         isScrapShopMode = !isScrapShopMode;
         selectedTankId = null;
@@ -390,6 +390,33 @@ function getPurchaseButtonRect() {
         y: detailsTop + 50,
         width: CONFIG.PURCHASE_BUTTON.width,
         height: CONFIG.PURCHASE_BUTTON.height
+    };
+}
+
+/**
+ * Get the back button rectangle (positioned relative to left edge).
+ * @returns {{x: number, y: number, width: number, height: number}}
+ */
+function getBackButtonRect() {
+    return {
+        x: CONFIG.BACK_BUTTON.x,  // Fixed margin from left
+        y: CONFIG.BACK_BUTTON.y,
+        width: CONFIG.BACK_BUTTON.width,
+        height: CONFIG.BACK_BUTTON.height
+    };
+}
+
+/**
+ * Get the scrap shop button rectangle (positioned relative to right edge).
+ * @returns {{x: number, y: number, width: number, height: number}}
+ */
+function getScrapShopButtonRect() {
+    const margin = 60; // Same margin as back button from edge
+    return {
+        x: Renderer.getWidth() - CONFIG.SCRAP_SHOP_BUTTON.width - margin,
+        y: CONFIG.SCRAP_SHOP_BUTTON.y,
+        width: CONFIG.SCRAP_SHOP_BUTTON.width,
+        height: CONFIG.SCRAP_SHOP_BUTTON.height
     };
 }
 
@@ -1011,10 +1038,10 @@ function renderFooter(ctx) {
 }
 
 /**
- * Render back button.
+ * Render back button (positioned relative to left edge).
  */
 function renderBackButton(ctx) {
-    const btn = CONFIG.BACK_BUTTON;
+    const btn = getBackButtonRect();
 
     ctx.save();
 
@@ -1041,10 +1068,10 @@ function renderBackButton(ctx) {
 
 
 /**
- * Render the scrap shop toggle button.
+ * Render the scrap shop toggle button (positioned relative to right edge).
  */
 function renderScrapShopButton(ctx) {
-    const btn = CONFIG.SCRAP_SHOP_BUTTON;
+    const btn = getScrapShopButtonRect();
     const scrap = getScrap();
 
     ctx.save();
