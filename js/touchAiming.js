@@ -16,6 +16,7 @@
 
 import { CANVAS, COLORS, PHYSICS, TANK, UI } from './constants.js';
 import { queueGameInput, INPUT_EVENTS, isGameInputEnabled, onMouseDown, onMouseUp, onMouseMove, onTouchStart, onTouchEnd, onTouchMove, getPointerPosition } from './input.js';
+import * as Wind from './wind.js';
 import { renderTrajectoryPreview } from './aimingControls.js';
 
 // =============================================================================
@@ -83,21 +84,11 @@ const state = {
     currentX: 0,
     currentY: 0,
 
-    /** Smoothed touch position (for reducing jitter) */
-    smoothX: 0,
-    smoothY: 0,
-
     /** Current calculated angle from drag */
     calculatedAngle: 45,
 
     /** Current calculated power from drag */
     calculatedPower: 50,
-
-    /** Target angle (before smoothing) */
-    targetAngle: 45,
-
-    /** Target power (before smoothing) */
-    targetPower: 50,
 
     /** Reference to player tank */
     playerTank: null,
@@ -111,21 +102,6 @@ const state = {
     /** Whether the user is hovering near the tank (shows activation hint) */
     nearTank: false
 };
-
-/**
- * Smoothing factor for touch position (0-1, higher = more responsive but more jittery)
- */
-const SMOOTHING_FACTOR = 0.3;
-
-/**
- * Smoothing factor for angle changes (0-1, higher = more responsive)
- */
-const ANGLE_SMOOTHING = 0.25;
-
-/**
- * Smoothing factor for power changes
- */
-const POWER_SMOOTHING = 0.4;
 
 // =============================================================================
 // HELPER FUNCTIONS
@@ -161,23 +137,9 @@ function isNearTank(x, y, tank) {
 }
 
 /**
- * Lerp (linear interpolation) helper.
- * @param {number} a - Start value
- * @param {number} b - End value
- * @param {number} t - Interpolation factor (0-1)
- * @returns {number} Interpolated value
- */
-function lerp(a, b, t) {
-    return a + (b - a) * t;
-}
-
-/**
  * Calculate aim angle from drag direction.
  * The angle is inverted from the drag direction (slingshot style).
  * Dragging down-right aims up-left, etc.
- *
- * Key insight: The trajectory should always be exactly 180° opposite from the pull direction.
- * This means the angle displayed should match where the projectile will go, not the pull direction.
  *
  * @param {number} startX - Drag start X (near tank)
  * @param {number} startY - Drag start Y (near tank)
@@ -193,44 +155,17 @@ function calculateAngleFromDrag(startX, startY, currentX, currentY, tank) {
     const dragX = currentX - startX;
     const dragY = currentY - startY;
 
-    // If drag is too small, maintain current angle
-    const dragLen = Math.sqrt(dragX * dragX + dragY * dragY);
-    if (dragLen < TOUCH_AIM.MIN_DRAG_DISTANCE) {
-        return state.calculatedAngle; // Keep current smoothed angle, not tank.angle
-    }
+    // Invert the drag direction for slingshot effect
+    // Dragging down-right should aim up-left
+    const aimX = -dragX;
+    const aimY = -dragY;
 
-    // Normalize the drag vector to get pure direction (decoupled from distance/power)
-    const normX = dragX / dragLen;
-    const normY = dragY / dragLen;
+    // Calculate angle (0 = right, 90 = up, 180 = left)
+    // Canvas Y is inverted, so we use aimY directly (negative Y = up)
+    let angle = Math.atan2(-aimY, aimX) * (180 / Math.PI);
 
-    // For slingshot aiming, we want the fire direction to be opposite to pull direction.
-    // Pull direction: (normX, normY)
-    // Fire direction: (-normX, -normY)
-    //
-    // We need to calculate the angle of the fire direction in standard artillery coordinates:
-    // - 0° = firing right (positive X)
-    // - 90° = firing straight up (negative Y in screen coords)
-    // - 180° = firing left (negative X)
-    //
-    // The fire vector is (-normX, -normY)
-    // In screen coords, Y increases downward, so for atan2 we need to flip Y
-    // Fire angle = atan2(-fireY, fireX) = atan2(-(-normY), -normX) = atan2(normY, -normX)
-
-    let angle = Math.atan2(normY, -normX) * (180 / Math.PI);
-
-    // atan2 returns -180 to 180. We need 0 to 180 for valid firing angles.
-    // Angles outside this range mean the user is trying to fire "downward" which is invalid.
-    //
-    // When angle < 0: user pulled up-left of center, trying to fire down-right (invalid)
-    //   -> clamp to 0° (rightmost valid angle)
-    // When angle > 180: user pulled up-right of center, trying to fire down-left (invalid)
-    //   -> clamp to 180° (leftmost valid angle)
-
-    if (angle < PHYSICS.MIN_ANGLE) {
-        angle = PHYSICS.MIN_ANGLE;
-    } else if (angle > PHYSICS.MAX_ANGLE) {
-        angle = PHYSICS.MAX_ANGLE;
-    }
+    // Clamp to valid range (0-180)
+    angle = Math.max(PHYSICS.MIN_ANGLE, Math.min(PHYSICS.MAX_ANGLE, angle));
 
     return angle;
 }
@@ -273,14 +208,10 @@ function handlePointerDown(x, y) {
         state.startY = y;
         state.currentX = x;
         state.currentY = y;
-        state.smoothX = x;
-        state.smoothY = y;
 
         // Initialize with tank's current values
         state.calculatedAngle = state.playerTank.angle;
         state.calculatedPower = state.playerTank.power;
-        state.targetAngle = state.playerTank.angle;
-        state.targetPower = state.playerTank.power;
     }
 }
 
@@ -297,32 +228,33 @@ function handlePointerMove(x, y) {
 
     if (!state.isActive || !state.playerTank) return;
 
-    // Store raw position
     state.currentX = x;
     state.currentY = y;
 
-    // Apply position smoothing to reduce jitter (especially on iOS)
-    state.smoothX = lerp(state.smoothX, x, SMOOTHING_FACTOR);
-    state.smoothY = lerp(state.smoothY, y, SMOOTHING_FACTOR);
-
-    // Calculate drag distance using smoothed position
-    const dragDist = distance(state.startX, state.startY, state.smoothX, state.smoothY);
+    // Calculate drag distance
+    const dragDist = distance(state.startX, state.startY, x, y);
 
     // Only update angle/power if drag is significant
     if (dragDist >= TOUCH_AIM.MIN_DRAG_DISTANCE) {
-        // Calculate target angle and power from smoothed drag position
-        state.targetAngle = calculateAngleFromDrag(state.startX, state.startY, state.smoothX, state.smoothY, state.playerTank);
-        state.targetPower = calculatePowerFromDrag(state.startX, state.startY, state.smoothX, state.smoothY);
+        // Calculate new angle and power from drag
+        const newAngle = calculateAngleFromDrag(state.startX, state.startY, x, y, state.playerTank);
+        const newPower = calculatePowerFromDrag(state.startX, state.startY, x, y);
 
-        // Smooth the calculated values to prevent jerky movement
-        state.calculatedAngle = lerp(state.calculatedAngle, state.targetAngle, ANGLE_SMOOTHING);
-        state.calculatedPower = lerp(state.calculatedPower, state.targetPower, POWER_SMOOTHING);
+        // Calculate deltas
+        const angleDelta = newAngle - state.playerTank.angle;
+        const powerDelta = newPower - state.playerTank.power;
 
-        // Use absolute ANGLE_SET and POWER_SET events to avoid accumulation issues.
-        // The previous delta-based approach could drift due to timing issues between
-        // when deltas were calculated vs when the tank's angle was updated.
-        queueGameInput(INPUT_EVENTS.ANGLE_SET, state.calculatedAngle);
-        queueGameInput(INPUT_EVENTS.POWER_SET, state.calculatedPower);
+        // Queue input events for significant changes
+        if (Math.abs(angleDelta) > 0.5) {
+            queueGameInput(INPUT_EVENTS.ANGLE_CHANGE, angleDelta);
+        }
+        if (Math.abs(powerDelta) > 0.5) {
+            queueGameInput(INPUT_EVENTS.POWER_CHANGE, powerDelta);
+        }
+
+        // Store calculated values for rendering
+        state.calculatedAngle = newAngle;
+        state.calculatedPower = newPower;
     }
 }
 
@@ -409,7 +341,6 @@ function renderActivationZone(ctx, tank) {
 /**
  * Render the rubber band effect during drag.
  * Visual connection between tank and touch point.
- * Uses smoothed position for stable visuals.
  *
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  * @param {import('./tank.js').Tank} tank - Player tank
@@ -420,16 +351,12 @@ function renderRubberBand(ctx, tank) {
     const tankCenterX = tank.x;
     const tankCenterY = tank.y - TANK.HEIGHT / 2;
 
-    // Use smoothed position for stable rendering
-    const touchX = state.smoothX;
-    const touchY = state.smoothY;
-
     ctx.save();
 
     // Create gradient from tank to touch point
     const gradient = ctx.createLinearGradient(
         tankCenterX, tankCenterY,
-        touchX, touchY
+        state.currentX, state.currentY
     );
     gradient.addColorStop(0, TOUCH_AIM.RUBBER_BAND.COLOR_START);
     gradient.addColorStop(1, TOUCH_AIM.RUBBER_BAND.COLOR_END);
@@ -437,7 +364,7 @@ function renderRubberBand(ctx, tank) {
     // Draw rubber band line
     ctx.beginPath();
     ctx.moveTo(tankCenterX, tankCenterY);
-    ctx.lineTo(touchX, touchY);
+    ctx.lineTo(state.currentX, state.currentY);
     ctx.strokeStyle = gradient;
     ctx.lineWidth = TOUCH_AIM.RUBBER_BAND.WIDTH;
     ctx.lineCap = 'round';
@@ -450,8 +377,8 @@ function renderRubberBand(ctx, tank) {
     ctx.shadowBlur = 4;
 
     // Calculate perpendicular offset for side lines
-    const dx = touchX - tankCenterX;
-    const dy = touchY - tankCenterY;
+    const dx = state.currentX - tankCenterX;
+    const dy = state.currentY - tankCenterY;
     const len = Math.sqrt(dx * dx + dy * dy);
     if (len > 0) {
         const perpX = (-dy / len) * 4;
@@ -460,14 +387,14 @@ function renderRubberBand(ctx, tank) {
         // Left side line
         ctx.beginPath();
         ctx.moveTo(tankCenterX + perpX, tankCenterY + perpY);
-        ctx.lineTo(touchX, touchY);
+        ctx.lineTo(state.currentX, state.currentY);
         ctx.strokeStyle = 'rgba(0, 243, 255, 0.5)';
         ctx.stroke();
 
         // Right side line
         ctx.beginPath();
         ctx.moveTo(tankCenterX - perpX, tankCenterY - perpY);
-        ctx.lineTo(touchX, touchY);
+        ctx.lineTo(state.currentX, state.currentY);
         ctx.stroke();
     }
 
@@ -477,7 +404,6 @@ function renderRubberBand(ctx, tank) {
 /**
  * Render the touch point indicator.
  * Shows where the user is touching/dragging.
- * Uses smoothed position for stable visuals.
  *
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  */
@@ -487,15 +413,11 @@ function renderTouchIndicator(ctx) {
     const pulse = Math.sin(state.animationTime * TOUCH_AIM.TOUCH_INDICATOR.PULSE_SPEED) * 0.2 + 1;
     const radius = TOUCH_AIM.TOUCH_INDICATOR.RADIUS * pulse;
 
-    // Use smoothed position for stable rendering
-    const touchX = state.smoothX;
-    const touchY = state.smoothY;
-
     ctx.save();
 
     // Outer glow ring
     ctx.beginPath();
-    ctx.arc(touchX, touchY, radius, 0, Math.PI * 2);
+    ctx.arc(state.currentX, state.currentY, radius, 0, Math.PI * 2);
     ctx.strokeStyle = TOUCH_AIM.TOUCH_INDICATOR.COLOR;
     ctx.lineWidth = 3;
     ctx.shadowColor = TOUCH_AIM.TOUCH_INDICATOR.COLOR;
@@ -504,7 +426,7 @@ function renderTouchIndicator(ctx) {
 
     // Inner solid circle
     ctx.beginPath();
-    ctx.arc(touchX, touchY, 8, 0, Math.PI * 2);
+    ctx.arc(state.currentX, state.currentY, 8, 0, Math.PI * 2);
     ctx.fillStyle = TOUCH_AIM.TOUCH_INDICATOR.COLOR;
     ctx.fill();
 
@@ -513,10 +435,10 @@ function renderTouchIndicator(ctx) {
     ctx.lineWidth = 2;
     ctx.shadowBlur = 0;
     ctx.beginPath();
-    ctx.moveTo(touchX - 12, touchY);
-    ctx.lineTo(touchX + 12, touchY);
-    ctx.moveTo(touchX, touchY - 12);
-    ctx.lineTo(touchX, touchY + 12);
+    ctx.moveTo(state.currentX - 12, state.currentY);
+    ctx.lineTo(state.currentX + 12, state.currentY);
+    ctx.moveTo(state.currentX, state.currentY - 12);
+    ctx.lineTo(state.currentX, state.currentY + 12);
     ctx.stroke();
 
     ctx.restore();
@@ -525,25 +447,20 @@ function renderTouchIndicator(ctx) {
 /**
  * Render power indicator during drag.
  * Shows the current power level as text near touch point.
- * Uses smoothed position for stable visuals.
  *
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  */
 function renderPowerIndicator(ctx) {
     if (!state.isActive) return;
 
-    const dragDist = distance(state.startX, state.startY, state.smoothX, state.smoothY);
+    const dragDist = distance(state.startX, state.startY, state.currentX, state.currentY);
     if (dragDist < TOUCH_AIM.MIN_DRAG_DISTANCE) return;
-
-    // Use smoothed position for stable rendering
-    const touchX = state.smoothX;
-    const touchY = state.smoothY;
 
     ctx.save();
 
     // Position above touch indicator
-    const textX = touchX;
-    const textY = touchY - 50;
+    const textX = state.currentX;
+    const textY = state.currentY - 50;
 
     // Power percentage
     ctx.fillStyle = COLORS.NEON_YELLOW;
