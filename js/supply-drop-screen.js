@@ -26,6 +26,8 @@ import {
     getCurrentPerformanceBonus
 } from './drop-rates.js';
 import * as LifetimeStats from './lifetime-stats.js';
+import * as ScrapTutorial from './scrap-tutorial.js';
+import { shouldShowScrapTutorial } from './tank-collection.js';
 
 // =============================================================================
 // CONFIGURATION
@@ -194,6 +196,20 @@ function attemptPurchase(optionIndex) {
             console.log(`Added NEW tank to collection: ${dropResult.tank.name}`);
         } else if (dropResult.isDuplicate) {
             console.log(`Duplicate tank: ${dropResult.tank.name} (+${dropResult.scrapAwarded} scrap)`);
+
+            // Show scrap tutorial on first duplicate
+            if (shouldShowScrapTutorial(dropResult)) {
+                ScrapTutorial.show({
+                    scrapAwarded: dropResult.scrapAwarded,
+                    onDismiss: () => {
+                        console.log('[SupplyDropScreen] Scrap tutorial dismissed');
+                    },
+                    onGoToShop: () => {
+                        console.log('[SupplyDropScreen] Going to scrap shop');
+                        Game.setState('COLLECTION');
+                    }
+                });
+            }
         }
 
         state.isAnimating = false;
@@ -217,6 +233,12 @@ function attemptPurchase(optionIndex) {
  * Handle click/tap events
  */
 function handleClick(pos) {
+    // Check scrap tutorial first (blocks other input)
+    if (ScrapTutorial.isOpen()) {
+        ScrapTutorial.handleClick(pos);
+        return;
+    }
+
     if (state.isAnimating) {
         // During animation, check for skip/continue
         if (SupplyDrop.isShowingResultCard()) {
@@ -273,6 +295,12 @@ function handleMouseMove(pos) {
  * Handle keyboard input
  */
 function handleKeyDown(key) {
+    // Check scrap tutorial first (blocks other input)
+    if (ScrapTutorial.isOpen()) {
+        ScrapTutorial.handleKeyDown(key);
+        return;
+    }
+
     if (state.isAnimating) {
         // Space to skip/continue during animation
         if (key === ' ' || key === 'Space') {
@@ -607,6 +635,9 @@ function render(ctx) {
     }
 
     drawHints(ctx);
+
+    // Draw scrap tutorial popup (on top of everything)
+    ScrapTutorial.render(ctx);
 }
 
 /**

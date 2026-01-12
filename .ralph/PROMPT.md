@@ -1,40 +1,49 @@
-# Ralph Loop - Autonomous Issue Processing
+# Ralph Loop - Issue Processing Iteration
 
-## Scope
+## CRITICAL: ONE ISSUE ONLY
+
+**You MUST complete exactly ONE issue, then STOP.**
+
+Do NOT:
+- Work on multiple issues
+- Start a second issue after completing one
+- Try to be "efficient" by doing more
+- Run `bd ready` again after closing an issue
+
+The loop will restart you for the next issue. Your job is ONE issue per iteration.
+
+---
+
+## Current Scope
 
 {{SCOPE_DESCRIPTION}}
 
 **Filter command:** `{{READY_CMD}}`
 {{EPIC_CONTEXT}}
 
-## Your Task (ONE issue per iteration)
+---
 
-**IMPORTANT: Complete exactly ONE issue per iteration, then STOP.**
+## STEP 1: Fetch Your Issue (MANDATORY FIRST STEP)
 
-**KEY MINDSET:** Your job is to make PROGRESS, not achieve perfection. For each issue:
-- Implement what you can
-- File new issues for bugs, gaps, or blockers you discover
-- Close the issue when you've done what was asked (validation = went through criteria, filed issues for problems)
-- Don't get stuck waiting - file an issue and move on
-
-### STEP 0: MARK ISSUE IN PROGRESS (MANDATORY)
-
-Before doing ANY other work, you MUST mark the issue as in progress:
-
+Run the ready command to get your next issue:
 ```bash
-# 1. Find the next issue - USE THIS EXACT COMMAND (includes scope filter!)
 {{READY_CMD}}
+```
 
-# 2. IMMEDIATELY mark it in progress (this is required - do not skip!)
+Select the **top issue** from the list.
+
+**IF AND ONLY IF the list is empty** (no issues returned), output this exact line on its own and stop:
+
+RALPH_SIGNAL::SCOPE_COMPLETE
+
+**OTHERWISE** (if there ARE issues), continue to the next step. **NEVER output the signal after completing work - the loop handles iteration.**
+
+**IMMEDIATELY** mark it in progress:
+```bash
 bd update <issue-id> --status in_progress
 ```
 
-**CRITICAL SCOPE RULES:**
-
-- ONLY work on issues returned by `{{READY_CMD}}`
-- NEVER run `bd ready` without the filter flags shown above
-- If `{{READY_CMD}}` returns no issues, output `<promise>SCOPE COMPLETE</promise>` and STOP
-- Do NOT work on issues outside this scope, even if you see them
+Do NOT proceed to any other step until you have marked the issue in progress.
 
 **EPIC HANDLING:**
 - If an **epic** (type: epic) appears in the ready list, **DO NOT work on the epic directly**
@@ -43,49 +52,78 @@ bd update <issue-id> --status in_progress
 - Pick the first OPEN child issue (type: task, bug, or feature) and mark THAT as in_progress instead
 - Epics are containers for organizing work - the real work is in the child issues
 
-**DO NOT proceed to any other step until you have run `bd update --status in_progress` on an actionable issue (not an epic).**
+---
 
-### STEP 1: Understand the Issue
+## STEP 2: Understand the Issue (READ ALL FIELDS)
 
-Use `bd show <issue-id>` to see full details and acceptance criteria.
+Read the full issue details:
+```bash
+bd show <issue-id>
+```
 
-**IMPORTANT: READ THE COMMENTS!** The `bd show` output includes a Comments section at the bottom. Comments often contain:
+**IMPORTANT: Beads issues have multiple fields. Read and understand ALL of them:**
+
+| Field | Purpose |
+|-------|---------|
+| **DESCRIPTION** | Overview of what needs to be done, background context, deliverables |
+| **DESIGN** | Technical approach, implementation details, structure/architecture |
+| **ACCEPTANCE CRITERIA** | Checkable criteria that MUST all be `[x]` before closing |
+| **NOTES** | Additional context, implementation notes from previous work |
+
+Also check for comments - the `bd show` output includes a Comments section at the bottom. Comments may contain:
 - Design references and mockups
 - Additional requirements not in the main description
 - Clarifications from the issue creator
 - Links to spec files or images
 
-**Do NOT skip the comments section.** If there are comments, read them carefully - they may contain critical information for completing the issue correctly.
+**Do NOT skip the comments section.** If there are comments, read them carefully.
 
-### STEP 2: Research
+**Before proceeding, ensure you understand:**
+- What is the goal? (from DESCRIPTION)
+- How should it be built? (from DESIGN)
+- What defines "done"? (from ACCEPTANCE CRITERIA)
+- Any additional context? (from NOTES and comments)
 
-Before making changes, search the codebase to verify the item needs work (don't assume).
+---
 
-### STEP 3: Implement
+## STEP 3: Research
 
-Implement the solution following project standards (see AGENT.md).
+Before implementing, verify the work actually needs doing:
+- Check if the problem still exists
+- Check if someone else already did the work
+- Check if the approach makes sense
 
-### STEP 4: Validate with Chrome Extension (REQUIRED)
+If the issue is no longer relevant, close it with a note explaining why.
 
-**You MUST use the Chrome browser extension to validate ALL changes:**
+---
 
+## STEP 4: Implement
+
+Do the actual work. Follow project patterns and conventions.
+
+**Keep commits atomic.** Commit related changes together with the issue ID:
+```bash
+git add <files>
+git commit -m "<type>(<scope>): <description>
+
+Refs: <issue-id>"
 ```
-1. Start local server: python3 -m http.server 8000
-2. Navigate: mcp__claude-in-chrome__navigate to http://localhost:8000
-3. Take screenshot: mcp__claude-in-chrome__computer action=screenshot
-4. Check console: mcp__claude-in-chrome__read_console_messages
-5. Test interactions if applicable
-```
 
-**Validation checklist:**
-- [ ] Game loads without console errors
-- [ ] Visual elements render correctly
-- [ ] Any new functionality works as expected
-- [ ] Take screenshots as evidence
+---
 
-**DO NOT close an issue until you have visually verified it works in the browser.**
+## STEP 5: Validate
 
-### STEP 5: Verify and Check Off EACH Acceptance Criterion (MANDATORY)
+Verify your implementation works:
+- Run relevant tests if available
+- Check for lint/type errors
+- Manually verify if needed
+- For UI changes, test in browser
+
+If validation fails, fix the issues before proceeding.
+
+---
+
+## STEP 6: Check Acceptance Criteria (MANDATORY)
 
 **You MUST verify and check off EACH criterion before closing. This is NOT optional.**
 
@@ -94,14 +132,6 @@ Implement the solution following project standards (see AGENT.md).
    - Did you actually do this? Verify it.
    - If YES: Mark it `[x]`
    - If NO: Go back and do it. Do not proceed.
-
-**FOR VALIDATION/QA TASKS:**
-- Each criterion should be marked with a result: PASS, FAIL, or BLOCKED
-- PASS = verified working as specified → mark `[x]`
-- FAIL = doesn't work as specified → create a **bug issue**, then mark `[x]` (you validated it, found a bug)
-- BLOCKED = can't test due to missing feature → create a **task issue**, then mark `[x]` (you validated scope, filed gap)
-- After going through ALL criteria (filing bugs/tasks as needed), the validation issue is COMPLETE
-- Don't leave validation issues open waiting for fixes - that's what the new bug issues are for
 
 3. Update the issue with ALL criteria checked:
 
@@ -116,34 +146,38 @@ bd update <issue-id> --acceptance "## Acceptance Criteria
 
 **CRITICAL: If ANY criterion shows `[ ]` (unchecked), you are NOT DONE. Go back and complete it.**
 
-**CRITICAL: You must actually RUN the `bd update --acceptance` command to check things off. Do not just say you did it.**
+**CRITICAL: You must actually RUN the `bd update --acceptance` command to check things off.**
 
-### STEP 6: Create New Issues for Discoveries
+---
 
-When you discover a bug or new task, create it in beads:
+## STEP 7: Handle Discoveries
 
+During your work, you may discover bugs, missing functionality, or follow-up tasks.
+
+**DO NOT get blocked by these.** File new issues:
 ```bash
-bd create --title "..." --type bug --priority P2{{PARENT_FLAG}}
+bd create --title "<title>" --type <bug|task|feature> --priority P2{{PARENT_FLAG}}
 ```
 
-### STEP 7: Add Implementation Notes
+Add any relevant context to the new issue description.
 
-After ALL acceptance criteria are checked off, add notes:
+---
 
+## STEP 8: Add Implementation Notes
+
+Before closing, add notes documenting what you did:
 ```bash
 bd update <issue-id> --notes "## Implementation Summary
 
-<Describe what was done, key decisions made, any issues encountered>
-
-### Files Modified
-- path/to/file1.js - description
-- path/to/file2.js - description
-
-### Verification
-- <How each acceptance criterion was verified>"
+- What was done
+- Key decisions made
+- Any caveats or limitations
+- Files modified"
 ```
 
-### STEP 8: Final Check Before Close
+---
+
+## STEP 9: Final Check Before Close
 
 Before running `bd close`:
 
@@ -152,9 +186,11 @@ Before running `bd close`:
 3. If ANY show `[ ]`, STOP and go complete them
 4. Only proceed if everything is checked
 
-### STEP 9: Complete and Close
+---
 
-When the task is complete and tests pass:
+## STEP 10: Close the Issue
+
+Once everything is validated:
 
 1. Close the issue: `bd close <issue-id>`
 2. Append to progress log:
@@ -171,55 +207,54 @@ When the task is complete and tests pass:
 3. Run `git add -A`
 4. Run `git commit` referencing the issue ID
 
-### STEP 10: Check if Parent Epic is Complete
+Then check if the parent epic (if any) is now complete:
+- If issue had a parent epic, check `bd show <parent-epic-id>`
+- If ALL children are closed, close the epic too
 
-After closing an issue that has a parent epic:
+---
 
-1. Check if issue had a parent: look at the output of `bd show <issue-id>` for "Parent:"
-2. If it has a parent epic, check the epic: `bd show <parent-epic-id>`
-3. Look at its children - are ALL of them closed?
-4. If ALL children are closed, close the epic too: `bd close <parent-epic-id>`
-5. If some children are still open, leave the epic open
+## COMPLETION - STOP HERE
 
-**Epics should be closed when all their child issues are complete.**
+After closing the issue:
 
-6. **STOP HERE** - The loop will restart for the next issue.
+1. **STOP IMMEDIATELY** - Do not start another issue
+2. **Do not run `bd ready` again** - The loop handles this
+3. **Do not "peek" at what's next** - Just stop
 
-## Critical Rules
+The loop will restart you for the next issue automatically.
 
-1. **ONE ISSUE PER ITERATION.** Complete one issue, commit, then STOP.
+**DO NOT output any completion signal here.** The signal is ONLY for Step 1 when the list is empty.
 
-2. **CHECK OFF EVERY ACCEPTANCE CRITERION.** Before closing ANY issue, you MUST run `bd update --acceptance` to mark each criterion as `[x]`. If you don't run this command, you haven't done it. Verify the checkboxes are updated by running `bd show` again.
+If you completed an issue successfully, just stop. The loop will restart you.
 
-3. **CHROME EXTENSION VALIDATION FOR CODE.** For implementation tasks, visually verify changes work in the browser. Skip for research/spec/planning tasks where there's no code to test.
+**YOUR ITERATION IS DONE. STOP NOW.**
 
-4. When authoring code, capture WHY in comments for complex logic.
+---
 
-5. Single sources of truth - check existing patterns first.
+## Quick Reference
 
-6. If unrelated tests fail, resolve them as part of your change.
+| Command | Purpose |
+|---------|---------|
+| `{{READY_CMD}}` | List issues ready to work (scoped) |
+| `bd show <id>` | View issue details |
+| `bd update <id> --status in_progress` | Claim an issue |
+| `bd update <id> --acceptance "<text>"` | Update acceptance criteria |
+| `bd update <id> --notes "<text>"` | Add implementation notes |
+| `bd create --title "..." --type task{{PARENT_FLAG}}` | Create new issue |
+| `bd close <id>` | Close completed issue |
 
-7. FULL IMPLEMENTATIONS ONLY. No placeholders or stubs.
+---
 
-8. Before creating new files, search to ensure they don't already exist.
+## Critical Rules Summary
 
-9. Beads is the ONLY source of truth for task status:
-   - Starting work: `bd update <issue-id> --status in_progress`
-   - Completing work: `bd close <issue-id>`
-   - Finding bugs: `bd create --title "..." --type bug{{PARENT_FLAG}}`
-   - New tasks: `bd create --title "..." --type task{{PARENT_FLAG}}`
+1. **ONE ISSUE, THEN STOP** - This is the most important rule
+2. **Mark in progress FIRST** - Before any other work
+3. **Read ALL fields** - Description, Design, Acceptance Criteria, Notes, Comments
+4. **All acceptance criteria must be `[x]`** - Every single one
+5. **File issues for discoveries** - Don't get blocked, create new issues
+6. **Commit with issue ID** - Include the beads ID in commit message
+7. **Progress over perfection** - A closed issue with notes beats a stuck issue
 
-8. Reference the beads issue ID in git commits:
+---
 
-   ```
-   git commit -m "feat: Description of change
-
-   Implements <issue-id>
-   ..."
-   ```
-
-9. When ALL issues in scope are complete (`{{READY_CMD}}` returns nothing), output:
-   ```
-   <promise>SCOPE COMPLETE</promise>
-   ```
-   ONLY output this when genuinely finished.
+Now begin with Step 1. Complete ONE issue, then STOP.

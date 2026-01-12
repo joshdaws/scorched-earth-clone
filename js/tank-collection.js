@@ -51,8 +51,10 @@ const state = {
     /** Count of consecutive duplicate drops (reset when new tank received) */
     consecutiveDuplicates: 0,
     /** ID of last tank dropped (for duplicate protection) */
-    lastTankDropped: null
-};;
+    lastTankDropped: null,
+    /** Whether the scrap tutorial popup has been shown */
+    hasSeenScrapTutorial: false
+};
 
 /** Whether the module has been initialized */
 let isInitialized = false;
@@ -109,6 +111,9 @@ function loadState() {
             state.consecutiveDuplicates = parsed.consecutiveDuplicates || 0;
             state.lastTankDropped = parsed.lastTankDropped || null;
 
+            // Restore scrap tutorial flag
+            state.hasSeenScrapTutorial = parsed.hasSeenScrapTutorial || false;
+
             debugLog('State loaded from localStorage', {
                 owned: state.owned.size,
                 equipped: state.equipped,
@@ -138,7 +143,8 @@ function saveState() {
             duplicateCounts: Object.fromEntries(state.duplicateCounts),
             scrap: state.scrap,
             consecutiveDuplicates: state.consecutiveDuplicates,
-            lastTankDropped: state.lastTankDropped
+            lastTankDropped: state.lastTankDropped,
+            hasSeenScrapTutorial: state.hasSeenScrapTutorial
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
         debugLog('State saved to localStorage');
@@ -490,6 +496,40 @@ export function resetConsecutiveDuplicates() {
         state.consecutiveDuplicates = 0;
         saveState();
     }
+}
+
+// =============================================================================
+// SCRAP TUTORIAL
+// =============================================================================
+
+/**
+ * Check if scrap tutorial has been seen.
+ * @returns {boolean} True if tutorial has been shown
+ */
+export function hasSeenScrapTutorial() {
+    return state.hasSeenScrapTutorial;
+}
+
+/**
+ * Mark the scrap tutorial as seen.
+ * Call this after showing the tutorial popup.
+ */
+export function markScrapTutorialSeen() {
+    if (!state.hasSeenScrapTutorial) {
+        state.hasSeenScrapTutorial = true;
+        saveState();
+        debugLog('Scrap tutorial marked as seen');
+    }
+}
+
+/**
+ * Check if scrap tutorial should be shown.
+ * Returns true only if this is a duplicate drop and tutorial hasn't been seen.
+ * @param {Object} dropResult - Result from addTank()
+ * @returns {boolean} True if tutorial should show
+ */
+export function shouldShowScrapTutorial(dropResult) {
+    return dropResult.isDuplicate && !state.hasSeenScrapTutorial;
 }
 
 // =============================================================================
