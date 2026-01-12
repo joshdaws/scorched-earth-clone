@@ -1497,10 +1497,16 @@ function renderDifficultyButton(ctx, key, pulseIntensity) {
 
     // Render description text below the button
     ctx.save();
-    ctx.fillStyle = COLORS.TEXT_MUTED;
-    ctx.font = `${UI.FONT_SIZE_SMALL - 2}px ${UI.FONT_FAMILY}`;
+    // Use lighter color with text shadow for better readability
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.font = `${UI.FONT_SIZE_SMALL + 2}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    // Add subtle shadow for contrast against varying backgrounds
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetX = 1;
+    ctx.shadowOffsetY = 1;
     ctx.fillText(config.description, button.x, button.y + 18);
     ctx.restore();
 }
