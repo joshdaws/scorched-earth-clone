@@ -301,6 +301,166 @@ function getActiveFalloutZones() {
 }
 
 // =============================================================================
+// FIRE ZONE STATE (Napalm)
+// =============================================================================
+
+/**
+ * Active fire zones from Napalm explosions.
+ * Each zone deals burn damage to tanks within its radius at the start of their turn.
+ * @type {Array<{x: number, y: number, radius: number, damagePerTurn: number, turnsRemaining: number}>}
+ */
+let activeFireZones = [];
+
+/**
+ * Fire zone configuration (Napalm).
+ */
+const FIRE_CONFIG = {
+    /** Initial damage on impact (from weapon definition) */
+    INITIAL_DAMAGE: 8,
+    /** Burn damage per turn */
+    DAMAGE_PER_TURN: 5,
+    /** Number of turns the fire burns */
+    BURN_DURATION: 5
+};
+
+/**
+ * Create a new fire zone at the specified position.
+ * Fire deals burn damage to tanks within radius at the start of each turn.
+ *
+ * @param {number} x - Center X position
+ * @param {number} y - Center Y position
+ * @param {number} radius - Fire zone radius in pixels
+ */
+function createFireZone(x, y, radius) {
+    activeFireZones.push({
+        x,
+        y,
+        radius,
+        damagePerTurn: FIRE_CONFIG.DAMAGE_PER_TURN,
+        turnsRemaining: FIRE_CONFIG.BURN_DURATION
+    });
+    console.log(`Fire zone created at (${x.toFixed(1)}, ${y.toFixed(1)}), radius=${radius.toFixed(1)}, duration=${FIRE_CONFIG.BURN_DURATION} turns`);
+}
+
+/**
+ * Apply fire damage to a tank if it's within any fire zones.
+ * Called at the start of each tank's turn.
+ *
+ * @param {import('./tank.js').Tank} tank - Tank to check for fire damage
+ * @returns {number} Total fire damage dealt
+ */
+function applyFireDamageToTank(tank) {
+    if (!tank || tank.health <= 0) return 0;
+
+    let totalDamage = 0;
+
+    for (const zone of activeFireZones) {
+        const dx = tank.x - zone.x;
+        const dy = tank.y - zone.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance <= zone.radius) {
+            const damage = zone.damagePerTurn;
+            tank.takeDamage(damage);
+            totalDamage += damage;
+            console.log(`${tank.team} tank took ${damage} burn damage (${zone.turnsRemaining} turns remaining in fire)`);
+        }
+    }
+
+    return totalDamage;
+}
+
+/**
+ * Tick all fire zones - decrement duration and remove expired zones.
+ * Called at the end of each full round (after both tanks have taken turns).
+ */
+function tickFireZones() {
+    activeFireZones = activeFireZones.filter(zone => {
+        zone.turnsRemaining--;
+        if (zone.turnsRemaining <= 0) {
+            console.log('Fire zone burned out');
+            return false;
+        }
+        return true;
+    });
+}
+
+/**
+ * Clear all fire zones.
+ * Called when starting a new round or resetting the game.
+ */
+function clearFireZones() {
+    activeFireZones = [];
+}
+
+/**
+ * Get all active fire zones for rendering.
+ * @returns {Array<{x: number, y: number, radius: number, turnsRemaining: number}>} Active zones
+ */
+function getActiveFireZones() {
+    return activeFireZones;
+}
+
+// =============================================================================
+// GRAVITY WELL STATE
+// =============================================================================
+
+/**
+ * Active gravity wells from Gravity Well weapon.
+ * Each well pulls tanks toward its center on the turn it's active.
+ * @type {Array<{x: number, y: number, pullRadius: number, pullStrength: number}>}
+ */
+let activeGravityWells = [];
+
+/**
+ * Gravity Well configuration.
+ */
+const GRAVITY_WELL_CONFIG = {
+    /** Pull radius in pixels */
+    PULL_RADIUS: 200,
+    /** Maximum pull distance in pixels per application */
+    PULL_STRENGTH: 50
+};
+
+/**
+ * Create a gravity well at the specified position.
+ * Immediately pulls nearby tanks toward the center.
+ *
+ * @param {number} x - Center X position
+ * @param {number} y - Center Y position
+ */
+function createGravityWell(x, y) {
+    console.log(`Gravity Well created at (${x.toFixed(1)}, ${y.toFixed(1)})`);
+
+    // Get all tanks
+    const tanks = [playerTank, enemyTank].filter(t => t !== null && !t.isDestroyed());
+
+    for (const tank of tanks) {
+        const dx = x - tank.x;
+        const dy = y - tank.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance <= GRAVITY_WELL_CONFIG.PULL_RADIUS && distance > 0) {
+            // Calculate pull strength based on distance (stronger when closer)
+            const pullFactor = 1 - (distance / GRAVITY_WELL_CONFIG.PULL_RADIUS);
+            const pullDistance = GRAVITY_WELL_CONFIG.PULL_STRENGTH * pullFactor;
+
+            // Normalize direction and apply pull
+            const pullX = (dx / distance) * pullDistance;
+
+            // Move tank horizontally toward gravity well center
+            const newX = Math.max(0, Math.min(currentTerrain.getWidth() - 1, tank.x + pullX));
+            tank.x = newX;
+
+            // Update tank's Y position to match new terrain height
+            updateTankTerrainPosition(tank, currentTerrain);
+
+            console.log(`${tank.team} tank pulled ${pullDistance.toFixed(1)}px toward gravity well`);
+        }
+    }
+}
+
+// =============================================================================
 // PAUSE BUTTON STATE
 // =============================================================================
 
@@ -2675,6 +2835,130 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
         Sound.playExplosionSound(blastRadius);
     }
 
+    // ==========================================================================
+    // SPECIAL WEAPON EFFECTS
+    // ==========================================================================
+
+    const isSpecial = weapon && weapon.type === WEAPON_TYPES.SPECIAL;
+
+    if (isSpecial) {
+        // Napalm - Create burning fire zone
+        if (weapon.burning && weaponId === 'napalm') {
+            createFireZone(pos.x, pos.y, blastRadius);
+            console.log(`Napalm fire zone created at (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)})`);
+        }
+
+        // Liquid Dirt - Add terrain at impact point to bury enemy
+        if (weapon.buriesTank && weaponId === 'liquid-dirt') {
+            const dirtRadius = 50; // Width of dirt pile
+            const dirtHeight = 100; // Height of dirt added
+
+            // Add terrain in a mound shape at impact point
+            for (let dx = -dirtRadius; dx <= dirtRadius; dx++) {
+                const x = Math.floor(pos.x + dx);
+                if (x >= 0 && x < currentTerrain.getWidth()) {
+                    // Create a mound shape: higher in the center, lower at edges
+                    const distFromCenter = Math.abs(dx) / dirtRadius;
+                    const heightMultiplier = 1 - (distFromCenter * distFromCenter); // Parabolic falloff
+                    const addedHeight = dirtHeight * heightMultiplier;
+
+                    const currentHeight = currentTerrain.getHeight(x);
+                    const newHeight = currentHeight + addedHeight;
+                    currentTerrain.setHeight(x, newHeight);
+                }
+            }
+
+            // Update tank positions after terrain change
+            if (playerTank && currentTerrain) {
+                updateTankTerrainPosition(playerTank, currentTerrain);
+            }
+            if (enemyTank && currentTerrain) {
+                updateTankTerrainPosition(enemyTank, currentTerrain);
+            }
+
+            console.log(`Liquid Dirt added ${dirtHeight}px terrain at (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)})`);
+        }
+
+        // Teleporter - Move the firing tank to the impact point
+        if (weapon.teleport && weaponId === 'teleporter') {
+            // Find the tank that fired this projectile
+            const firingTank = projectile.owner === 'player' ? playerTank : enemyTank;
+
+            if (firingTank && !firingTank.isDestroyed()) {
+                // Teleport to impact X position, but snap to terrain height
+                const teleportX = Math.max(32, Math.min(currentTerrain.getWidth() - 32, pos.x));
+                firingTank.x = teleportX;
+
+                // Update Y to match terrain at new position
+                updateTankTerrainPosition(firingTank, currentTerrain);
+
+                console.log(`${firingTank.team} tank teleported to (${teleportX.toFixed(1)}, ${firingTank.y.toFixed(1)})`);
+
+                // Visual effect for teleportation
+                screenFlash('#9900ff', 200); // Purple flash for teleport
+            }
+        }
+
+        // Wind Bomb - Change wind direction and strength
+        if (weapon.windEffect && weaponId === 'wind-bomb') {
+            // Generate a new random wind value
+            const currentWind = Wind.getWind();
+            const newWind = (Math.random() * 20) - 10; // Range -10 to +10
+            Wind.setWind(newWind);
+
+            console.log(`Wind Bomb changed wind from ${currentWind.toFixed(1)} to ${newWind.toFixed(1)}`);
+
+            // Visual feedback
+            screenFlash('#87ceeb', 150); // Light blue flash for wind change
+        }
+
+        // Gravity Well - Pull nearby tanks toward impact point
+        if (weapon.gravityWell && weaponId === 'gravity-well') {
+            createGravityWell(pos.x, pos.y);
+
+            // Visual effect for gravity well
+            screenFlash('#330066', 300); // Dark purple flash
+        }
+
+        // Lightning Strike - Vertical strike from sky (already handled by vertical flag in projectile)
+        if (weapon.vertical && weaponId === 'lightning-strike') {
+            // The lightning strike visual effect
+            screenFlash('#00ffff', 100); // Bright cyan flash
+
+            console.log(`Lightning Strike at (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)})`);
+        }
+
+        // Ion Cannon - Continuous beam from orbit (vertical + beam)
+        if (weapon.vertical && weapon.beam && weaponId === 'ion-cannon') {
+            // Ion Cannon has longer sustained flash effect
+            screenFlash('#ff00ff', 400); // Magenta flash for Ion Cannon
+
+            // Additional terrain damage in a line from top of screen to impact
+            const beamWidth = 10;
+            for (let dx = -beamWidth; dx <= beamWidth; dx++) {
+                const x = Math.floor(pos.x + dx);
+                if (x >= 0 && x < currentTerrain.getWidth()) {
+                    const currentHeight = currentTerrain.getHeight(x);
+                    // Reduce terrain height by 30 pixels in the beam path
+                    currentTerrain.setHeight(x, Math.max(0, currentHeight - 30));
+                }
+            }
+
+            // Update tank positions after terrain destruction
+            if (playerTank && currentTerrain) {
+                updateTankTerrainPosition(playerTank, currentTerrain);
+            }
+            if (enemyTank && currentTerrain) {
+                updateTankTerrainPosition(enemyTank, currentTerrain);
+            }
+
+            console.log(`Ion Cannon beam at (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)})`);
+        }
+    }
+
+    // Shield Buster - Extra damage is handled in damage calculation (shieldBuster flag)
+    // Note: Shield system not yet implemented, but the weapon flag is ready
+
     // Play hit or miss sound based on whether a tank was hit
     if (directHitTank) {
         // Tank was directly hit - play metallic hit sound
@@ -3429,6 +3713,70 @@ function renderFalloutZones(ctx) {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('☢', zone.x, zone.y);
+    }
+
+    ctx.restore();
+}
+
+/**
+ * Render active fire zones from Napalm explosions.
+ * Displays a pulsing fiery area indicator with animated flames.
+ *
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ */
+function renderFireZones(ctx) {
+    if (activeFireZones.length === 0) return;
+
+    ctx.save();
+
+    // Pulsing animation based on time (faster than fallout for fire effect)
+    const time = performance.now();
+    const pulse = 0.6 + 0.4 * Math.sin(time / 150);
+    const flicker = 0.8 + 0.2 * Math.sin(time / 50);
+
+    for (const zone of activeFireZones) {
+        // Draw the fire zone as a glowing fiery circle
+        ctx.beginPath();
+        ctx.arc(zone.x, zone.y, zone.radius, 0, Math.PI * 2);
+
+        // Orange/red fire colors
+        const gradient = ctx.createRadialGradient(
+            zone.x, zone.y, 0,
+            zone.x, zone.y, zone.radius
+        );
+        gradient.addColorStop(0, `rgba(255, 200, 50, ${0.25 * pulse * flicker})`);
+        gradient.addColorStop(0.3, `rgba(255, 100, 0, ${0.2 * pulse})`);
+        gradient.addColorStop(0.6, `rgba(200, 50, 0, ${0.15 * pulse})`);
+        gradient.addColorStop(1, 'rgba(100, 0, 0, 0)');
+        ctx.fillStyle = gradient;
+        ctx.fill();
+
+        // Draw outer ring (flickering)
+        ctx.strokeStyle = `rgba(255, 100, 0, ${0.4 * flicker})`;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // Draw flame symbol in center
+        const symbolSize = Math.min(zone.radius * 0.4, 24);
+        ctx.fillStyle = `rgba(255, 255, 100, ${0.5 * flicker})`;
+        ctx.font = `bold ${symbolSize}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🔥', zone.x, zone.y);
+
+        // Draw small flame particles around the zone
+        const numParticles = 5;
+        for (let i = 0; i < numParticles; i++) {
+            const angle = (time / 200 + i * (Math.PI * 2 / numParticles)) % (Math.PI * 2);
+            const particleR = zone.radius * 0.7;
+            const particleX = zone.x + Math.cos(angle) * particleR;
+            const particleY = zone.y + Math.sin(angle) * particleR - 5 * Math.sin(time / 100 + i);
+
+            ctx.beginPath();
+            ctx.arc(particleX, particleY, 4, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, ${150 + Math.floor(100 * Math.sin(time / 100 + i))}, 0, ${0.6 * flicker})`;
+            ctx.fill();
+        }
     }
 
     ctx.restore();
@@ -4466,6 +4814,9 @@ function renderPlaying(ctx) {
     // Render fallout zones (on top of terrain, behind tanks)
     renderFalloutZones(ctx);
 
+    // Render fire zones from Napalm (on top of terrain, behind tanks)
+    renderFireZones(ctx);
+
     // Render tanks on terrain
     renderTanks(ctx);
 
@@ -4683,12 +5034,19 @@ function setupPlayingState() {
                 if (falloutDamage > 0) {
                     console.log(`Player tank took ${falloutDamage} total fallout damage at turn start`);
                 }
+
+                // Apply fire damage (Napalm)
+                const fireDamage = applyFireDamageToTank(playerTank);
+                if (fireDamage > 0) {
+                    console.log(`Player tank took ${fireDamage} total burn damage at turn start`);
+                }
             }
 
-            // After player turn starts, tick fallout zones (they decrease after each full round)
+            // After player turn starts, tick fallout zones and fire zones (they decrease after each full round)
             // We do this when transitioning from AI phase to player phase (completing a round)
             if (oldPhase === TURN_PHASES.PROJECTILE_FLIGHT) {
                 tickFalloutZones();
+                tickFireZones();
             }
         } else if (newPhase === TURN_PHASES.AI_AIM) {
             // Apply status effects at the start of AI's turn
@@ -4700,6 +5058,12 @@ function setupPlayingState() {
                 const falloutDamage = applyFalloutDamageToTank(enemyTank);
                 if (falloutDamage > 0) {
                     console.log(`Enemy tank took ${falloutDamage} total fallout damage at turn start`);
+                }
+
+                // Apply fire damage (Napalm)
+                const fireDamage = applyFireDamageToTank(enemyTank);
+                if (fireDamage > 0) {
+                    console.log(`Enemy tank took ${fireDamage} total burn damage at turn start`);
                 }
             }
         } else {
@@ -4900,6 +5264,7 @@ function setupPlayingState() {
             clearScreenFlash();
             clearPersistentTrails();
             clearFalloutZones();
+            clearFireZones();
             explosionEffect = null;
             // Clear explosion particles
             clearParticles();

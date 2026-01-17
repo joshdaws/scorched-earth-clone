@@ -318,6 +318,13 @@ export class Projectile {
          */
         this.turnsPersisted = 0;
 
+        /**
+         * Whether this is a vertical strike weapon (Lightning Strike, Ion Cannon).
+         * Vertical strikes ignore gravity and fall straight down.
+         * @type {boolean}
+         */
+        this.isVerticalStrike = false;
+
         // Calculate initial velocity from power and angle
         this._calculateInitialVelocity(angle, power);
 
@@ -381,13 +388,16 @@ export class Projectile {
             this.trail.shift();
         }
 
-        // Apply wind to horizontal velocity
-        // Wind is a constant force that affects velocity each frame
-        this.vx += wind;
+        // Vertical strike weapons ignore wind and gravity - they fall straight down
+        if (!this.isVerticalStrike) {
+            // Apply wind to horizontal velocity
+            // Wind is a constant force that affects velocity each frame
+            this.vx += wind;
 
-        // Apply gravity to vertical velocity
-        // Gravity is a constant acceleration downward (positive Y in canvas)
-        this.vy += PHYSICS.GRAVITY;
+            // Apply gravity to vertical velocity
+            // Gravity is a constant acceleration downward (positive Y in canvas)
+            this.vy += PHYSICS.GRAVITY;
+        }
 
         // Store previous position for distance calculation
         const prevX = this.x;
@@ -1361,11 +1371,52 @@ export function shouldChainReact(projectile) {
  * Create a projectile fired from a tank.
  * Convenience function that extracts fire position from tank.
  *
+ * For vertical weapons (Lightning Strike, Ion Cannon), the projectile
+ * spawns from above the screen and falls straight down to the target X.
+ *
  * @param {import('./tank.js').Tank} tank - The tank firing the projectile
  * @param {number} [wind=0] - Current wind value (optional, not used in spawn)
  * @returns {Projectile} A new projectile instance
  */
 export function createProjectileFromTank(tank, wind = 0) {
+    const weapon = WeaponRegistry.getWeapon(tank.currentWeapon);
+
+    // Vertical weapons (Lightning Strike, Ion Cannon) fire from above
+    if (weapon && weapon.vertical) {
+        // Calculate target X position based on tank's aiming
+        const firePos = tank.getFirePosition();
+        const radians = (tank.angle * Math.PI) / 180;
+        const range = (tank.power / 100) * 800; // Range based on power
+
+        // Target X is where the projectile would land at terrain level
+        // For vertical weapons, we use the horizontal distance calculation
+        const targetX = firePos.x + Math.cos(radians) * range;
+
+        // Spawn from top of screen
+        const spawnY = -50; // Above visible screen
+
+        const projectile = new Projectile({
+            x: targetX,
+            y: spawnY,
+            angle: 270, // Straight down (270° = down in our angle system where 90° = up)
+            power: 100, // Max speed for dramatic effect
+            weaponId: tank.currentWeapon,
+            owner: tank.team
+        });
+
+        // Override velocity to fall straight down at high speed
+        projectile.vx = 0;
+        projectile.vy = 25; // Fast downward velocity
+
+        // Mark as vertical strike for special handling
+        projectile.isVerticalStrike = true;
+
+        console.log(`Vertical weapon ${tank.currentWeapon} targeting X=${targetX.toFixed(1)}`);
+
+        return projectile;
+    }
+
+    // Normal projectile creation
     const firePos = tank.getFirePosition();
 
     return new Projectile({
