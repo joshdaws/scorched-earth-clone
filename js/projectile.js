@@ -252,6 +252,72 @@ export class Projectile {
          */
         this.safeDistance = PROJECTILE.SELF_COLLISION_SAFE_DISTANCE || 50;
 
+        // =============================================================================
+        // BOUNCING STATE (for Bouncer-type weapons)
+        // =============================================================================
+
+        /**
+         * Number of bounces remaining for bouncer weapons.
+         * Decrements on each terrain impact until 0.
+         * @type {number}
+         */
+        this.bouncesRemaining = options.bouncesRemaining ?? (WeaponRegistry.getWeapon(weaponId)?.bounceCount || 0);
+
+        /**
+         * Whether this projectile is a bouncing type.
+         * Determined from weapon bounceCount property.
+         * @type {boolean}
+         */
+        this.isBouncer = this.bouncesRemaining > 0;
+
+        // =============================================================================
+        // DEPLOYABLE STATE (for Land Mine and Sticky Bomb weapons)
+        // =============================================================================
+
+        /**
+         * Whether this projectile is deployed (stationary, waiting to trigger).
+         * Used for land mines and sticky bombs.
+         * @type {boolean}
+         */
+        this.isDeployed = false;
+
+        /**
+         * Timestamp when deployment started.
+         * Used to track deployment duration for timeouts and timers.
+         * @type {number}
+         */
+        this.deployStartTime = 0;
+
+        /**
+         * Position where the projectile is deployed.
+         * @type {{x: number, y: number}|null}
+         */
+        this.deployPosition = null;
+
+        /**
+         * Whether this is a land mine (triggers on proximity).
+         * @type {boolean}
+         */
+        this.isLandMine = weaponId === 'land-mine';
+
+        /**
+         * Whether this is a sticky bomb (has countdown timer).
+         * @type {boolean}
+         */
+        this.isStickyBomb = weaponId === 'sticky-bomb';
+
+        /**
+         * Proximity trigger radius for land mines (in pixels).
+         * @type {number}
+         */
+        this.proximityRadius = 50;
+
+        /**
+         * Number of turns the land mine has persisted.
+         * @type {number}
+         */
+        this.turnsPersisted = 0;
+
         // Calculate initial velocity from power and angle
         this._calculateInitialVelocity(angle, power);
 
@@ -547,6 +613,7 @@ export class Projectile {
     /**
      * Start rolling mode for this projectile.
      * Sets initial roll direction based on current horizontal velocity.
+     * Heavy Roller gets increased initial momentum.
      *
      * @param {number} terrainY - The Y position of the terrain surface (canvas coords)
      */
@@ -558,10 +625,14 @@ export class Projectile {
         // If vx is very small, default to rolling right
         this.rollDirection = this.vx >= 0 ? 1 : -1;
 
+        // Check if this is a Heavy Roller for momentum boost
+        const isHeavyRoller = this.weaponId === 'heavy-roller';
+
         // Initial roll velocity is based on horizontal speed at impact
-        // Minimum velocity to ensure roller moves
-        const minRollSpeed = 2;
-        this.rollVelocity = Math.max(Math.abs(this.vx) * 0.5, minRollSpeed) * this.rollDirection;
+        // Heavy Roller gets 80% of impact velocity retained, normal gets 50%
+        const velocityRetention = isHeavyRoller ? 0.8 : 0.5;
+        const minRollSpeed = isHeavyRoller ? 4 : 2; // Heavy Roller has higher minimum speed
+        this.rollVelocity = Math.max(Math.abs(this.vx) * velocityRetention, minRollSpeed) * this.rollDirection;
 
         // Snap to terrain surface
         this.y = terrainY;
@@ -569,7 +640,7 @@ export class Projectile {
         // Clear vertical velocity (now following terrain)
         this.vy = 0;
 
-        console.log(`Roller started rolling at (${this.x.toFixed(1)}, ${this.y.toFixed(1)}), direction=${this.rollDirection > 0 ? 'right' : 'left'}, velocity=${this.rollVelocity.toFixed(2)}`);
+        console.log(`${isHeavyRoller ? 'Heavy Roller' : 'Roller'} started rolling at (${this.x.toFixed(1)}, ${this.y.toFixed(1)}), direction=${this.rollDirection > 0 ? 'right' : 'left'}, velocity=${this.rollVelocity.toFixed(2)}`);
     }
 
     /**
@@ -616,32 +687,38 @@ export class Projectile {
         const heightDiff = currentSurfaceY - nextSurfaceY; // Positive if terrain goes up (roller goes uphill)
         const slopeAngle = Math.atan2(-heightDiff, lookAhead); // Negative heightDiff for correct direction
 
-        // Check for steep cliff - roller cannot climb slopes steeper than ~45 degrees
+        // Check if this is a Heavy Roller for enhanced momentum
+        const isHeavyRoller = this.weaponId === 'heavy-roller';
+
+        // Check for steep cliff - roller cannot climb slopes steeper than ~45 degrees (60 for heavy)
         // If trying to climb (heightDiff > 0) and slope too steep, reverse direction
-        const maxClimbAngle = 45; // degrees - maximum slope the roller can climb
+        const maxClimbAngle = isHeavyRoller ? 60 : 45; // Heavy Roller can climb steeper slopes
         const slopeDegrees = Math.abs(Math.atan2(heightDiff, lookAhead) * 180 / Math.PI);
 
         if (heightDiff > 1 && slopeDegrees > maxClimbAngle) {
-            // Cliff too steep - reverse direction and lose most momentum
+            // Cliff too steep - reverse direction and lose momentum
+            // Heavy Roller retains more momentum (50% vs 30%)
+            const momentumRetention = isHeavyRoller ? 0.5 : 0.3;
             this.rollDirection *= -1;
-            this.rollVelocity = Math.abs(this.rollVelocity) * 0.3 * this.rollDirection; // Lose 70% momentum on bounce
+            this.rollVelocity = Math.abs(this.rollVelocity) * momentumRetention * this.rollDirection;
 
             if (DEBUG.ENABLED) {
-                console.log(`[Roller] Cliff too steep (${slopeDegrees.toFixed(1)}°), reversing direction`);
+                console.log(`[${isHeavyRoller ? 'Heavy Roller' : 'Roller'}] Cliff too steep (${slopeDegrees.toFixed(1)}°), reversing direction`);
             }
         }
 
         // Base roll speed affected by slope
         // Gravity effect: rolling downhill speeds up, uphill slows down
-        const gravityEffect = 0.15; // How much slope affects speed
+        // Heavy Roller has stronger gravity effect (more mass)
+        const gravityEffect = isHeavyRoller ? 0.25 : 0.15;
         const slopeAcceleration = Math.sin(slopeAngle) * gravityEffect;
 
         // Update roll velocity with slope effect
         this.rollVelocity += slopeAcceleration * this.rollDirection;
 
-        // Clamp roll speed
-        const maxRollSpeed = 8;
-        const minRollSpeed = 0.5;
+        // Clamp roll speed - Heavy Roller can go faster
+        const maxRollSpeed = isHeavyRoller ? 12 : 8;
+        const minRollSpeed = isHeavyRoller ? 0.8 : 0.5;
         const absVelocity = Math.abs(this.rollVelocity);
 
         if (absVelocity > maxRollSpeed) {
@@ -650,7 +727,9 @@ export class Projectile {
 
         // Check for valley bottom (speed too low to climb)
         // If we're trying to go uphill but can't make it, we've hit a valley
-        if (absVelocity < minRollSpeed && heightDiff > 0.5) {
+        // Heavy Roller needs higher threshold to stop
+        const valleyThreshold = isHeavyRoller ? 0.8 : 0.5;
+        if (absVelocity < minRollSpeed && heightDiff > valleyThreshold) {
             return { explode: true, reason: 'valley' };
         }
 
@@ -864,6 +943,193 @@ export class Projectile {
      */
     getDigDistance() {
         return this.digDistance;
+    }
+
+    // =============================================================================
+    // BOUNCING WEAPON SUPPORT
+    // =============================================================================
+
+    /**
+     * Check if this projectile should bounce on terrain contact.
+     * Returns true if bounces remaining and not in other special modes.
+     *
+     * @returns {boolean} True if projectile should bounce
+     */
+    shouldBounce() {
+        if (this.isRolling || this.isDigging || this.isDeployed) return false;
+        return this.isBouncer && this.bouncesRemaining > 0;
+    }
+
+    /**
+     * Perform a bounce off terrain.
+     * Reflects velocity, reduces speed slightly, decrements bounce count.
+     *
+     * @param {number} terrainSurfaceY - The Y position of the terrain surface
+     * @param {number} [slopeAngle=0] - The angle of the terrain slope in radians
+     */
+    bounce(terrainSurfaceY, slopeAngle = 0) {
+        this.bouncesRemaining--;
+
+        // Position above terrain
+        this.y = terrainSurfaceY - 2;
+
+        // Reflect velocity with energy loss
+        const energyRetention = 0.7; // Lose 30% energy on each bounce
+
+        // Simple reflection: reverse vertical velocity
+        this.vy = -Math.abs(this.vy) * energyRetention;
+
+        // Slightly reduce horizontal velocity too
+        this.vx *= energyRetention;
+
+        // Apply slope effect - terrain angle affects bounce direction
+        if (Math.abs(slopeAngle) > 0.1) {
+            // Add horizontal push based on slope
+            const slopePush = Math.sin(slopeAngle) * Math.abs(this.vy) * 0.5;
+            this.vx += slopePush;
+        }
+
+        console.log(`Bouncer bounced! ${this.bouncesRemaining} bounces remaining. New vel=(${this.vx.toFixed(2)}, ${this.vy.toFixed(2)})`);
+    }
+
+    /**
+     * Get the number of bounces remaining.
+     * @returns {number} Bounces remaining
+     */
+    getBouncesRemaining() {
+        return this.bouncesRemaining;
+    }
+
+    // =============================================================================
+    // DEPLOYABLE WEAPON SUPPORT (Land Mine, Sticky Bomb)
+    // =============================================================================
+
+    /**
+     * Check if this projectile should deploy on terrain contact.
+     * Only deployable weapons (land mine, sticky bomb) can deploy.
+     *
+     * @returns {boolean} True if weapon should deploy
+     */
+    shouldDeploy() {
+        if (this.isDeployed || this.isRolling || this.isDigging) return false;
+
+        const weapon = WeaponRegistry.getWeapon(this.weaponId);
+        return weapon?.deployable === true;
+    }
+
+    /**
+     * Deploy this projectile at the current position.
+     * Projectile becomes stationary and waits for trigger.
+     *
+     * @param {number} x - Deploy X position
+     * @param {number} y - Deploy Y position (terrain surface)
+     */
+    deploy(x, y) {
+        this.isDeployed = true;
+        this.deployStartTime = performance.now();
+        this.deployPosition = { x, y };
+        this.x = x;
+        this.y = y;
+
+        // Clear velocity - deployed weapons are stationary
+        this.vx = 0;
+        this.vy = 0;
+
+        console.log(`${this.weaponId} deployed at (${x.toFixed(1)}, ${y.toFixed(1)})`);
+    }
+
+    /**
+     * Update deployed projectile state.
+     * For land mines: Check proximity trigger
+     * For sticky bombs: Check countdown timer
+     *
+     * @param {import('./tank.js').Tank[]} tanks - Array of tanks to check proximity
+     * @returns {{explode: boolean, reason: string}|null} Trigger info or null
+     */
+    updateDeployed(tanks) {
+        if (!this.isDeployed) return null;
+
+        const weapon = WeaponRegistry.getWeapon(this.weaponId);
+        const deployTimeout = weapon?.rollTimeout || 10000;
+        const deployDuration = performance.now() - this.deployStartTime;
+
+        // Sticky Bomb: Fixed countdown timer
+        if (this.isStickyBomb) {
+            if (deployDuration >= deployTimeout) {
+                return { explode: true, reason: 'timer' };
+            }
+            return null;
+        }
+
+        // Land Mine: Check proximity trigger
+        if (this.isLandMine) {
+            // Check timeout (10 seconds default)
+            if (deployDuration >= deployTimeout) {
+                return { explode: true, reason: 'timeout' };
+            }
+
+            // Check proximity to enemy tanks
+            for (const tank of tanks) {
+                if (tank.isDestroyed()) continue;
+                // Don't trigger on owner's tank
+                if (tank.team === this.owner) continue;
+
+                const tankPos = tank.getPosition();
+                const dx = tankPos.x - this.x;
+                const dy = tankPos.y - this.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance <= this.proximityRadius) {
+                    console.log(`Land mine triggered by ${tank.team} tank at distance ${distance.toFixed(1)}`);
+                    return { explode: true, reason: 'proximity', hitTank: tank };
+                }
+            }
+
+            return null;
+        }
+
+        // Fallback: check timeout for any other deployable
+        if (deployDuration >= deployTimeout) {
+            return { explode: true, reason: 'timeout' };
+        }
+
+        return null;
+    }
+
+    /**
+     * Get the deployment duration in milliseconds.
+     * @returns {number} Time since deployment in ms
+     */
+    getDeployDuration() {
+        if (!this.isDeployed) return 0;
+        return performance.now() - this.deployStartTime;
+    }
+
+    /**
+     * Get the remaining time on sticky bomb timer.
+     * @returns {number} Time remaining in ms, or 0 if not a sticky bomb
+     */
+    getStickyBombTimeRemaining() {
+        if (!this.isStickyBomb || !this.isDeployed) return 0;
+        const weapon = WeaponRegistry.getWeapon(this.weaponId);
+        const timeout = weapon?.rollTimeout || 2000;
+        return Math.max(0, timeout - this.getDeployDuration());
+    }
+
+    /**
+     * Increment the turn counter for land mines.
+     * Called at the end of each turn to track persistence.
+     */
+    incrementTurnsPersisted() {
+        this.turnsPersisted++;
+    }
+
+    /**
+     * Get the number of turns this mine has persisted.
+     * @returns {number} Number of turns
+     */
+    getTurnsPersisted() {
+        return this.turnsPersisted;
     }
 }
 

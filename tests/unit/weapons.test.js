@@ -244,6 +244,46 @@ describe('Weapon Properties', () => {
     });
   });
 
+  describe('Rolling Category Weapons', () => {
+    it('Heavy Roller has increased timeout for momentum', () => {
+      const weapon = WeaponRegistry.getWeapon('heavy-roller');
+      expect(weapon.type).toBe(WEAPON_TYPES.ROLLING);
+      expect(weapon.rollTimeout).toBe(4000); // Longer timeout than Roller (3000)
+      expect(weapon.damage).toBe(45); // Higher damage
+      expect(weapon.blastRadius).toBe(45); // Larger radius
+    });
+
+    it('Bouncer has exactly 3 bounces', () => {
+      const weapon = WeaponRegistry.getWeapon('bouncer');
+      expect(weapon.type).toBe(WEAPON_TYPES.ROLLING);
+      expect(weapon.bounceCount).toBe(3);
+      expect(weapon.damage).toBe(25);
+    });
+
+    it('Super Bouncer has exactly 6 bounces', () => {
+      const weapon = WeaponRegistry.getWeapon('super-bouncer');
+      expect(weapon.type).toBe(WEAPON_TYPES.ROLLING);
+      expect(weapon.bounceCount).toBe(6);
+      expect(weapon.damage).toBe(35);
+    });
+
+    it('Land Mine is deployable with proximity trigger', () => {
+      const weapon = WeaponRegistry.getWeapon('land-mine');
+      expect(weapon.type).toBe(WEAPON_TYPES.ROLLING);
+      expect(weapon.deployable).toBe(true);
+      expect(weapon.rollTimeout).toBe(10000); // 10 second persistence
+      expect(weapon.damage).toBe(50);
+    });
+
+    it('Sticky Bomb is deployable with timer', () => {
+      const weapon = WeaponRegistry.getWeapon('sticky-bomb');
+      expect(weapon.type).toBe(WEAPON_TYPES.ROLLING);
+      expect(weapon.deployable).toBe(true);
+      expect(weapon.rollTimeout).toBe(2000); // 2 second timer
+      expect(weapon.damage).toBe(40);
+    });
+  });
+
   describe('Weapon immutability', () => {
     it('weapons are frozen objects', () => {
       expect(Object.isFrozen(BASIC_SHOT)).toBe(true);

@@ -2620,6 +2620,25 @@ function updateProjectile() {
             continue; // Skip normal physics for digging projectiles
         }
 
+        // Handle deployed projectiles (Land Mine, Sticky Bomb)
+        if (projectile.isDeployed) {
+            // Check for trigger conditions
+            const deployResult = projectile.updateDeployed(tanks);
+
+            if (deployResult && deployResult.explode) {
+                console.log(`${projectile.weaponId} triggered: ${deployResult.reason} at (${projectile.x.toFixed(1)}, ${projectile.y.toFixed(1)})`);
+                const hitTank = deployResult.hitTank || null;
+                const chainChildren = handleProjectileExplosion(projectile, projectile.getPosition(), hitTank);
+                newChildren.push(...chainChildren);
+                projectile.deactivate();
+                projectile.clearTrail();
+                toRemove.push(projectile);
+                continue;
+            }
+
+            continue; // Skip normal physics for deployed projectiles
+        }
+
         // Handle rolling projectiles differently
         if (projectile.isRolling) {
             // Check for tank collision while rolling
@@ -2731,6 +2750,40 @@ function updateProjectile() {
             const collision = currentTerrain.checkTerrainCollision(pos.x, pos.y);
 
             if (collision && collision.hit) {
+                // Check if this is a bouncing weapon that should bounce
+                if (projectile.shouldBounce()) {
+                    // Calculate terrain slope at collision point for realistic bounce
+                    const lookAhead = 5;
+                    const prevX = Math.max(0, Math.floor(collision.x) - lookAhead);
+                    const nextX = Math.min(currentTerrain.getWidth() - 1, Math.floor(collision.x) + lookAhead);
+                    const prevHeight = currentTerrain.getHeight(prevX);
+                    const nextHeight = currentTerrain.getHeight(nextX);
+                    const slopeAngle = Math.atan2(nextHeight - prevHeight, nextX - prevX);
+
+                    console.log(`Bouncer hit terrain at (${collision.x}, ${collision.y.toFixed(1)}) - bouncing! Slope angle: ${(slopeAngle * 180 / Math.PI).toFixed(1)}°`);
+                    projectile.bounce(collision.y, slopeAngle);
+
+                    // Precision achievement: projectile touched terrain (for Trick Shot)
+                    if (projectile.owner === 'player') {
+                        PrecisionAchievements.onProjectileTouchedTerrain();
+                    }
+
+                    continue; // Continue to next frame, don't explode yet
+                }
+
+                // Check if this is a deployable weapon (Land Mine, Sticky Bomb)
+                if (projectile.shouldDeploy()) {
+                    console.log(`${projectile.weaponId} hit terrain at (${collision.x}, ${collision.y.toFixed(1)}) - deploying!`);
+                    projectile.deploy(pos.x, collision.y);
+
+                    // Precision achievement: projectile touched terrain (for Trick Shot)
+                    if (projectile.owner === 'player') {
+                        PrecisionAchievements.onProjectileTouchedTerrain();
+                    }
+
+                    continue; // Continue to next frame, don't explode yet
+                }
+
                 // Check if this is a rolling weapon that should enter rolling mode
                 if (projectile.shouldRoll()) {
                     console.log(`Roller hit terrain at (${collision.x}, ${collision.y.toFixed(1)}) - starting roll!`);
@@ -3661,6 +3714,74 @@ function renderProjectile(ctx, projectile) {
         ctx.arc(0, 0, radius * 0.6, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(255, 200, 100, ${0.3 + pulseAlpha * 0.3})`;
         ctx.fill();
+
+        ctx.restore();
+    } else if (projectile.isDeployed) {
+        // Deployed weapons (Land Mine, Sticky Bomb) show distinct visuals
+        ctx.save();
+        ctx.translate(x, y);
+
+        if (projectile.isLandMine) {
+            // Land Mine: Red pulsing circle with warning pattern
+            const deployTime = projectile.getDeployDuration();
+            const pulseSpeed = 1500; // ms per pulse cycle
+            const pulseAlpha = 0.6 + 0.4 * Math.sin((deployTime / pulseSpeed) * Math.PI * 2);
+
+            // Outer danger ring
+            ctx.beginPath();
+            ctx.arc(0, 0, radius * 2.5, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(255, 0, 0, ${pulseAlpha * 0.5})`;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Mine body
+            ctx.beginPath();
+            ctx.arc(0, 0, radius * 1.5, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(80, 0, 0, 0.9)';
+            ctx.fill();
+            ctx.strokeStyle = `rgba(255, 0, 0, ${pulseAlpha})`;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Center indicator light
+            ctx.beginPath();
+            ctx.arc(0, 0, radius * 0.4, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 0, 0, ${pulseAlpha})`;
+            ctx.fill();
+        } else if (projectile.isStickyBomb) {
+            // Sticky Bomb: Green with countdown timer display
+            const timeRemaining = projectile.getStickyBombTimeRemaining();
+            const totalTime = 2000; // 2 second timer
+            const progress = 1 - (timeRemaining / totalTime);
+            const urgency = progress > 0.7 ? 0.5 + 0.5 * Math.sin(progress * Math.PI * 10) : 1;
+
+            // Bomb body - gets more red as timer runs out
+            const greenComponent = Math.floor(255 * (1 - progress));
+            const redComponent = Math.floor(255 * progress);
+
+            ctx.beginPath();
+            ctx.arc(0, 0, radius * 1.8, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(${redComponent}, ${greenComponent}, 50, 0.9)`;
+            ctx.fill();
+            ctx.strokeStyle = `rgba(0, 255, 136, ${urgency})`;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Timer countdown arc
+            ctx.beginPath();
+            ctx.arc(0, 0, radius * 2.2, -Math.PI / 2, -Math.PI / 2 + (1 - progress) * Math.PI * 2, false);
+            ctx.strokeStyle = 'rgba(0, 255, 136, 0.8)';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Timer text (seconds remaining)
+            const secondsLeft = Math.ceil(timeRemaining / 1000);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 12px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(secondsLeft.toString(), 0, 0);
+        }
 
         ctx.restore();
     } else {
