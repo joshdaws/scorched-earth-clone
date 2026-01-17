@@ -13,7 +13,7 @@
  */
 
 import { CANVAS, GAME_KEYS, KEYS, PHYSICS } from './constants.js';
-import { getGameScale } from './screenSize.js';
+import { getGameScale, getDisplayOffset } from './screenSize.js';
 
 // =============================================================================
 // GAME INPUT EVENTS
@@ -174,8 +174,8 @@ function handleKeyUp(e) {
 /**
  * Convert screen coordinates (relative to canvas) to game coordinate space.
  * The game operates in design coordinates (1200x800), while the display may
- * be scaled to fit the viewport. This function converts from display pixels
- * to design pixels.
+ * be scaled to fit the viewport with letterboxing. This function converts from
+ * display pixels to design pixels, accounting for both scale and letterbox offset.
  *
  * @param {number} screenX - X coordinate relative to canvas CSS rect
  * @param {number} screenY - Y coordinate relative to canvas CSS rect
@@ -183,11 +183,14 @@ function handleKeyUp(e) {
  * @returns {{x: number, y: number}} Coordinates in design space (1200x800)
  */
 function screenToDesign(screenX, screenY, rect) {
-    // Divide by game scale to convert from display pixels to design pixels
     const gameScale = getGameScale();
+    const offset = getDisplayOffset();
+
+    // First subtract the letterbox offset (in CSS pixels) to get coordinates
+    // relative to the game content area, then divide by scale
     return {
-        x: screenX / gameScale,
-        y: screenY / gameScale
+        x: (screenX - offset.x) / gameScale,
+        y: (screenY - offset.y) / gameScale
     };
 }
 
