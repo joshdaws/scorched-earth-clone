@@ -86,6 +86,7 @@ function getHandlers(state) {
  */
 const validTransitions = {
     [GAME_STATES.MENU]: [
+        GAME_STATES.MODE_SELECT,        // Go to mode selection (Start Game)
         GAME_STATES.DIFFICULTY_SELECT,  // Go to difficulty selection first
         GAME_STATES.LEVEL_SELECT,       // Level-based progression mode
         GAME_STATES.HIGH_SCORES,        // View high scores
@@ -96,14 +97,21 @@ const validTransitions = {
         GAME_STATES.AIMING,  // Can also start directly into aiming
         GAME_STATES.ROUND_TRANSITION  // For debug/testing
     ],
+    [GAME_STATES.MODE_SELECT]: [
+        GAME_STATES.LEVEL_SELECT,       // Level-based mode selected
+        GAME_STATES.DIFFICULTY_SELECT,  // Endless mode selected
+        GAME_STATES.MENU                // Back to menu
+    ],
     [GAME_STATES.DIFFICULTY_SELECT]: [
         GAME_STATES.PLAYING,  // Start game after selecting difficulty
-        GAME_STATES.MENU      // Can go back to menu
+        GAME_STATES.MENU,     // Can go back to menu
+        GAME_STATES.MODE_SELECT  // Can go back to mode selection
     ],
     [GAME_STATES.LEVEL_SELECT]: [
         GAME_STATES.PLAYING,  // Start selected level
         GAME_STATES.AIMING,   // Start directly into aiming
-        GAME_STATES.MENU      // Can go back to menu
+        GAME_STATES.MENU,     // Can go back to menu
+        GAME_STATES.MODE_SELECT  // Can go back to mode selection
     ],
     [GAME_STATES.LEVEL_COMPLETE]: [
         GAME_STATES.LEVEL_SELECT, // Return to level select (Menu button)
