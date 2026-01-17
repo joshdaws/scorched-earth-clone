@@ -41,6 +41,7 @@ import * as ExtractionReveal from './extraction-reveal.js';
 import * as AchievementScreen from './achievement-screen.js';
 import * as CollectionScreen from './collection-screen.js';
 import * as SupplyDropScreen from './supply-drop-screen.js';
+import * as LevelSelectScreen from './level-select-screen.js';
 import * as CombatAchievements from './combat-achievements.js';
 import * as PrecisionAchievements from './precision-achievements.js';
 import * as WeaponAchievements from './weapon-achievements.js';
@@ -5167,6 +5168,7 @@ async function init() {
     AchievementScreen.setup();
     CollectionScreen.setup();
     SupplyDropScreen.setup();
+    LevelSelectScreen.setup();
     setupPlayingState();
     setupPausedState();
     setupVictoryState();

@@ -104,6 +104,7 @@ export const GAME = {
 export const GAME_STATES = {
     MENU: 'menu',
     DIFFICULTY_SELECT: 'difficulty_select',
+    LEVEL_SELECT: 'level_select',
     HIGH_SCORES: 'high_scores',
     ACHIEVEMENTS: 'achievements',
     COLLECTION: 'collection',

@@ -87,6 +87,7 @@ function getHandlers(state) {
 const validTransitions = {
     [GAME_STATES.MENU]: [
         GAME_STATES.DIFFICULTY_SELECT,  // Go to difficulty selection first
+        GAME_STATES.LEVEL_SELECT,       // Level-based progression mode
         GAME_STATES.HIGH_SCORES,        // View high scores
         GAME_STATES.ACHIEVEMENTS,       // View achievements
         GAME_STATES.COLLECTION,         // View tank collection
@@ -97,6 +98,11 @@ const validTransitions = {
     ],
     [GAME_STATES.DIFFICULTY_SELECT]: [
         GAME_STATES.PLAYING,  // Start game after selecting difficulty
+        GAME_STATES.MENU      // Can go back to menu
+    ],
+    [GAME_STATES.LEVEL_SELECT]: [
+        GAME_STATES.PLAYING,  // Start selected level
+        GAME_STATES.AIMING,   // Start directly into aiming
         GAME_STATES.MENU      // Can go back to menu
     ],
     [GAME_STATES.HIGH_SCORES]: [
