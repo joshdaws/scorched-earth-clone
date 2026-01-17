@@ -380,11 +380,21 @@ export function update(deltaTime) {
 export function render(ctx) {
     if (!isVisible) return;
 
-    ctx.save();
+    // Draw dark overlay in viewport coordinates to cover entire screen (including letterbox)
+    const viewport = Renderer.getViewportDimensions();
+    const dpr = Renderer.getDevicePixelRatio();
 
-    // Semi-transparent overlay
+    ctx.save();
+    // Reset to viewport coordinates (no game content transform)
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    // Semi-transparent overlay - covers entire viewport
     ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-    ctx.fillRect(0, 0, Renderer.getWidth(), Renderer.getHeight());
+    ctx.fillRect(0, 0, viewport.width, viewport.height);
+
+    ctx.restore();
+
+    ctx.save();
 
     // Panel position
     const panelX = (Renderer.getWidth() - NAME_PANEL.WIDTH) / 2;

@@ -162,11 +162,21 @@ export function render(ctx) {
     const panelY = centerY - PAUSE_PANEL.HEIGHT / 2;
     panelPosition = { x: panelX, y: panelY };
 
-    ctx.save();
+    // Draw dark overlay in viewport coordinates to cover entire screen (including letterbox)
+    const viewport = Renderer.getViewportDimensions();
+    const dpr = Renderer.getDevicePixelRatio();
 
-    // Dark overlay to dim the game
+    ctx.save();
+    // Reset to viewport coordinates (no game content transform)
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    // Dark overlay to dim the game - covers entire viewport
     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(0, 0, width, height);
+    ctx.fillRect(0, 0, viewport.width, viewport.height);
+
+    ctx.restore();
+
+    ctx.save();
 
     // If showing options, render volume controls instead
     if (showingOptions) {

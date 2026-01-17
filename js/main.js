@@ -1370,13 +1370,23 @@ function renderOptionsOverlay(ctx) {
     const width = Renderer.getWidth();
     const height = Renderer.getHeight();
 
+    // Draw dark overlay in viewport coordinates to cover entire screen (including letterbox)
+    const viewport = Renderer.getViewportDimensions();
+    const dpr = Renderer.getDevicePixelRatio();
+
+    ctx.save();
+    // Reset to viewport coordinates (no game content transform)
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    // Semi-transparent dark overlay - covers entire viewport
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, viewport.width, viewport.height);
+
+    ctx.restore();
+
     ctx.save();
 
-    // Semi-transparent dark overlay
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(0, 0, width, height);
-
-    // Render volume controls panel
+    // Render volume controls panel (in design coordinates)
     VolumeControls.render(ctx);
 
     // Close hint at bottom
