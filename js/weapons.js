@@ -111,6 +111,8 @@ function createWeapon(config) {
         buriesTank: config.buriesTank || false,
         shieldBuster: config.shieldBuster || false,
         showsTrajectory: config.showsTrajectory || false,
+        // Damage modifiers
+        directHitMultiplier: config.directHitMultiplier || 0, // 0 means use default (1.5x), otherwise use this value
         // Visual effect flags
         screenShake: config.screenShake || false,
         screenFlash: config.screenFlash || false,
@@ -237,12 +239,13 @@ const PRECISION_STRIKE = createWeapon({
     name: 'Precision Strike',
     cost: 2500,
     ammo: 2,
-    damage: 80,
+    damage: 45,  // Base damage - gets 2x multiplier for direct hits
     blastRadius: 20,
     type: WEAPON_TYPES.STANDARD,
     category: 'standard',
-    description: 'Maximum damage in a tiny radius. Requires surgical accuracy.',
+    description: 'Bonus damage for direct hits. 2x multiplier for center hits.',
     unlockRequirement: 'wins-3',
+    directHitMultiplier: 2.0,  // 2x damage for direct hits (vs normal 1.5x)
     projectileColor: '#ff0000',
     trailColor: '#cc0000',
     screenShake: true

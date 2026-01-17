@@ -189,6 +189,17 @@ let splitEffect = null;
  */
 let explosionEffect = null;
 
+/**
+ * Persistent trails for Tracer weapons.
+ * Shows the trajectory path for a few seconds after explosion.
+ * Each entry: {trail: Array<{x,y}>, startTime: number, duration: number, color: string}
+ * @type {Array<{trail: Array<{x: number, y: number}>, startTime: number, duration: number, color: string}>}
+ */
+let persistentTrails = [];
+
+/** Duration in ms that Tracer trails remain visible after explosion */
+const TRACER_TRAIL_DURATION = 3000;
+
 // =============================================================================
 // PAUSE BUTTON STATE
 // =============================================================================
@@ -2447,6 +2458,25 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
         hasMushroomCloud: weapon?.mushroomCloud || false
     };
 
+    // Save trail for Tracer weapons (showsTrajectory flag)
+    // Trail persists for TRACER_TRAIL_DURATION after explosion so player can learn trajectory
+    if (weapon?.showsTrajectory && projectile) {
+        const trail = projectile.getTrail();
+        if (trail && trail.length > 0) {
+            // Deep copy the trail positions (they'll be cleared from the projectile soon)
+            const trailCopy = trail.map(p => ({ x: p.x, y: p.y }));
+            // Add the final impact position to the trail
+            trailCopy.push({ x: pos.x, y: pos.y });
+            persistentTrails.push({
+                trail: trailCopy,
+                startTime: performance.now(),
+                duration: TRACER_TRAIL_DURATION,
+                color: weapon.trailColor || '#ffffff'
+            });
+            console.log(`Tracer trail saved with ${trailCopy.length} points`);
+        }
+    }
+
     // Spawn explosion particles
     spawnExplosionParticles(pos.x, pos.y, blastRadius, isNuclear);
 
@@ -3426,6 +3456,72 @@ function renderProjectileTrail(ctx, projectile) {
 }
 
 /**
+ * Update persistent trails (Tracer weapon feature).
+ * Removes trails that have exceeded their duration.
+ */
+function updatePersistentTrails() {
+    const now = performance.now();
+    persistentTrails = persistentTrails.filter(trail => {
+        const elapsed = now - trail.startTime;
+        return elapsed < trail.duration;
+    });
+}
+
+/**
+ * Render persistent trails for Tracer weapons.
+ * Trails fade out over their duration.
+ *
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ */
+function renderPersistentTrails(ctx) {
+    if (persistentTrails.length === 0) return;
+
+    const now = performance.now();
+    ctx.save();
+
+    for (const trailData of persistentTrails) {
+        const elapsed = now - trailData.startTime;
+        const fadeProgress = elapsed / trailData.duration; // 0 to 1
+        const overallAlpha = 1 - fadeProgress; // 1 to 0
+
+        if (overallAlpha <= 0) continue;
+
+        const rgb = hexToRgb(trailData.color);
+        const trail = trailData.trail;
+        const trailRadius = PROJECTILE_VISUAL.DIAMETER / 4;
+
+        // Render each trail point with fading effect
+        for (let i = 0; i < trail.length; i++) {
+            const pos = trail[i];
+
+            // Base alpha: oldest = 0.2, newest = 0.9
+            const positionAlpha = 0.2 + (i / trail.length) * 0.7;
+            // Multiply by overall fade
+            const alpha = positionAlpha * overallAlpha;
+
+            // Add glow effect
+            ctx.shadowColor = trailData.color;
+            ctx.shadowBlur = 6;
+
+            // Draw trail circle
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, trailRadius, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+            ctx.fill();
+        }
+    }
+
+    ctx.restore();
+}
+
+/**
+ * Clear all persistent trails (called on round/game end).
+ */
+function clearPersistentTrails() {
+    persistentTrails = [];
+}
+
+/**
  * Render the projectile as a glowing circle or rotating roller.
  * Per spec: 8px diameter circle with glow effect.
  * Uses weapon-specific projectile colors for distinct visual appearance.
@@ -3709,6 +3805,9 @@ function renderExplosionEffect(ctx) {
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  */
 function renderActiveProjectile(ctx) {
+    // Render persistent trails first (behind everything else - for Tracer weapon)
+    renderPersistentTrails(ctx);
+
     // Render split effect first (behind projectiles)
     renderSplitEffect(ctx);
 
@@ -4358,6 +4457,7 @@ function setupPlayingState() {
             // Reset visual effect states
             clearScreenShake();
             clearScreenFlash();
+            clearPersistentTrails();
             explosionEffect = null;
             // Clear explosion particles
             clearParticles();
@@ -5532,6 +5632,7 @@ function quitToMenu() {
     clearScreenFlash();
     clearParticles();
     clearBackground();
+    clearPersistentTrails();
     explosionEffect = null;
 
     // Reset round counter for new game
@@ -6423,6 +6524,9 @@ function update(deltaTime) {
 
     // Update particle system
     updateParticles(deltaTime);
+
+    // Update persistent trails (Tracer weapon feature - fades over time)
+    updatePersistentTrails();
 
     // Update falling tanks
     updateFallingTanks();

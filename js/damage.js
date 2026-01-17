@@ -123,7 +123,11 @@ export function calculateDamage(explosion, tank, weapon = null) {
     // Check for direct hit bonus (distance < 5px)
     const isDirectHit = distance < DAMAGE.DIRECT_HIT_DISTANCE;
     if (isDirectHit) {
-        damage *= DAMAGE.DIRECT_HIT_MULTIPLIER;
+        // Use weapon-specific direct hit multiplier if defined, otherwise use default 1.5x
+        const multiplier = (weapon?.directHitMultiplier > 0)
+            ? weapon.directHitMultiplier
+            : DAMAGE.DIRECT_HIT_MULTIPLIER;
+        damage *= multiplier;
     }
 
     // Round to integer for cleaner damage values
@@ -132,12 +136,15 @@ export function calculateDamage(explosion, tank, weapon = null) {
     // Debug logging
     if (DEBUG.ENABLED) {
         const hitType = isDirectHit ? 'DIRECT HIT' : 'hit';
+        const multiplierUsed = isDirectHit
+            ? ((weapon?.directHitMultiplier > 0) ? weapon.directHitMultiplier : DAMAGE.DIRECT_HIT_MULTIPLIER)
+            : 1;
         console.log(
             `Damage: ${tank.team} tank ${hitType}! ` +
             `distance=${distance.toFixed(1)}px, ` +
             `falloff=${(falloffMultiplier * 100).toFixed(0)}%, ` +
             `damage=${damage}` +
-            (isDirectHit ? ' (1.5x multiplier applied)' : '')
+            (isDirectHit ? ` (${multiplierUsed}x multiplier applied)` : '')
         );
     }
 
