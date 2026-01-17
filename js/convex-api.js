@@ -2,25 +2,19 @@
  * Convex API Module
  *
  * Provides a wrapper for Convex backend communication.
- * Uses the ConvexHttpClient for non-reactive queries and mutations.
+ * Uses dynamic imports to gracefully handle local development without a bundler.
+ * When Convex is unavailable, all operations fall back to local storage.
  */
 
-import { ConvexHttpClient } from 'convex/browser';
-import { api } from '../convex/_generated/api.js';
-
 // Get Convex URL from runtime config (loaded via config.js before this module)
-// Falls back to empty string if not configured - will fail at runtime with clear error
 const CONVEX_URL = window.SCORCHED_EARTH_CONFIG?.CONVEX_URL || '';
-
-if (!CONVEX_URL) {
-    console.error('[ConvexAPI] No CONVEX_URL configured. Copy config.example.js to config.js and add your deployment URL.');
-}
 
 // LocalStorage keys
 const STORAGE_KEYS = {
     DEVICE_ID: 'scorched_earth_device_id',
     PLAYER_NAME: 'scorched_earth_player_name',
-    OFFLINE_QUEUE: 'scorched_earth_offline_queue'
+    OFFLINE_QUEUE: 'scorched_earth_offline_queue',
+    LOCAL_SCORES: 'scorched_earth_local_scores'
 };
 
 // Connection state
@@ -29,6 +23,41 @@ let isOnline = navigator.onLine;
 let connectionError = null;
 let deviceId = null;
 let playerName = null;
+let convexAvailable = false;
+let ConvexHttpClient = null;
+let api = null;
+
+// =============================================================================
+// CONVEX MODULE LOADING (Dynamic Import)
+// =============================================================================
+
+/**
+ * Attempt to load Convex modules dynamically.
+ * This allows the game to run without a bundler by gracefully falling back
+ * to local-only operation when Convex modules can't be resolved.
+ */
+async function loadConvexModules() {
+    if (convexAvailable) return true;
+
+    try {
+        // Dynamic import - will fail gracefully if module can't be resolved
+        const browserModule = await import('convex/browser');
+        ConvexHttpClient = browserModule.ConvexHttpClient;
+
+        const apiModule = await import('../convex/_generated/api.js');
+        api = apiModule.api;
+
+        convexAvailable = true;
+        console.log('[ConvexAPI] Convex modules loaded successfully');
+        return true;
+    } catch (e) {
+        // Expected when running via simple HTTP server without Vite
+        console.warn('[ConvexAPI] Convex modules not available - running in local-only mode');
+        console.warn('[ConvexAPI] To enable online features, run: npm run dev');
+        convexAvailable = false;
+        return false;
+    }
+}
 
 // =============================================================================
 // DEVICE ID MANAGEMENT
@@ -87,10 +116,10 @@ function setStoredPlayerName(name) {
 // =============================================================================
 
 /**
- * Check if we're currently online
+ * Check if we're currently online and Convex is available
  */
 function checkOnline() {
-    return isOnline && !connectionError;
+    return isOnline && !connectionError && convexAvailable;
 }
 
 /**
@@ -156,6 +185,8 @@ function calculateBackoffDelay(retryCount) {
  * Uses exponential backoff for failed operations
  */
 async function processOfflineQueue() {
+    if (!convexAvailable) return;
+
     const queue = getOfflineQueue();
     if (queue.length === 0) return;
 
@@ -248,6 +279,7 @@ async function processOfflineQueue() {
  */
 function initClient() {
     if (client) return client;
+    if (!convexAvailable || !ConvexHttpClient) return null;
 
     try {
         client = new ConvexHttpClient(CONVEX_URL);
@@ -338,6 +370,41 @@ async function executeMutation(functionPath, args = {}) {
 }
 
 // =============================================================================
+// LOCAL STORAGE HELPERS (for local-only mode)
+// =============================================================================
+
+/**
+ * Get locally stored scores
+ */
+function getLocalScores() {
+    try {
+        const scores = localStorage.getItem(STORAGE_KEYS.LOCAL_SCORES);
+        return scores ? JSON.parse(scores) : [];
+    } catch (e) {
+        console.error('[ConvexAPI] Failed to parse local scores:', e);
+        return [];
+    }
+}
+
+/**
+ * Save a score locally
+ */
+function saveLocalScore(runStats) {
+    const scores = getLocalScores();
+    scores.push({
+        ...runStats,
+        deviceId: getDeviceId(),
+        displayName: getStoredPlayerName() || `Player_${getDeviceId().substring(0, 8)}`,
+        timestamp: Date.now()
+    });
+    // Keep only top 100 scores sorted by totalScore
+    scores.sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
+    const trimmed = scores.slice(0, 100);
+    localStorage.setItem(STORAGE_KEYS.LOCAL_SCORES, JSON.stringify(trimmed));
+    return trimmed;
+}
+
+// =============================================================================
 // PLAYER API
 // =============================================================================
 
@@ -350,7 +417,7 @@ export async function ensurePlayer(displayName = null) {
     const name = displayName || getStoredPlayerName() || `Player_${id.substring(0, 8)}`;
 
     if (!checkOnline()) {
-        console.log('[ConvexAPI] Offline - returning local player info');
+        console.log('[ConvexAPI] Offline/local-only - returning local player info');
         return {
             deviceId: id,
             displayName: name,
@@ -404,7 +471,7 @@ export async function updatePlayerName(newName) {
     setStoredPlayerName(newName);
 
     if (!checkOnline()) {
-        console.log('[ConvexAPI] Offline - name stored locally');
+        console.log('[ConvexAPI] Offline/local-only - name stored locally');
         return { success: true, _offline: true };
     }
 
@@ -430,16 +497,21 @@ export async function updatePlayerName(newName) {
 export async function submitScore(runStats) {
     const id = getDeviceId();
 
+    // Always save locally first (for local-only mode and as backup)
+    saveLocalScore(runStats);
+
     if (!checkOnline()) {
-        // Queue for later
-        queueOfflineAction({
-            type: 'submit_score',
-            runStats
-        });
+        // Queue for later if we're just temporarily offline
+        if (convexAvailable) {
+            queueOfflineAction({
+                type: 'submit_score',
+                runStats
+            });
+        }
         return {
             success: true,
             _offline: true,
-            _queued: true
+            _queued: convexAvailable
         };
     }
 
@@ -474,13 +546,19 @@ export async function submitScore(runStats) {
  * Get global leaderboard
  */
 export async function getLeaderboard(limit = 100) {
-    if (!checkOnline()) return null;
+    if (!checkOnline()) {
+        // Return local scores in local-only mode
+        const localScores = getLocalScores();
+        console.log('[ConvexAPI] Returning local leaderboard with', localScores.length, 'scores');
+        return localScores.slice(0, limit);
+    }
 
     try {
         return await executeQuery('highScores:getLeaderboard', { limit });
     } catch (e) {
         console.error('[ConvexAPI] Failed to get leaderboard:', e);
-        return null;
+        // Fall back to local scores
+        return getLocalScores().slice(0, limit);
     }
 }
 
@@ -488,7 +566,12 @@ export async function getLeaderboard(limit = 100) {
  * Get player's scores
  */
 export async function getPlayerScores(limit = 10) {
-    if (!checkOnline()) return null;
+    if (!checkOnline()) {
+        // Return local scores for this device
+        const localScores = getLocalScores();
+        const myScores = localScores.filter(s => s.deviceId === getDeviceId());
+        return myScores.slice(0, limit);
+    }
 
     const id = getDeviceId();
     try {
@@ -498,7 +581,9 @@ export async function getPlayerScores(limit = 10) {
         });
     } catch (e) {
         console.error('[ConvexAPI] Failed to get player scores:', e);
-        return null;
+        // Fall back to local scores
+        const localScores = getLocalScores();
+        return localScores.filter(s => s.deviceId === getDeviceId()).slice(0, limit);
     }
 }
 
@@ -506,7 +591,15 @@ export async function getPlayerScores(limit = 10) {
  * Get player's rank on leaderboard
  */
 export async function getPlayerRank() {
-    if (!checkOnline()) return null;
+    if (!checkOnline()) {
+        // Calculate rank from local scores
+        const localScores = getLocalScores();
+        const myScores = localScores.filter(s => s.deviceId === getDeviceId());
+        if (myScores.length === 0) return null;
+        const bestScore = Math.max(...myScores.map(s => s.totalScore || 0));
+        const rank = localScores.filter(s => (s.totalScore || 0) > bestScore).length + 1;
+        return { rank, totalPlayers: new Set(localScores.map(s => s.deviceId)).size };
+    }
 
     const id = getDeviceId();
     try {
@@ -547,10 +640,11 @@ function detectPlatform() {
  */
 export function getConnectionStatus() {
     return {
-        isOnline: isOnline,
+        isOnline: isOnline && convexAvailable,
         hasError: !!connectionError,
         errorMessage: connectionError?.message || null,
-        queuedActions: getOfflineQueue().length
+        queuedActions: getOfflineQueue().length,
+        convexAvailable: convexAvailable
     };
 }
 
@@ -561,7 +655,12 @@ export async function retryConnection() {
     connectionError = null;
     isOnline = navigator.onLine;
 
-    if (isOnline) {
+    // Try to load Convex modules if not already loaded
+    if (!convexAvailable) {
+        await loadConvexModules();
+    }
+
+    if (isOnline && convexAvailable) {
         await processOfflineQueue();
     }
 
@@ -585,20 +684,26 @@ export async function init() {
     // Ensure device ID exists
     getDeviceId();
 
-    // Initialize client
-    initClient();
+    // Try to load Convex modules (will fail gracefully if not available)
+    await loadConvexModules();
 
-    // Try to process any queued offline actions
-    if (isOnline) {
-        await processOfflineQueue();
+    // Initialize client if Convex is available
+    if (convexAvailable) {
+        initClient();
+
+        // Try to process any queued offline actions
+        if (isOnline) {
+            await processOfflineQueue();
+        }
     }
 
-    console.log('[ConvexAPI] Initialized. Device ID:', deviceId, 'Online:', isOnline);
+    console.log('[ConvexAPI] Initialized. Device ID:', deviceId, 'Online:', isOnline, 'Convex:', convexAvailable);
 
     return {
         deviceId,
-        isOnline,
-        hasStoredName: !!getStoredPlayerName()
+        isOnline: isOnline && convexAvailable,
+        hasStoredName: !!getStoredPlayerName(),
+        convexAvailable
     };
 }
 
