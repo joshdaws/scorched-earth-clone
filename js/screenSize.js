@@ -17,25 +17,40 @@ import { getSafeArea, initSafeArea, refreshSafeArea } from './safeArea.js';
 
 /**
  * @typedef {Object} ScreenDimensions
- * @property {number} width - Usable game width in design-space pixels
- * @property {number} height - Usable game height in design-space pixels
+ * @property {number} width - Usable game width in design-space pixels (always 1200 at 3:2 aspect)
+ * @property {number} height - Usable game height in design-space pixels (always 800 at 3:2 aspect)
  * @property {number} viewportWidth - Raw viewport width (CSS pixels)
  * @property {number} viewportHeight - Raw viewport height (CSS pixels)
  * @property {number} devicePixelRatio - Current device pixel ratio
  * @property {number} canvasResolutionWidth - Canvas buffer width (physical pixels)
  * @property {number} canvasResolutionHeight - Canvas buffer height (physical pixels)
- * @property {Object} safeArea - Safe area insets (in design-space pixels)
+ * @property {number} gameScale - Scale factor from design coords to screen coords
+ * @property {number} displayWidth - Actual CSS width used for canvas display
+ * @property {number} displayHeight - Actual CSS height used for canvas display
+ * @property {number} offsetX - X offset for letterboxing (CSS pixels)
+ * @property {number} offsetY - Y offset for letterboxing (CSS pixels)
+ * @property {Object} safeArea - Safe area insets (in CSS pixels)
  */
+
+// Design dimensions - the fixed coordinate space for all game logic
+const DESIGN_WIDTH = 1200;
+const DESIGN_HEIGHT = 800;
+const DESIGN_ASPECT_RATIO = DESIGN_WIDTH / DESIGN_HEIGHT;
 
 // Cached screen dimensions
 let screenDimensions = {
-    width: 1200,    // Default fallback
-    height: 800,    // Default fallback
+    width: DESIGN_WIDTH,    // Always design dimensions for game logic
+    height: DESIGN_HEIGHT,
     viewportWidth: 1200,
     viewportHeight: 800,
     devicePixelRatio: 1,
     canvasResolutionWidth: 1200,
     canvasResolutionHeight: 800,
+    gameScale: 1,
+    displayWidth: 1200,
+    displayHeight: 800,
+    offsetX: 0,
+    offsetY: 0,
     safeArea: { top: 0, bottom: 0, left: 0, right: 0 }
 };
 
@@ -52,6 +67,11 @@ const RESIZE_DEBOUNCE_MS = 50;
 /**
  * Calculate screen dimensions from viewport and safe area.
  * This is the core calculation that determines usable game area.
+ *
+ * The game always operates in DESIGN_WIDTH x DESIGN_HEIGHT (1200x800) coordinates.
+ * We calculate a scale factor to fit this design space into the available screen,
+ * maintaining aspect ratio and letterboxing if needed.
+ *
  * @returns {ScreenDimensions}
  */
 function calculateDimensions() {
@@ -59,10 +79,7 @@ function calculateDimensions() {
     const viewportHeight = window.innerHeight;
     const dpr = window.devicePixelRatio || 1;
 
-    // Get safe area insets (already in design-space-equivalent values)
-    // Note: safeArea.js converts from CSS pixels using the current canvas scale,
-    // but since we're now using a 1:1 mapping (no fixed aspect ratio), we need
-    // raw CSS pixel values instead.
+    // Get safe area insets in CSS pixels
     const safeArea = getSafeAreaRaw();
 
     // Calculate usable viewport after safe areas (in CSS pixels)
@@ -70,23 +87,41 @@ function calculateDimensions() {
     const usableViewportWidth = viewportWidth - safeArea.left - safeArea.right;
     const usableViewportHeight = viewportHeight - safeArea.top - safeArea.bottom;
 
-    // Canvas resolution (physical pixels) for crisp rendering
-    const canvasResolutionWidth = Math.floor(usableViewportWidth * dpr);
-    const canvasResolutionHeight = Math.floor(usableViewportHeight * dpr);
+    // Calculate scale factor to fit design dimensions into usable viewport
+    // Use the smaller of width/height ratios to ensure everything fits
+    const scaleX = usableViewportWidth / DESIGN_WIDTH;
+    const scaleY = usableViewportHeight / DESIGN_HEIGHT;
+    const gameScale = Math.min(scaleX, scaleY);
 
-    // Game dimensions match usable viewport 1:1 (CSS pixels = design pixels)
-    // This gives us the largest possible game area without letterboxing
-    const width = usableViewportWidth;
-    const height = usableViewportHeight;
+    // Calculate actual display size (may be smaller than viewport due to letterboxing)
+    const displayWidth = DESIGN_WIDTH * gameScale;
+    const displayHeight = DESIGN_HEIGHT * gameScale;
+
+    // Calculate letterbox offsets to center the game area
+    const offsetX = (usableViewportWidth - displayWidth) / 2;
+    const offsetY = (usableViewportHeight - displayHeight) / 2;
+
+    // Canvas resolution (physical pixels) for crisp rendering
+    const canvasResolutionWidth = Math.floor(displayWidth * dpr);
+    const canvasResolutionHeight = Math.floor(displayHeight * dpr);
 
     return {
-        width,
-        height,
+        // Game logic always uses design dimensions
+        width: DESIGN_WIDTH,
+        height: DESIGN_HEIGHT,
+        // Viewport info
         viewportWidth,
         viewportHeight,
         devicePixelRatio: dpr,
+        // Canvas buffer size
         canvasResolutionWidth,
         canvasResolutionHeight,
+        // Scaling info
+        gameScale,
+        displayWidth,
+        displayHeight,
+        offsetX,
+        offsetY,
         safeArea
     };
 }
@@ -120,22 +155,23 @@ function getSafeAreaRaw() {
 function updateDimensions() {
     const newDimensions = calculateDimensions();
 
-    // Check if dimensions actually changed
+    // Check if dimensions actually changed (gameScale is the key metric now)
     const changed =
-        newDimensions.width !== screenDimensions.width ||
-        newDimensions.height !== screenDimensions.height ||
-        newDimensions.devicePixelRatio !== screenDimensions.devicePixelRatio;
+        newDimensions.gameScale !== screenDimensions.gameScale ||
+        newDimensions.devicePixelRatio !== screenDimensions.devicePixelRatio ||
+        newDimensions.viewportWidth !== screenDimensions.viewportWidth ||
+        newDimensions.viewportHeight !== screenDimensions.viewportHeight;
 
     // Update cached values
     screenDimensions = newDimensions;
 
     // Log dimension changes for debugging
     console.log(
-        `[ScreenSize] Dimensions updated: ${Math.round(screenDimensions.width)}x${Math.round(screenDimensions.height)} ` +
-        `(viewport: ${screenDimensions.viewportWidth}x${screenDimensions.viewportHeight}, ` +
-        `dpr: ${screenDimensions.devicePixelRatio}, ` +
-        `safeArea: L${screenDimensions.safeArea.left.toFixed(0)} R${screenDimensions.safeArea.right.toFixed(0)} ` +
-        `T${screenDimensions.safeArea.top.toFixed(0)} B${screenDimensions.safeArea.bottom.toFixed(0)})`
+        `[ScreenSize] Design: ${screenDimensions.width}x${screenDimensions.height}, ` +
+        `display: ${Math.round(screenDimensions.displayWidth)}x${Math.round(screenDimensions.displayHeight)}, ` +
+        `scale: ${screenDimensions.gameScale.toFixed(3)}, ` +
+        `offset: (${Math.round(screenDimensions.offsetX)}, ${Math.round(screenDimensions.offsetY)}), ` +
+        `dpr: ${screenDimensions.devicePixelRatio}`
     );
 
     // Notify listeners if dimensions changed
@@ -262,6 +298,39 @@ export function getCanvasResolutionHeight() {
  */
 export function getSafeAreaInsets() {
     return { ...screenDimensions.safeArea };
+}
+
+/**
+ * Get the game scale factor.
+ * This is the ratio of display size to design size (1200x800).
+ * Use this to scale from design coordinates to screen coordinates.
+ * @returns {number} Scale factor (e.g., 0.5 for half size, 2.0 for double size)
+ */
+export function getGameScale() {
+    return screenDimensions.gameScale;
+}
+
+/**
+ * Get the display dimensions (actual CSS pixels used for canvas).
+ * May be smaller than viewport due to letterboxing.
+ * @returns {{width: number, height: number}} Display size in CSS pixels
+ */
+export function getDisplayDimensions() {
+    return {
+        width: screenDimensions.displayWidth,
+        height: screenDimensions.displayHeight
+    };
+}
+
+/**
+ * Get the letterbox offsets (where the canvas is positioned within viewport).
+ * @returns {{x: number, y: number}} Offset in CSS pixels from safe area origin
+ */
+export function getDisplayOffset() {
+    return {
+        x: screenDimensions.offsetX,
+        y: screenDimensions.offsetY
+    };
 }
 
 /**

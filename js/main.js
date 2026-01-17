@@ -5036,14 +5036,10 @@ function setupShopState() {
     if (canvas) {
         canvas.addEventListener('wheel', (e) => {
             if (Game.getState() === GAME_STATES.SHOP) {
-                // Convert screen coordinates to design coordinates
-                const rect = canvas.getBoundingClientRect();
-                const scaleX = CANVAS.DESIGN_WIDTH / rect.width;
-                const scaleY = CANVAS.DESIGN_HEIGHT / rect.height;
-                const x = (e.clientX - rect.left) * scaleX;
-                const y = (e.clientY - rect.top) * scaleY;
+                // Convert screen coordinates to design coordinates using renderer
+                const designCoords = Renderer.screenToDesign(e.clientX, e.clientY);
 
-                if (Shop.handleWheel(x, y, e.deltaY, e.shiftKey)) {
+                if (Shop.handleWheel(designCoords.x, designCoords.y, e.deltaY, e.shiftKey)) {
                     e.preventDefault();
                 }
             }

@@ -14,7 +14,7 @@
  *   const y = fromBottom(50);
  */
 
-import { getScreenWidth, getScreenHeight, getSafeAreaInsets } from './screenSize.js';
+import { getScreenWidth, getScreenHeight, getSafeAreaInsets, getGameScale, getDisplayDimensions } from './screenSize.js';
 
 // =============================================================================
 // EDGE-RELATIVE POSITIONING HELPERS
@@ -89,77 +89,79 @@ export function centerY(height = 0) {
 // UI SCALING HELPERS
 // =============================================================================
 
-// Reference design height for scaling calculations
+// Reference design dimensions
 const REFERENCE_HEIGHT = 800;
 const REFERENCE_WIDTH = 1200;
 
-// Minimum scale factor to prevent UI from becoming too small
-// Lower on mobile to allow more compact UI on small screens
-const MIN_UI_SCALE = 0.5;
-
-// Maximum scale factor to prevent UI from becoming too large
-const MAX_UI_SCALE = 1.3;
-
-// Mobile screen threshold (CSS pixels height in landscape)
-// Below this, we apply additional mobile scaling
+// Mobile screen threshold (display height in CSS pixels)
+// Below this, we consider it a mobile device
 const MOBILE_HEIGHT_THRESHOLD = 500;
 
-// Additional scale factor applied on mobile devices
-const MOBILE_SCALE_FACTOR = 0.85;
-
 /**
- * Check if the current device appears to be a mobile device based on screen size.
- * Uses screen height as primary indicator (mobile landscape is typically <500px).
+ * Check if the current device appears to be a mobile device based on display size.
+ * Uses actual display height (not design height) as indicator.
+ * Mobile landscape is typically <500px.
  * @returns {boolean} True if device appears to be mobile
  */
 export function isMobileDevice() {
-    const screenHeight = getScreenHeight();
-    return screenHeight < MOBILE_HEIGHT_THRESHOLD;
+    const displayDims = getDisplayDimensions();
+    return displayDims.height < MOBILE_HEIGHT_THRESHOLD;
 }
 
 /**
- * Calculate UI scale factor based on screen height.
- * Smaller screens get smaller UI elements. Mobile devices get additional
- * scaling to keep UI compact and touch-friendly without being oversized.
- * @returns {number} Scale factor (typically 0.5 - 1.3)
+ * Calculate UI scale factor for values that need explicit scaling.
+ *
+ * With the unified canvas transform scaling system, most drawing is done
+ * in design coordinates (1200x800) and the canvas transform handles scaling
+ * to the actual display size. So getUIScale() returns 1.0 by default.
+ *
+ * The canvas transform already applies gameScale, so UI elements drawn
+ * in design coordinates will scale automatically. Only use scaled() when
+ * you need to compensate for something that doesn't go through the transform.
+ *
+ * @returns {number} Always returns 1.0 since canvas transform handles scaling
  */
 export function getUIScale() {
-    const screenHeight = getScreenHeight();
-    let scale = screenHeight / REFERENCE_HEIGHT;
-
-    // Clamp to valid range
-    scale = Math.max(MIN_UI_SCALE, Math.min(MAX_UI_SCALE, scale));
-
-    // Apply additional mobile scaling for small screens
-    // This helps keep UI proportional on phones where the natural scale
-    // (e.g., 400/800 = 0.5) would make elements too large relative to screen
-    if (isMobileDevice()) {
-        scale *= MOBILE_SCALE_FACTOR;
-        // Re-clamp after mobile adjustment
-        scale = Math.max(MIN_UI_SCALE, scale);
-    }
-
-    return scale;
+    // Return 1.0 because the canvas transform already handles scaling.
+    // All drawing is done in design coordinates (1200x800), and the
+    // canvas context transform scales everything to fit the display.
+    return 1.0;
 }
 
 /**
  * Scale a dimension by the current UI scale factor.
- * @param {number} value - Original dimension value
- * @returns {number} Scaled dimension value
+ * With the canvas transform handling scaling, this returns the value unchanged
+ * since all drawing is done in design coordinates.
+ * @param {number} value - Original dimension value (in design pixels)
+ * @returns {number} Same value (canvas transform handles actual scaling)
  */
 export function scaled(value) {
     return value * getUIScale();
 }
 
 /**
- * Scale a dimension but enforce minimum touch target size.
+ * Ensure a touch target meets minimum size requirements.
+ *
+ * With canvas transform scaling, elements drawn in design coordinates are
+ * automatically scaled. However, touch targets need to remain usable on
+ * small screens. A 44px button in design coords might only be 22px on
+ * a phone with gameScale=0.5 - too small to tap.
+ *
+ * This function returns the larger of:
+ * - The original value (for large screens where gameScale >= 1)
+ * - The minimum size divided by gameScale (ensures min display pixels)
+ *
  * Apple HIG recommends 44pt minimum for touch targets.
- * @param {number} value - Original dimension value
- * @param {number} [minSize=44] - Minimum size to enforce
- * @returns {number} Scaled dimension, at least minSize
+ *
+ * @param {number} value - Original dimension value (in design pixels)
+ * @param {number} [minDisplaySize=44] - Minimum display size in CSS pixels
+ * @returns {number} Value in design pixels that will result in at least minDisplaySize when scaled
  */
-export function scaledTouch(value, minSize = 44) {
-    return Math.max(minSize, value * getUIScale());
+export function scaledTouch(value, minDisplaySize = 44) {
+    const gameScale = getGameScale();
+    // Calculate minimum design size needed to achieve minDisplaySize after scaling
+    const minDesignSize = minDisplaySize / gameScale;
+    return Math.max(value, minDesignSize);
 }
 
 // =============================================================================
@@ -194,39 +196,43 @@ export function getRawSafeArea() {
 /**
  * Check if current screen is "wide" (iPhone-like aspect ratio).
  * Wide screens may need different layout strategies.
- * @returns {boolean} True if screen is wider than 2:1 aspect ratio
+ * Uses actual display dimensions, not design dimensions.
+ * @returns {boolean} True if display is wider than 2:1 aspect ratio
  */
 export function isWideScreen() {
-    const width = getScreenWidth();
-    const height = getScreenHeight();
-    return width / height > 2;
+    const displayDims = getDisplayDimensions();
+    return displayDims.width / displayDims.height > 2;
 }
 
 /**
  * Check if current screen is "short" (limited vertical space).
  * Short screens may need more compact vertical layouts.
- * @returns {boolean} True if screen height is less than 600 pixels
+ * Uses actual display dimensions.
+ * @returns {boolean} True if display height is less than 600 CSS pixels
  */
 export function isShortScreen() {
-    return getScreenHeight() < 600;
+    const displayDims = getDisplayDimensions();
+    return displayDims.height < 600;
 }
 
 /**
  * Check if current screen is "very short" (extreme vertical constraint).
  * Very short screens need maximum compactness (e.g., phone landscape).
- * @returns {boolean} True if screen height is less than 450 pixels
+ * Uses actual display dimensions.
+ * @returns {boolean} True if display height is less than 450 CSS pixels
  */
 export function isVeryShortScreen() {
-    return getScreenHeight() < 450;
+    const displayDims = getDisplayDimensions();
+    return displayDims.height < 450;
 }
 
 /**
  * Check if current screen is "tall" (iPad-like aspect ratio).
  * Tall screens have more room for vertical spacing.
- * @returns {boolean} True if screen aspect ratio is closer to 4:3
+ * Uses actual display dimensions.
+ * @returns {boolean} True if display aspect ratio is closer to 4:3
  */
 export function isTallScreen() {
-    const width = getScreenWidth();
-    const height = getScreenHeight();
-    return width / height < 1.5;
+    const displayDims = getDisplayDimensions();
+    return displayDims.width / displayDims.height < 1.5;
 }

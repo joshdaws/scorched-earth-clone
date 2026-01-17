@@ -15,6 +15,9 @@ import {
     getCanvasResolutionHeight,
     getDevicePixelRatio as getScreenDPR,
     getSafeAreaInsets,
+    getGameScale,
+    getDisplayDimensions,
+    getDisplayOffset,
     onResize
 } from './screenSize.js';
 
@@ -88,38 +91,33 @@ function handleResize() {
 }
 
 /**
- * Resize canvas to fill available screen space (no letterboxing).
- * Now uses dynamic screen sizing module for fully adaptive dimensions.
+ * Resize canvas to fit design dimensions (1200x800) into available space.
+ * Maintains aspect ratio with letterboxing if needed.
  * Accounts for safe areas and devicePixelRatio for crisp rendering.
  *
- * The canvas fills the entire usable viewport area after accounting for
- * safe area insets (notch, Dynamic Island, home indicator).
+ * The game always operates in design coordinates (1200x800). The canvas
+ * transform scales all rendering to fit the actual screen size.
  */
 export function resizeCanvas() {
     if (!canvas) return;
 
-    // Get dynamic screen dimensions from screenSize module
-    const screenW = getScreenWidth();
-    const screenH = getScreenHeight();
+    // Get display dimensions from screenSize module
+    const displayDims = getDisplayDimensions();
+    const displayOffset = getDisplayOffset();
     const safeArea = getSafeAreaInsets();
+    const gameScale = getGameScale();
 
     // Get current device pixel ratio
     devicePixelRatio = getScreenDPR();
 
-    // Display size = usable screen area (CSS pixels)
-    // No aspect ratio constraints - fill the available space
-    const displayWidth = screenW;
-    const displayHeight = screenH;
+    // Set CSS display size (may be smaller than viewport due to letterboxing)
+    canvas.style.width = `${displayDims.width}px`;
+    canvas.style.height = `${displayDims.height}px`;
 
-    // Set CSS display size
-    canvas.style.width = `${displayWidth}px`;
-    canvas.style.height = `${displayHeight}px`;
-
-    // Position canvas to account for safe areas
-    // Safe area left/top push the canvas inward from the edges
+    // Position canvas to account for safe areas and letterbox centering
     canvas.style.position = 'absolute';
-    canvas.style.left = `${safeArea.left}px`;
-    canvas.style.top = `${safeArea.top}px`;
+    canvas.style.left = `${safeArea.left + displayOffset.x}px`;
+    canvas.style.top = `${safeArea.top + displayOffset.y}px`;
 
     // Set internal resolution (physical pixels for crisp rendering)
     const resolutionWidth = getCanvasResolutionWidth();
@@ -128,22 +126,21 @@ export function resizeCanvas() {
     canvas.width = resolutionWidth;
     canvas.height = resolutionHeight;
 
-    // Calculate scale factor: with dynamic sizing, this is simply DPR
-    // since screen dimensions = design dimensions (1:1 mapping)
-    scaleFactor = devicePixelRatio;
+    // Combined scale factor: gameScale (design->screen) * DPR (screen->physical)
+    scaleFactor = gameScale * devicePixelRatio;
 
-    // Scale the context to account for device pixel ratio
-    // Drawing in screen coordinates, scaled up for high-DPI
+    // Scale the context to account for both game scaling and device pixel ratio
+    // All drawing is done in design coordinates (1200x800), scaled to fit screen
     if (ctx) {
         ctx.setTransform(scaleFactor, 0, 0, scaleFactor, 0, 0);
     }
 
     console.log(
-        `Canvas resized: display=${Math.round(displayWidth)}x${Math.round(displayHeight)}, ` +
+        `Canvas resized: design=${getScreenWidth()}x${getScreenHeight()}, ` +
+        `display=${Math.round(displayDims.width)}x${Math.round(displayDims.height)}, ` +
         `resolution=${resolutionWidth}x${resolutionHeight}, ` +
-        `dpr=${devicePixelRatio}, scale=${scaleFactor.toFixed(3)}, ` +
-        `safeArea: L${safeArea.left.toFixed(0)} R${safeArea.right.toFixed(0)} ` +
-        `T${safeArea.top.toFixed(0)} B${safeArea.bottom.toFixed(0)}`
+        `gameScale=${gameScale.toFixed(3)}, dpr=${devicePixelRatio}, ` +
+        `combined=${scaleFactor.toFixed(3)}`
     );
 }
 
@@ -211,11 +208,14 @@ export function getDevicePixelRatio() {
 /**
  * Convert screen/mouse coordinates to design coordinates.
  * Use this when handling mouse/touch events.
- * With dynamic sizing, screen coordinates map 1:1 to design coordinates
- * (after accounting for canvas position).
- * @param {number} screenX - X coordinate from mouse/touch event
- * @param {number} screenY - Y coordinate from mouse/touch event
- * @returns {{x: number, y: number}} Design coordinates
+ *
+ * Screen coordinates (from mouse/touch events) need to be:
+ * 1. Offset by canvas position (bounding rect)
+ * 2. Divided by gameScale to convert from display pixels to design pixels
+ *
+ * @param {number} screenX - X coordinate from mouse/touch event (clientX)
+ * @param {number} screenY - Y coordinate from mouse/touch event (clientY)
+ * @returns {{x: number, y: number}} Design coordinates (1200x800 space)
  */
 export function screenToDesign(screenX, screenY) {
     if (!canvas) return { x: 0, y: 0 };
@@ -224,13 +224,14 @@ export function screenToDesign(screenX, screenY) {
     const rect = canvas.getBoundingClientRect();
 
     // Convert screen coords to position relative to canvas display
-    // With dynamic sizing, this is a 1:1 mapping (no scaling needed)
     const canvasX = screenX - rect.left;
     const canvasY = screenY - rect.top;
 
+    // Scale from display pixels to design pixels
+    const gameScale = getGameScale();
     return {
-        x: canvasX,
-        y: canvasY
+        x: canvasX / gameScale,
+        y: canvasY / gameScale
     };
 }
 

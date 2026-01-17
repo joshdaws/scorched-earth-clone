@@ -13,6 +13,7 @@
  */
 
 import { CANVAS, GAME_KEYS, KEYS, PHYSICS } from './constants.js';
+import { getGameScale } from './screenSize.js';
 
 // =============================================================================
 // GAME INPUT EVENTS
@@ -172,19 +173,21 @@ function handleKeyUp(e) {
 
 /**
  * Convert screen coordinates (relative to canvas) to game coordinate space.
- * With dynamic screen sizing, CSS pixels = game coordinates (1:1 mapping).
- * The canvas fills the available screen space, so no aspect ratio scaling needed.
+ * The game operates in design coordinates (1200x800), while the display may
+ * be scaled to fit the viewport. This function converts from display pixels
+ * to design pixels.
+ *
  * @param {number} screenX - X coordinate relative to canvas CSS rect
  * @param {number} screenY - Y coordinate relative to canvas CSS rect
- * @param {DOMRect} rect - Canvas bounding client rect (unused with 1:1 mapping)
- * @returns {{x: number, y: number}} Coordinates in game space
+ * @param {DOMRect} rect - Canvas bounding client rect (unused, kept for API compatibility)
+ * @returns {{x: number, y: number}} Coordinates in design space (1200x800)
  */
 function screenToDesign(screenX, screenY, rect) {
-    // With dynamic screen sizing, CSS coordinates = game coordinates directly
-    // No scaling needed since the canvas fills the screen at 1:1 pixel ratio
+    // Divide by game scale to convert from display pixels to design pixels
+    const gameScale = getGameScale();
     return {
-        x: screenX,
-        y: screenY
+        x: screenX / gameScale,
+        y: screenY / gameScale
     };
 }
 
