@@ -133,6 +133,25 @@ export class Tank {
          */
         this.targetY = 0;
 
+        // =============================================================================
+        // STATUS EFFECTS
+        // =============================================================================
+
+        /**
+         * Number of turns remaining with EMP status (weapons disabled).
+         * When > 0, tank can only use basic weapons (Baby Shot, Basic Shot).
+         * Decrements at the start of each turn.
+         * @type {number}
+         */
+        this.empTurnsRemaining = 0;
+
+        /**
+         * Active fallout zones affecting this tank.
+         * Each zone has position, radius, damage per turn, and turns remaining.
+         * @type {Array<{x: number, y: number, radius: number, damagePerTurn: number, turnsRemaining: number}>}
+         */
+        this.falloutZones = [];
+
         console.log(`Tank created: team=${team}, position=(${x}, ${y}), health=${this.health}`);
     }
 
@@ -258,10 +277,17 @@ export class Tank {
     /**
      * Set the current weapon.
      * Only allows setting if the tank has ammo for that weapon.
+     * EMP effect prevents selection of advanced weapons.
      * @param {string} weaponId - The weapon ID to select
      * @returns {boolean} True if weapon was successfully selected
      */
     setWeapon(weaponId) {
+        // Check if weapon is disabled by EMP
+        if (this.isWeaponDisabledByEmp(weaponId)) {
+            console.warn(`Tank (${this.team}) cannot select weapon '${weaponId}': disabled by EMP (${this.empTurnsRemaining} turns remaining)`);
+            return false;
+        }
+
         // Check if tank has this weapon with ammo
         const ammo = this.inventory[weaponId];
 
@@ -468,7 +494,8 @@ export class Tank {
             power: this.power,
             team: this.team,
             currentWeapon: this.currentWeapon,
-            inventory: { ...this.inventory }
+            inventory: { ...this.inventory },
+            empTurnsRemaining: this.empTurnsRemaining
         };
     }
 
@@ -490,8 +517,84 @@ export class Tank {
         tank.power = data.power;
         tank.currentWeapon = data.currentWeapon;
         tank.inventory = { ...data.inventory };
+        tank.empTurnsRemaining = data.empTurnsRemaining || 0;
 
         return tank;
+    }
+
+    // =============================================================================
+    // STATUS EFFECT METHODS
+    // =============================================================================
+
+    /**
+     * Apply EMP status effect to the tank.
+     * Tank can only use basic weapons (Baby Shot, Basic Shot) while affected.
+     * @param {number} turns - Number of turns to disable advanced weapons
+     */
+    applyEmp(turns) {
+        // EMP doesn't stack, use maximum duration
+        this.empTurnsRemaining = Math.max(this.empTurnsRemaining, turns);
+        console.log(`${this.team} tank hit by EMP! Weapons disabled for ${this.empTurnsRemaining} turns`);
+
+        // If currently using a non-basic weapon, switch to basic shot
+        if (this.isWeaponDisabledByEmp(this.currentWeapon)) {
+            this.currentWeapon = 'basic-shot';
+            console.log(`${this.team} tank forced to switch to Basic Shot due to EMP`);
+        }
+    }
+
+    /**
+     * Check if a weapon is disabled by EMP effect.
+     * Only basic weapons (cost 0) can be used while EMPed.
+     * @param {string} weaponId - Weapon ID to check
+     * @returns {boolean} True if weapon is disabled
+     */
+    isWeaponDisabledByEmp(weaponId) {
+        if (this.empTurnsRemaining <= 0) return false;
+
+        // Basic weapons that are always allowed (free/unlimited ammo weapons)
+        const basicWeapons = ['baby-shot', 'basic-shot'];
+        return !basicWeapons.includes(weaponId);
+    }
+
+    /**
+     * Check if tank is currently affected by EMP.
+     * @returns {boolean} True if EMP status is active
+     */
+    isEmpActive() {
+        return this.empTurnsRemaining > 0;
+    }
+
+    /**
+     * Get the number of EMP turns remaining.
+     * @returns {number} Turns remaining
+     */
+    getEmpTurnsRemaining() {
+        return this.empTurnsRemaining;
+    }
+
+    /**
+     * Decrement EMP turns at the start of a turn.
+     * Call this at the beginning of the tank's turn.
+     */
+    tickEmpStatus() {
+        if (this.empTurnsRemaining > 0) {
+            this.empTurnsRemaining--;
+            if (this.empTurnsRemaining > 0) {
+                console.log(`${this.team} tank EMP status: ${this.empTurnsRemaining} turns remaining`);
+            } else {
+                console.log(`${this.team} tank EMP status has worn off - weapons restored!`);
+            }
+        }
+    }
+
+    /**
+     * Clear all status effects.
+     * Call when resetting the game or starting a new round.
+     */
+    clearStatusEffects() {
+        this.empTurnsRemaining = 0;
+        this.falloutZones = [];
     }
 }
 

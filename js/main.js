@@ -201,6 +201,106 @@ let persistentTrails = [];
 const TRACER_TRAIL_DURATION = 3000;
 
 // =============================================================================
+// FALLOUT ZONE STATE (Tactical Nuke)
+// =============================================================================
+
+/**
+ * Active fallout zones from Tactical Nuke explosions.
+ * Each zone deals damage to tanks within its radius at the start of their turn.
+ * @type {Array<{x: number, y: number, radius: number, damagePerTurn: number, turnsRemaining: number}>}
+ */
+let activeFalloutZones = [];
+
+/**
+ * Fallout zone configuration.
+ */
+const FALLOUT_CONFIG = {
+    /** Damage per turn for Tactical Nuke fallout */
+    DAMAGE_PER_TURN: 10,
+    /** Default number of turns fallout lasts */
+    DEFAULT_DURATION: 2
+};
+
+/**
+ * Create a new fallout zone at the specified position.
+ * Fallout deals damage to tanks within radius at the start of each turn.
+ *
+ * @param {number} x - Center X position
+ * @param {number} y - Center Y position
+ * @param {number} radius - Fallout zone radius in pixels
+ * @param {number} [duration=2] - Number of turns the fallout lasts
+ */
+function createFalloutZone(x, y, radius, duration = FALLOUT_CONFIG.DEFAULT_DURATION) {
+    activeFalloutZones.push({
+        x,
+        y,
+        radius,
+        damagePerTurn: FALLOUT_CONFIG.DAMAGE_PER_TURN,
+        turnsRemaining: duration
+    });
+    console.log(`Fallout zone created at (${x.toFixed(1)}, ${y.toFixed(1)}), radius=${radius.toFixed(1)}, duration=${duration} turns`);
+}
+
+/**
+ * Apply fallout damage to a tank if it's within any fallout zones.
+ * Called at the start of each tank's turn.
+ *
+ * @param {import('./tank.js').Tank} tank - Tank to check for fallout damage
+ * @returns {number} Total fallout damage dealt
+ */
+function applyFalloutDamageToTank(tank) {
+    if (!tank || tank.health <= 0) return 0;
+
+    let totalDamage = 0;
+
+    for (const zone of activeFalloutZones) {
+        const dx = tank.x - zone.x;
+        const dy = tank.y - zone.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance <= zone.radius) {
+            const damage = zone.damagePerTurn;
+            tank.takeDamage(damage);
+            totalDamage += damage;
+            console.log(`${tank.team} tank took ${damage} fallout damage (${zone.turnsRemaining} turns remaining in zone)`);
+        }
+    }
+
+    return totalDamage;
+}
+
+/**
+ * Tick all fallout zones - decrement duration and remove expired zones.
+ * Called at the end of each full round (after both tanks have taken turns).
+ */
+function tickFalloutZones() {
+    activeFalloutZones = activeFalloutZones.filter(zone => {
+        zone.turnsRemaining--;
+        if (zone.turnsRemaining <= 0) {
+            console.log('Fallout zone dissipated');
+            return false;
+        }
+        return true;
+    });
+}
+
+/**
+ * Clear all fallout zones.
+ * Called when starting a new round or resetting the game.
+ */
+function clearFalloutZones() {
+    activeFalloutZones = [];
+}
+
+/**
+ * Get all active fallout zones for rendering.
+ * @returns {Array<{x: number, y: number, radius: number, turnsRemaining: number}>} Active zones
+ */
+function getActiveFalloutZones() {
+    return activeFalloutZones;
+}
+
+// =============================================================================
 // PAUSE BUTTON STATE
 // =============================================================================
 
@@ -2524,8 +2624,8 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
     // Haptic feedback for explosions (mobile devices)
     Haptics.hapticExplosion(blastRadius);
 
-    // Destroy terrain
-    if (currentTerrain) {
+    // Destroy terrain (unless weapon has noTerrainDamage flag - e.g., Neutron Bomb, EMP)
+    if (currentTerrain && !weapon?.noTerrainDamage) {
         destroyTerrainAt(pos.x, pos.y, blastRadius);
 
         // Update tank positions to match new terrain height
@@ -2535,6 +2635,8 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
         if (enemyTank && currentTerrain) {
             updateTankTerrainPosition(enemyTank, currentTerrain);
         }
+    } else if (weapon?.noTerrainDamage) {
+        console.log(`${weapon.name} - no terrain damage (noTerrainDamage flag)`);
     }
 
     // Nuclear weapon special effects (flash only - shake handled above for all weapons)
@@ -2544,6 +2646,26 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
         // Screen flash effect (white flash) - triggers for nuclear weapons only
         if (weapon.screenFlash) {
             screenFlash('white', 300);
+        }
+
+        // EMP effect - disables advanced weapons for 2 turns
+        if (weapon.emp) {
+            const allTanks = [playerTank, enemyTank].filter(t => t !== null);
+            for (const tank of allTanks) {
+                // Check if tank is within blast radius
+                const dx = tank.x - pos.x;
+                const dy = tank.y - pos.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance <= blastRadius) {
+                    tank.applyEmp(2); // Disable weapons for 2 turns
+                }
+            }
+        }
+
+        // Tactical Nuke fallout - create a fallout zone that persists
+        if (weapon.burning && weaponId === 'tactical-nuke') {
+            createFalloutZone(pos.x, pos.y, blastRadius * 0.6, 2); // 60% of blast radius, 2 turns
         }
 
         // Play nuclear explosion sound
@@ -3260,6 +3382,56 @@ function darkenColor(hex, factor) {
 
     // Convert back to hex
     return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
+}
+
+/**
+ * Render active fallout zones from Tactical Nuke explosions.
+ * Displays a pulsing hazardous area indicator.
+ *
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ */
+function renderFalloutZones(ctx) {
+    if (activeFalloutZones.length === 0) return;
+
+    ctx.save();
+
+    // Pulsing animation based on time
+    const pulse = 0.5 + 0.3 * Math.sin(performance.now() / 300);
+
+    for (const zone of activeFalloutZones) {
+        // Draw the fallout zone as a glowing hazardous circle
+        ctx.beginPath();
+        ctx.arc(zone.x, zone.y, zone.radius, 0, Math.PI * 2);
+
+        // Greenish radioactive color (classic nuclear waste aesthetic)
+        const gradient = ctx.createRadialGradient(
+            zone.x, zone.y, 0,
+            zone.x, zone.y, zone.radius
+        );
+        gradient.addColorStop(0, `rgba(100, 255, 100, ${0.15 * pulse})`);
+        gradient.addColorStop(0.5, `rgba(100, 200, 50, ${0.1 * pulse})`);
+        gradient.addColorStop(0.8, `rgba(150, 150, 30, ${0.08 * pulse})`);
+        gradient.addColorStop(1, 'rgba(100, 100, 0, 0)');
+        ctx.fillStyle = gradient;
+        ctx.fill();
+
+        // Draw outer ring (pulsing)
+        ctx.strokeStyle = `rgba(100, 255, 100, ${0.3 * pulse})`;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Draw radiation hazard symbol in center (simplified)
+        const symbolSize = Math.min(zone.radius * 0.3, 20);
+        ctx.fillStyle = `rgba(255, 255, 0, ${0.4 * pulse})`;
+        ctx.font = `bold ${symbolSize}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('☢', zone.x, zone.y);
+    }
+
+    ctx.restore();
 }
 
 /**
@@ -4291,6 +4463,9 @@ function renderPlaying(ctx) {
     // Render terrain (in front of background)
     renderTerrain(ctx);
 
+    // Render fallout zones (on top of terrain, behind tanks)
+    renderFalloutZones(ctx);
+
     // Render tanks on terrain
     renderTanks(ctx);
 
@@ -4492,11 +4667,41 @@ function setupPlayingState() {
         handlePlayingPointerUp({ x, y });
     });
 
-    // Register phase change callback to enable/disable input
+    // Register phase change callback to enable/disable input and apply status effects
     Turn.onPhaseChange((newPhase, oldPhase) => {
         // Enable input only during player's aiming phase
         if (newPhase === TURN_PHASES.PLAYER_AIM) {
             Input.enableGameInput();
+
+            // Apply status effects at the start of player's turn
+            if (playerTank) {
+                // Tick EMP status (reduce turns remaining)
+                playerTank.tickEmpStatus();
+
+                // Apply fallout damage
+                const falloutDamage = applyFalloutDamageToTank(playerTank);
+                if (falloutDamage > 0) {
+                    console.log(`Player tank took ${falloutDamage} total fallout damage at turn start`);
+                }
+            }
+
+            // After player turn starts, tick fallout zones (they decrease after each full round)
+            // We do this when transitioning from AI phase to player phase (completing a round)
+            if (oldPhase === TURN_PHASES.PROJECTILE_FLIGHT) {
+                tickFalloutZones();
+            }
+        } else if (newPhase === TURN_PHASES.AI_AIM) {
+            // Apply status effects at the start of AI's turn
+            if (enemyTank) {
+                // Tick EMP status (reduce turns remaining)
+                enemyTank.tickEmpStatus();
+
+                // Apply fallout damage
+                const falloutDamage = applyFalloutDamageToTank(enemyTank);
+                if (falloutDamage > 0) {
+                    console.log(`Enemy tank took ${falloutDamage} total fallout damage at turn start`);
+                }
+            }
         } else {
             Input.disableGameInput();
         }
@@ -4694,6 +4899,7 @@ function setupPlayingState() {
             clearScreenShake();
             clearScreenFlash();
             clearPersistentTrails();
+            clearFalloutZones();
             explosionEffect = null;
             // Clear explosion particles
             clearParticles();
@@ -5869,6 +6075,7 @@ function quitToMenu() {
     clearParticles();
     clearBackground();
     clearPersistentTrails();
+    clearFalloutZones();
     explosionEffect = null;
 
     // Reset round counter for new game

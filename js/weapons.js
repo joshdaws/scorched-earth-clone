@@ -660,6 +660,7 @@ const EMP_BLAST = createWeapon({
     unlockRequirement: 'round-4',
     emp: true,
     noTerrainDamage: true,
+    screenShake: true,
     screenFlash: true,
     projectileColor: '#0088ff',
     trailColor: '#0066cc'

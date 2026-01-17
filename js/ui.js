@@ -1250,6 +1250,9 @@ export function renderWeaponBar(ctx, playerTank) {
         // Get ammo from player inventory (0 if not owned)
         const ammo = playerTank ? playerTank.getAmmo(weapon.id) : 0;
 
+        // Check if weapon is disabled by EMP
+        const isEmpDisabled = playerTank ? playerTank.isWeaponDisabledByEmp(weapon.id) : false;
+
         // Only cache visible slot positions for hit testing (not off-screen slots)
         if (slotX >= slotsStartX - slotSize / 2 && slotX <= slotsStartX + slotsWidth - slotSize / 2) {
             weaponSlotPositions.push({
@@ -1260,7 +1263,7 @@ export function renderWeaponBar(ctx, playerTank) {
             });
         }
 
-        renderWeaponSlot(ctx, slotX, slotY, slotSize, isSelected, weapon, ammo);
+        renderWeaponSlot(ctx, slotX, slotY, slotSize, isSelected, weapon, ammo, isEmpDisabled);
     }
 
     ctx.restore();
@@ -1443,24 +1446,30 @@ function getWeaponColor(weapon, isSelected, hasAmmo) {
  * @param {boolean} isSelected - Whether this slot is currently selected
  * @param {Object} weapon - Weapon definition from WeaponRegistry
  * @param {number} ammo - Ammo count (0 if not owned, Infinity for unlimited)
+ * @param {boolean} [isEmpDisabled=false] - Whether this weapon is disabled by EMP effect
  */
-function renderWeaponSlot(ctx, x, y, size, isSelected, weapon, ammo) {
+function renderWeaponSlot(ctx, x, y, size, isSelected, weapon, ammo, isEmpDisabled = false) {
     ctx.save();
 
     const hasAmmo = ammo > 0 || ammo === Infinity;
+    const isDisabled = !hasAmmo || isEmpDisabled;
 
     // Determine border color based on selection and availability
     let borderColor;
-    if (isSelected) {
+    if (isEmpDisabled && hasAmmo) {
+        borderColor = 'rgba(255, 100, 50, 0.8)'; // Orange-red for EMP disabled
+    } else if (isSelected && !isDisabled) {
         borderColor = COLORS.NEON_CYAN;
-    } else if (!hasAmmo) {
+    } else if (isDisabled) {
         borderColor = 'rgba(50, 50, 70, 0.4)';
     } else {
         borderColor = 'rgba(100, 100, 140, 0.6)';
     }
 
-    // Slot background - dimmer if no ammo
-    if (!hasAmmo) {
+    // Slot background - dimmer if disabled or no ammo
+    if (isEmpDisabled && hasAmmo) {
+        ctx.fillStyle = 'rgba(40, 20, 20, 0.7)'; // Reddish tint for EMP
+    } else if (!hasAmmo) {
         ctx.fillStyle = 'rgba(15, 15, 25, 0.6)';
     } else if (isSelected) {
         ctx.fillStyle = 'rgba(5, 217, 232, 0.15)';
@@ -1541,7 +1550,9 @@ function renderWeaponSlot(ctx, x, y, size, isSelected, weapon, ammo) {
     // Ammo count
     const ammoText = ammo === Infinity ? '∞' : (ammo === 0 ? '0' : ammo.toString());
 
-    if (!hasAmmo) {
+    if (isEmpDisabled && hasAmmo) {
+        ctx.fillStyle = 'rgba(255, 100, 50, 0.8)';
+    } else if (!hasAmmo) {
         ctx.fillStyle = 'rgba(80, 80, 100, 0.5)';
     } else if (isSelected) {
         ctx.fillStyle = COLORS.NEON_YELLOW;
@@ -1555,6 +1566,16 @@ function renderWeaponSlot(ctx, x, y, size, isSelected, weapon, ammo) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     ctx.fillText(ammoText, x + size / 2, y + size - 3);
+
+    // EMP disabled indicator - show lock/EMP label
+    if (isEmpDisabled && hasAmmo) {
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = 'rgba(255, 100, 50, 0.9)';
+        ctx.font = `bold ${UI.FONT_SIZE_SMALL - 4}px ${UI.FONT_FAMILY}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillText('EMP', x + size / 2, y + 2);
+    }
 
     ctx.restore();
 }
