@@ -14,6 +14,7 @@ import * as Sound from './sound.js';
 import * as Music from './music.js';
 import { LevelRegistry, LEVEL_CONSTANTS, WORLD_THEMES } from './levels.js';
 import { Stars } from './stars.js';
+import * as TitleScene from './titleScene/titleScene.js';
 
 // =============================================================================
 // CONFIGURATION
@@ -755,11 +756,20 @@ export function setup() {
             init();
             // Play menu music
             Music.playForState(GAME_STATES.MENU);
+            // Ensure TitleScene is running (may be returning from gameplay)
+            if (!TitleScene.isActive()) {
+                TitleScene.start();
+            }
         },
         onExit: (toState) => {
             console.log('Exiting LEVEL_SELECT state');
             hoveredLevel = -1;
             hoveredWorld = -1;
+            // Stop TitleScene when going to gameplay states
+            // Keep it running for MENU and MODE_SELECT (seamless transition)
+            if (toState !== GAME_STATES.MENU && toState !== GAME_STATES.MODE_SELECT) {
+                TitleScene.stop();
+            }
         },
         update: update,
         render: render
