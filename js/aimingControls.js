@@ -394,7 +394,7 @@ function simulateTrajectory(tank, angle, power, windForce, terrain) {
 
         // Apply physics
         vy += PHYSICS.GRAVITY;
-        vx += windForce * PHYSICS.WIND_FORCE_MULTIPLIER;
+        vx += windForce;  // windForce already includes WIND_FORCE_MULTIPLIER from Wind.getWindForce()
 
         // Cap velocity
         const speed = Math.sqrt(vx * vx + vy * vy);
