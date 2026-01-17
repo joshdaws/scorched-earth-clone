@@ -3688,11 +3688,9 @@ function renderProjectile(ctx, projectile) {
         ctx.restore();
     } else if (projectile.isDigging) {
         // Digging projectiles show a drill-like visual with pulsing effect
-        // Darker, more muted appearance to indicate underground
         const digProgress = (projectile.getDigDistance() % 20) / 20; // Cycle every 20px
         const pulseAlpha = 0.5 + 0.5 * Math.sin(digProgress * Math.PI * 2);
 
-        // Draw drill tip (triangle pointing in dig direction)
         ctx.save();
         ctx.translate(x, y);
 
@@ -3700,20 +3698,86 @@ function renderProjectile(ctx, projectile) {
         const digAngle = Math.atan2(projectile.digDirection.y, projectile.digDirection.x);
         ctx.rotate(digAngle);
 
-        // Draw drill bit shape
-        ctx.beginPath();
-        ctx.moveTo(radius * 1.5, 0); // Tip
-        ctx.lineTo(-radius * 0.5, -radius * 0.8);
-        ctx.lineTo(-radius * 0.5, radius * 0.8);
-        ctx.closePath();
-        ctx.fillStyle = `rgba(255, 140, 0, ${pulseAlpha})`; // Orange with pulse
-        ctx.fill();
+        // Special rendering for Laser Drill - wide red beam effect
+        if (projectile.weaponId === 'laser-drill') {
+            const weapon = WeaponRegistry.getWeapon('laser-drill');
+            const beamWidth = weapon?.tunnelRadius || 25;
 
-        // Draw core (dimmer)
-        ctx.beginPath();
-        ctx.arc(0, 0, radius * 0.6, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255, 200, 100, ${0.3 + pulseAlpha * 0.3})`;
-        ctx.fill();
+            // Draw laser beam from entry point to current position
+            const entryPoint = projectile.getDigEntryPoint();
+            if (entryPoint) {
+                ctx.save();
+                ctx.rotate(-digAngle); // Undo local rotation to draw in world space
+                ctx.translate(-x, -y);
+
+                // Calculate beam length
+                const dx = x - entryPoint.x;
+                const dy = y - entryPoint.y;
+                const beamLength = Math.sqrt(dx * dx + dy * dy);
+
+                // Draw main beam (gradient from entry to current position)
+                const gradient = ctx.createLinearGradient(entryPoint.x, entryPoint.y, x, y);
+                gradient.addColorStop(0, `rgba(255, 0, 0, ${0.1 + pulseAlpha * 0.1})`);
+                gradient.addColorStop(0.5, `rgba(255, 50, 50, ${0.4 + pulseAlpha * 0.3})`);
+                gradient.addColorStop(1, `rgba(255, 100, 100, ${0.8 + pulseAlpha * 0.2})`);
+
+                ctx.beginPath();
+                // Draw beam as a wide line from entry to current position
+                const beamAngle = Math.atan2(dy, dx);
+                const perpX = Math.sin(beamAngle) * beamWidth * 0.5;
+                const perpY = -Math.cos(beamAngle) * beamWidth * 0.5;
+
+                ctx.moveTo(entryPoint.x - perpX, entryPoint.y - perpY);
+                ctx.lineTo(entryPoint.x + perpX, entryPoint.y + perpY);
+                ctx.lineTo(x + perpX, y + perpY);
+                ctx.lineTo(x - perpX, y - perpY);
+                ctx.closePath();
+                ctx.fillStyle = gradient;
+                ctx.fill();
+
+                // Draw glow around beam
+                ctx.shadowColor = '#ff0000';
+                ctx.shadowBlur = 20;
+                ctx.strokeStyle = `rgba(255, 0, 0, ${0.5 + pulseAlpha * 0.5})`;
+                ctx.lineWidth = beamWidth;
+                ctx.beginPath();
+                ctx.moveTo(entryPoint.x, entryPoint.y);
+                ctx.lineTo(x, y);
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+
+                ctx.restore();
+            }
+
+            // Draw bright core at drill tip
+            ctx.beginPath();
+            ctx.arc(0, 0, radius * 1.5, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 255, 200, ${0.8 + pulseAlpha * 0.2})`;
+            ctx.fill();
+
+            // Outer glow ring
+            ctx.beginPath();
+            ctx.arc(0, 0, radius * 2.5, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(255, 0, 0, ${pulseAlpha * 0.8})`;
+            ctx.lineWidth = 3;
+            ctx.stroke();
+        } else {
+            // Standard drill visual for other digging weapons
+            // Draw drill bit shape
+            ctx.beginPath();
+            ctx.moveTo(radius * 1.5, 0); // Tip
+            ctx.lineTo(-radius * 0.5, -radius * 0.8);
+            ctx.lineTo(-radius * 0.5, radius * 0.8);
+            ctx.closePath();
+            ctx.fillStyle = `rgba(255, 140, 0, ${pulseAlpha})`; // Orange with pulse
+            ctx.fill();
+
+            // Draw core (dimmer)
+            ctx.beginPath();
+            ctx.arc(0, 0, radius * 0.6, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 200, 100, ${0.3 + pulseAlpha * 0.3})`;
+            ctx.fill();
+        }
 
         ctx.restore();
     } else if (projectile.isDeployed) {

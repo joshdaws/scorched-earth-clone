@@ -801,6 +801,10 @@ export class Projectile {
      * Start digging mode for this projectile.
      * Sets the digging direction based on current velocity and records entry point.
      *
+     * Special handling:
+     * - Drill weapon: Uses original launch angle for straight-line trajectory (ignores gravity curve)
+     * - Other diggers: Use current velocity direction (which includes gravity effects)
+     *
      * @param {number} entryX - The X position where digger enters terrain
      * @param {number} entryY - The Y position where digger enters terrain (canvas coords)
      */
@@ -811,22 +815,41 @@ export class Projectile {
         // Record entry point for visual effects
         this.digEntryPoint = { x: entryX, y: entryY };
 
-        // Calculate normalized direction vector from current velocity
-        const speed = this.getSpeed();
-        if (speed > 0.01) {
+        const weapon = WeaponRegistry.getWeapon(this.weaponId);
+        const isDrill = this.weaponId === 'drill';
+        const isLaserDrill = this.weaponId === 'laser-drill';
+
+        // Drill weapon uses original launch angle for straight-line digging
+        // This makes it ignore gravity's effect on trajectory
+        if (isDrill) {
+            // Use the original launch angle to calculate direction
+            const radians = (this.launchAngle * Math.PI) / 180;
             this.digDirection = {
-                x: this.vx / speed,
-                y: this.vy / speed
+                x: Math.cos(radians),
+                y: -Math.sin(radians) // Negative because canvas Y is inverted
             };
+            // Drill is fast - use higher base speed
+            this.digSpeed = 6;
+            console.log(`Drill started digging in straight line at angle ${this.launchAngle}°`);
         } else {
-            // If speed is negligible, default to straight down
-            this.digDirection = { x: 0, y: 1 };
+            // Calculate normalized direction vector from current velocity
+            const speed = this.getSpeed();
+            if (speed > 0.01) {
+                this.digDirection = {
+                    x: this.vx / speed,
+                    y: this.vy / speed
+                };
+            } else {
+                // If speed is negligible, default to straight down
+                this.digDirection = { x: 0, y: 1 };
+            }
+
+            // Set digging speed (slightly slower than impact speed, but minimum 3 px/frame)
+            // Laser Drill is slightly slower but has wider beam
+            this.digSpeed = isLaserDrill ? Math.max(speed * 0.5, 2.5) : Math.max(speed * 0.7, 3);
         }
 
-        // Set digging speed (slightly slower than impact speed, but minimum 3 px/frame)
-        this.digSpeed = Math.max(speed * 0.7, 3);
-
-        console.log(`Digger started digging at (${entryX.toFixed(1)}, ${entryY.toFixed(1)}), direction=(${this.digDirection.x.toFixed(2)}, ${this.digDirection.y.toFixed(2)}), speed=${this.digSpeed.toFixed(2)}`);
+        console.log(`${weapon?.name || 'Digger'} started digging at (${entryX.toFixed(1)}, ${entryY.toFixed(1)}), direction=(${this.digDirection.x.toFixed(2)}, ${this.digDirection.y.toFixed(2)}), speed=${this.digSpeed.toFixed(2)}`);
     }
 
     /**
