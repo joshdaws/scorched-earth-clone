@@ -86,7 +86,60 @@ Also check for comments - the `bd show` output includes a Comments section at th
 
 ---
 
-## STEP 3: Research
+## STEP 3: Evaluate Issue Size (MANDATORY)
+
+After reading the issue, evaluate its scope before starting work:
+
+### 1. Analyze Scope
+
+List the files that will likely need changes and count distinct logical changes:
+
+```bash
+# Think through:
+# - Which files need to be modified?
+# - How many separate, distinct changes are required?
+# - Are there multiple independent concerns?
+```
+
+### 2. Assign Size
+
+| Size | Files | Distinct Changes | Action |
+|------|-------|------------------|--------|
+| **S** | 1-2 | 1-2 | Work directly |
+| **M** | 3-5 | 2-4 | Work directly |
+| **L** | 6-10 | 5-8 | **Decompose first** |
+| **XL** | 10+ | 8+ | **Must decompose** |
+
+### 3. If Size is L or XL: Decompose
+
+**STOP** - Do not start coding. Decompose into smaller sub-issues first:
+
+```bash
+# Create sub-issues linked to parent
+bd create --title "Sub-task 1: <specific piece>" --type task --parent <issue-id>
+bd create --title "Sub-task 2: <specific piece>" --type task --parent <issue-id>
+# ... continue for each logical piece
+```
+
+**Decomposition Rules:**
+- Each sub-issue should be S or M sized
+- Each sub-issue should be independently testable
+- Each sub-issue should be independently committable
+- Use `--blocked-by` if sub-issues have dependencies
+- First sub-issue should be the foundation others build on
+
+After decomposing:
+1. Update parent issue notes explaining the decomposition
+2. Mark the parent issue as `blocked` (it's now just a container)
+3. Start work on the first sub-issue
+
+### 4. If Size is S or M: Proceed
+
+Continue to the next step.
+
+---
+
+## STEP 4: Research
 
 Before implementing, verify the work actually needs doing:
 - Check if the problem still exists
@@ -97,7 +150,7 @@ If the issue is no longer relevant, close it with a note explaining why.
 
 ---
 
-## STEP 4: Implement
+## STEP 5: Implement
 
 Do the actual work. Follow project patterns and conventions.
 
@@ -111,7 +164,7 @@ Refs: <issue-id>"
 
 ---
 
-## STEP 5: Validate
+## STEP 6: Validate
 
 Verify your implementation works:
 - Run relevant tests if available
@@ -123,7 +176,7 @@ If validation fails, fix the issues before proceeding.
 
 ---
 
-## STEP 6: Check Acceptance Criteria (MANDATORY)
+## STEP 7: Check Acceptance Criteria (MANDATORY)
 
 **You MUST verify and check off EACH criterion before closing. This is NOT optional.**
 
@@ -150,7 +203,7 @@ bd update <issue-id> --acceptance "## Acceptance Criteria
 
 ---
 
-## STEP 7: Handle Discoveries
+## STEP 8: Handle Discoveries
 
 During your work, you may discover bugs, missing functionality, or follow-up tasks.
 
@@ -163,7 +216,7 @@ Add any relevant context to the new issue description.
 
 ---
 
-## STEP 8: Add Implementation Notes
+## STEP 9: Add Implementation Notes
 
 Before closing, add notes documenting what you did:
 ```bash
@@ -177,7 +230,7 @@ bd update <issue-id> --notes "## Implementation Summary
 
 ---
 
-## STEP 9: Final Check Before Close
+## STEP 10: Final Check Before Close
 
 Before running `bd close`:
 
@@ -188,7 +241,7 @@ Before running `bd close`:
 
 ---
 
-## STEP 10: Close the Issue
+## STEP 11: Close the Issue
 
 Once everything is validated:
 
