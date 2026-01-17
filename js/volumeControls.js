@@ -125,9 +125,10 @@ function getSliders(panelX, panelY) {
 function getMuteButton(panelX, panelY) {
     const totalWidth = VOLUME_PANEL.BUTTON_WIDTH * 2 + VOLUME_PANEL.BUTTON_SPACING;
     const startX = panelX + (VOLUME_PANEL.WIDTH - totalWidth) / 2;
+    // Position below trajectory toggle (290 + 40 height + 12 spacing = 342)
     return {
         x: startX,
-        y: panelY + VOLUME_PANEL.HEIGHT - 130,
+        y: panelY + 342,
         width: VOLUME_PANEL.BUTTON_WIDTH,
         height: VOLUME_PANEL.BUTTON_HEIGHT
     };
@@ -142,9 +143,10 @@ function getMuteButton(panelX, panelY) {
 function getCrtButton(panelX, panelY) {
     const totalWidth = VOLUME_PANEL.BUTTON_WIDTH * 2 + VOLUME_PANEL.BUTTON_SPACING;
     const startX = panelX + (VOLUME_PANEL.WIDTH - totalWidth) / 2;
+    // Same row as mute button (Y=342)
     return {
         x: startX + VOLUME_PANEL.BUTTON_WIDTH + VOLUME_PANEL.BUTTON_SPACING,
-        y: panelY + VOLUME_PANEL.HEIGHT - 130,
+        y: panelY + 342,
         width: VOLUME_PANEL.BUTTON_WIDTH,
         height: VOLUME_PANEL.BUTTON_HEIGHT
     };
@@ -157,8 +159,9 @@ function getCrtButton(panelX, panelY) {
  * @returns {{x: number, y: number, width: number, height: number, labelWidth: number}}
  */
 function getControlModeButton(panelX, panelY) {
-    // Position below the mute/CRT row
-    const buttonY = panelY + VOLUME_PANEL.HEIGHT - 190;
+    // Position below the sliders with proper spacing above mute/CRT row
+    // Sliders end around Y=220, so start this section at Y=240
+    const buttonY = panelY + 240;
     return {
         x: panelX + VOLUME_PANEL.PADDING,
         y: buttonY,
@@ -175,8 +178,8 @@ function getControlModeButton(panelX, panelY) {
  * @returns {{x: number, y: number, width: number, height: number, labelWidth: number}}
  */
 function getTrajectoryButton(panelX, panelY) {
-    // Position below control mode
-    const buttonY = panelY + VOLUME_PANEL.HEIGHT - 190 + VOLUME_PANEL.TOGGLE_HEIGHT + VOLUME_PANEL.TOGGLE_SPACING;
+    // Position below control mode (240 + 40 height + 10 spacing = 290)
+    const buttonY = panelY + 240 + VOLUME_PANEL.TOGGLE_HEIGHT + VOLUME_PANEL.TOGGLE_SPACING;
     return {
         x: panelX + VOLUME_PANEL.PADDING,
         y: buttonY,
@@ -193,11 +196,11 @@ function getTrajectoryButton(panelX, panelY) {
  * @returns {{x: number, y: number, width: number, height: number}}
  */
 function getChangeNameButton(panelX, panelY) {
-    // Centered, full width-ish button at the bottom
+    // Centered, full width-ish button below mute/CRT row (342 + 48 height + 12 spacing = 402)
     const buttonWidth = VOLUME_PANEL.WIDTH - VOLUME_PANEL.PADDING * 2;
     return {
         x: panelX + VOLUME_PANEL.PADDING,
-        y: panelY + VOLUME_PANEL.HEIGHT - 70,
+        y: panelY + 402,
         width: buttonWidth,
         height: VOLUME_PANEL.BUTTON_HEIGHT
     };
