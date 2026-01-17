@@ -42,3 +42,15 @@ config.js
 
 # Convex
 convex/_generated/
+
+# Unity (artifacts from native branch that may appear on main)
+Library/
+Temp/
+Logs/
+UserSettings/
+*.csproj
+*.sln
+*.slnx
+obj/
+Builds/
+Assets/TextMesh Pro/
