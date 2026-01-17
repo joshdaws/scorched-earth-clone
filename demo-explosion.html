@@ -93,15 +93,15 @@
 
     // Sprite sheet config
     const spriteSheet = new Image();
-    spriteSheet.src = 'assets/images/effects/explosion-synthwave.png';
+    spriteSheet.src = 'assets/images/effects/explosion-classic.png';
 
-    // 4x4 grid layout: 16 frames (1024x1024 total)
+    // 4x3 grid layout: 12 frames (256x256 total)
     const COLS = 4;
-    const ROWS = 4;
+    const ROWS = 3;
     const FRAME_COUNT = COLS * ROWS;
-    const FRAME_WIDTH = 256;   // 1024 / 4
-    const FRAME_HEIGHT = 256;  // 1024 / 4
-    const FRAME_DURATION = 50; // ms per frame
+    const FRAME_WIDTH = 64;    // 256 / 4
+    const FRAME_HEIGHT = 85;   // 256 / 3
+    const FRAME_DURATION = 60; // ms per frame
 
     // Active explosions
     const explosions = [];
