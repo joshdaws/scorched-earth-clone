@@ -61,6 +61,7 @@ import * as NameEntry from './nameEntry.js';
 import * as TitleScene from './titleScene/titleScene.js';
 import { Button } from './ui/Button.js';
 import * as ControlSettings from './controls/controlSettings.js';
+import * as SceneIsolation from './sceneIsolation.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -5983,14 +5984,421 @@ async function init() {
     // Expose DebugTools as 'Debug' for convenience (e.g., Debug.skipToShop())
     // This creates a merged object with both Debug module and DebugTools functions
     window.Debug = { ...Debug, ...DebugTools };
+    window.SceneIsolation = SceneIsolation;
 
     // Expose game objects for testing/debugging
     window.getPlayerTank = () => playerTank;
     window.getEnemyTank = () => enemyTank;
     window.getTerrain = () => currentTerrain;
 
+    // Initialize scene isolation (parse URL parameters)
+    const sceneInfo = SceneIsolation.init();
+
+    // Enable debug mode if requested via URL
+    if (SceneIsolation.isDebugRequested()) {
+        Debug.setEnabled(true);
+        console.log('[Main] Debug mode enabled via URL parameter');
+    }
+
     // Start the game loop with update, render, and context
     Game.startLoop(update, render, ctx);
+
+    // Handle scene isolation routing after loop starts
+    // This allows us to bypass the menu and go directly to test scenes
+    if (SceneIsolation.hasTestScene()) {
+        handleSceneIsolation(sceneInfo.scene, sceneInfo.params);
+    }
+}
+
+/**
+ * Handle scene isolation - route to appropriate test scene based on URL params.
+ * @param {Object|null} scene - Scene configuration from SceneIsolation
+ * @param {Object} params - URL parameters
+ */
+function handleSceneIsolation(scene, params) {
+    if (!scene) {
+        console.warn('[SceneIsolation] Unknown scene:', params.scene);
+        console.log('[SceneIsolation] Available scenes:', SceneIsolation.listScenes().join(', '));
+        return;
+    }
+
+    console.log(`[SceneIsolation] Setting up scene: ${scene.name}`);
+
+    // Stop title scene animation for test scenes
+    TitleScene.stop();
+
+    // Apply URL parameter overrides
+    if (params.round !== null) {
+        currentRound = params.round;
+        console.log(`[SceneIsolation] Starting at round ${currentRound}`);
+    }
+
+    if (params.money !== null) {
+        Money.init();
+        Money.addMoney(params.money - GAME.STARTING_MONEY);
+        console.log(`[SceneIsolation] Starting money: ${params.money}`);
+    }
+
+    // Handle specific scenes
+    switch (params.scene) {
+        case 'slingshot-test':
+            setupSlingshotTestScene(scene, params);
+            break;
+
+        case 'physics-sandbox':
+            setupPhysicsSandboxScene(scene, params);
+            break;
+
+        case 'shop':
+            setupShopTestScene(scene, params);
+            break;
+
+        case 'terrain-viewer':
+            setupTerrainViewerScene(scene, params);
+            break;
+
+        case 'ai-debug':
+            setupAIDebugScene(scene, params);
+            break;
+
+        case 'round-start':
+            setupRoundStartScene(scene, params);
+            break;
+
+        default:
+            // Generic scene: just skip to playing state
+            Game.setState(GAME_STATES.PLAYING);
+            break;
+    }
+}
+
+/**
+ * Setup slingshot/aiming test scene.
+ * Minimal setup for testing touch aiming controls.
+ */
+function setupSlingshotTestScene(scene, params) {
+    console.log('[SceneIsolation] Setting up slingshot test scene');
+
+    // Initialize game state without going through menus
+    startNewRunState();
+    Money.init();
+
+    // Generate terrain
+    currentTerrain = generateTerrain(undefined, undefined, {
+        roughness: 0.5,
+        minHeightPercent: 0.2,
+        maxHeightPercent: 0.7,
+        seed: params.seed
+    });
+
+    // Place tanks
+    const tanks = placeTanksOnTerrain(currentTerrain);
+    playerTank = tanks.player;
+    enemyTank = tanks.enemy;
+
+    // Set fixed wind if specified, otherwise disable wind for consistent testing
+    if (params.wind !== null) {
+        Wind.setWind(params.wind);
+    } else {
+        Wind.setWind(0);
+    }
+
+    // Update TestAPI references
+    TestAPI.setPlayerTank(playerTank);
+    TestAPI.setEnemyTank(enemyTank);
+    TestAPI.setTerrain(currentTerrain);
+
+    // Initialize turn system
+    Turn.init();
+    // Turn.init() automatically sets phase to PLAYER_AIM
+
+    // Enable game input for aiming
+    Input.enableGameInput();
+
+    // Go to playing state
+    Game.setState(GAME_STATES.PLAYING);
+
+    console.log('[SceneIsolation] Slingshot test ready - use TestAPI.aim() and TestAPI.fire() to test');
+}
+
+/**
+ * Setup physics sandbox scene.
+ * Full physics testing with trajectory visualization.
+ */
+function setupPhysicsSandboxScene(scene, params) {
+    console.log('[SceneIsolation] Setting up physics sandbox');
+
+    // Initialize game state
+    startNewRunState();
+    Money.init();
+
+    // Give player all weapons with unlimited ammo for testing
+    Money.addMoney(99999);
+
+    // Generate terrain
+    currentTerrain = generateTerrain(undefined, undefined, {
+        roughness: 0.5,
+        minHeightPercent: 0.2,
+        maxHeightPercent: 0.7,
+        seed: params.seed
+    });
+
+    // Place tanks
+    const tanks = placeTanksOnTerrain(currentTerrain);
+    playerTank = tanks.player;
+    enemyTank = tanks.enemy;
+
+    // Give player all weapons with high ammo
+    const allWeapons = WeaponRegistry.getAllWeapons();
+    for (const weapon of allWeapons) {
+        playerTank.inventory[weapon.id] = 999;
+    }
+
+    // Set wind (use URL param or enable normal wind)
+    if (params.wind !== null) {
+        Wind.setWind(params.wind);
+    } else {
+        Wind.generateRandomWind();
+    }
+
+    // Update TestAPI references
+    TestAPI.setPlayerTank(playerTank);
+    TestAPI.setEnemyTank(enemyTank);
+    TestAPI.setTerrain(currentTerrain);
+
+    // Initialize turn system
+    Turn.init();
+    // Turn.init() automatically sets phase to PLAYER_AIM
+
+    // Enable debug mode for physics visualization
+    Debug.setEnabled(true);
+
+    // Enable game input
+    Input.enableGameInput();
+
+    // Go to playing state
+    Game.setState(GAME_STATES.PLAYING);
+
+    console.log('[SceneIsolation] Physics sandbox ready');
+    console.log('  - TestAPI.simulateProjectile({ angle, power }) - simulate without firing');
+    console.log('  - TestAPI.fireAndCollect({ angle, power }) - simulate with damage calculation');
+    console.log('  - TestAPI.validatePhysics({ angle, power, expectedRange }) - validate physics');
+    console.log('  - All weapons available with unlimited ammo');
+}
+
+/**
+ * Setup shop test scene.
+ * Shop UI with generous budget for testing.
+ */
+function setupShopTestScene(scene, params) {
+    console.log('[SceneIsolation] Setting up shop test scene');
+
+    // Initialize money with generous budget
+    Money.init();
+    const startingMoney = params.money ?? scene.setup.startingMoney ?? 10000;
+    Money.addMoney(startingMoney - GAME.STARTING_MONEY);
+
+    // Set round number for shop pricing
+    currentRound = params.round ?? 1;
+
+    // Create a mock player tank for inventory
+    playerTank = {
+        x: 0,
+        y: 0,
+        health: TANK.START_HEALTH,
+        maxHealth: TANK.START_HEALTH,
+        inventory: {
+            'basic-shot': Infinity
+        },
+        currentWeapon: 'basic-shot',
+        angle: 45,
+        power: 50,
+        team: 'player'
+    };
+
+    // Go directly to shop state
+    Game.setState(GAME_STATES.SHOP);
+
+    console.log('[SceneIsolation] Shop test ready');
+    console.log(`  - Starting money: $${Money.getMoney()}`);
+    console.log('  - Use Money.addMoney(amount) to add more money');
+}
+
+/**
+ * Setup terrain viewer scene.
+ * View terrain generation with seed control.
+ */
+function setupTerrainViewerScene(scene, params) {
+    console.log('[SceneIsolation] Setting up terrain viewer');
+
+    // Initialize game state
+    startNewRunState();
+    Money.init();
+
+    // Generate terrain with optional seed
+    const seed = params.seed ?? Math.floor(Math.random() * 1000000);
+    currentTerrain = generateTerrain(undefined, undefined, {
+        roughness: 0.5,
+        minHeightPercent: 0.2,
+        maxHeightPercent: 0.7,
+        seed: seed
+    });
+
+    // Place tanks for reference
+    const tanks = placeTanksOnTerrain(currentTerrain);
+    playerTank = tanks.player;
+    enemyTank = tanks.enemy;
+
+    // Disable wind
+    Wind.setWind(0);
+
+    // Update TestAPI references
+    TestAPI.setPlayerTank(playerTank);
+    TestAPI.setEnemyTank(enemyTank);
+    TestAPI.setTerrain(currentTerrain);
+
+    // Initialize turn system but don't enable firing
+    Turn.init();
+
+    // Enable debug mode
+    Debug.setEnabled(true);
+
+    // Go to playing state (view only)
+    Game.setState(GAME_STATES.PLAYING);
+
+    console.log('[SceneIsolation] Terrain viewer ready');
+    console.log(`  - Seed: ${seed}`);
+    console.log('  - Reload with ?scene=terrain-viewer&seed=<number> to regenerate');
+    console.log('  - getTerrain().getHeight(x) to query terrain height');
+}
+
+/**
+ * Setup AI debug scene.
+ * Watch AI decision making in action.
+ */
+function setupAIDebugScene(scene, params) {
+    console.log('[SceneIsolation] Setting up AI debug scene');
+
+    // Initialize game state
+    startNewRunState();
+    Money.init();
+
+    // Generate terrain
+    currentTerrain = generateTerrain(undefined, undefined, {
+        roughness: 0.5,
+        minHeightPercent: 0.2,
+        maxHeightPercent: 0.7,
+        seed: params.seed
+    });
+
+    // Place tanks
+    const tanks = placeTanksOnTerrain(currentTerrain);
+    playerTank = tanks.player;
+    enemyTank = tanks.enemy;
+
+    // Generate wind
+    Wind.generateRandomWind();
+
+    // Set AI difficulty based on URL or default to medium
+    const difficultyMap = { easy: 1, medium: 2, hard: 3 };
+    const difficulty = difficultyMap[params.difficulty] ?? 2;
+    AI.setDifficulty(difficulty);
+
+    // Update TestAPI references
+    TestAPI.setPlayerTank(playerTank);
+    TestAPI.setEnemyTank(enemyTank);
+    TestAPI.setTerrain(currentTerrain);
+
+    // Initialize turn system
+    Turn.init();
+
+    // Enable debug mode
+    Debug.setEnabled(true);
+
+    // Start AI turn to see decision making
+    Turn.setPhase(TURN_PHASES.AI_AIM);
+
+    // Go to playing state
+    Game.setState(GAME_STATES.PLAYING);
+
+    console.log('[SceneIsolation] AI debug ready');
+    console.log(`  - AI difficulty: ${AI.getDifficultyName(difficulty)}`);
+    console.log('  - Watch console for AI decision logging');
+}
+
+/**
+ * Setup round-start scene.
+ * Jump to a specific round with appropriate scaling.
+ */
+function setupRoundStartScene(scene, params) {
+    const targetRound = params.round ?? 1;
+    console.log(`[SceneIsolation] Setting up round ${targetRound}`);
+
+    // Set round number
+    currentRound = targetRound;
+
+    // Initialize game state
+    startNewRunState();
+    Money.init();
+
+    // Generate terrain
+    currentTerrain = generateTerrain(undefined, undefined, {
+        roughness: 0.5,
+        minHeightPercent: 0.2,
+        maxHeightPercent: 0.7,
+        seed: params.seed
+    });
+
+    // Place tanks
+    const tanks = placeTanksOnTerrain(currentTerrain);
+    playerTank = tanks.player;
+    enemyTank = tanks.enemy;
+
+    // Scale enemy health based on round
+    const enemyHealth = getEnemyHealthForRound(currentRound);
+    enemyTank.health = enemyHealth;
+    enemyTank.maxHealth = enemyHealth;
+
+    // Apply health overrides from URL
+    if (params.playerHealth !== null) {
+        playerTank.health = params.playerHealth;
+        playerTank.maxHealth = params.playerHealth;
+    }
+    if (params.enemyHealth !== null) {
+        enemyTank.health = params.enemyHealth;
+        enemyTank.maxHealth = params.enemyHealth;
+    }
+
+    // Generate wind
+    Wind.generateRandomWind();
+
+    // Set AI difficulty based on URL or round
+    if (params.difficulty) {
+        const difficultyMap = { easy: 1, medium: 2, hard: 3 };
+        AI.setDifficulty(difficultyMap[params.difficulty] ?? 2);
+    } else {
+        AI.setDifficulty(AI.getAIDifficulty(currentRound));
+    }
+
+    // Update TestAPI references
+    TestAPI.setPlayerTank(playerTank);
+    TestAPI.setEnemyTank(enemyTank);
+    TestAPI.setTerrain(currentTerrain);
+
+    // Initialize turn system
+    Turn.init();
+    // Turn.init() automatically sets phase to PLAYER_AIM
+
+    // Enable game input
+    Input.enableGameInput();
+
+    // Go to playing state
+    Game.setState(GAME_STATES.PLAYING);
+
+    console.log('[SceneIsolation] Round start ready');
+    console.log(`  - Round: ${currentRound}`);
+    console.log(`  - Enemy health: ${enemyTank.health} HP`);
+    console.log(`  - AI difficulty: ${AI.getDifficultyName(AI.getDifficulty())}`);
 }
 
 /**
