@@ -13,7 +13,7 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { getSafeAreaInsets, onResize as registerResize, getScreenWidth, getScreenHeight } from '../screenSize.js';
+import { getSafeAreaInsets, onResize as registerResize, getScreenDimensions } from '../screenSize.js';
 
 // =============================================================================
 // CONFIGURATION
@@ -399,8 +399,12 @@ export function init() {
     resize();
 
     // Register for screen resize events
+    // Use viewport dimensions (not design dimensions) for full screen coverage
     registerResize((dimensions) => {
-        resize(dimensions.width, dimensions.height);
+        const safeArea = getSafeAreaInsets();
+        const viewportW = dimensions.viewportWidth - safeArea.left - safeArea.right;
+        const viewportH = dimensions.viewportHeight - safeArea.top - safeArea.bottom;
+        resize(viewportW, viewportH);
     });
 
     // Pause animation when tab is hidden (battery/performance optimization)
@@ -699,8 +703,11 @@ export function update(deltaTime) {
  * Handle window resize.
  * Updates camera aspect ratio, renderer size, and composer.
  *
- * @param {number} [width] - Optional width override
- * @param {number} [height] - Optional height override
+ * The title scene should fill the entire viewport (minus safe areas),
+ * unlike the game canvas which maintains a fixed aspect ratio.
+ *
+ * @param {number} [width] - Optional width override (viewport width)
+ * @param {number} [height] - Optional height override (viewport height)
  */
 export function resize(width, height) {
     if (!renderer || !camera || !composer || !canvas) return;
@@ -708,9 +715,18 @@ export function resize(width, height) {
     // Get safe area insets
     const safeArea = getSafeAreaInsets();
 
-    // Use provided dimensions or get from screenSize module
-    const w = width || getScreenWidth();
-    const h = height || getScreenHeight();
+    // Use provided dimensions or get actual viewport dimensions from screenSize module
+    // The title scene needs to fill the viewport, not use design dimensions
+    let w, h;
+    if (width !== undefined && height !== undefined) {
+        w = width;
+        h = height;
+    } else {
+        const dimensions = getScreenDimensions();
+        // Use viewport dimensions minus safe areas for full coverage
+        w = dimensions.viewportWidth - safeArea.left - safeArea.right;
+        h = dimensions.viewportHeight - safeArea.top - safeArea.bottom;
+    }
 
     // Update camera aspect ratio
     camera.aspect = w / h;
