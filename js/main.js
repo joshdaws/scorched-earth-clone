@@ -6574,8 +6574,9 @@ function render(ctx) {
                                  currentState === GAME_STATES.DIFFICULTY_SELECT;
 
     if (useTransparentClear) {
-        // Clear to transparent so TitleScene (3D WebGL) shows through
-        ctx.clearRect(0, 0, Renderer.getWidth(), Renderer.getHeight());
+        // Clear entire viewport (including letterbox areas) to transparent
+        // so TitleScene (3D WebGL) shows through everywhere
+        Renderer.clearTransparent();
     } else {
         // Normal opaque clear for gameplay states
         Renderer.clear();

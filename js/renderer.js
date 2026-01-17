@@ -182,6 +182,25 @@ export function clear() {
 }
 
 /**
+ * Clear the entire canvas to transparent.
+ * Use this when you want content beneath the canvas (like Three.js) to show through.
+ * Clears both the game content area and letterbox regions.
+ */
+export function clearTransparent() {
+    if (!ctx) return;
+
+    // Save current transform
+    ctx.save();
+
+    // Reset to identity to clear entire viewport (including letterbox areas)
+    ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+    ctx.clearRect(0, 0, canvasViewportWidth, canvasViewportHeight);
+
+    // Restore the game content transform
+    ctx.restore();
+}
+
+/**
  * Get the screen width (game logic should use this)
  * Now returns dynamic width that adapts to the device screen.
  * @returns {number} Current screen width in design-space pixels
