@@ -79,6 +79,12 @@ let appearDelay = 0;
 let contentVisible = false;
 
 /**
+ * Timestamp when the screen was shown (for fade-in calculation).
+ * @type {number}
+ */
+let showStartTime = 0;
+
+/**
  * Callback to execute when "Continue" is clicked (skip shop, go to next round).
  * @type {Function|null}
  */
@@ -229,6 +235,7 @@ export function show(options = {}) {
     appearDelay = delay;
     contentVisible = false;
     isVisible = true;
+    showStartTime = performance.now();
 
     // Start the delay timer for content to appear
     setTimeout(() => {
@@ -246,6 +253,7 @@ export function hide() {
     isVisible = false;
     contentVisible = false;
     animationTime = 0;
+    showStartTime = 0;
     tokenResult = null;
     roundAchievements = [];
 }
@@ -435,10 +443,33 @@ function getDifficultyColor(difficulty) {
 
 /**
  * Render the round transition screen.
+ * Includes a fade-in effect during the delay period so the transition is smooth.
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  */
 export function render(ctx) {
-    if (!isVisible || !contentVisible) return;
+    if (!isVisible) return;
+
+    // Calculate time elapsed since screen was shown
+    const elapsed = performance.now() - showStartTime;
+
+    // During the delay period, render a fade-in overlay so the transition is smooth
+    // This lets the player see the explosion while the screen gradually darkens
+    if (!contentVisible) {
+        // Calculate fade progress (0 to 1) over the delay period
+        // Use a slower fade for the first half to let the explosion be visible
+        const fadeProgress = Math.min(1, elapsed / appearDelay);
+        // Use an eased curve so the fade starts slow and accelerates
+        const easedProgress = fadeProgress * fadeProgress;
+        // Maximum overlay opacity during fade-in (will reach full 0.95 when content appears)
+        const maxFadeOpacity = 0.7;
+        const overlayOpacity = easedProgress * maxFadeOpacity;
+
+        ctx.save();
+        ctx.fillStyle = `rgba(10, 10, 26, ${overlayOpacity})`;
+        ctx.fillRect(0, 0, Renderer.getWidth(), Renderer.getHeight());
+        ctx.restore();
+        return;
+    }
 
     // Update button positions for current screen size
     updateButtonPositions();

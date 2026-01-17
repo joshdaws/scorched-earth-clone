@@ -29,6 +29,9 @@ LOG_FILE="$RALPH_DIR/ralph.log"
 PROGRESS_FILE="$RALPH_DIR/progress.txt"
 OUTPUT_FILE="$RALPH_DIR/output.tmp"
 MAX_ITERATIONS=50
+MAX_RETRIES=3
+INITIAL_RETRY_DELAY=5
+ITERATION_PAUSE=5
 
 # Colors for output
 RED='\033[0;31m'
@@ -222,6 +225,106 @@ count_remaining() {
     echo "${count:-0}"
 }
 
+# Run Claude with retry logic and exponential backoff
+run_claude_with_retry() {
+    local prompt_file="$1"
+    local output_file="$2"
+    local attempt=1
+    local delay=$INITIAL_RETRY_DELAY
+    local debug_dir="$RALPH_DIR/debug"
+
+    # Create debug directory if it doesn't exist
+    mkdir -p "$debug_dir"
+
+    while [[ $attempt -le $MAX_RETRIES ]]; do
+        log "Claude attempt $attempt of $MAX_RETRIES..."
+
+        # Pre-flight diagnostics
+        local prompt_size=$(wc -c < "$prompt_file" 2>/dev/null || echo "0")
+        local prompt_lines=$(wc -l < "$prompt_file" 2>/dev/null || echo "0")
+        log "  Prompt: $prompt_lines lines, $prompt_size bytes"
+
+        if [[ ! -s "$prompt_file" ]]; then
+            log "ERROR: Prompt file is empty or missing!"
+            return 1
+        fi
+
+        # Run Claude and capture exit code
+        local exit_code=0
+        local timestamp=$(date '+%Y%m%d_%H%M%S')
+        cat "$prompt_file" | claude --dangerously-skip-permissions 2>&1 | tee "$output_file" || exit_code=$?
+
+        # Check if output contains the "No messages returned" error
+        if grep -q "No messages returned" "$output_file" 2>/dev/null; then
+            log "Transient error detected: No messages returned"
+
+            # Save debug info for analysis
+            local debug_file="$debug_dir/error_${timestamp}_attempt${attempt}.txt"
+            {
+                echo "=== ERROR DEBUG INFO ==="
+                echo "Timestamp: $(date '+%Y-%m-%d %H:%M:%S')"
+                echo "Attempt: $attempt of $MAX_RETRIES"
+                echo "Prompt file: $prompt_file"
+                echo "Prompt size: $prompt_size bytes, $prompt_lines lines"
+                echo "Exit code: $exit_code"
+                echo ""
+                echo "=== ENVIRONMENT ==="
+                echo "Node version: $(node --version 2>/dev/null || echo 'unknown')"
+                echo "Claude version: $(claude --version 2>/dev/null || echo 'unknown')"
+                echo "PWD: $(pwd)"
+                echo ""
+                echo "=== OUTPUT ==="
+                cat "$output_file"
+                echo ""
+                echo "=== PROMPT FIRST 50 LINES ==="
+                head -50 "$prompt_file"
+            } > "$debug_file"
+            log "  Debug info saved to: $debug_file"
+
+            if [[ $attempt -lt $MAX_RETRIES ]]; then
+                echo -e "${YELLOW}Transient error detected. Retrying in ${delay}s... (attempt $attempt of $MAX_RETRIES)${NC}"
+                sleep $delay
+                # Exponential backoff: double the delay for next attempt
+                delay=$((delay * 2))
+                ((attempt++))
+                continue
+            else
+                log "Max retries reached. Giving up on this iteration."
+                echo -e "${RED}Max retries reached. Skipping this iteration.${NC}"
+                echo -e "${YELLOW}Debug files saved in: $debug_dir${NC}"
+                return 1
+            fi
+        fi
+
+        # Check for other unhandled promise rejections (transient errors)
+        if grep -q "unhandledRejection\|promise.*rejected" "$output_file" 2>/dev/null; then
+            log "Transient error detected: Unhandled rejection"
+            if [[ $attempt -lt $MAX_RETRIES ]]; then
+                echo -e "${YELLOW}Transient error detected. Retrying in ${delay}s... (attempt $attempt of $MAX_RETRIES)${NC}"
+                sleep $delay
+                delay=$((delay * 2))
+                ((attempt++))
+                continue
+            else
+                log "Max retries reached. Giving up on this iteration."
+                echo -e "${RED}Max retries reached. Skipping this iteration.${NC}"
+                return 1
+            fi
+        fi
+
+        # Success or non-transient error
+        if [[ $exit_code -eq 0 ]]; then
+            log "Claude completed successfully"
+            return 0
+        else
+            log "Claude exited with code $exit_code (non-transient)"
+            return $exit_code
+        fi
+    done
+
+    return 1
+}
+
 # Generate prompt from template
 generate_prompt() {
     local ready_cmd="$1"
@@ -332,11 +435,12 @@ main() {
 
         log "Running Claude for iteration $iteration..."
 
-        # Run Claude and capture output
-        if cat "$GENERATED_PROMPT" | claude --dangerously-skip-permissions 2>&1 | tee "$OUTPUT_FILE"; then
-            log "Claude iteration $iteration completed"
+        # Run Claude with retry logic
+        if run_claude_with_retry "$GENERATED_PROMPT" "$OUTPUT_FILE"; then
+            log "Claude iteration $iteration completed successfully"
         else
-            log "Claude iteration $iteration exited with error"
+            log "Claude iteration $iteration failed after retries"
+            echo -e "${RED}Iteration $iteration failed. Continuing to next iteration...${NC}"
         fi
 
         # Check for completion signal (must be exact match on its own line)
@@ -352,9 +456,9 @@ main() {
 
         rm -f "$OUTPUT_FILE"
 
-        # Brief pause between iterations
-        log "Pausing before next iteration..."
-        sleep 2
+        # Brief pause between iterations to avoid rate limiting
+        log "Pausing ${ITERATION_PAUSE}s before next iteration..."
+        sleep $ITERATION_PAUSE
     done
 
     if [[ $iteration -ge $MAX_ITERATIONS ]]; then
