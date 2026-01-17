@@ -252,48 +252,15 @@ run_claude_with_retry() {
         # Run Claude and capture exit code
         local exit_code=0
         local timestamp=$(date '+%Y%m%d_%H%M%S')
-        cat "$prompt_file" | claude --dangerously-skip-permissions 2>&1 | tee "$output_file" || exit_code=$?
+        local stderr_file="$debug_dir/stderr_${timestamp}.txt"
 
-        # Check if output contains the "No messages returned" error
-        if grep -q "No messages returned" "$output_file" 2>/dev/null; then
-            log "Transient error detected: No messages returned"
+        # Run Claude, capturing stdout and stderr separately for better debugging
+        cat "$prompt_file" | claude --dangerously-skip-permissions > >(tee "$output_file") 2> >(tee "$stderr_file" >&2) || exit_code=$?
 
-            # Save debug info for analysis
-            local debug_file="$debug_dir/error_${timestamp}_attempt${attempt}.txt"
-            {
-                echo "=== ERROR DEBUG INFO ==="
-                echo "Timestamp: $(date '+%Y-%m-%d %H:%M:%S')"
-                echo "Attempt: $attempt of $MAX_RETRIES"
-                echo "Prompt file: $prompt_file"
-                echo "Prompt size: $prompt_size bytes, $prompt_lines lines"
-                echo "Exit code: $exit_code"
-                echo ""
-                echo "=== ENVIRONMENT ==="
-                echo "Node version: $(node --version 2>/dev/null || echo 'unknown')"
-                echo "Claude version: $(claude --version 2>/dev/null || echo 'unknown')"
-                echo "PWD: $(pwd)"
-                echo ""
-                echo "=== OUTPUT ==="
-                cat "$output_file"
-                echo ""
-                echo "=== PROMPT FIRST 50 LINES ==="
-                head -50 "$prompt_file"
-            } > "$debug_file"
-            log "  Debug info saved to: $debug_file"
-
-            if [[ $attempt -lt $MAX_RETRIES ]]; then
-                echo -e "${YELLOW}Transient error detected. Retrying in ${delay}s... (attempt $attempt of $MAX_RETRIES)${NC}"
-                sleep $delay
-                # Exponential backoff: double the delay for next attempt
-                delay=$((delay * 2))
-                ((attempt++))
-                continue
-            else
-                log "Max retries reached. Giving up on this iteration."
-                echo -e "${RED}Max retries reached. Skipping this iteration.${NC}"
-                echo -e "${YELLOW}Debug files saved in: $debug_dir${NC}"
-                return 1
-            fi
+        # Check stderr for "No messages returned" - this is a spurious error from Claude Code CLI
+        # that doesn't actually block execution. Just log and ignore it.
+        if grep -q "No messages returned" "$stderr_file" 2>/dev/null; then
+            log "  (Ignoring spurious 'No messages returned' error - work continues normally)"
         fi
 
         # Check for other unhandled promise rejections (transient errors)
