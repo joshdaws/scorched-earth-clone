@@ -104,14 +104,14 @@ const pointer = {
 let canvasRef = null;
 
 // Callback storage
-let keyDownCallbacks = [];
-let keyUpCallbacks = [];
-let mouseDownCallbacks = [];
-let mouseUpCallbacks = [];
-let mouseMoveCallbacks = [];
-let touchStartCallbacks = [];
-let touchEndCallbacks = [];
-let touchMoveCallbacks = [];
+const keyDownCallbacks = [];
+const keyUpCallbacks = [];
+const mouseDownCallbacks = [];
+const mouseUpCallbacks = [];
+const mouseMoveCallbacks = [];
+const touchStartCallbacks = [];
+const touchEndCallbacks = [];
+const touchMoveCallbacks = [];
 
 /**
  * Initialize input handlers

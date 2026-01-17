@@ -16,20 +16,94 @@ bd create --title "..." --type bug --priority P2  # Report new bugs
 ## Project Stack
 
 - **Frontend**: Vanilla JavaScript, HTML5 Canvas
-- **Styling**: CSS
-- **No build step**: Direct browser loading via index.html
+- **Build**: Vite (dev server and production builds)
+- **Testing**: Vitest with happy-dom
+- **Linting**: ESLint with modern ES6+ rules
+- **Type Checking**: TypeScript (for Convex files)
+
+## Quality Gates (MANDATORY)
+
+**ALWAYS run quality checks before committing:**
+
+```bash
+npm run check    # Runs lint + typecheck + tests
+```
+
+Individual commands:
+```bash
+npm run lint        # ESLint - must pass (0 errors, warnings OK)
+npm run lint:fix    # Auto-fix style issues
+npm run typecheck   # TypeScript check
+npm run test        # Run all tests
+npm run test:watch  # Watch mode for development
+```
+
+### Pre-commit Hook
+
+The pre-commit hook automatically runs:
+1. ESLint (errors block commit)
+2. TypeScript check (errors block commit)
+3. Tests (failures block commit)
+4. Beads sync
+
+**If the pre-commit hook fails:**
+1. Read the error message
+2. Fix the issue
+3. Try committing again
+
+### Test-Driven Development
+
+**For new features:**
+1. Write tests first in `tests/unit/` or `tests/integration/`
+2. Run tests (they should fail)
+3. Implement the feature
+4. Run tests (they should pass)
+5. Run full `npm run check`
+6. Commit
+
+**For bug fixes:**
+1. Write a failing test that reproduces the bug
+2. Fix the bug
+3. Verify test passes
+4. Run full `npm run check`
+5. Commit
+
+### Writing Tests
+
+Test files live in:
+```
+tests/
+  unit/           # Pure function tests (physics, damage, weapons)
+  integration/    # System integration tests (game flow, turns)
+  helpers/        # Test utilities and mocks
+```
+
+Example test:
+```javascript
+import { describe, it, expect } from 'vitest';
+import { WeaponRegistry } from '../../js/weapons.js';
+
+describe('WeaponRegistry', () => {
+  it('returns weapon by ID', () => {
+    const weapon = WeaponRegistry.getWeapon('basic-shot');
+    expect(weapon).not.toBeNull();
+    expect(weapon.id).toBe('basic-shot');
+  });
+});
+```
 
 ## Running the Game
 
-Open `index.html` directly in a browser, or use a local server:
+Use Vite dev server (recommended) or simple HTTP server:
 
 ```bash
-# Option 1: Python simple server
+# Option 1: Vite dev server (recommended - has hot reload)
+npm run dev
+# Opens http://localhost:8000 automatically
+
+# Option 2: Python simple server
 python3 -m http.server 8000
 # Then open http://localhost:8000
-
-# Option 2: Node serve (if available)
-npx serve .
 ```
 
 ## Testing with Chrome Extension (MANDATORY)

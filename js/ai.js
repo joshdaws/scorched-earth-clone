@@ -274,7 +274,7 @@ function calculateBallisticAim(aiTank, playerTank) {
     angle = Math.max(15, Math.min(165, angle));
 
     if (debugMode) {
-        console.log(`[AI] Ballistic calculation:`);
+        console.log('[AI] Ballistic calculation:');
         console.log(`[AI]   dx=${dx.toFixed(1)}, dy=${dy.toFixed(1)}, distance=${distance.toFixed(1)}`);
         console.log(`[AI]   v0=${v0.toFixed(2)}, discriminant=${discriminant.toFixed(2)}`);
         console.log(`[AI]   Calculated angle=${angle.toFixed(1)}°, power=${power.toFixed(1)}%`);
@@ -1329,7 +1329,7 @@ const AI_PREFERRED_PURCHASES = {
     [AI_DIFFICULTY.EASY]: [],  // Easy AI doesn't buy
     [AI_DIFFICULTY.MEDIUM]: [
         'missile',       // $500, 5 ammo - reliable upgrade
-        'roller',        // $1500, 3 ammo - good for valleys
+        'roller'        // $1500, 3 ammo - good for valleys
     ],
     [AI_DIFFICULTY.HARD]: [
         'mini-nuke',     // $4000, 2 ammo - high damage
@@ -1339,7 +1339,7 @@ const AI_PREFERRED_PURCHASES = {
         'big-shot',      // $1000, 3 ammo - solid damage
         'missile',       // $500, 5 ammo - reliable
         'digger',        // $2000, 3 ammo - terrain penetration
-        'roller',        // $1500, 3 ammo - rolling damage
+        'roller'        // $1500, 3 ammo - rolling damage
     ],
     [AI_DIFFICULTY.HARD_PLUS]: [
         'nuke',          // $8000, 1 ammo - devastating
@@ -1348,7 +1348,7 @@ const AI_PREFERRED_PURCHASES = {
         'heavy-digger',  // $3500, 2 ammo - terrain penetration
         'heavy-roller',  // $2500, 2 ammo - heavy damage
         'big-shot',      // $1000, 3 ammo - solid damage
-        'missile',       // $500, 5 ammo - reliable
+        'missile'       // $500, 5 ammo - reliable
     ]
 };
 

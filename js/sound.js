@@ -2099,7 +2099,7 @@ function playEpicRevealSound(volume) {
             { freq: 392, time: 0.45 },   // G4
             { freq: 494, time: 0.6 },    // B4
             { freq: 587, time: 0.8 },    // D5
-            { freq: 784, time: 1.0 },    // G5 - hold
+            { freq: 784, time: 1.0 }    // G5 - hold
         ];
 
         notes.forEach(note => {
@@ -2209,7 +2209,7 @@ function playLegendaryRevealSound(volume) {
             { freq: 784, time: 0.9, dur: 0.8 },   // G5 (long)
             { freq: 740, time: 1.7, dur: 0.2 },   // F#5
             { freq: 784, time: 1.9, dur: 0.2 },   // G5
-            { freq: 880, time: 2.1, dur: 1.5 },   // A5 (triumphant hold)
+            { freq: 880, time: 2.1, dur: 1.5 }   // A5 (triumphant hold)
         ];
 
         melody.forEach(note => {

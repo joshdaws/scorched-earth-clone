@@ -382,7 +382,7 @@ export class Button {
         let bgColor = this.bgColor;
         let borderColor = this.borderColor;
         let textColor = this.textColor;
-        let glowColor = this.glowColor;
+        const glowColor = this.glowColor;
         let glowIntensity = pulseIntensity;
 
         if (this.disabled) {

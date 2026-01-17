@@ -137,7 +137,7 @@ export function calculateDamage(explosion, tank, weapon = null) {
             `distance=${distance.toFixed(1)}px, ` +
             `falloff=${(falloffMultiplier * 100).toFixed(0)}%, ` +
             `damage=${damage}` +
-            (isDirectHit ? ` (1.5x multiplier applied)` : '')
+            (isDirectHit ? ' (1.5x multiplier applied)' : '')
         );
     }
 

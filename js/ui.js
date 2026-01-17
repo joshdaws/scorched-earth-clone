@@ -240,7 +240,7 @@ const HUD = {
  * Current player money (managed externally, passed to render functions).
  * @type {number}
  */
-let displayMoney = 0;
+const displayMoney = 0;
 
 /**
  * Current turn state (whose turn it is).

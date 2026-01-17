@@ -99,7 +99,7 @@ const CONFIG = {
 // MODULE STATE
 // =============================================================================
 
-let state = {
+const state = {
     hoveredCard: -1,
     isAnimating: false,
     selectedOption: null,

@@ -625,7 +625,7 @@ function renderStatsView(ctx) {
     const rowHeight = 42;
     const leftX = 100;
     const rightX = Renderer.getWidth() / 2 + 60;
-    let startY = listTop + 90;
+    const startY = listTop + 90;
 
     // Render left column
     for (let i = 0; i < leftStats.length; i++) {

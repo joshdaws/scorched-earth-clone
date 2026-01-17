@@ -149,7 +149,7 @@ let cableLength = 0;
 /** @type {number} Cable swing offset */
 let cableSwing = 0;
 /** @type {number} Tank Y position on cable */
-let tankY = 0;
+const tankY = 0;
 /** @type {boolean} Tank has touched down */
 let tankLanded = false;
 
@@ -163,7 +163,7 @@ let transmissionFlicker = 0;
 /** @type {Array} Rotor wash particles */
 let washParticles = [];
 /** @type {Array} Fog layer positions */
-let fogLayers = [];
+const fogLayers = [];
 /** @type {number} Screen flash opacity */
 let flashOpacity = 0;
 /** @type {number} Reveal text alpha */

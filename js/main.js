@@ -368,13 +368,13 @@ function calculateMenuLayout(height, width) {
     const titleMaxWidth = 850;  // Approximate width of "SCORCHED" at base font size
     const titleMinMargin = 40;  // Minimum horizontal margin on each side
     const titleAvailableWidth = width - (titleMinMargin * 2);
-    
+
     // Scale based on width when viewport is too narrow for full-size title
     const widthBasedTitleScale = Math.min(1, titleAvailableWidth / titleMaxWidth);
-    
+
     // Scale based on height for compact screens (phones)
     const heightBasedTitleScale = isCompact ? Math.max(0.5, height / 800) : 1;
-    
+
     // Use the smaller of the two scales to ensure title fits both dimensions
     // Clamp between 0.4 (minimum readable) and 1.0 (maximum, current size)
     const titleScale = Math.max(0.4, Math.min(widthBasedTitleScale, heightBasedTitleScale));
@@ -891,7 +891,7 @@ function renderMenuButton(ctx, button, pulseIntensity, badgeCount = 0) {
 const TITLE_TEXT_CONFIG = {
     extrusionDepth: 16,   // How "thick" the 3D block shadow is (doubled for larger title)
     skewX: -0.15,         // Slight italic skew for dynamic feel
-    extrusionColor: '#2a003b', // Dark purple shadow color
+    extrusionColor: '#2a003b' // Dark purple shadow color
 };
 
 /**
@@ -907,11 +907,11 @@ const TITLE_TEXT_CONFIG = {
  */
 function drawSynthwaveText(ctx, text, x, y, fontSize, pulseIntensity) {
     ctx.save();
-    
+
     // Apply skew transform for dynamic appearance
     ctx.translate(x, y);
     ctx.transform(1, 0, TITLE_TEXT_CONFIG.skewX, 1, 0, 0);
-    
+
     ctx.font = `${fontSize}px ${UI.TITLE_FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -966,11 +966,11 @@ function drawSynthwaveText(ctx, text, x, y, fontSize, pulseIntensity) {
  */
 function drawNeonSubtitle(ctx, text, x, y, fontSize, pulseIntensity) {
     ctx.save();
-    
+
     // Apply same skew as main title for consistency
     ctx.translate(x, y);
     ctx.transform(1, 0, TITLE_TEXT_CONFIG.skewX, 1, 0, 0);
-    
+
     ctx.font = `${fontSize}px ${UI.TITLE_FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -1067,7 +1067,7 @@ function renderMenu(ctx) {
     const baseScorchedY = isCompact ? 100 : 120;
     const baseEarthY = isCompact ? 190 : 220;
     const baseSubtitleY = isCompact ? 260 : 300;
-    
+
     // Scale Y positions proportionally with titleScale to maintain visual balance
     // The title block should shrink as a unit, not just the font sizes
     const scorchedY = Math.round(baseScorchedY * titleScale);
@@ -2114,7 +2114,7 @@ function updateProjectile() {
 
         // Check for MIRV splitting at apex
         if (projectile.shouldSplit()) {
-            console.log(`Projectile at apex - splitting!`);
+            console.log('Projectile at apex - splitting!');
 
             // Create child projectiles
             const children = createSplitProjectiles(projectile);
@@ -3090,7 +3090,7 @@ function renderExplosionEffect(ctx) {
             const gradient = ctx.createRadialGradient(x, y, 0, x, y, flashRadius);
             gradient.addColorStop(0, `rgba(255, 255, 255, ${flashAlpha})`);
             gradient.addColorStop(0.5, `rgba(255, 200, 100, ${flashAlpha * 0.8})`);
-            gradient.addColorStop(1, `rgba(255, 100, 50, 0)`);
+            gradient.addColorStop(1, 'rgba(255, 100, 50, 0)');
             ctx.fillStyle = gradient;
             ctx.fill();
         }
@@ -3108,7 +3108,7 @@ function renderExplosionEffect(ctx) {
             fireGradient.addColorStop(0, `rgba(255, 150, 50, ${fireAlpha})`);
             fireGradient.addColorStop(0.4, `rgba(255, 100, 30, ${fireAlpha * 0.7})`);
             fireGradient.addColorStop(0.7, `rgba(200, 50, 20, ${fireAlpha * 0.4})`);
-            fireGradient.addColorStop(1, `rgba(100, 20, 10, 0)`);
+            fireGradient.addColorStop(1, 'rgba(100, 20, 10, 0)');
             ctx.fillStyle = fireGradient;
             ctx.fill();
         }
@@ -3165,7 +3165,7 @@ function renderExplosionEffect(ctx) {
         const gradient = ctx.createRadialGradient(x, y, 0, x, y, expandedRadius);
         gradient.addColorStop(0, `rgba(255, 200, 100, ${alpha})`);
         gradient.addColorStop(0.5, `rgba(255, 100, 50, ${alpha * 0.7})`);
-        gradient.addColorStop(1, `rgba(200, 50, 20, 0)`);
+        gradient.addColorStop(1, 'rgba(200, 50, 20, 0)');
         ctx.fillStyle = gradient;
         ctx.fill();
 
@@ -4525,19 +4525,19 @@ function renderHighScores(ctx) {
     const statValueY = statsY + 42;
 
     // Total Runs
-    ctx.fillText(`Total Runs: `, stat1X, statValueY);
+    ctx.fillText('Total Runs: ', stat1X, statValueY);
     ctx.fillStyle = COLORS.NEON_CYAN;
     ctx.fillText(`${lifetimeStats.totalRuns}`, stat1X + 90, statValueY);
 
     // Avg Rounds
     ctx.fillStyle = COLORS.TEXT_LIGHT;
-    ctx.fillText(`Avg Rounds: `, stat2X, statValueY);
+    ctx.fillText('Avg Rounds: ', stat2X, statValueY);
     ctx.fillStyle = COLORS.NEON_CYAN;
     ctx.fillText(`${lifetimeStats.averageRoundsPerRun.toFixed(1)}`, stat2X + 95, statValueY);
 
     // Best
     ctx.fillStyle = COLORS.TEXT_LIGHT;
-    ctx.fillText(`Best: `, stat3X, statValueY);
+    ctx.fillText('Best: ', stat3X, statValueY);
     ctx.fillStyle = COLORS.NEON_YELLOW;
     ctx.fillText(`${lifetimeStats.bestRound}`, stat3X + 45, statValueY);
 

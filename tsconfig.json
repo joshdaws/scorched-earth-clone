@@ -9,10 +9,17 @@
     "noEmit": true,
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
+    "allowJs": false,
+    "checkJs": false,
     "paths": {
       "./_generated/*": ["./convex/_generated/*"]
     }
   },
-  "include": ["convex/**/*.ts"],
-  "exclude": ["node_modules", "convex/_generated"]
+  "include": [
+    "convex/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "convex/_generated"
+  ]
 }

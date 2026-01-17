@@ -176,7 +176,7 @@ export function calculateModifiedRates(baseRates, performanceBonus) {
 
     // Calculate distribution
     let rareBonus = actualBonus * PERFORMANCE_BONUS_DISTRIBUTION.RARE;
-    let epicBonus = actualBonus * PERFORMANCE_BONUS_DISTRIBUTION.EPIC;
+    const epicBonus = actualBonus * PERFORMANCE_BONUS_DISTRIBUTION.EPIC;
     let legendaryBonus = actualBonus * PERFORMANCE_BONUS_DISTRIBUTION.LEGENDARY;
 
     // Cap legendary bonus at +4% from performance
@@ -422,7 +422,7 @@ export function selectTank(rarity, options = {}) {
     const { exclusions = [], forceNew = false } = options;
 
     // Get all tanks of this rarity
-    let candidates = getTanksByRarity(rarity);
+    const candidates = getTanksByRarity(rarity);
 
     if (candidates.length === 0) {
         console.warn(`[DropRates] No tanks available for rarity: ${rarity}`);
@@ -459,7 +459,7 @@ export function selectTank(rarity, options = {}) {
     }
 
     // First selection attempt
-    let selectedIndex = Math.floor(Math.random() * filtered.length);
+    const selectedIndex = Math.floor(Math.random() * filtered.length);
     let selected = filtered[selectedIndex];
 
     // Duplicate reroll: if selected is owned, try once more within same rarity
