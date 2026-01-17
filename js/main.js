@@ -14,7 +14,7 @@ import * as Turn from './turn.js';
 import { COLORS, DEBUG, CANVAS, UI, GAME_STATES, TURN_PHASES, PHYSICS, TANK, PROJECTILE, GAME } from './constants.js';
 import { generateTerrain } from './terrain.js';
 import { placeTanksOnTerrain, updateTankTerrainPosition, calculateFallDamage, areAnyTanksFalling } from './tank.js';
-import { Projectile, createProjectileFromTank, checkTankCollision, createSplitProjectiles } from './projectile.js';
+import { Projectile, createProjectileFromTank, checkTankCollision, createSplitProjectiles, createChainReactionProjectiles, shouldChainReact } from './projectile.js';
 import { applyExplosionDamage, applyExplosionToAllTanks, DAMAGE } from './damage.js';
 import * as Wind from './wind.js';
 import { WeaponRegistry, WEAPON_TYPES } from './weapons.js';
@@ -2254,10 +2254,12 @@ function fireProjectile(tank) {
  * Handle a single projectile's explosion (on terrain or tank hit).
  * Creates crater, applies damage, updates tank positions.
  * Triggers special effects for nuclear weapons.
+ * Returns any chain reaction projectiles that should be spawned.
  *
  * @param {import('./projectile.js').Projectile} projectile - The projectile that exploded
  * @param {{x: number, y: number}} pos - Impact position
  * @param {import('./tank.js').Tank|null} directHitTank - Tank that was directly hit, or null for terrain hit
+ * @returns {import('./projectile.js').Projectile[]} Chain reaction projectiles to spawn, or empty array
  */
 function handleProjectileExplosion(projectile, pos, directHitTank) {
     const weaponId = projectile.weaponId;
@@ -2559,6 +2561,14 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
         // Terrain hit only - play dull thud miss sound
         Sound.playMissSound();
     }
+
+    // Check for chain reaction - spawn child projectiles from explosion
+    if (shouldChainReact(projectile)) {
+        const chainChildren = createChainReactionProjectiles(projectile, pos);
+        return chainChildren;
+    }
+
+    return [];
 }
 
 /**
@@ -2593,7 +2603,8 @@ function updateProjectile() {
             if (digResult && digResult.explode) {
                 console.log(`Digger exploded: ${digResult.reason} at (${projectile.x.toFixed(1)}, ${projectile.y.toFixed(1)})`);
                 const hitTank = digResult.hitTank || null;
-                handleProjectileExplosion(projectile, projectile.getPosition(), hitTank);
+                const chainChildren = handleProjectileExplosion(projectile, projectile.getPosition(), hitTank);
+                newChildren.push(...chainChildren);
                 projectile.deactivate();
                 projectile.clearTrail();
                 toRemove.push(projectile);
@@ -2620,7 +2631,8 @@ function updateProjectile() {
             if (tankHit) {
                 const { tank } = tankHit;
                 console.log(`Roller hit ${tank.team} tank!`);
-                handleProjectileExplosion(projectile, pos, tank);
+                const chainChildren = handleProjectileExplosion(projectile, pos, tank);
+                newChildren.push(...chainChildren);
                 projectile.deactivate();
                 projectile.clearTrail();
                 toRemove.push(projectile);
@@ -2631,7 +2643,8 @@ function updateProjectile() {
             const rollResult = projectile.updateRolling(currentTerrain);
             if (rollResult && rollResult.explode) {
                 console.log(`Roller exploded: ${rollResult.reason} at (${projectile.x.toFixed(1)}, ${projectile.y.toFixed(1)})`);
-                handleProjectileExplosion(projectile, projectile.getPosition(), null);
+                const chainChildren = handleProjectileExplosion(projectile, projectile.getPosition(), null);
+                newChildren.push(...chainChildren);
                 projectile.deactivate();
                 projectile.clearTrail();
                 toRemove.push(projectile);
@@ -2647,7 +2660,8 @@ function updateProjectile() {
             if (tankHitAfterMove) {
                 const { tank } = tankHitAfterMove;
                 console.log(`Roller hit ${tank.team} tank after moving!`);
-                handleProjectileExplosion(projectile, newPos, tank);
+                const chainChildren = handleProjectileExplosion(projectile, newPos, tank);
+                newChildren.push(...chainChildren);
                 projectile.deactivate();
                 projectile.clearTrail();
                 toRemove.push(projectile);
@@ -2703,7 +2717,8 @@ function updateProjectile() {
         });
         if (tankHit) {
             const { tank } = tankHit;
-            handleProjectileExplosion(projectile, pos, tank);
+            const chainChildren = handleProjectileExplosion(projectile, pos, tank);
+            newChildren.push(...chainChildren);
 
             projectile.deactivate();
             projectile.clearTrail();
@@ -2738,7 +2753,8 @@ function updateProjectile() {
 
                 // Standard weapon - explode on terrain contact
                 console.log(`Projectile hit terrain at (${collision.x}, ${collision.y.toFixed(1)})`);
-                handleProjectileExplosion(projectile, pos, null);
+                const chainChildren = handleProjectileExplosion(projectile, pos, null);
+                newChildren.push(...chainChildren);
 
                 projectile.deactivate();
                 projectile.clearTrail();
@@ -3458,9 +3474,9 @@ function renderProjectileTrail(ctx, projectile) {
 
     ctx.save();
 
-    // Get weapon-specific trail color (defaults to yellow if not specified)
+    // Get trail color - check projectile override first (for Fireworks), then weapon, then default
     const weapon = WeaponRegistry.getWeapon(projectile.weaponId);
-    const trailColor = weapon?.trailColor || PROJECTILE_VISUAL.GLOW_COLOR;
+    const trailColor = projectile.trailColor || weapon?.trailColor || PROJECTILE_VISUAL.GLOW_COLOR;
     const rgb = hexToRgb(trailColor);
 
     // Trail circles are smaller than the main projectile
@@ -3571,9 +3587,9 @@ function renderProjectile(ctx, projectile) {
     const { x, y } = projectile.getPosition();
     const radius = PROJECTILE_VISUAL.DIAMETER / 2;
 
-    // Get weapon-specific projectile color (defaults to yellow if not specified)
+    // Get projectile color - check projectile override first (for Fireworks), then weapon, then default
     const weapon = WeaponRegistry.getWeapon(projectile.weaponId);
-    const projectileColor = weapon?.projectileColor || PROJECTILE_VISUAL.COLOR;
+    const projectileColor = projectile.projectileColor || weapon?.projectileColor || PROJECTILE_VISUAL.COLOR;
     const rgb = hexToRgb(projectileColor);
 
     ctx.save();

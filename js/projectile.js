@@ -77,6 +77,22 @@ export class Projectile {
         this.weaponId = weaponId;
 
         /**
+         * Custom projectile color override.
+         * Used for Fireworks weapon where each sub-projectile has a unique color.
+         * If null, uses the weapon's default projectileColor.
+         * @type {string|null}
+         */
+        this.projectileColor = options.projectileColor || null;
+
+        /**
+         * Custom trail color override.
+         * Used for Fireworks weapon where each sub-projectile has a unique color.
+         * If null, uses the weapon's default trailColor.
+         * @type {string|null}
+         */
+        this.trailColor = options.trailColor || null;
+
+        /**
          * Team/owner of this projectile.
          * Used to attribute damage and prevent self-damage if needed.
          * @type {string}
@@ -136,6 +152,13 @@ export class Projectile {
          * @type {boolean}
          */
         this.isChild = options.isChild || false;
+
+        /**
+         * Chain depth for chain reaction weapons.
+         * Starts at 0 and increments with each chain. Max depth is 3.
+         * @type {number}
+         */
+        this.chainDepth = options.chainDepth || 0;
 
         // =============================================================================
         // ROLLING STATE (for Roller-type weapons)
@@ -849,8 +872,29 @@ export class Projectile {
 // =============================================================================
 
 /**
- * Create child projectiles for a splitting weapon (MIRV, Death's Head).
+ * Vibrant colors for Fireworks weapon sub-projectiles.
+ * Each child gets a random color from this palette for maximum visual impact.
+ * @type {string[]}
+ */
+const FIREWORKS_COLORS = [
+    '#ff0000', // Red
+    '#ff6600', // Orange
+    '#ffff00', // Yellow
+    '#00ff00', // Green
+    '#00ffff', // Cyan
+    '#0066ff', // Blue
+    '#9900ff', // Purple
+    '#ff00ff', // Magenta
+    '#ff3399', // Pink
+    '#ffffff', // White
+    '#ffcc00', // Gold
+    '#00ff99'  // Mint
+];
+
+/**
+ * Create child projectiles for a splitting weapon (MIRV, Death's Head, Fireworks).
  * Child projectiles spread in an arc centered on the parent's direction of travel.
+ * Fireworks weapon gets special colorful sub-projectiles.
  *
  * @param {Projectile} parent - The parent projectile that is splitting
  * @returns {Projectile[]} Array of child projectiles
@@ -864,6 +908,7 @@ export function createSplitProjectiles(parent) {
 
     const splitCount = weapon.splitCount || 5;
     const spreadAngle = weapon.splitAngle || 30; // Total spread in degrees
+    const isFireworks = parent.weaponId === 'fireworks';
 
     const children = [];
 
@@ -879,7 +924,8 @@ export function createSplitProjectiles(parent) {
     // Note: atan2(vy, vx) gives the direction the projectile is moving
     const parentDirection = Math.atan2(parent.vy, parent.vx);
 
-    console.log(`MIRV split at (${parent.x.toFixed(1)}, ${parent.y.toFixed(1)}): spawning ${splitCount} warheads with ${spreadAngle}° spread`);
+    const splitType = isFireworks ? 'Fireworks' : 'MIRV';
+    console.log(`${splitType} split at (${parent.x.toFixed(1)}, ${parent.y.toFixed(1)}): spawning ${splitCount} warheads with ${spreadAngle}° spread`);
 
     for (let i = 0; i < splitCount; i++) {
         // Calculate offset angle for this child
@@ -889,6 +935,15 @@ export function createSplitProjectiles(parent) {
         // Child direction = parent direction + offset
         const childDirection = parentDirection + offsetRadians;
 
+        // For Fireworks, assign a random vibrant color
+        let projectileColor = null;
+        let trailColor = null;
+        if (isFireworks) {
+            const colorIndex = Math.floor(Math.random() * FIREWORKS_COLORS.length);
+            projectileColor = FIREWORKS_COLORS[colorIndex];
+            trailColor = projectileColor;
+        }
+
         // Create child projectile at parent's position
         const child = new Projectile({
             x: parent.x,
@@ -897,7 +952,9 @@ export function createSplitProjectiles(parent) {
             power: 0, // Not used, we set velocity directly
             weaponId: parent.weaponId,
             owner: parent.owner,
-            isChild: true
+            isChild: true,
+            projectileColor: projectileColor,
+            trailColor: trailColor
         });
 
         // At apex, the parent speed is near zero (only horizontal component remains)
@@ -920,6 +977,95 @@ export function createSplitProjectiles(parent) {
     }
 
     return children;
+}
+
+/**
+ * Maximum chain depth for chain reaction weapons.
+ * After this many generations, chains stop spawning new projectiles.
+ * @type {number}
+ */
+const MAX_CHAIN_DEPTH = 3;
+
+/**
+ * Create chain reaction projectiles when a chain reaction weapon explodes.
+ * Each explosion spawns splitCount new projectiles that fly outward and explode on impact.
+ * Chain depth is tracked to prevent infinite chains (max 3 levels).
+ *
+ * @param {Projectile} parent - The parent projectile that just exploded
+ * @param {{x: number, y: number}} explosionPos - Position where explosion occurred
+ * @returns {Projectile[]} Array of chain reaction projectiles, or empty if max depth reached
+ */
+export function createChainReactionProjectiles(parent, explosionPos) {
+    const weapon = WeaponRegistry.getWeapon(parent.weaponId);
+    if (!weapon || !weapon.chainReaction) {
+        return [];
+    }
+
+    // Check if we've reached max chain depth
+    const currentDepth = parent.chainDepth || 0;
+    if (currentDepth >= MAX_CHAIN_DEPTH) {
+        console.log(`Chain reaction reached max depth (${MAX_CHAIN_DEPTH}), stopping chain`);
+        return [];
+    }
+
+    const splitCount = weapon.splitCount || 2;
+    const spreadAngle = weapon.splitAngle || 40;
+
+    const children = [];
+
+    // Calculate the angle between each child projectile
+    // Spread them evenly in a full circle for explosion effect
+    const angleStep = 360 / splitCount;
+
+    // Chain reaction speed - consistent speed for each generation
+    const chainSpeed = 8;
+
+    console.log(`Chain reaction at (${explosionPos.x.toFixed(1)}, ${explosionPos.y.toFixed(1)}): depth=${currentDepth + 1}, spawning ${splitCount} projectiles`);
+
+    for (let i = 0; i < splitCount; i++) {
+        // Calculate angle for this child (spread evenly around circle)
+        const angleDegrees = (angleStep * i) + (Math.random() * 20 - 10); // Add slight randomness
+        const angleRadians = (angleDegrees * Math.PI) / 180;
+
+        // Create child projectile at explosion position
+        const child = new Projectile({
+            x: explosionPos.x,
+            y: explosionPos.y,
+            angle: 0, // Not used, we set velocity directly
+            power: 0, // Not used, we set velocity directly
+            weaponId: parent.weaponId,
+            owner: parent.owner,
+            isChild: true,
+            chainDepth: currentDepth + 1
+        });
+
+        // Set velocity based on calculated angle
+        child.vx = Math.cos(angleRadians) * chainSpeed;
+        child.vy = Math.sin(angleRadians) * chainSpeed;
+
+        // Mark as already split so it doesn't try to split at apex
+        child.hasSplit = true;
+
+        children.push(child);
+    }
+
+    return children;
+}
+
+/**
+ * Check if a projectile should spawn chain reaction projectiles on explosion.
+ *
+ * @param {Projectile} projectile - The projectile to check
+ * @returns {boolean} True if chain reaction should occur
+ */
+export function shouldChainReact(projectile) {
+    const weapon = WeaponRegistry.getWeapon(projectile.weaponId);
+    if (!weapon || !weapon.chainReaction) {
+        return false;
+    }
+
+    const currentDepth = projectile.chainDepth || 0;
+    return currentDepth < MAX_CHAIN_DEPTH;
 }
 
 /**

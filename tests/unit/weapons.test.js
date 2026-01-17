@@ -196,6 +196,43 @@ describe('Weapon Properties', () => {
     });
   });
 
+  describe('Splitting Weapons', () => {
+    it("Death's Head splits into 5 warheads", () => {
+      const weapon = WeaponRegistry.getWeapon('deaths-head');
+      expect(weapon.type).toBe(WEAPON_TYPES.SPLITTING);
+      expect(weapon.splitCount).toBe(5);
+      expect(weapon.splitAngle).toBe(35);
+    });
+
+    it('Cluster Bomb splits into 8 bomblets', () => {
+      const weapon = WeaponRegistry.getWeapon('cluster-bomb');
+      expect(weapon.type).toBe(WEAPON_TYPES.SPLITTING);
+      expect(weapon.splitCount).toBe(8);
+      expect(weapon.splitAngle).toBe(50);
+    });
+
+    it('Chain Reaction has chain reaction flag', () => {
+      const weapon = WeaponRegistry.getWeapon('chain-reaction');
+      expect(weapon.type).toBe(WEAPON_TYPES.SPLITTING);
+      expect(weapon.splitCount).toBe(2);
+      expect(weapon.chainReaction).toBe(true);
+    });
+
+    it('Scatter Shot has wide spread angle', () => {
+      const weapon = WeaponRegistry.getWeapon('scatter-shot');
+      expect(weapon.type).toBe(WEAPON_TYPES.SPLITTING);
+      expect(weapon.splitCount).toBe(6);
+      expect(weapon.splitAngle).toBe(60);
+    });
+
+    it('Fireworks splits into 12 colorful projectiles', () => {
+      const weapon = WeaponRegistry.getWeapon('fireworks');
+      expect(weapon.type).toBe(WEAPON_TYPES.SPLITTING);
+      expect(weapon.splitCount).toBe(12);
+      expect(weapon.splitAngle).toBe(90);
+    });
+  });
+
   describe('Nuke', () => {
     it('has nuclear effects enabled', () => {
       expect(NUKE.type).toBe(WEAPON_TYPES.NUCLEAR);
