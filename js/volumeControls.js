@@ -10,6 +10,7 @@ import { COLORS, UI, CANVAS } from './constants.js';
 import * as Renderer from './renderer.js';
 import * as Sound from './sound.js';
 import { isCrtEnabled, toggleCrt } from './effects.js';
+import * as ControlSettings from './controls/controlSettings.js';
 
 // =============================================================================
 // LAYOUT CONFIGURATION
@@ -22,7 +23,7 @@ import { isCrtEnabled, toggleCrt } from './effects.js';
  */
 const VOLUME_PANEL = {
     WIDTH: 340,
-    HEIGHT: 400,               // Increased to fit Change Name button
+    HEIGHT: 520,               // Increased to fit control settings
     PADDING: 24,
     SLIDER_HEIGHT: 12,         // Thicker track for easier tapping
     SLIDER_WIDTH: 260,
@@ -31,7 +32,9 @@ const VOLUME_PANEL = {
     LABEL_OFFSET: 28,
     BUTTON_WIDTH: 120,         // Standard button width
     BUTTON_HEIGHT: 48,         // Touch-friendly height
-    BUTTON_SPACING: 12         // Space between buttons
+    BUTTON_SPACING: 12,        // Space between buttons
+    TOGGLE_HEIGHT: 40,         // Height for toggle buttons (control mode, trajectory)
+    TOGGLE_SPACING: 10         // Spacing between toggle rows
 };
 
 // =============================================================================
@@ -148,6 +151,42 @@ function getCrtButton(panelX, panelY) {
 }
 
 /**
+ * Get Control Mode toggle button bounds.
+ * @param {number} panelX - Panel X position
+ * @param {number} panelY - Panel Y position
+ * @returns {{x: number, y: number, width: number, height: number, labelWidth: number}}
+ */
+function getControlModeButton(panelX, panelY) {
+    // Position below the mute/CRT row
+    const buttonY = panelY + VOLUME_PANEL.HEIGHT - 190;
+    return {
+        x: panelX + VOLUME_PANEL.PADDING,
+        y: buttonY,
+        width: VOLUME_PANEL.WIDTH - VOLUME_PANEL.PADDING * 2,
+        height: VOLUME_PANEL.TOGGLE_HEIGHT,
+        labelWidth: 130  // Width for the label portion
+    };
+}
+
+/**
+ * Get Trajectory Preview toggle button bounds.
+ * @param {number} panelX - Panel X position
+ * @param {number} panelY - Panel Y position
+ * @returns {{x: number, y: number, width: number, height: number, labelWidth: number}}
+ */
+function getTrajectoryButton(panelX, panelY) {
+    // Position below control mode
+    const buttonY = panelY + VOLUME_PANEL.HEIGHT - 190 + VOLUME_PANEL.TOGGLE_HEIGHT + VOLUME_PANEL.TOGGLE_SPACING;
+    return {
+        x: panelX + VOLUME_PANEL.PADDING,
+        y: buttonY,
+        width: VOLUME_PANEL.WIDTH - VOLUME_PANEL.PADDING * 2,
+        height: VOLUME_PANEL.TOGGLE_HEIGHT,
+        labelWidth: 130  // Width for the label portion
+    };
+}
+
+/**
  * Get Change Name button bounds.
  * @param {number} panelX - Panel X position
  * @param {number} panelY - Panel Y position
@@ -240,6 +279,12 @@ export function render(ctx, centerX = Renderer.getWidth() / 2, centerY = Rendere
 
     // Render CRT effects toggle button
     renderCrtButton(ctx, getCrtButton(panelX, panelY));
+
+    // Render Control Mode toggle
+    renderControlModeButton(ctx, getControlModeButton(panelX, panelY));
+
+    // Render Trajectory Preview toggle
+    renderTrajectoryButton(ctx, getTrajectoryButton(panelX, panelY));
 
     // Render Change Name button
     renderChangeNameButton(ctx, getChangeNameButton(panelX, panelY));
@@ -371,6 +416,100 @@ function renderCrtButton(ctx, button) {
 }
 
 /**
+ * Render the Control Mode toggle button.
+ * Shows a label on the left and current mode value on the right.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {Object} button - Button bounds with labelWidth
+ */
+function renderControlModeButton(ctx, button) {
+    const modeLabel = ControlSettings.getControlModeLabel();
+
+    ctx.save();
+
+    // Full button background
+    ctx.fillStyle = 'rgba(5, 217, 232, 0.1)';
+    ctx.beginPath();
+    ctx.roundRect(button.x, button.y, button.width, button.height, 6);
+    ctx.fill();
+
+    // Button border
+    ctx.strokeStyle = COLORS.NEON_CYAN;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Label on left side
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('CONTROLS', button.x + 12, button.y + button.height / 2);
+
+    // Value button on right side
+    const valueX = button.x + button.labelWidth;
+    const valueWidth = button.width - button.labelWidth;
+
+    ctx.fillStyle = 'rgba(5, 217, 232, 0.2)';
+    ctx.beginPath();
+    ctx.roundRect(valueX, button.y + 4, valueWidth - 4, button.height - 8, 4);
+    ctx.fill();
+
+    // Value text
+    ctx.fillStyle = COLORS.NEON_CYAN;
+    ctx.font = `bold ${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.fillText(modeLabel, valueX + valueWidth / 2, button.y + button.height / 2);
+
+    ctx.restore();
+}
+
+/**
+ * Render the Trajectory Preview toggle button.
+ * Shows a label on the left and current mode value on the right.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {Object} button - Button bounds with labelWidth
+ */
+function renderTrajectoryButton(ctx, button) {
+    const modeLabel = ControlSettings.getTrajectoryModeLabel();
+
+    ctx.save();
+
+    // Full button background
+    ctx.fillStyle = 'rgba(255, 42, 109, 0.1)';
+    ctx.beginPath();
+    ctx.roundRect(button.x, button.y, button.width, button.height, 6);
+    ctx.fill();
+
+    // Button border
+    ctx.strokeStyle = COLORS.NEON_PINK;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Label on left side
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('TRAJECTORY', button.x + 12, button.y + button.height / 2);
+
+    // Value button on right side
+    const valueX = button.x + button.labelWidth;
+    const valueWidth = button.width - button.labelWidth;
+
+    ctx.fillStyle = 'rgba(255, 42, 109, 0.2)';
+    ctx.beginPath();
+    ctx.roundRect(valueX, button.y + 4, valueWidth - 4, button.height - 8, 4);
+    ctx.fill();
+
+    // Value text
+    ctx.fillStyle = COLORS.NEON_PINK;
+    ctx.font = `bold ${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.fillText(modeLabel, valueX + valueWidth / 2, button.y + button.height / 2);
+
+    ctx.restore();
+}
+
+/**
  * Render the Change Name button.
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  * @param {Object} button - Button bounds
@@ -482,6 +621,22 @@ export function handlePointerDown(x, y) {
     const crtBtn = getCrtButton(panelPosition.x, panelPosition.y);
     if (isInsideButton(x, y, crtBtn)) {
         toggleCrt();
+        Sound.playClickSound();
+        return true;
+    }
+
+    // Check Control Mode toggle button
+    const controlModeBtn = getControlModeButton(panelPosition.x, panelPosition.y);
+    if (isInsideButton(x, y, controlModeBtn)) {
+        ControlSettings.cycleControlMode();
+        Sound.playClickSound();
+        return true;
+    }
+
+    // Check Trajectory Preview toggle button
+    const trajectoryBtn = getTrajectoryButton(panelPosition.x, panelPosition.y);
+    if (isInsideButton(x, y, trajectoryBtn)) {
+        ControlSettings.cycleTrajectoryMode();
         Sound.playClickSound();
         return true;
     }

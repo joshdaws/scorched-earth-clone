@@ -59,6 +59,7 @@ import * as LifetimeStats from './lifetime-stats.js';
 import * as NameEntry from './nameEntry.js';
 import * as TitleScene from './titleScene/titleScene.js';
 import { Button } from './ui/Button.js';
+import * as ControlSettings from './controls/controlSettings.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -4319,6 +4320,10 @@ function setupPlayingState() {
             AI.setDifficulty(difficulty);
             // Purchase weapons based on difficulty
             AI.purchaseWeaponsForAI(enemyTank, difficulty);
+
+            // Apply difficulty-based trajectory preview settings
+            // Only applies if user hasn't manually overridden in settings
+            ControlSettings.applyDifficultyPreview(difficulty);
 
             // Generate wind for this round
             // Level mode: use level-defined wind range; Roguelike: scale with round number

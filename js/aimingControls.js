@@ -20,6 +20,7 @@ import {
     fromRight, fromBottom,
     scaled, scaledTouch, isVeryShortScreen, isMobileDevice
 } from './uiPosition.js?v=20260111a';
+import * as ControlSettings from './controls/controlSettings.js';
 
 // =============================================================================
 // LAYOUT HELPERS
@@ -440,14 +441,25 @@ function simulateTrajectory(tank, angle, power, windForce, terrain) {
 export function renderTrajectoryPreview(ctx, tank, angle, power, terrain) {
     if (!tank) return;
 
+    // Check if trajectory preview is enabled in settings
+    if (!ControlSettings.isTrajectoryVisible()) {
+        return;
+    }
+
     const traj = CONTROLS.TRAJECTORY;
     const windForce = Wind.getWindForce();
 
     const points = simulateTrajectory(tank, angle, power, windForce, terrain);
     if (points.length < 2) return;
 
-    // Only show a portion of the trajectory for skill-based aiming
-    const previewPointCount = Math.max(2, Math.floor(points.length * traj.PREVIEW_PERCENT));
+    // Get trajectory fraction from settings (1.0 for full, 0.5 for partial, 0 for none)
+    // The settings fraction is applied on top of the base preview percent
+    const settingsFraction = ControlSettings.getTrajectoryFraction();
+    // For FULL: show full preview (use 1.0 to override PREVIEW_PERCENT limit)
+    // For PARTIAL: show half the preview
+    // For NONE: already returned above
+    const effectiveFraction = settingsFraction >= 1.0 ? 1.0 : (traj.PREVIEW_PERCENT * 2 * settingsFraction);
+    const previewPointCount = Math.max(2, Math.floor(points.length * effectiveFraction));
     const previewPoints = points.slice(0, previewPointCount);
 
 

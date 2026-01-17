@@ -9,6 +9,7 @@
 import { PHYSICS } from '../constants.js';
 import { getWindForce } from '../wind.js';
 import { getScreenWidth, getScreenHeight } from '../screenSize.js';
+import * as ControlSettings from './controlSettings.js';
 
 /**
  * @typedef {Object} TrajectoryPoint
@@ -224,14 +225,28 @@ export class TrajectoryPreview {
      * - Line width: 2px
      * - Impact marker: red circle outline, 8px radius
      *
+     * Respects trajectory mode settings:
+     * - FULL: Shows entire trajectory with impact marker
+     * - PARTIAL: Shows first half of trajectory only
+     * - NONE: Shows nothing (returns early)
+     *
      * @param {CanvasRenderingContext2D} ctx - Canvas 2D rendering context
      */
     render(ctx) {
+        // Check if trajectory preview is enabled in settings
+        if (!ControlSettings.isTrajectoryVisible()) {
+            return;
+        }
+
         if (!this.visible || this.points.length < 2) {
             return;
         }
 
         ctx.save();
+
+        // Get trajectory fraction from settings (1.0 for full, 0.5 for partial)
+        const fraction = ControlSettings.getTrajectoryFraction();
+        const pointsToRender = Math.max(2, Math.floor(this.points.length * fraction));
 
         // Draw trajectory path as dashed line
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
@@ -243,7 +258,7 @@ export class TrajectoryPreview {
         ctx.beginPath();
         ctx.moveTo(this.points[0].x, this.points[0].y);
 
-        for (let i = 1; i < this.points.length; i++) {
+        for (let i = 1; i < pointsToRender; i++) {
             ctx.lineTo(this.points[i].x, this.points[i].y);
         }
 
@@ -252,8 +267,8 @@ export class TrajectoryPreview {
         // Reset line dash for impact marker
         ctx.setLineDash([]);
 
-        // Draw impact marker if we have one
-        if (this.impactPoint) {
+        // Only draw impact marker if showing full trajectory
+        if (fraction >= 1.0 && this.impactPoint) {
             this._renderImpactMarker(ctx, this.impactPoint.x, this.impactPoint.y);
         }
 
