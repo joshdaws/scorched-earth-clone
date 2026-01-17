@@ -44,6 +44,7 @@ import * as SupplyDropScreen from './supply-drop-screen.js';
 import * as LevelSelectScreen from './level-select-screen.js';
 import * as LevelCompleteScreen from './level-complete-screen.js';
 import { LevelRegistry } from './levels.js';
+import { Stars } from './stars.js';
 import * as CombatAchievements from './combat-achievements.js';
 import * as PrecisionAchievements from './precision-achievements.js';
 import * as WeaponAchievements from './weapon-achievements.js';
@@ -112,6 +113,39 @@ let currentLevelData = null;
  * @type {boolean}
  */
 let isLevelMode = false;
+
+/**
+ * Level mode statistics tracking.
+ * Tracks accuracy and turns for star calculation.
+ * @type {{shotsFired: number, shotsHit: number, turnsUsed: number, damageDealt: number}}
+ */
+let levelModeStats = {
+    shotsFired: 0,
+    shotsHit: 0,
+    turnsUsed: 0,
+    damageDealt: 0
+};
+
+/**
+ * Reset level mode stats for a new level.
+ */
+function resetLevelModeStats() {
+    levelModeStats = {
+        shotsFired: 0,
+        shotsHit: 0,
+        turnsUsed: 0,
+        damageDealt: 0
+    };
+}
+
+/**
+ * Get current accuracy for level mode (0.0 - 1.0).
+ * @returns {number} Accuracy as a decimal
+ */
+function getLevelModeAccuracy() {
+    if (levelModeStats.shotsFired === 0) return 0;
+    return levelModeStats.shotsHit / levelModeStats.shotsFired;
+}
 
 // =============================================================================
 // PROJECTILE STATE
@@ -1737,6 +1771,12 @@ function fireProjectile(tank) {
         recordStat('shotFired');
         recordStat('weaponUsed', firedWeaponId);
 
+        // Level mode: track shots for accuracy calculation
+        if (isLevelMode) {
+            levelModeStats.shotsFired++;
+            levelModeStats.turnsUsed++;
+        }
+
         // Track nuclear weapon launches specifically
         if (weapon && weapon.type === WEAPON_TYPES.NUCLEAR) {
             recordStat('nukeLaunched');
@@ -1803,6 +1843,11 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
             playerHitEnemy = true;
             wasDirectHit = damageResult.isDirectHit;
 
+            // Level mode: track damage dealt
+            if (isLevelMode) {
+                levelModeStats.damageDealt += damageResult.actualDamage;
+            }
+
             // Lifetime stats: record damage dealt
             LifetimeStats.recordDamageDealt(damageResult.actualDamage);
 
@@ -1850,6 +1895,11 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
                     LifetimeStats.recordMoneyEarned(splashReward);
                     recordStat('damageDealt', result.actualDamage);
                     playerHitEnemy = true;
+
+                    // Level mode: track splash damage dealt
+                    if (isLevelMode) {
+                        levelModeStats.damageDealt += result.actualDamage;
+                    }
 
                     // Lifetime stats: record splash damage dealt
                     LifetimeStats.recordDamageDealt(result.actualDamage);
@@ -1902,6 +1952,11 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
                     recordStat('damageDealt', result.actualDamage);
                     playerHitEnemy = true;
 
+                    // Level mode: track terrain splash damage dealt
+                    if (isLevelMode) {
+                        levelModeStats.damageDealt += result.actualDamage;
+                    }
+
                     // Lifetime stats: record terrain splash damage dealt
                     LifetimeStats.recordDamageDealt(result.actualDamage);
 
@@ -1938,6 +1993,11 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
     // Record shotHit if player shot hit the enemy (only once per projectile)
     if (isPlayerShot && playerHitEnemy) {
         recordStat('shotHit');
+
+        // Level mode: track hits for accuracy calculation
+        if (isLevelMode) {
+            levelModeStats.shotsHit++;
+        }
 
         // Lifetime stats: record shot that hit
         LifetimeStats.recordShot(true);
@@ -2337,7 +2397,38 @@ function checkRoundEnd() {
         const roundEarnings = Money.getRoundEarnings();
         const roundDamage = Money.getRoundDamage();
 
-        // Show round transition screen (replaces victory screen)
+        // Haptic feedback for victory (mobile devices)
+        Haptics.hapticVictory();
+
+        // Level mode: show Level Complete screen with star calculation
+        if (isLevelMode && currentLevelData) {
+            const levelId = currentLevelId;
+
+            // Calculate stats for level completion
+            const accuracy = getLevelModeAccuracy();
+            const turnsUsed = levelModeStats.turnsUsed;
+            const damageDealt = levelModeStats.damageDealt;
+
+            console.log(`[Main] Level complete! Accuracy: ${(accuracy * 100).toFixed(1)}%, Turns: ${turnsUsed}, Damage: ${damageDealt}`);
+
+            // Show Level Complete screen (it handles star calculation internally)
+            LevelCompleteScreen.show({
+                levelId,
+                stats: {
+                    damageDealt,
+                    accuracy,
+                    turnsUsed,
+                    won: true
+                },
+                coinsEarned: roundEarnings
+            });
+
+            // Transition to Level Complete state
+            Game.setState(GAME_STATES.LEVEL_COMPLETE);
+            return;
+        }
+
+        // Roguelike mode: show round transition screen
         RoundTransition.show({
             round: currentRound,
             damage: roundDamage,
@@ -2347,9 +2438,6 @@ function checkRoundEnd() {
             achievements: roundAchievements,
             delay: 1200
         });
-
-        // Haptic feedback for victory (mobile devices)
-        Haptics.hapticVictory();
 
         // Transition to round transition state
         Game.setState(GAME_STATES.ROUND_TRANSITION);
@@ -3688,8 +3776,11 @@ function setupPlayingState() {
             }
 
             // Determine if this is a new game or continuation
-            // New game comes from MENU or DIFFICULTY_SELECT (since difficulty selection is part of new game flow)
-            const isNewGame = fromState === GAME_STATES.MENU || fromState === GAME_STATES.DIFFICULTY_SELECT;
+            // New game comes from MENU, DIFFICULTY_SELECT, LEVEL_SELECT, or LEVEL_COMPLETE
+            const isNewGame = fromState === GAME_STATES.MENU ||
+                             fromState === GAME_STATES.DIFFICULTY_SELECT ||
+                             fromState === GAME_STATES.LEVEL_SELECT ||
+                             fromState === GAME_STATES.LEVEL_COMPLETE;
 
             // Initialize game systems if this is a new game
             if (isNewGame) {
@@ -3753,11 +3844,26 @@ function setupPlayingState() {
             // Generate new terrain for this game
             // Uses midpoint displacement algorithm for natural-looking hills and valleys
             // Terrain adapts to dynamic screen dimensions (no fixed width/height)
-            currentTerrain = generateTerrain(undefined, undefined, {
+            let terrainOptions = {
                 roughness: 0.5,  // Balanced jaggedness (0.4-0.6 recommended)
                 minHeightPercent: 0.2,  // Terrain starts at 20% of screen height minimum
                 maxHeightPercent: 0.7   // Terrain peaks at 70% of screen height maximum
-            });
+            };
+
+            // In level mode, use level-specific terrain config
+            if (isLevelMode && currentLevelData && currentLevelData.terrain) {
+                const levelTerrain = currentLevelData.terrain;
+                const terrainStyle = LevelRegistry.getTerrainStyle(levelTerrain.style);
+                terrainOptions = {
+                    roughness: terrainStyle.roughness,
+                    // Convert absolute pixel values to percentages of screen height
+                    minHeightPercent: levelTerrain.minHeight / Renderer.getHeight(),
+                    maxHeightPercent: levelTerrain.maxHeight / Renderer.getHeight()
+                };
+                console.log(`[Main] Level mode terrain: ${levelTerrain.style}`, terrainOptions);
+            }
+
+            currentTerrain = generateTerrain(undefined, undefined, terrainOptions);
 
             // Place tanks on the generated terrain
             // Player on left third (15-25%), Enemy on right third (75-85%)
@@ -3766,12 +3872,25 @@ function setupPlayingState() {
             playerTank = tanks.player;
             enemyTank = tanks.enemy;
 
-            // Apply enemy health scaling based on round number (roguelike progression)
-            // Enemy tanks become more durable in later rounds: 100 HP → up to 180 HP
-            const scaledEnemyHealth = getEnemyHealthForRound(currentRound);
-            enemyTank.health = scaledEnemyHealth;
-            enemyTank.maxHealth = scaledEnemyHealth; // Set max for proper health bar display
-            console.log(`Round ${currentRound}: Enemy health scaled to ${scaledEnemyHealth} HP`);
+            // Apply enemy health based on mode
+            // Level mode: use level-defined health; Roguelike: scale with round number
+            let enemyHealth;
+            let playerHealth = TANK.START_HEALTH;
+
+            if (isLevelMode && currentLevelData) {
+                enemyHealth = currentLevelData.enemyHealth || TANK.START_HEALTH;
+                playerHealth = currentLevelData.playerHealth || TANK.START_HEALTH;
+                console.log(`[Main] Level mode health - Player: ${playerHealth} HP, Enemy: ${enemyHealth} HP`);
+            } else {
+                // Roguelike mode: Enemy tanks become more durable in later rounds
+                enemyHealth = getEnemyHealthForRound(currentRound);
+                console.log(`Round ${currentRound}: Enemy health scaled to ${enemyHealth} HP`);
+            }
+
+            enemyTank.health = enemyHealth;
+            enemyTank.maxHealth = enemyHealth; // Set max for proper health bar display
+            playerTank.health = playerHealth;
+            playerTank.maxHealth = playerHealth;
 
             // Restore player inventory from previous round (if continuing)
             // For new games, tank starts with default inventory (basic-shot only)
@@ -3785,18 +3904,32 @@ function setupPlayingState() {
             // Hidden achievement: track initial inventory for Minimalist detection
             HiddenAchievements.onInventoryChanged(playerTank.inventory);
 
-            // Set up AI for this round with player-selected difficulty
-            // If player selected a difficulty, use that; otherwise fall back to round-based progression
-            const difficulty = selectedDifficulty || AI.getAIDifficulty(currentRound);
+            // Set up AI for this round
+            // Level mode: use level-defined difficulty; Roguelike: use player selection or round-based
+            let difficulty;
+            if (isLevelMode && currentLevelData && currentLevelData.aiDifficulty) {
+                difficulty = currentLevelData.aiDifficulty;
+                console.log(`[Main] Level mode AI difficulty: ${AI.getDifficultyName(difficulty)}`);
+            } else {
+                difficulty = selectedDifficulty || AI.getAIDifficulty(currentRound);
+                console.log(`Round ${currentRound}: AI difficulty is ${AI.getDifficultyName(difficulty)} (player selected: ${selectedDifficulty ? 'yes' : 'no'})`);
+            }
             AI.setDifficulty(difficulty);
-            const difficultyName = AI.getDifficultyName(difficulty);
             // Purchase weapons based on difficulty
             AI.purchaseWeaponsForAI(enemyTank, difficulty);
-            console.log(`Round ${currentRound}: AI difficulty is ${difficultyName} (player selected: ${selectedDifficulty ? 'yes' : 'no'})`);
 
-            // Generate random wind for this round
-            // Wind range scales with round number for roguelike difficulty progression
-            const windRange = Wind.getWindRangeForRound(currentRound);
+            // Generate wind for this round
+            // Level mode: use level-defined wind range; Roguelike: scale with round number
+            let windRange;
+            if (isLevelMode && currentLevelData && currentLevelData.wind) {
+                // Generate wind within level-defined range
+                const levelWind = currentLevelData.wind;
+                windRange = Math.max(Math.abs(levelWind.min), Math.abs(levelWind.max));
+                console.log(`[Main] Level mode wind range: ±${windRange}`);
+            } else {
+                // Roguelike: Wind range scales with round number
+                windRange = Wind.getWindRangeForRound(currentRound);
+            }
             Wind.generateRandomWind(windRange);
 
             // Initialize the turn system when entering playing state
@@ -4009,8 +4142,20 @@ function handleLevelSelected(event) {
     // Reset round to 1 for level mode
     currentRound = 1;
 
-    // TODO: Initialize level-specific settings (difficulty, wind, etc.)
-    // This will be implemented in issue scorched-earth-aca.5
+    // Reset level mode stats for fresh tracking
+    resetLevelModeStats();
+
+    // Level-specific settings will be applied in PLAYING state's onEnter handler
+    console.log('[Main] Level config:', {
+        aiDifficulty: level.aiDifficulty,
+        enemyHealth: level.enemyHealth,
+        playerHealth: level.playerHealth,
+        wind: level.wind,
+        terrain: level.terrain
+    });
+
+    // Start the level
+    Game.setState(GAME_STATES.PLAYING);
 }
 
 /**
@@ -4024,11 +4169,15 @@ function setupLevelCompleteCallbacks() {
 
         // Reset game state for retry
         currentLevelId = levelId;
+        currentLevelData = LevelRegistry.getLevel(levelId);
         currentRound = 1;
+        isLevelMode = true;
 
-        // TODO: Start the level again
-        // This will be fully implemented in issue scorched-earth-aca.5
-        Game.setState(GAME_STATES.LEVEL_SELECT);
+        // Reset level mode stats for fresh tracking
+        resetLevelModeStats();
+
+        // Start the level
+        Game.setState(GAME_STATES.PLAYING);
     });
 
     // Next button - advance to next level
@@ -4036,20 +4185,29 @@ function setupLevelCompleteCallbacks() {
         console.log(`[Main] Starting next level: ${levelId}`);
         LevelCompleteScreen.hide();
 
-        // Update current level info
+        // Update current level info for next level
         currentLevelId = levelId;
         currentLevelData = LevelRegistry.getLevel(levelId);
         currentRound = 1;
+        isLevelMode = true;
 
-        // TODO: Start the next level
-        // This will be fully implemented in issue scorched-earth-aca.5
-        Game.setState(GAME_STATES.LEVEL_SELECT);
+        // Reset level mode stats for fresh tracking
+        resetLevelModeStats();
+
+        // Start the next level
+        Game.setState(GAME_STATES.PLAYING);
     });
 
     // Menu button - return to level select
     LevelCompleteScreen.onMenu(() => {
         console.log('[Main] Returning to level select');
         LevelCompleteScreen.hide();
+
+        // Reset level mode state
+        isLevelMode = false;
+        currentLevelId = null;
+        currentLevelData = null;
+
         Game.setState(GAME_STATES.LEVEL_SELECT);
     });
 }

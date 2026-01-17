@@ -1387,6 +1387,21 @@ export const LevelRegistry = {
      */
     getMaxStarsForWorlds(worlds) {
         return Math.min(worlds, 6) * 10 * 3;
+    },
+
+    /**
+     * Parse a level ID into world and level numbers.
+     * @param {string} id - Level ID (e.g., 'world1-level3')
+     * @returns {{worldNum: number, levelNum: number}|null} Parsed values or null if invalid
+     */
+    parseLevelId(id) {
+        if (!id || typeof id !== 'string') return null;
+        const match = id.match(/^world(\d+)-level(\d+)$/);
+        if (!match) return null;
+        return {
+            worldNum: parseInt(match[1], 10),
+            levelNum: parseInt(match[2], 10)
+        };
     }
 };
 
