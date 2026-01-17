@@ -240,6 +240,20 @@ function isInsidePauseButton(x, y) {
 }
 
 /**
+ * Get fullscreen parameters for CRT effects rendering.
+ * CRT effects should cover the entire viewport, not just the game content area.
+ * @returns {{viewportWidth: number, viewportHeight: number, dpr: number}}
+ */
+function getCrtFullscreenParams() {
+    const viewport = Renderer.getViewportDimensions();
+    return {
+        viewportWidth: viewport.width,
+        viewportHeight: viewport.height,
+        dpr: Renderer.getDevicePixelRatio()
+    };
+}
+
+/**
  * Render the pause button.
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  */
@@ -1333,8 +1347,8 @@ function renderMenu(ctx) {
         renderOptionsOverlay(ctx);
     }
 
-    // Render CRT effects as final post-processing overlay
-    renderCrtEffects(ctx, width, height);
+    // Render CRT effects as final post-processing overlay (fullscreen)
+    renderCrtEffects(ctx, width, height, getCrtFullscreenParams());
 }
 
 /**
@@ -1735,8 +1749,8 @@ function renderModeSelect(ctx) {
 
     ctx.restore();
 
-    // Render CRT effects
-    renderCrtEffects(ctx, width, height);
+    // Render CRT effects (fullscreen)
+    renderCrtEffects(ctx, width, height, getCrtFullscreenParams());
 }
 
 /**
@@ -2066,8 +2080,8 @@ function renderDifficultySelect(ctx) {
 
     ctx.restore();
 
-    // Render CRT effects as final post-processing overlay
-    renderCrtEffects(ctx, width, height);
+    // Render CRT effects as final post-processing overlay (fullscreen)
+    renderCrtEffects(ctx, width, height, getCrtFullscreenParams());
 }
 
 /**
@@ -4119,8 +4133,8 @@ function renderPlaying(ctx) {
     // Render screen flash on top of everything (not affected by shake)
     renderScreenFlash(ctx, Renderer.getWidth(), Renderer.getHeight());
 
-    // Render CRT effects as final post-processing overlay
-    renderCrtEffects(ctx, Renderer.getWidth(), Renderer.getHeight());
+    // Render CRT effects as final post-processing overlay (fullscreen)
+    renderCrtEffects(ctx, Renderer.getWidth(), Renderer.getHeight(), getCrtFullscreenParams());
 }
 
 /**
@@ -5348,8 +5362,8 @@ function renderHighScores(ctx) {
 
     ctx.restore();
 
-    // Render CRT effects as final post-processing overlay
-    renderCrtEffects(ctx, width, height);
+    // Render CRT effects as final post-processing overlay (fullscreen)
+    renderCrtEffects(ctx, width, height, getCrtFullscreenParams());
 }
 
 /**

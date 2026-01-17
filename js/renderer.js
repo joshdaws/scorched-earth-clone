@@ -11,13 +11,12 @@ import {
     initScreenSize,
     getScreenWidth,
     getScreenHeight,
-    getCanvasResolutionWidth,
-    getCanvasResolutionHeight,
     getDevicePixelRatio as getScreenDPR,
     getSafeAreaInsets,
     getGameScale,
     getDisplayDimensions,
     getDisplayOffset,
+    getScreenDimensions,
     onResize
 } from './screenSize.js';
 
@@ -29,6 +28,14 @@ let ctx = null;
 // scaleFactor converts from design coordinates (1200x800) to actual canvas coordinates
 let scaleFactor = 1;
 let devicePixelRatio = 1;
+
+// Canvas viewport dimensions (usable viewport in CSS pixels, for full-screen CRT effects)
+let canvasViewportWidth = 0;
+let canvasViewportHeight = 0;
+
+// Offset for centering game content within viewport (in physical pixels)
+let contentOffsetX = 0;
+let contentOffsetY = 0;
 
 // Debounce timer for resize events
 let resizeTimeout = null;
@@ -91,17 +98,18 @@ function handleResize() {
 }
 
 /**
- * Resize canvas to fit design dimensions (1200x800) into available space.
- * Maintains aspect ratio with letterboxing if needed.
- * Accounts for safe areas and devicePixelRatio for crisp rendering.
+ * Resize canvas to fill the usable viewport (minus safe areas).
+ * Game content is centered with letterboxing rendered within the canvas.
+ * This allows CRT effects to cover the entire visible area.
  *
  * The game always operates in design coordinates (1200x800). The canvas
- * transform scales all rendering to fit the actual screen size.
+ * transform scales and offsets all rendering to center in the viewport.
  */
 export function resizeCanvas() {
     if (!canvas) return;
 
-    // Get display dimensions from screenSize module
+    // Get all dimensions from screenSize module
+    const screenDims = getScreenDimensions();
     const displayDims = getDisplayDimensions();
     const displayOffset = getDisplayOffset();
     const safeArea = getSafeAreaInsets();
@@ -110,18 +118,22 @@ export function resizeCanvas() {
     // Get current device pixel ratio
     devicePixelRatio = getScreenDPR();
 
-    // Set CSS display size (may be smaller than viewport due to letterboxing)
-    canvas.style.width = `${displayDims.width}px`;
-    canvas.style.height = `${displayDims.height}px`;
+    // Calculate usable viewport dimensions (CSS pixels)
+    canvasViewportWidth = screenDims.viewportWidth - safeArea.left - safeArea.right;
+    canvasViewportHeight = screenDims.viewportHeight - safeArea.top - safeArea.bottom;
 
-    // Position canvas to account for safe areas and letterbox centering
+    // Set CSS display size to fill the usable viewport
+    canvas.style.width = `${canvasViewportWidth}px`;
+    canvas.style.height = `${canvasViewportHeight}px`;
+
+    // Position canvas at the start of usable area (after safe area insets)
     canvas.style.position = 'absolute';
-    canvas.style.left = `${safeArea.left + displayOffset.x}px`;
-    canvas.style.top = `${safeArea.top + displayOffset.y}px`;
+    canvas.style.left = `${safeArea.left}px`;
+    canvas.style.top = `${safeArea.top}px`;
 
-    // Set internal resolution (physical pixels for crisp rendering)
-    const resolutionWidth = getCanvasResolutionWidth();
-    const resolutionHeight = getCanvasResolutionHeight();
+    // Set internal resolution to match viewport at device pixel ratio
+    const resolutionWidth = Math.floor(canvasViewportWidth * devicePixelRatio);
+    const resolutionHeight = Math.floor(canvasViewportHeight * devicePixelRatio);
 
     canvas.width = resolutionWidth;
     canvas.height = resolutionHeight;
@@ -129,30 +141,44 @@ export function resizeCanvas() {
     // Combined scale factor: gameScale (design->screen) * DPR (screen->physical)
     scaleFactor = gameScale * devicePixelRatio;
 
-    // Scale the context to account for both game scaling and device pixel ratio
-    // All drawing is done in design coordinates (1200x800), scaled to fit screen
+    // Calculate offset to center game content within viewport (in physical pixels)
+    // displayOffset is the letterbox offset in CSS pixels
+    contentOffsetX = displayOffset.x * devicePixelRatio;
+    contentOffsetY = displayOffset.y * devicePixelRatio;
+
+    // Scale and translate the context to center game content
+    // All game drawing is done in design coordinates (1200x800)
     if (ctx) {
-        ctx.setTransform(scaleFactor, 0, 0, scaleFactor, 0, 0);
+        ctx.setTransform(scaleFactor, 0, 0, scaleFactor, contentOffsetX, contentOffsetY);
     }
 
     console.log(
         `Canvas resized: design=${getScreenWidth()}x${getScreenHeight()}, ` +
+        `viewport=${Math.round(canvasViewportWidth)}x${Math.round(canvasViewportHeight)}, ` +
         `display=${Math.round(displayDims.width)}x${Math.round(displayDims.height)}, ` +
         `resolution=${resolutionWidth}x${resolutionHeight}, ` +
-        `gameScale=${gameScale.toFixed(3)}, dpr=${devicePixelRatio}, ` +
-        `combined=${scaleFactor.toFixed(3)}`
+        `offset=(${Math.round(contentOffsetX)}, ${Math.round(contentOffsetY)}), ` +
+        `gameScale=${gameScale.toFixed(3)}, dpr=${devicePixelRatio}`
     );
 }
 
 /**
- * Clear the canvas with the background color.
- * Uses dynamic screen dimensions.
+ * Clear the entire canvas with the background color.
+ * Clears both the game content area and letterbox regions.
  */
 export function clear() {
     if (!ctx) return;
+
+    // Save current transform
+    ctx.save();
+
+    // Reset to identity to clear entire viewport (including letterbox areas)
+    ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
     ctx.fillStyle = COLORS.BACKGROUND;
-    // Use dynamic screen dimensions
-    ctx.fillRect(0, 0, getScreenWidth(), getScreenHeight());
+    ctx.fillRect(0, 0, canvasViewportWidth, canvasViewportHeight);
+
+    // Restore the game content transform
+    ctx.restore();
 }
 
 /**
@@ -206,6 +232,31 @@ export function getDevicePixelRatio() {
 }
 
 /**
+ * Get the canvas viewport dimensions (usable screen area in CSS pixels).
+ * Use this for full-screen effects like CRT overlay that should cover
+ * the entire canvas including letterbox areas.
+ * @returns {{width: number, height: number}} Viewport dimensions in CSS pixels
+ */
+export function getViewportDimensions() {
+    return {
+        width: canvasViewportWidth,
+        height: canvasViewportHeight
+    };
+}
+
+/**
+ * Get the content offset (for centering game content in viewport).
+ * This is the letterbox offset in CSS pixels.
+ * @returns {{x: number, y: number}} Offset in CSS pixels
+ */
+export function getContentOffset() {
+    return {
+        x: contentOffsetX / devicePixelRatio,
+        y: contentOffsetY / devicePixelRatio
+    };
+}
+
+/**
  * Convert screen/mouse coordinates to design coordinates.
  * Use this when handling mouse/touch events.
  *
@@ -227,11 +278,15 @@ export function screenToDesign(screenX, screenY) {
     const canvasX = screenX - rect.left;
     const canvasY = screenY - rect.top;
 
-    // Scale from display pixels to design pixels
+    // Subtract content offset (letterbox offset in CSS pixels)
+    const offsetX = contentOffsetX / devicePixelRatio;
+    const offsetY = contentOffsetY / devicePixelRatio;
+
+    // Scale from display pixels to design pixels, accounting for content offset
     const gameScale = getGameScale();
     return {
-        x: canvasX / gameScale,
-        y: canvasY / gameScale
+        x: (canvasX - offsetX) / gameScale,
+        y: (canvasY - offsetY) / gameScale
     };
 }
 

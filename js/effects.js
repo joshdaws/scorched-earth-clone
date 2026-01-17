@@ -1575,34 +1575,60 @@ function renderPhosphorGlow(ctx, width, height) {
  * Render all CRT effects as a post-processing overlay.
  * Call this AFTER all other rendering is complete.
  * Far Cry Blood Dragon / VHS inspired effects.
+ *
+ * When fullscreen parameters are provided, the CRT effects will cover the
+ * entire viewport (including letterbox areas), not just the game content area.
+ *
  * @param {CanvasRenderingContext2D} ctx - Canvas context
- * @param {number} width - Canvas width
- * @param {number} height - Canvas height
+ * @param {number} width - Game content width (design coordinates)
+ * @param {number} height - Game content height (design coordinates)
+ * @param {Object} [fullscreenParams] - Optional params for full-viewport rendering
+ * @param {number} fullscreenParams.viewportWidth - Full viewport width in CSS pixels
+ * @param {number} fullscreenParams.viewportHeight - Full viewport height in CSS pixels
+ * @param {number} fullscreenParams.dpr - Device pixel ratio
  */
-export function renderCrtEffects(ctx, width, height) {
+export function renderCrtEffects(ctx, width, height, fullscreenParams = null) {
     if (!crtEnabled) return;
 
     // Update glitch animation state
     updateVhsGlitch(16.67); // Assume ~60fps for delta time
 
+    let effectWidth = width;
+    let effectHeight = height;
+
+    // If fullscreen params provided, reset transform and use viewport dimensions
+    if (fullscreenParams) {
+        ctx.save();
+        // Reset to identity transform (no scaling, no offset)
+        ctx.setTransform(fullscreenParams.dpr, 0, 0, fullscreenParams.dpr, 0, 0);
+        // Use viewport dimensions for effects
+        effectWidth = fullscreenParams.viewportWidth;
+        effectHeight = fullscreenParams.viewportHeight;
+    }
+
     // Render effects in order (back to front)
     // 1. Phosphor glow (subtle bloom)
-    renderPhosphorGlow(ctx, width, height);
+    renderPhosphorGlow(ctx, effectWidth, effectHeight);
 
     // 2. Chromatic aberration (RGB color fringing)
-    renderChromaticAberration(ctx, width, height);
+    renderChromaticAberration(ctx, effectWidth, effectHeight);
 
     // 3. VHS noise/grain
-    renderVhsNoise(ctx, width, height);
+    renderVhsNoise(ctx, effectWidth, effectHeight);
 
     // 4. VHS tracking glitch
-    renderVhsGlitch(ctx, width, height);
+    renderVhsGlitch(ctx, effectWidth, effectHeight);
 
     // 5. Scanlines (horizontal lines)
-    renderScanlines(ctx, width, height);
+    renderScanlines(ctx, effectWidth, effectHeight);
 
     // 6. Vignette (darker corners) - on top
-    renderVignette(ctx, width, height);
+    renderVignette(ctx, effectWidth, effectHeight);
+
+    // Restore transform if we modified it
+    if (fullscreenParams) {
+        ctx.restore();
+    }
 }
 
 /**
