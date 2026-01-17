@@ -15,6 +15,8 @@ import { queueGameInput, INPUT_EVENTS } from './input.js';
 import * as Wind from './wind.js';
 import * as Turn from './turn.js';
 import { getScreenWidth, getScreenHeight } from './screenSize.js';
+import { calculateDamage } from './damage.js';
+import { WeaponRegistry } from './weapons.js';
 
 // =============================================================================
 // MODULE STATE
@@ -450,6 +452,287 @@ export function simulateProjectile(options = {}) {
 }
 
 // =============================================================================
+// TRAJECTORY COLLECTION API
+// =============================================================================
+
+/**
+ * Fire a projectile and collect comprehensive trajectory data.
+ * This function simulates the trajectory and calculates damage without
+ * actually modifying game state, making it ideal for physics validation.
+ *
+ * @param {Object} options - Fire options
+ * @param {number} [options.angle=45] - Launch angle in degrees
+ * @param {number} [options.power=50] - Launch power percentage (0-100)
+ * @param {string} [options.weaponId='basic-shot'] - Weapon ID to use for damage calculation
+ * @param {number} [options.wind] - Wind value (uses current game wind if not specified)
+ * @returns {Object} Comprehensive trajectory and impact data
+ */
+export function fireAndCollect(options = {}) {
+    const {
+        angle = 45,
+        power = 50,
+        weaponId = 'basic-shot',
+        wind = Wind.getWind()
+    } = options;
+
+    // Validate inputs
+    if (typeof angle !== 'number' || angle < PHYSICS.MIN_ANGLE || angle > PHYSICS.MAX_ANGLE) {
+        return {
+            success: false,
+            error: `Invalid angle: ${angle}. Must be between ${PHYSICS.MIN_ANGLE} and ${PHYSICS.MAX_ANGLE}`
+        };
+    }
+
+    if (typeof power !== 'number' || power < PHYSICS.MIN_POWER || power > PHYSICS.MAX_POWER) {
+        return {
+            success: false,
+            error: `Invalid power: ${power}. Must be between ${PHYSICS.MIN_POWER} and ${PHYSICS.MAX_POWER}`
+        };
+    }
+
+    // Get weapon data for damage calculation
+    const weapon = WeaponRegistry.getWeapon(weaponId);
+    if (!weapon) {
+        return {
+            success: false,
+            error: `Unknown weapon: ${weaponId}`
+        };
+    }
+
+    // Run the simulation to get trajectory
+    const simulation = simulateProjectile({
+        angle,
+        power,
+        wind,
+        maxSteps: 1000 // Higher limit for full trajectory
+    });
+
+    if (!simulation.success) {
+        return simulation;
+    }
+
+    // Calculate damage if a tank was hit
+    let damageDealt = 0;
+    let hitTankHealth = null;
+    let hitTankTeam = null;
+
+    if (simulation.tankHit) {
+        const hitTank = simulation.tankHit === 'enemy'
+            ? (module.enemyTank || enemyTank)
+            : (module.playerTank || playerTank);
+
+        if (hitTank) {
+            hitTankHealth = hitTank.health;
+            hitTankTeam = hitTank.team;
+
+            // Calculate damage using the actual damage system
+            const explosion = {
+                x: simulation.landingX,
+                y: simulation.landingY,
+                blastRadius: weapon.blastRadius
+            };
+
+            damageDealt = calculateDamage(explosion, hitTank, weapon);
+        }
+    }
+
+    // Also calculate potential damage to both tanks if terrain was hit
+    // (explosion splash damage can hit tanks near the impact point)
+    let playerDamage = 0;
+    let enemyDamage = 0;
+
+    if (simulation.terrainHit && simulation.landingX !== null && simulation.landingY !== null) {
+        const explosion = {
+            x: simulation.landingX,
+            y: simulation.landingY,
+            blastRadius: weapon.blastRadius
+        };
+
+        const player = module.playerTank || playerTank;
+        const enemy = module.enemyTank || enemyTank;
+
+        if (player && !player.isDestroyed) {
+            playerDamage = calculateDamage(explosion, player, weapon);
+        }
+        if (enemy && !enemy.isDestroyed) {
+            enemyDamage = calculateDamage(explosion, enemy, weapon);
+        }
+    }
+
+    // Build result object matching the spec from the issue description
+    const result = {
+        success: true,
+        // Input parameters
+        angle,
+        power,
+        wind,
+        weaponId,
+        // Trajectory data
+        trajectory: simulation.trajectory, // Array of {x, y, t} points
+        // Flight statistics
+        maxHeight: simulation.maxHeightAboveStart, // Height above starting point
+        maxHeightY: simulation.maxHeight, // Actual Y coordinate of apex
+        maxHeightX: simulation.maxHeightX, // X coordinate at apex
+        flightTime: simulation.flightTime, // Total steps
+        // Landing data
+        landingX: simulation.landingX,
+        landingY: simulation.landingY,
+        // Collision data
+        tankHit: simulation.tankHit, // 'player' | 'enemy' | null
+        terrainHit: simulation.terrainHit,
+        outOfBounds: simulation.outOfBounds,
+        // Damage data
+        damageDealt, // Damage to the directly hit tank
+        hitTankTeam, // Team of tank that was hit
+        hitTankHealth, // Health of tank before damage
+        // Splash damage (for terrain hits)
+        splashDamage: {
+            player: playerDamage,
+            enemy: enemyDamage
+        },
+        // Weapon info
+        weapon: {
+            name: weapon.name,
+            baseDamage: weapon.damage,
+            blastRadius: weapon.blastRadius
+        },
+        // Starting position
+        startX: simulation.startX,
+        startY: simulation.startY
+    };
+
+    console.log(`[TestAPI] fireAndCollect({ angle: ${angle}, power: ${power} }) - ` +
+                `flightTime: ${result.flightTime}, maxHeight: ${result.maxHeight?.toFixed(1)}, ` +
+                `landingX: ${result.landingX?.toFixed(1)}, tankHit: ${result.tankHit}, ` +
+                `damageDealt: ${result.damageDealt}`);
+
+    return result;
+}
+
+/**
+ * Validate projectile physics by comparing expected range with actual landing position.
+ * Useful for automated testing and physics regression detection.
+ *
+ * @param {Object} options - Validation options
+ * @param {number} options.angle - Launch angle in degrees
+ * @param {number} options.power - Launch power percentage (0-100)
+ * @param {number} options.expectedRange - Expected horizontal distance traveled (in pixels)
+ * @param {number} [options.tolerance=10] - Acceptable deviation from expected (in pixels)
+ * @param {number} [options.wind=0] - Wind value for simulation (default: 0 for controlled tests)
+ * @param {number} [options.expectedMaxHeight] - Optional: expected max height above start
+ * @param {number} [options.heightTolerance] - Tolerance for height validation
+ * @returns {Object} Validation result with pass/fail and details
+ */
+export function validatePhysics(options = {}) {
+    const {
+        angle,
+        power,
+        expectedRange,
+        tolerance = 10,
+        wind = 0,
+        expectedMaxHeight = null,
+        heightTolerance = null
+    } = options;
+
+    // Validate required inputs
+    if (typeof angle !== 'number') {
+        return { success: false, pass: false, error: 'angle is required and must be a number' };
+    }
+    if (typeof power !== 'number') {
+        return { success: false, pass: false, error: 'power is required and must be a number' };
+    }
+    if (typeof expectedRange !== 'number') {
+        return { success: false, pass: false, error: 'expectedRange is required and must be a number' };
+    }
+
+    // Run simulation with controlled wind (default 0)
+    const simulation = simulateProjectile({
+        angle,
+        power,
+        wind,
+        maxSteps: 1000
+    });
+
+    if (!simulation.success) {
+        return {
+            success: false,
+            pass: false,
+            error: `Simulation failed: ${simulation.error || 'unknown error'}`
+        };
+    }
+
+    // Calculate actual range (horizontal distance from start to landing)
+    const actualRange = simulation.landingX !== null
+        ? Math.abs(simulation.landingX - simulation.startX)
+        : null;
+
+    // Range validation
+    let rangePass = false;
+    let rangeDeviation = null;
+    let rangeWithinTolerance = false;
+
+    if (actualRange !== null) {
+        rangeDeviation = actualRange - expectedRange;
+        rangeWithinTolerance = Math.abs(rangeDeviation) <= tolerance;
+        rangePass = rangeWithinTolerance;
+    }
+
+    // Height validation (optional)
+    let heightPass = true; // Default to pass if not testing height
+    let heightDeviation = null;
+    let heightWithinTolerance = null;
+
+    if (expectedMaxHeight !== null && typeof expectedMaxHeight === 'number') {
+        const actualMaxHeight = simulation.maxHeightAboveStart;
+        const hTolerance = heightTolerance ?? tolerance;
+        heightDeviation = actualMaxHeight - expectedMaxHeight;
+        heightWithinTolerance = Math.abs(heightDeviation) <= hTolerance;
+        heightPass = heightWithinTolerance;
+    }
+
+    // Overall pass/fail
+    const pass = rangePass && heightPass;
+
+    const result = {
+        success: true,
+        pass,
+        // Input parameters
+        angle,
+        power,
+        wind,
+        // Expected vs actual
+        expectedRange,
+        actualRange,
+        rangeDeviation,
+        rangeWithinTolerance,
+        tolerance,
+        // Height validation (if requested)
+        expectedMaxHeight,
+        actualMaxHeight: simulation.maxHeightAboveStart,
+        heightDeviation,
+        heightWithinTolerance,
+        heightTolerance: heightTolerance ?? tolerance,
+        // Additional simulation data
+        flightTime: simulation.flightTime,
+        landingX: simulation.landingX,
+        landingY: simulation.landingY,
+        startX: simulation.startX,
+        startY: simulation.startY,
+        terrainHit: simulation.terrainHit,
+        tankHit: simulation.tankHit,
+        outOfBounds: simulation.outOfBounds,
+        // Summary message
+        message: pass
+            ? `PASS: Range ${actualRange?.toFixed(1)}px within ${tolerance}px of expected ${expectedRange}px`
+            : `FAIL: Range ${actualRange?.toFixed(1)}px deviates ${rangeDeviation?.toFixed(1)}px from expected ${expectedRange}px (tolerance: ${tolerance}px)`
+    };
+
+    console.log(`[TestAPI] validatePhysics({ angle: ${angle}, power: ${power} }) - ${result.message}`);
+
+    return result;
+}
+
+// =============================================================================
 // UTILITY FUNCTIONS
 // =============================================================================
 
@@ -518,6 +801,10 @@ const TestAPI = {
     fire,
     fireDirect,
     simulateProjectile,
+    // Trajectory collection and physics validation
+    fireAndCollect,
+    validatePhysics,
+    // Utility functions
     getAim,
     getWind,
     getWindForce,
