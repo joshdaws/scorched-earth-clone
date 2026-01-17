@@ -31,6 +31,7 @@ import * as PauseMenu from './pauseMenu.js';
 import * as TouchAiming from './touchAiming.js';
 import * as Haptics from './haptics.js';
 import * as DebugTools from './debugTools.js';
+import * as TestAPI from './testAPI.js';
 import * as GameOver from './gameOver.js';
 import * as RoundTransition from './roundTransition.js';
 import { getEnemyHealthForRound, recordStat, startNewRun as startNewRunState, endRun as endRunState, advanceRound as advanceRunRound } from './runState.js';
@@ -5853,6 +5854,15 @@ async function init() {
         getEnemyTank: () => enemyTank,
         getCurrentRound: () => currentRound,
         setCurrentRound: (round) => { currentRound = round; }
+    });
+
+    // Initialize TestAPI with game state accessors
+    TestAPI.init({
+        getPlayerTank: () => playerTank,
+        getEnemyTank: () => enemyTank,
+        getTerrain: () => currentTerrain,
+        fireProjectile: fireProjectile,
+        playerAim: playerAim
     });
 
     // Register debug keyboard shortcuts (Shift+1-9 when debug mode is on)
