@@ -42,6 +42,8 @@ import * as AchievementScreen from './achievement-screen.js';
 import * as CollectionScreen from './collection-screen.js';
 import * as SupplyDropScreen from './supply-drop-screen.js';
 import * as LevelSelectScreen from './level-select-screen.js';
+import * as LevelCompleteScreen from './level-complete-screen.js';
+import { LevelRegistry } from './levels.js';
 import * as CombatAchievements from './combat-achievements.js';
 import * as PrecisionAchievements from './precision-achievements.js';
 import * as WeaponAchievements from './weapon-achievements.js';
@@ -88,6 +90,28 @@ let enemyTank = null;
  * @type {number}
  */
 let currentRound = 1;
+
+// =============================================================================
+// LEVEL MODE STATE
+// =============================================================================
+
+/**
+ * Current level ID when playing in level mode (e.g., 'world1-level3')
+ * @type {string|null}
+ */
+let currentLevelId = null;
+
+/**
+ * Current level definition when playing in level mode
+ * @type {Object|null}
+ */
+let currentLevelData = null;
+
+/**
+ * Whether currently playing in level-based mode (vs roguelike/endless mode)
+ * @type {boolean}
+ */
+let isLevelMode = false;
 
 // =============================================================================
 // PROJECTILE STATE
@@ -3965,6 +3989,72 @@ function setupDefeatState() {
 }
 
 // =============================================================================
+// LEVEL COMPLETE STATE (Level-based Mode)
+// =============================================================================
+
+/**
+ * Handle level selection from Level Select screen.
+ * @param {CustomEvent} event - Level selected event with detail
+ */
+function handleLevelSelected(event) {
+    const { levelId, level, worldNum, levelNum } = event.detail;
+
+    console.log(`[Main] Level selected: ${levelId}`);
+
+    // Store current level info
+    currentLevelId = levelId;
+    currentLevelData = level;
+    isLevelMode = true;
+
+    // Reset round to 1 for level mode
+    currentRound = 1;
+
+    // TODO: Initialize level-specific settings (difficulty, wind, etc.)
+    // This will be implemented in issue scorched-earth-aca.5
+}
+
+/**
+ * Set up Level Complete screen callbacks.
+ */
+function setupLevelCompleteCallbacks() {
+    // Retry button - restart same level
+    LevelCompleteScreen.onRetry((levelId, worldNum, levelNum) => {
+        console.log(`[Main] Retrying level: ${levelId}`);
+        LevelCompleteScreen.hide();
+
+        // Reset game state for retry
+        currentLevelId = levelId;
+        currentRound = 1;
+
+        // TODO: Start the level again
+        // This will be fully implemented in issue scorched-earth-aca.5
+        Game.setState(GAME_STATES.LEVEL_SELECT);
+    });
+
+    // Next button - advance to next level
+    LevelCompleteScreen.onNext((levelId, worldNum, levelNum) => {
+        console.log(`[Main] Starting next level: ${levelId}`);
+        LevelCompleteScreen.hide();
+
+        // Update current level info
+        currentLevelId = levelId;
+        currentLevelData = LevelRegistry.getLevel(levelId);
+        currentRound = 1;
+
+        // TODO: Start the next level
+        // This will be fully implemented in issue scorched-earth-aca.5
+        Game.setState(GAME_STATES.LEVEL_SELECT);
+    });
+
+    // Menu button - return to level select
+    LevelCompleteScreen.onMenu(() => {
+        console.log('[Main] Returning to level select');
+        LevelCompleteScreen.hide();
+        Game.setState(GAME_STATES.LEVEL_SELECT);
+    });
+}
+
+// =============================================================================
 // ROUND TRANSITION STATE
 // =============================================================================
 
@@ -5169,6 +5259,7 @@ async function init() {
     CollectionScreen.setup();
     SupplyDropScreen.setup();
     LevelSelectScreen.setup();
+    LevelCompleteScreen.setup();
     setupPlayingState();
     setupPausedState();
     setupVictoryState();
@@ -5176,6 +5267,12 @@ async function init() {
     setupRoundTransitionState();
     setupGameOverState();
     setupShopState();
+
+    // Set up Level Complete screen callbacks
+    setupLevelCompleteCallbacks();
+
+    // Listen for level selection from Level Select screen
+    window.addEventListener('levelSelected', handleLevelSelected);
 
     // Register 'D' key to toggle debug mode
     Input.onKeyDown((keyCode) => {
@@ -5306,6 +5403,7 @@ async function init() {
     window.SupplyDrop = SupplyDrop;
     window.ExtractionReveal = ExtractionReveal;
     window.LifetimeStats = LifetimeStats;
+    window.LevelCompleteScreen = LevelCompleteScreen;
     // Expose DebugTools as 'Debug' for convenience (e.g., Debug.skipToShop())
     // This creates a merged object with both Debug module and DebugTools functions
     window.Debug = { ...Debug, ...DebugTools };
