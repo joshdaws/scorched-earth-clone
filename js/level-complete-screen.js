@@ -90,6 +90,14 @@ let lastScoreLineTime = 0;
 /** Button hover state */
 let hoveredButton = null;
 
+/** World unlock celebration state */
+let worldUnlockCelebration = {
+    active: false,
+    worldNum: 0,
+    animationTime: 0,
+    confetti: []
+};
+
 /** Callbacks */
 let onRetryCallback = null;
 let onNextCallback = null;
@@ -128,6 +136,12 @@ export function show(options = {}) {
     scoreLinesRevealed = 0;
     lastScoreLineTime = 0;
     hoveredButton = null;
+    worldUnlockCelebration = {
+        active: false,
+        worldNum: 0,
+        animationTime: 0,
+        confetti: []
+    };
 
     // Get level info
     const level = LevelRegistry.getLevel(levelId);
@@ -135,9 +149,31 @@ export function show(options = {}) {
 
     // Get previous stars before recording completion
     const previousStars = Stars.getForLevel(levelId);
+    const previousTotalStars = Stars.getTotalStars();
 
     // Calculate and record stars
     const result = Stars.recordCompletion(levelId, stats);
+
+    // Check if a new world was unlocked by this completion
+    if (result.stars > previousStars) {
+        const newTotalStars = Stars.getTotalStars();
+        // Check each world that could have been unlocked
+        for (let w = 2; w <= LEVEL_CONSTANTS.WORLDS; w++) {
+            const threshold = LEVEL_CONSTANTS.STAR_THRESHOLDS[w];
+            if (previousTotalStars < threshold && newTotalStars >= threshold) {
+                // World w was just unlocked!
+                worldUnlockCelebration.active = true;
+                worldUnlockCelebration.worldNum = w;
+                worldUnlockCelebration.animationTime = 0;
+                // Generate confetti particles
+                worldUnlockCelebration.confetti = generateConfetti(100);
+                // Play world unlock sound
+                playWorldUnlockSound();
+                console.log(`[LevelComplete] World ${w} unlocked!`);
+                break; // Only celebrate one world at a time
+            }
+        }
+    }
 
     // Check if this is a first clear (no previous stars)
     const isFirstClear = previousStars === 0 && result.stars > 0;
@@ -408,6 +444,162 @@ function handleKeyDown(keyCode) {
 }
 
 // =============================================================================
+// WORLD UNLOCK CELEBRATION
+// =============================================================================
+
+/**
+ * Generate confetti particles for world unlock celebration.
+ * @param {number} count - Number of particles to generate
+ * @returns {Array} Array of confetti particle objects
+ */
+function generateConfetti(count) {
+    const particles = [];
+    const colors = [COLORS.NEON_CYAN, COLORS.NEON_PINK, COLORS.NEON_YELLOW, COLORS.NEON_PURPLE, COLORS.NEON_ORANGE];
+
+    for (let i = 0; i < count; i++) {
+        particles.push({
+            x: Math.random() * Renderer.getWidth(),
+            y: -20 - Math.random() * 100,
+            vx: (Math.random() - 0.5) * 4,
+            vy: Math.random() * 3 + 2,
+            rotation: Math.random() * 360,
+            rotationSpeed: (Math.random() - 0.5) * 10,
+            size: Math.random() * 8 + 4,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            type: Math.random() > 0.5 ? 'rect' : 'circle'
+        });
+    }
+
+    return particles;
+}
+
+/**
+ * Update confetti particles.
+ * @param {number} deltaTime - Time since last frame in ms
+ */
+function updateConfetti(deltaTime) {
+    if (!worldUnlockCelebration.active) return;
+
+    const dt = deltaTime / 16; // Normalize to ~60fps
+
+    for (const p of worldUnlockCelebration.confetti) {
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.vy += 0.1 * dt; // Gravity
+        p.rotation += p.rotationSpeed * dt;
+    }
+
+    // Remove particles that have fallen off screen
+    worldUnlockCelebration.confetti = worldUnlockCelebration.confetti.filter(
+        p => p.y < Renderer.getHeight() + 50
+    );
+
+    // Deactivate celebration when all confetti is gone
+    if (worldUnlockCelebration.confetti.length === 0 && worldUnlockCelebration.animationTime > 3000) {
+        worldUnlockCelebration.active = false;
+    }
+}
+
+/**
+ * Render confetti particles.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ */
+function renderConfetti(ctx) {
+    if (!worldUnlockCelebration.active) return;
+
+    ctx.save();
+
+    for (const p of worldUnlockCelebration.confetti) {
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rotation * Math.PI / 180);
+        ctx.fillStyle = p.color;
+
+        if (p.type === 'rect') {
+            ctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
+        } else {
+            ctx.beginPath();
+            ctx.arc(0, 0, p.size / 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        ctx.restore();
+    }
+
+    ctx.restore();
+}
+
+/**
+ * Render world unlock celebration overlay.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} pulseIntensity - Glow pulse intensity (0-1)
+ */
+function renderWorldUnlockCelebration(ctx, pulseIntensity) {
+    if (!worldUnlockCelebration.active) return;
+
+    const width = Renderer.getWidth();
+    const height = Renderer.getHeight();
+    const worldNum = worldUnlockCelebration.worldNum;
+    const animTime = worldUnlockCelebration.animationTime;
+
+    // Fade in the overlay
+    const fadeIn = Math.min(1, animTime / 500);
+    const fadeOut = animTime > 2500 ? Math.max(0, 1 - (animTime - 2500) / 500) : 1;
+    const alpha = fadeIn * fadeOut;
+
+    if (alpha <= 0) return;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    // Dark overlay
+    ctx.fillStyle = 'rgba(10, 10, 26, 0.85)';
+    ctx.fillRect(0, 0, width, height);
+
+    // Render confetti first (behind text)
+    renderConfetti(ctx);
+
+    // "WORLD X UNLOCKED!" text
+    const worldTheme = WORLD_THEMES[worldNum] || WORLD_THEMES[1];
+    const centerY = height / 2;
+
+    // Scale animation
+    const scale = animTime < 300 ?
+        0.5 + 0.5 * Math.pow(animTime / 300, 0.5) :
+        1 + 0.02 * Math.sin(animTime * 0.005);
+
+    ctx.save();
+    ctx.translate(width / 2, centerY);
+    ctx.scale(scale, scale);
+
+    // "WORLD" label
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.font = `bold 24px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('WORLD', 0, -50);
+
+    // World number with glow
+    ctx.font = `bold 72px ${UI.FONT_FAMILY}`;
+    ctx.shadowColor = worldTheme.color;
+    ctx.shadowBlur = 20 + pulseIntensity * 15;
+    ctx.fillStyle = worldTheme.color;
+    ctx.fillText(worldNum.toString(), 0, 0);
+    ctx.shadowBlur = 0;
+
+    // "UNLOCKED!" label
+    ctx.fillStyle = COLORS.NEON_YELLOW;
+    ctx.font = `bold 36px ${UI.FONT_FAMILY}`;
+    ctx.shadowColor = COLORS.NEON_YELLOW;
+    ctx.shadowBlur = 15 + pulseIntensity * 10;
+    ctx.fillText('UNLOCKED!', 0, 60);
+    ctx.shadowBlur = 0;
+
+    ctx.restore();
+    ctx.restore();
+}
+
+// =============================================================================
 // UPDATE
 // =============================================================================
 
@@ -419,6 +611,12 @@ export function update(deltaTime) {
     if (!isVisible) return;
 
     animationTime += deltaTime;
+
+    // Update world unlock celebration
+    if (worldUnlockCelebration.active) {
+        worldUnlockCelebration.animationTime += deltaTime;
+        updateConfetti(deltaTime);
+    }
 
     if (!contentVisible) return;
 
@@ -515,6 +713,63 @@ function playStarRevealSound(starIndex) {
     osc2.stop(now + 0.3);
 }
 
+/**
+ * Play a fanfare sound for world unlock.
+ * A more dramatic, celebratory sound than star reveal.
+ */
+function playWorldUnlockSound() {
+    if (!Sound.isInitialized()) return;
+
+    const audioCtx = Sound.getContext();
+    if (!audioCtx) return;
+
+    const sfxGain = Sound.getSfxGain();
+    if (!sfxGain) return;
+
+    const now = audioCtx.currentTime;
+    const baseVolume = 0.35;
+
+    // Create a fanfare with multiple ascending notes
+    const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+
+    notes.forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        const delay = i * 0.12;
+
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now + delay);
+
+        gain.gain.setValueAtTime(0, now + delay);
+        gain.gain.linearRampToValueAtTime(baseVolume, now + delay + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + delay + 0.4);
+
+        osc.connect(gain);
+        gain.connect(sfxGain);
+
+        osc.start(now + delay);
+        osc.stop(now + delay + 0.4);
+    });
+
+    // Add a shimmering high note
+    const shimmer = audioCtx.createOscillator();
+    const shimmerGain = audioCtx.createGain();
+
+    shimmer.type = 'sine';
+    shimmer.frequency.setValueAtTime(2093, now + 0.3); // C7
+    shimmer.frequency.exponentialRampToValueAtTime(2093 * 1.5, now + 0.6);
+
+    shimmerGain.gain.setValueAtTime(0, now + 0.3);
+    shimmerGain.gain.linearRampToValueAtTime(baseVolume * 0.5, now + 0.35);
+    shimmerGain.gain.exponentialRampToValueAtTime(0.01, now + 0.8);
+
+    shimmer.connect(shimmerGain);
+    shimmerGain.connect(sfxGain);
+
+    shimmer.start(now + 0.3);
+    shimmer.stop(now + 0.8);
+}
+
 // =============================================================================
 // RENDERING
 // =============================================================================
@@ -597,6 +852,11 @@ export function render(ctx) {
     renderFrame(ctx, mainColor, pulseIntensity);
 
     ctx.restore();
+
+    // ==========================================================================
+    // WORLD UNLOCK CELEBRATION (renders on top of everything)
+    // ==========================================================================
+    renderWorldUnlockCelebration(ctx, pulseIntensity);
 }
 
 /**

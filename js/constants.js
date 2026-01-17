@@ -103,6 +103,7 @@ export const GAME = {
  */
 export const GAME_STATES = {
     MENU: 'menu',
+    MODE_SELECT: 'mode_select',
     DIFFICULTY_SELECT: 'difficulty_select',
     LEVEL_SELECT: 'level_select',
     LEVEL_COMPLETE: 'level_complete',

@@ -646,8 +646,8 @@ function handleMenuClick(pos) {
     if (menuButtons.start.containsPoint(pos.x, pos.y)) {
         // Play click sound
         Sound.playClickSound();
-        // Start fade-out transition, then go to DIFFICULTY_SELECT state
-        startMenuTransition(GAME_STATES.DIFFICULTY_SELECT);
+        // Start fade-out transition, then go to MODE_SELECT state
+        startMenuTransition(GAME_STATES.MODE_SELECT);
     } else if (menuButtons.highScores.containsPoint(pos.x, pos.y)) {
         // Play click sound
         Sound.playClickSound();
@@ -1252,6 +1252,66 @@ function renderMenu(ctx) {
     ctx.fillText(roundsText, bestCardPadding + 10, height - bestCardPadding - 6);
     ctx.restore();
 
+    // Total Stars display - bottom center as a styled card
+    const totalStars = Stars.getTotalStars();
+    const starsCardWidth = isCompact ? 85 : 100;
+    const starsCardHeight = isCompact ? 50 : 60;
+    const starsCardX = (width - starsCardWidth) / 2;
+    const starsCardY = height - tokenPadding - starsCardHeight;
+    const starsFontSize = isCompact ? UI.FONT_SIZE_SMALL : UI.FONT_SIZE_MEDIUM;
+
+    ctx.save();
+    // Card background
+    ctx.fillStyle = 'rgba(10, 10, 26, 0.85)';
+    ctx.beginPath();
+    ctx.roundRect(starsCardX, starsCardY, starsCardWidth, starsCardHeight, 8);
+    ctx.fill();
+
+    // Neon border with pink glow effect (matching level mode color)
+    ctx.strokeStyle = COLORS.NEON_PINK;
+    ctx.lineWidth = 2;
+    ctx.shadowColor = COLORS.NEON_PINK;
+    ctx.shadowBlur = 8;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Star icon - positioned on left side of card
+    const starIconX = starsCardX + 18;
+    const starIconY = starsCardY + starsCardHeight / 2 - 2;
+    const starRadius = isCompact ? 8 : 10;
+
+    // Draw 5-pointed star
+    ctx.fillStyle = COLORS.NEON_YELLOW;
+    ctx.shadowColor = COLORS.NEON_YELLOW;
+    ctx.shadowBlur = 6;
+    ctx.beginPath();
+    for (let i = 0; i < 5; i++) {
+        const angle = (i * 4 * Math.PI / 5) - Math.PI / 2;
+        const r = i === 0 ? starRadius : starRadius;
+        const x = starIconX + Math.cos(angle) * r;
+        const y = starIconY + Math.sin(angle) * r;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Star count - large number next to star icon
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `bold ${starsFontSize + 2}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${totalStars}`, starIconX + starRadius + 8, starIconY);
+
+    // "STARS" label - below the star/number row
+    ctx.fillStyle = '#888899';
+    ctx.font = `${isCompact ? 9 : 11}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText('STARS', starsCardX + starsCardWidth / 2, starsCardY + starsCardHeight - 6);
+    ctx.restore();
+
     ctx.restore();
 
     // Render options overlay on top if visible
@@ -1310,9 +1370,9 @@ function setupMenuState() {
                 optionsOverlayVisible = false;
                 VolumeControls.reset();
             }
-            // Keep TitleScene running for difficulty select (seamless visual transition)
+            // Keep TitleScene running for mode select and difficulty select (seamless visual transition)
             // Stop it only when going to other states
-            if (toState !== GAME_STATES.DIFFICULTY_SELECT) {
+            if (toState !== GAME_STATES.MODE_SELECT && toState !== GAME_STATES.DIFFICULTY_SELECT) {
                 TitleScene.stop();
             }
         },
@@ -1393,9 +1453,351 @@ function setupMenuState() {
                 return;
             }
 
-            // Space/Enter starts game (only if options not open) - go to difficulty selection
+            // Space/Enter starts game (only if options not open) - go to mode selection
             if (!optionsOverlayVisible && (keyCode === 'Space' || keyCode === 'Enter')) {
-                Game.setState(GAME_STATES.DIFFICULTY_SELECT);
+                Game.setState(GAME_STATES.MODE_SELECT);
+            }
+        }
+    });
+}
+
+// =============================================================================
+// MODE SELECTION STATE
+// =============================================================================
+
+/**
+ * User's preferred game mode (persisted to localStorage).
+ * @type {'level'|'endless'|null}
+ */
+let preferredGameMode = null;
+
+/**
+ * Animation time for mode selection screen effects.
+ * @type {number}
+ */
+let modeSelectAnimationTime = 0;
+
+/**
+ * Load preferred game mode from localStorage.
+ */
+function loadPreferredGameMode() {
+    try {
+        const saved = localStorage.getItem('scorched_earth_preferred_mode');
+        if (saved === 'level' || saved === 'endless') {
+            preferredGameMode = saved;
+        } else {
+            preferredGameMode = 'level'; // Default to level mode
+        }
+    } catch (e) {
+        preferredGameMode = 'level';
+    }
+}
+
+/**
+ * Save preferred game mode to localStorage.
+ * @param {'level'|'endless'} mode - The mode to save
+ */
+function savePreferredGameMode(mode) {
+    try {
+        localStorage.setItem('scorched_earth_preferred_mode', mode);
+        preferredGameMode = mode;
+    } catch (e) {
+        console.warn('Failed to save preferred game mode:', e);
+    }
+}
+
+/**
+ * Mode selection button configurations.
+ */
+const modeButtonConfigs = {
+    level: {
+        title: 'LEVEL MODE',
+        description: '60 levels • Earn stars • Unlock worlds',
+        subtitle: 'Recommended',
+        color: COLORS.NEON_CYAN
+    },
+    endless: {
+        title: 'ENDLESS MODE',
+        description: 'Classic roguelike • How far can you go?',
+        subtitle: '',
+        color: COLORS.NEON_PINK
+    }
+};
+
+/**
+ * Button instances for mode selection.
+ */
+const modeButtons = {
+    level: new Button({
+        text: '',
+        x: CANVAS.DESIGN_WIDTH / 2,
+        y: CANVAS.DESIGN_HEIGHT / 2 - 60,
+        width: 400,
+        height: 100,
+        fontSize: UI.FONT_SIZE_LARGE,
+        borderColor: COLORS.NEON_CYAN,
+        glowColor: COLORS.NEON_CYAN,
+        textColor: COLORS.TEXT_LIGHT
+    }),
+    endless: new Button({
+        text: '',
+        x: CANVAS.DESIGN_WIDTH / 2,
+        y: CANVAS.DESIGN_HEIGHT / 2 + 60,
+        width: 400,
+        height: 100,
+        fontSize: UI.FONT_SIZE_LARGE,
+        borderColor: COLORS.NEON_PINK,
+        glowColor: COLORS.NEON_PINK,
+        textColor: COLORS.TEXT_LIGHT
+    })
+};
+
+/**
+ * Back button for mode selection screen.
+ */
+const modeSelectBackButton = new Button({
+    text: '← BACK',
+    x: CANVAS.DESIGN_WIDTH / 2,
+    y: CANVAS.DESIGN_HEIGHT - 80,
+    width: 200,
+    height: 50,
+    fontSize: UI.FONT_SIZE_MEDIUM,
+    borderColor: COLORS.TEXT_MUTED,
+    glowColor: COLORS.TEXT_MUTED,
+    textColor: COLORS.TEXT_MUTED
+});
+
+/**
+ * Update mode selection button positions for responsive layout.
+ */
+function updateModeSelectButtonPositions() {
+    const width = Renderer.getWidth();
+    const height = Renderer.getHeight();
+    const centerX = width / 2;
+
+    // Calculate button dimensions based on screen size
+    const isCompact = height < 600;
+    const buttonWidth = isCompact ? 320 : 400;
+    const buttonHeight = isCompact ? 80 : 100;
+    const buttonGap = isCompact ? 20 : 30;
+
+    // Center the buttons vertically
+    const totalHeight = buttonHeight * 2 + buttonGap;
+    const startY = (height - totalHeight) / 2;
+
+    modeButtons.level.setPosition(centerX, startY + buttonHeight / 2);
+    modeButtons.level.setSize(buttonWidth, buttonHeight);
+
+    modeButtons.endless.setPosition(centerX, startY + buttonHeight + buttonGap + buttonHeight / 2);
+    modeButtons.endless.setSize(buttonWidth, buttonHeight);
+
+    // Position back button
+    modeSelectBackButton.setPosition(centerX, height - 60);
+    modeSelectBackButton.setSize(isCompact ? 150 : 200, isCompact ? 40 : 50);
+}
+
+/**
+ * Render a mode selection button with custom two-line text.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {string} key - Button key ('level' or 'endless')
+ * @param {number} pulseIntensity - Glow pulse intensity (0-1)
+ */
+function renderModeButton(ctx, key, pulseIntensity) {
+    const button = modeButtons[key];
+    const config = modeButtonConfigs[key];
+
+    // Render button background and border
+    button.render(ctx, pulseIntensity);
+
+    ctx.save();
+
+    // Render "Recommended" badge for level mode
+    if (config.subtitle) {
+        ctx.fillStyle = config.color;
+        ctx.font = `bold 11px ${UI.FONT_FAMILY}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = config.color;
+        ctx.shadowBlur = 6;
+        ctx.fillText(config.subtitle.toUpperCase(), button.x, button.y - 28);
+        ctx.shadowBlur = 0;
+    }
+
+    // Render title text
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.font = `bold ${UI.FONT_SIZE_LARGE + 2}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = button.glowColor;
+    ctx.shadowBlur = 4 + pulseIntensity * 2;
+    ctx.fillText(config.title, button.x, button.y - (config.subtitle ? 6 : 10));
+    ctx.shadowBlur = 0;
+
+    // Render description text
+    ctx.fillStyle = COLORS.TEXT_MUTED;
+    ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetX = 1;
+    ctx.shadowOffsetY = 1;
+    ctx.fillText(config.description, button.x, button.y + 18);
+
+    ctx.restore();
+}
+
+/**
+ * Render the mode selection screen.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ */
+function renderModeSelect(ctx) {
+    updateModeSelectButtonPositions();
+
+    const width = Renderer.getWidth();
+    const height = Renderer.getHeight();
+
+    modeSelectAnimationTime += 16;
+    const pulseIntensity = (Math.sin(modeSelectAnimationTime * 0.003) + 1) / 2;
+
+    ctx.save();
+
+    // TitleScene provides 3D background - add overlay for readability
+    const overlayGradient = ctx.createLinearGradient(0, 0, 0, height);
+    overlayGradient.addColorStop(0, 'rgba(10, 10, 26, 0.5)');
+    overlayGradient.addColorStop(0.5, 'rgba(10, 10, 26, 0.2)');
+    overlayGradient.addColorStop(1, 'rgba(10, 10, 26, 0.5)');
+    ctx.fillStyle = overlayGradient;
+    ctx.fillRect(0, 0, width, height);
+
+    // Title
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.font = `bold ${UI.FONT_SIZE_TITLE}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = COLORS.NEON_CYAN;
+    ctx.shadowBlur = 10 + pulseIntensity * 5;
+    ctx.fillText('SELECT MODE', width / 2, 100);
+    ctx.shadowBlur = 0;
+
+    // Render mode buttons
+    renderModeButton(ctx, 'level', pulseIntensity);
+    renderModeButton(ctx, 'endless', pulseIntensity);
+
+    // Render back button
+    modeSelectBackButton.render(ctx, pulseIntensity);
+
+    // Render total stars indicator in corner
+    const totalStars = Stars.getTotalStars();
+    if (totalStars > 0) {
+        const starX = width - 80;
+        const starY = 40;
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(10, 10, 26, 0.85)';
+        ctx.beginPath();
+        ctx.roundRect(starX - 35, starY - 18, 70, 36, 8);
+        ctx.fill();
+
+        ctx.strokeStyle = COLORS.NEON_YELLOW;
+        ctx.lineWidth = 2;
+        ctx.shadowColor = COLORS.NEON_YELLOW;
+        ctx.shadowBlur = 6;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        // Star icon
+        ctx.fillStyle = COLORS.NEON_YELLOW;
+        ctx.font = '16px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('★', starX - 15, starY);
+
+        // Star count
+        ctx.fillStyle = COLORS.TEXT_LIGHT;
+        ctx.font = `bold 14px ${UI.FONT_FAMILY}`;
+        ctx.textAlign = 'left';
+        ctx.fillText(`${totalStars}`, starX - 2, starY);
+        ctx.restore();
+    }
+
+    ctx.restore();
+
+    // Render CRT effects
+    renderCrtEffects(ctx, width, height);
+}
+
+/**
+ * Handle click on mode selection screen.
+ * @param {{x: number, y: number}} pos - Click position
+ */
+function handleModeSelectClick(pos) {
+    if (Game.getState() !== GAME_STATES.MODE_SELECT) return;
+
+    updateModeSelectButtonPositions();
+
+    if (modeButtons.level.containsPoint(pos.x, pos.y)) {
+        Sound.playClickSound();
+        savePreferredGameMode('level');
+        // Go to level select screen
+        Game.setState(GAME_STATES.LEVEL_SELECT);
+    } else if (modeButtons.endless.containsPoint(pos.x, pos.y)) {
+        Sound.playClickSound();
+        savePreferredGameMode('endless');
+        // Go to difficulty select for endless mode
+        Game.setState(GAME_STATES.DIFFICULTY_SELECT);
+    } else if (modeSelectBackButton.containsPoint(pos.x, pos.y)) {
+        Sound.playClickSound();
+        Game.setState(GAME_STATES.MENU);
+    }
+}
+
+/**
+ * Setup mode selection state handlers.
+ */
+function setupModeSelectState() {
+    // Load preferred mode on startup
+    loadPreferredGameMode();
+
+    Game.registerStateHandlers(GAME_STATES.MODE_SELECT, {
+        onEnter: (fromState) => {
+            console.log('Entered MODE_SELECT state');
+            modeSelectAnimationTime = 0;
+            // Ensure TitleScene is running
+            if (!TitleScene.isActive()) {
+                TitleScene.start();
+            }
+        },
+        onExit: (toState) => {
+            console.log('Exiting MODE_SELECT state');
+            // Keep TitleScene running for MENU, LEVEL_SELECT, DIFFICULTY_SELECT
+            if (toState !== GAME_STATES.MENU &&
+                toState !== GAME_STATES.LEVEL_SELECT &&
+                toState !== GAME_STATES.DIFFICULTY_SELECT) {
+                TitleScene.stop();
+            }
+        },
+        render: renderModeSelect
+    });
+
+    // Register click handler
+    Input.onMouseDown((x, y, button) => {
+        if (Game.getState() === GAME_STATES.MODE_SELECT && button === 0) {
+            handleModeSelectClick({ x, y });
+        }
+    });
+
+    // Register touch handler
+    Input.onTouchStart((x, y) => {
+        if (Game.getState() === GAME_STATES.MODE_SELECT) {
+            handleModeSelectClick({ x, y });
+        }
+    });
+
+    // Handle keyboard - Escape to go back
+    Input.onKeyDown((keyCode) => {
+        if (Game.getState() === GAME_STATES.MODE_SELECT) {
+            if (keyCode === 'Escape') {
+                Sound.playClickSound();
+                Game.setState(GAME_STATES.MENU);
             }
         }
     });
@@ -1540,7 +1942,7 @@ function handleDifficultyClick(pos) {
     // Check back button (using Button component's containsPoint)
     if (difficultyBackButton.containsPoint(pos.x, pos.y)) {
         Sound.playClickSound();
-        Game.setState(GAME_STATES.MENU);
+        Game.setState(GAME_STATES.MODE_SELECT);
     }
 }
 
@@ -1670,9 +2072,9 @@ function setupDifficultySelectState() {
         },
         onExit: (toState) => {
             console.log('Exiting DIFFICULTY_SELECT state');
-            // Keep TitleScene running if going back to MENU (seamless transition)
+            // Keep TitleScene running if going back to MENU or MODE_SELECT (seamless transition)
             // Stop it when going to PLAYING or other states
-            if (toState !== GAME_STATES.MENU) {
+            if (toState !== GAME_STATES.MENU && toState !== GAME_STATES.MODE_SELECT) {
                 TitleScene.stop();
             }
         },
@@ -1698,7 +2100,7 @@ function setupDifficultySelectState() {
         if (Game.getState() === GAME_STATES.DIFFICULTY_SELECT) {
             if (keyCode === 'Escape') {
                 Sound.playClickSound();
-                Game.setState(GAME_STATES.MENU);
+                Game.setState(GAME_STATES.MODE_SELECT);
             }
         }
     });
@@ -5411,6 +5813,7 @@ async function init() {
     // Setup state handlers BEFORE starting the loop
     // These register the update/render functions for each state
     setupMenuState();
+    setupModeSelectState();
     setupDifficultySelectState();
     setupHighScoresState();
     AchievementScreen.setup();
