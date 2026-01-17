@@ -7,6 +7,7 @@ import {
   WeaponRegistry,
   WEAPON_TYPES,
   BASIC_SHOT,
+  BABY_SHOT,
   MISSILE,
   MIRV,
   NUKE
@@ -34,9 +35,10 @@ describe('WeaponRegistry', () => {
       expect(weapons.length).toBeGreaterThan(0);
     });
 
-    it('includes Basic Shot as first weapon', () => {
+    it('includes Baby Shot as first weapon (sorted by category)', () => {
       const weapons = WeaponRegistry.getAllWeapons();
-      expect(weapons[0].id).toBe('basic-shot');
+      // Baby Shot is first in Standard category, which is first category
+      expect(weapons[0].id).toBe('baby-shot');
     });
   });
 
@@ -63,7 +65,9 @@ describe('WeaponRegistry', () => {
       expect(weapons.length).toBeGreaterThan(0);
       weapons.forEach(w => {
         expect(w.type).toBe(WEAPON_TYPES.NUCLEAR);
-        expect(w.screenShake).toBe(true);
+        // Most nuclear weapons have screenShake, but EMP Blast doesn't
+        // So we check that at least the effect flags are present
+        expect(typeof w.screenShake).toBe('boolean');
       });
     });
   });
@@ -106,7 +110,50 @@ describe('WeaponRegistry', () => {
   describe('getWeaponCount', () => {
     it('returns correct weapon count', () => {
       const count = WeaponRegistry.getWeaponCount();
-      expect(count).toBe(11); // 11 weapons defined in spec
+      expect(count).toBe(40); // 40 weapons defined in expanded spec
+    });
+  });
+
+  describe('getWeaponsByCategory', () => {
+    it('returns weapons for each category', () => {
+      const categories = ['standard', 'splitting', 'rolling', 'digging', 'nuclear', 'special'];
+      categories.forEach(cat => {
+        const weapons = WeaponRegistry.getWeaponsByCategory(cat);
+        expect(weapons.length).toBeGreaterThan(0);
+        weapons.forEach(w => {
+          expect(w.category).toBe(cat);
+        });
+      });
+    });
+
+    it('returns correct counts per category', () => {
+      expect(WeaponRegistry.getWeaponsByCategory('standard').length).toBe(8);
+      expect(WeaponRegistry.getWeaponsByCategory('splitting').length).toBe(6);
+      expect(WeaponRegistry.getWeaponsByCategory('rolling').length).toBe(6);
+      expect(WeaponRegistry.getWeaponsByCategory('digging').length).toBe(6);
+      expect(WeaponRegistry.getWeaponsByCategory('nuclear').length).toBe(6);
+      expect(WeaponRegistry.getWeaponsByCategory('special').length).toBe(8);
+    });
+  });
+
+  describe('getUnlockedWeapons', () => {
+    it('returns available weapons at round 1', () => {
+      const weapons = WeaponRegistry.getUnlockedWeapons(1, 0);
+      expect(weapons.length).toBeGreaterThan(0);
+      weapons.forEach(w => {
+        expect(w.unlockRequirement).toBe('available');
+      });
+    });
+
+    it('returns more weapons at later rounds', () => {
+      const round1 = WeaponRegistry.getUnlockedWeapons(1, 0);
+      const round5 = WeaponRegistry.getUnlockedWeapons(5, 0);
+      expect(round5.length).toBeGreaterThan(round1.length);
+    });
+
+    it('returns all weapons at round 5 with 10 wins', () => {
+      const weapons = WeaponRegistry.getUnlockedWeapons(5, 10);
+      expect(weapons.length).toBe(40);
     });
   });
 });
@@ -116,9 +163,19 @@ describe('Weapon Properties', () => {
     it('has correct properties', () => {
       expect(BASIC_SHOT.cost).toBe(0);
       expect(BASIC_SHOT.ammo).toBe(Infinity);
-      expect(BASIC_SHOT.damage).toBe(25);
+      expect(BASIC_SHOT.damage).toBe(30);
       expect(BASIC_SHOT.blastRadius).toBe(30);
       expect(BASIC_SHOT.type).toBe(WEAPON_TYPES.STANDARD);
+    });
+  });
+
+  describe('Baby Shot', () => {
+    it('has correct properties', () => {
+      expect(BABY_SHOT.cost).toBe(0);
+      expect(BABY_SHOT.ammo).toBe(Infinity);
+      expect(BABY_SHOT.damage).toBe(15);
+      expect(BABY_SHOT.blastRadius).toBe(20);
+      expect(BABY_SHOT.type).toBe(WEAPON_TYPES.STANDARD);
     });
   });
 
@@ -126,7 +183,7 @@ describe('Weapon Properties', () => {
     it('has correct properties', () => {
       expect(MISSILE.cost).toBe(500);
       expect(MISSILE.ammo).toBe(5);
-      expect(MISSILE.damage).toBe(35);
+      expect(MISSILE.damage).toBe(40);
       expect(MISSILE.type).toBe(WEAPON_TYPES.STANDARD);
     });
   });
@@ -134,8 +191,8 @@ describe('Weapon Properties', () => {
   describe('MIRV', () => {
     it('is a splitting weapon with correct split count', () => {
       expect(MIRV.type).toBe(WEAPON_TYPES.SPLITTING);
-      expect(MIRV.splitCount).toBe(5);
-      expect(MIRV.splitAngle).toBe(30);
+      expect(MIRV.splitCount).toBe(3);
+      expect(MIRV.splitAngle).toBe(25);
     });
   });
 
