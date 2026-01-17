@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Explosion Demo</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: linear-gradient(180deg, #0a0a1a 0%, #1a0a2e 50%, #2d1b4e 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      color: #fff;
+    }
+
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+      text-shadow: 0 0 20px #ff00ff, 0 0 40px #ff00ff;
+      color: #fff;
+    }
+
+    #canvas {
+      border: 2px solid #ff00ff;
+      box-shadow: 0 0 20px #ff00ff44, inset 0 0 60px #00000088;
+      background: #000;
+      cursor: crosshair;
+    }
+
+    .controls {
+      margin-top: 1.5rem;
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+    }
+
+    button {
+      background: linear-gradient(180deg, #ff00ff 0%, #aa00aa 100%);
+      border: none;
+      color: white;
+      padding: 12px 32px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      cursor: pointer;
+      border-radius: 4px;
+      box-shadow: 0 0 20px #ff00ff88;
+      transition: all 0.2s;
+    }
+
+    button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 30px #ff00ffaa;
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    .info {
+      margin-top: 1rem;
+      color: #888;
+      font-size: 0.9rem;
+    }
+
+    .info span {
+      color: #0ff;
+    }
+  </style>
+</head>
+<body>
+  <h1>Explosion Demo</h1>
+  <canvas id="canvas" width="800" height="500"></canvas>
+  <div class="controls">
+    <button id="triggerBtn">Trigger Explosion</button>
+    <button id="clearBtn" style="background: linear-gradient(180deg, #00cccc 0%, #008888 100%); box-shadow: 0 0 20px #00cccc88;">Clear</button>
+  </div>
+  <p class="info">Click the button or <span>click anywhere on the canvas</span> to spawn explosions</p>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    // Sprite sheet config
+    const spriteSheet = new Image();
+    spriteSheet.src = 'assets/images/effects/explosion-synthwave.png';
+
+    // 4x4 grid layout: 16 frames (1024x1024 total)
+    const COLS = 4;
+    const ROWS = 4;
+    const FRAME_COUNT = COLS * ROWS;
+    const FRAME_WIDTH = 256;   // 1024 / 4
+    const FRAME_HEIGHT = 256;  // 1024 / 4
+    const FRAME_DURATION = 50; // ms per frame
+
+    // Active explosions
+    const explosions = [];
+
+    class Explosion {
+      constructor(x, y, scale = 1) {
+        this.x = x;
+        this.y = y;
+        this.scale = scale;
+        this.frame = 0; // Start from first frame
+        this.lastFrameTime = performance.now();
+        this.finished = false;
+      }
+
+      update(now) {
+        if (now - this.lastFrameTime >= FRAME_DURATION) {
+          this.frame++;
+          this.lastFrameTime = now;
+
+          if (this.frame >= FRAME_COUNT) {
+            this.finished = true;
+          }
+        }
+      }
+
+      draw(ctx) {
+        if (this.finished) return;
+
+        // Grid-based frame indexing (row-major order)
+        const col = this.frame % COLS;
+        const row = Math.floor(this.frame / COLS);
+        const srcX = col * FRAME_WIDTH;
+        const srcY = row * FRAME_HEIGHT;
+        const drawWidth = FRAME_WIDTH * this.scale;
+        const drawHeight = FRAME_HEIGHT * this.scale;
+
+        ctx.drawImage(
+          spriteSheet,
+          srcX, srcY, FRAME_WIDTH, FRAME_HEIGHT,
+          this.x - drawWidth / 2,
+          this.y - drawHeight / 2,
+          drawWidth, drawHeight
+        );
+      }
+    }
+
+    function spawnExplosion(x, y) {
+      const scale = 0.8 + Math.random() * 0.8; // Random size variation
+      explosions.push(new Explosion(x, y, scale));
+    }
+
+    function gameLoop(now) {
+      // Clear canvas
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Draw grid lines (synthwave style)
+      ctx.strokeStyle = '#ff00ff22';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < canvas.width; x += 40) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+      }
+      for (let y = 0; y < canvas.height; y += 40) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+      }
+
+      // Update and draw explosions
+      for (let i = explosions.length - 1; i >= 0; i--) {
+        const explosion = explosions[i];
+        explosion.update(now);
+        explosion.draw(ctx);
+
+        if (explosion.finished) {
+          explosions.splice(i, 1);
+        }
+      }
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    // Event listeners
+    document.getElementById('triggerBtn').addEventListener('click', () => {
+      // Spawn in center with some randomness
+      const x = canvas.width / 2 + (Math.random() - 0.5) * 100;
+      const y = canvas.height / 2 + (Math.random() - 0.5) * 100;
+      spawnExplosion(x, y);
+    });
+
+    document.getElementById('clearBtn').addEventListener('click', () => {
+      explosions.length = 0;
+    });
+
+    canvas.addEventListener('click', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      spawnExplosion(x, y);
+    });
+
+    // Start loop when sprite sheet loads
+    spriteSheet.onload = () => {
+      console.log('Sprite sheet loaded:', spriteSheet.width, 'x', spriteSheet.height);
+      requestAnimationFrame(gameLoop);
+    };
+
+    spriteSheet.onerror = () => {
+      console.error('Failed to load sprite sheet');
+      ctx.fillStyle = '#ff0000';
+      ctx.font = '20px sans-serif';
+      ctx.fillText('Failed to load explosion sprite sheet', 200, 250);
+    };
+  </script>
+</body>
+</html>

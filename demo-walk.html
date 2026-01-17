@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Walk Cycle Demo</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Courier New', monospace;
+      color: #fff;
+    }
+
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+      text-shadow: 0 0 10px #ff00ff;
+      color: #ff00ff;
+    }
+
+    #canvas {
+      border: 4px solid #ff00ff;
+      box-shadow: 0 0 20px #ff00ff44;
+      background: #000;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    .controls {
+      margin-top: 1.5rem;
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    button {
+      background: #ff00ff;
+      border: none;
+      color: white;
+      padding: 10px 24px;
+      font-size: 1rem;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      cursor: pointer;
+      border-radius: 0;
+      box-shadow: 4px 4px 0 #aa00aa;
+      transition: all 0.1s;
+    }
+
+    button:hover {
+      transform: translate(-2px, -2px);
+      box-shadow: 6px 6px 0 #aa00aa;
+    }
+
+    button:active {
+      transform: translate(2px, 2px);
+      box-shadow: 2px 2px 0 #aa00aa;
+    }
+
+    .info {
+      margin-top: 1rem;
+      color: #0ff;
+      font-size: 0.9rem;
+      text-align: center;
+    }
+
+    .sprite-preview {
+      margin-top: 2rem;
+      padding: 1rem;
+      background: #000;
+      border: 2px solid #0ff;
+    }
+
+    .sprite-preview img {
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    .sprite-preview p {
+      color: #0ff;
+      font-size: 0.8rem;
+      margin-top: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>8-BIT WALK CYCLE</h1>
+  <canvas id="canvas" width="400" height="200"></canvas>
+  <div class="controls">
+    <button id="leftBtn">< LEFT</button>
+    <button id="stopBtn">STOP</button>
+    <button id="rightBtn">RIGHT ></button>
+  </div>
+  <div class="controls">
+    <button id="speedDownBtn">SLOWER</button>
+    <button id="speedUpBtn">FASTER</button>
+  </div>
+  <p class="info">Frame: <span id="frameNum">0</span> | Speed: <span id="speedNum">150</span>ms | Direction: <span id="dirNum">RIGHT</span></p>
+
+  <div class="sprite-preview">
+    <img src="assets/images/characters/walk-8bit-clean.png" alt="Sprite Sheet" style="transform: scale(4);">
+    <p>Sprite Sheet: 8 frames @ 32x32 (256x32 total)</p>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    // Disable smoothing for crisp pixels
+    ctx.imageSmoothingEnabled = false;
+
+    // Sprite config
+    const spriteSheet = new Image();
+    spriteSheet.src = 'assets/images/characters/walk-8bit-clean.png';
+
+    const FRAME_COUNT = 8;
+    const FRAME_WIDTH = 32;
+    const FRAME_HEIGHT = 32;
+
+    let frameDelay = 150; // ms per frame
+    let currentFrame = 0;
+    let lastFrameTime = 0;
+    let direction = 1; // 1 = right, -1 = left
+    let isWalking = true;
+    let characterX = canvas.width / 2;
+    const characterY = canvas.height / 2;
+    const moveSpeed = 2;
+    const scale = 3; // Scale up for visibility
+
+    function update(now) {
+      // Update animation frame
+      if (isWalking && now - lastFrameTime >= frameDelay) {
+        currentFrame = (currentFrame + 1) % FRAME_COUNT;
+        lastFrameTime = now;
+
+        // Move character
+        characterX += moveSpeed * direction;
+
+        // Wrap around screen
+        if (characterX > canvas.width + FRAME_WIDTH) {
+          characterX = -FRAME_WIDTH;
+        } else if (characterX < -FRAME_WIDTH) {
+          characterX = canvas.width + FRAME_WIDTH;
+        }
+      }
+
+      // Update UI
+      document.getElementById('frameNum').textContent = currentFrame;
+      document.getElementById('speedNum').textContent = frameDelay;
+      document.getElementById('dirNum').textContent = direction > 0 ? 'RIGHT' : 'LEFT';
+    }
+
+    function draw() {
+      // Clear with dark background
+      ctx.fillStyle = '#111';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Draw pixel grid pattern
+      ctx.strokeStyle = '#222';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < canvas.width; x += 16) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+      }
+      for (let y = 0; y < canvas.height; y += 16) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+      }
+
+      // Draw ground line
+      ctx.strokeStyle = '#ff00ff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, characterY + FRAME_HEIGHT * scale / 2 + 10);
+      ctx.lineTo(canvas.width, characterY + FRAME_HEIGHT * scale / 2 + 10);
+      ctx.stroke();
+
+      // Draw character
+      const srcX = currentFrame * FRAME_WIDTH;
+      const drawWidth = FRAME_WIDTH * scale;
+      const drawHeight = FRAME_HEIGHT * scale;
+
+      ctx.save();
+
+      // Flip if going left
+      if (direction < 0) {
+        ctx.translate(characterX + drawWidth / 2, 0);
+        ctx.scale(-1, 1);
+        ctx.translate(-drawWidth / 2, 0);
+        ctx.drawImage(
+          spriteSheet,
+          srcX, 0, FRAME_WIDTH, FRAME_HEIGHT,
+          0, characterY - drawHeight / 2,
+          drawWidth, drawHeight
+        );
+      } else {
+        ctx.drawImage(
+          spriteSheet,
+          srcX, 0, FRAME_WIDTH, FRAME_HEIGHT,
+          characterX - drawWidth / 2, characterY - drawHeight / 2,
+          drawWidth, drawHeight
+        );
+      }
+
+      ctx.restore();
+    }
+
+    function gameLoop(now) {
+      update(now);
+      draw();
+      requestAnimationFrame(gameLoop);
+    }
+
+    // Controls
+    document.getElementById('leftBtn').addEventListener('click', () => {
+      direction = -1;
+      isWalking = true;
+    });
+
+    document.getElementById('rightBtn').addEventListener('click', () => {
+      direction = 1;
+      isWalking = true;
+    });
+
+    document.getElementById('stopBtn').addEventListener('click', () => {
+      isWalking = !isWalking;
+      document.getElementById('stopBtn').textContent = isWalking ? 'STOP' : 'GO';
+    });
+
+    document.getElementById('speedDownBtn').addEventListener('click', () => {
+      frameDelay = Math.min(500, frameDelay + 25);
+    });
+
+    document.getElementById('speedUpBtn').addEventListener('click', () => {
+      frameDelay = Math.max(50, frameDelay - 25);
+    });
+
+    // Start when loaded
+    spriteSheet.onload = () => {
+      console.log('Sprite loaded:', spriteSheet.width, 'x', spriteSheet.height);
+      requestAnimationFrame(gameLoop);
+    };
+
+    spriteSheet.onerror = () => {
+      ctx.fillStyle = '#ff0000';
+      ctx.font = '16px Courier New';
+      ctx.fillText('Failed to load sprite sheet', 100, 100);
+    };
+  </script>
+</body>
+</html>
