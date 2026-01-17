@@ -17,6 +17,7 @@ import { playPurchaseSound, playErrorSound, playClickSound } from './sound.js';
 import * as ProgressionAchievements from './progression-achievements.js';
 import * as HiddenAchievements from './hidden-achievements.js';
 import { Button } from './ui/Button.js';
+import { Unlocks } from './unlocks.js';
 
 // =============================================================================
 // SHOP STATE
@@ -405,6 +406,22 @@ export function purchaseWeapon(weaponId) {
         if (DEBUG.ENABLED) {
             console.log(`[Shop] Unknown weapon: ${weaponId}`);
         }
+        return false;
+    }
+
+    // Check if weapon is locked
+    const lockInfo = Unlocks.getWeaponUnlockInfo(weaponId);
+    if (!lockInfo.unlocked) {
+        if (DEBUG.ENABLED) {
+            console.log(`[Shop] Weapon locked: ${weapon.name} (${lockInfo.hint})`);
+        }
+        playErrorSound();
+        purchaseFeedback = {
+            active: true,
+            weaponId: weaponId,
+            startTime: Date.now(),
+            success: false
+        };
         return false;
     }
 
@@ -1178,12 +1195,14 @@ function getTabAtPoint(x, y) {
  * @param {boolean} showFeedback - Whether to show purchase feedback
  * @param {boolean} feedbackSuccess - Whether the feedback is for success or failure
  * @param {number} feedbackProgress - Feedback animation progress (0-1)
+ * @param {Object|null} lockInfo - Lock info from Unlocks system (null if unlocked)
  */
-function renderWeaponCard(ctx, weapon, x, y, currentAmmo, canAfford, pulseIntensity, showFeedback = false, feedbackSuccess = false, feedbackProgress = 0) {
+function renderWeaponCard(ctx, weapon, x, y, currentAmmo, canAfford, pulseIntensity, showFeedback = false, feedbackSuccess = false, feedbackProgress = 0, lockInfo = null) {
     const cardWidth = SHOP_LAYOUT.CARD.WIDTH;
     const cardHeight = SHOP_LAYOUT.CARD.HEIGHT;
     const isPressed = pressedElementId === `weapon_${weapon.id}`;
     const isHovered = hoveredWeaponId === weapon.id;
+    const isLocked = lockInfo !== null && !lockInfo.unlocked;
 
     // Apply shake offset for failed purchase animation
     let shakeOffsetX = 0;
@@ -1205,8 +1224,8 @@ function renderWeaponCard(ctx, weapon, x, y, currentAmmo, canAfford, pulseIntens
     }
 
     // Determine card state
-    const isUnaffordable = !canAfford && weapon.cost > 0;
-    const isOwned = currentAmmo > 0 || currentAmmo === Infinity;
+    const isUnaffordable = (!canAfford && weapon.cost > 0) || isLocked;
+    const isOwned = !isLocked && (currentAmmo > 0 || currentAmmo === Infinity);
     const isSelected = isPressed || isHovered;
 
     ctx.save();
@@ -1413,11 +1432,49 @@ function renderWeaponCard(ctx, weapon, x, y, currentAmmo, canAfford, pulseIntens
         }
     }
 
-    // Row 3: Owned count (centered)
-    ctx.font = `10px ${UI.FONT_FAMILY}`;
-    ctx.fillStyle = isOwned ? '#00ff88' : COLORS.TEXT_MUTED;
-    const ownedAmmo = currentAmmo === Infinity ? '∞' : currentAmmo;
-    ctx.fillText(`x${ownedAmmo}`, centerX, textY + 64);
+    // Row 3: Owned count (centered) - or lock hint if locked
+    if (isLocked && lockInfo) {
+        // Show lock icon and hint for locked weapons
+        ctx.font = `bold 9px ${UI.FONT_FAMILY}`;
+        ctx.fillStyle = '#ff6699';  // Pink for locked
+
+        // Lock icon (🔒 emoji or simple padlock)
+        const lockEmoji = '🔒';
+        ctx.fillText(lockEmoji, centerX, textY + 64);
+
+        // Show abbreviated hint on hover
+        if (isHovered && lockInfo.hint) {
+            // Draw tooltip with unlock hint
+            ctx.font = `bold 8px ${UI.FONT_FAMILY}`;
+            ctx.fillStyle = 'rgba(20, 20, 40, 0.95)';
+            const tooltipText = lockInfo.hint;
+            const tooltipWidth = ctx.measureText(tooltipText).width + 12;
+            const tooltipHeight = 16;
+            const tooltipX = centerX - tooltipWidth / 2;
+            const tooltipY = textY + 78;
+
+            // Tooltip background
+            ctx.beginPath();
+            ctx.roundRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight, 3);
+            ctx.fill();
+
+            // Tooltip border
+            ctx.strokeStyle = '#ff6699';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Tooltip text
+            ctx.fillStyle = COLORS.TEXT_LIGHT;
+            ctx.textAlign = 'center';
+            ctx.fillText(tooltipText, centerX, tooltipY + tooltipHeight / 2 + 3);
+        }
+    } else {
+        // Normal owned count display
+        ctx.font = `10px ${UI.FONT_FAMILY}`;
+        ctx.fillStyle = isOwned ? '#00ff88' : COLORS.TEXT_MUTED;
+        const ownedAmmo = currentAmmo === Infinity ? '∞' : currentAmmo;
+        ctx.fillText(`x${ownedAmmo}`, centerX, textY + 64);
+    }
 
     ctx.restore();
 
@@ -1808,10 +1865,12 @@ export function render(ctx) {
                 const currentAmmo = playerTankRef ? playerTankRef.getAmmo(weapon.id) : 0;
                 const canAfford = Money.canAfford(weapon.cost);
                 const showFeedback = feedbackWeaponId === weapon.id;
+                const lockInfo = Unlocks.getWeaponUnlockInfo(weapon.id);
 
                 renderWeaponCard(
                     ctx, weapon, cardX, cardY, currentAmmo, canAfford,
-                    pulseIntensity, showFeedback, feedbackSuccess, feedbackProgress
+                    pulseIntensity, showFeedback, feedbackSuccess, feedbackProgress,
+                    lockInfo.unlocked ? null : lockInfo
                 );
             }
         }
