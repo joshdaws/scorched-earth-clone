@@ -1125,23 +1125,34 @@ function renderMenu(ctx) {
     // If Three.js title scene is active, skip the 2D background
     // and let the 3D animation show through. Otherwise render 2D fallback.
     if (TitleScene.isActive()) {
-        // Clear to transparent so Three.js shows through
-        ctx.clearRect(0, 0, width, height);
+        // Clear entire viewport to transparent so Three.js shows through
+        // (includes letterbox areas, not just game content)
+        Renderer.clearTransparent();
     } else {
         // Render 2D synthwave background as fallback
         renderMenuBackground(ctx);
     }
 
     // Subtle vignette overlay for better readability over 3D background
+    // Draw in viewport coordinates to cover entire screen (including letterbox)
+    const viewport = Renderer.getViewportDimensions();
+    const dpr = Renderer.getDevicePixelRatio();
+
+    ctx.save();
+    // Reset to viewport coordinates (no game content transform)
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
     const vignetteGradient = ctx.createRadialGradient(
-        width / 2, height / 2, 0,
-        width / 2, height / 2, Math.max(width, height) * 0.7
+        viewport.width / 2, viewport.height / 2, 0,
+        viewport.width / 2, viewport.height / 2, Math.max(viewport.width, viewport.height) * 0.7
     );
     vignetteGradient.addColorStop(0, 'rgba(10, 10, 26, 0)');
     vignetteGradient.addColorStop(0.7, 'rgba(10, 10, 26, 0.2)');
     vignetteGradient.addColorStop(1, 'rgba(10, 10, 26, 0.5)');
     ctx.fillStyle = vignetteGradient;
-    ctx.fillRect(0, 0, width, height);
+    ctx.fillRect(0, 0, viewport.width, viewport.height);
+
+    ctx.restore();
 
     // Get layout configuration
     const layout = currentMenuLayout || calculateMenuLayout(height, width);
