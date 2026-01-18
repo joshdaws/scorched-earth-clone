@@ -230,3 +230,269 @@ Tech stack setup complete (`scorched-earth-7ku`). All foundation systems are wor
 - Shop depends on weapon registry and economy
 
 Run `bd ready` to see what's available to work on.
+
+## Agent Testing Tools
+
+This project has a comprehensive testing toolkit for agents to test game functionality programmatically without requiring touch/mouse interaction or visual inspection.
+
+### Quick Start
+
+1. **Enable Debug Mode:** Press `D` key or open console and run `Debug.toggle()`
+2. **Access TestAPI:** All functions available via `TestAPI.*` in browser console
+3. **Scene Isolation:** Add URL parameters like `?scene=physics-sandbox`
+
+### TestAPI - Programmatic Game Control
+
+The TestAPI allows programmatic control of the game, exposed on `window.TestAPI`.
+
+#### Aiming & Firing
+
+```javascript
+// Set angle and power
+TestAPI.aim({ angle: 45, power: 75 });
+
+// Get current aim settings
+TestAPI.getAim();  // { angle: 45, power: 75 }
+
+// Fire a shot (respects turn system)
+TestAPI.fire();
+
+// Fire directly (bypasses turn validation - for testing)
+TestAPI.fireDirect();
+```
+
+#### Physics Simulation
+
+```javascript
+// Simulate trajectory without firing
+const result = TestAPI.simulateProjectile({
+    angle: 45,
+    power: 75,
+    wind: 5,      // optional, uses current wind if not set
+    maxSteps: 500 // optional
+});
+// Returns: { trajectory: [...], landingX, landingY, tankHit, terrainHit, ... }
+
+// Fire and collect comprehensive data
+const data = TestAPI.fireAndCollect({
+    angle: 45,
+    power: 75,
+    weaponId: 'basic-shot'
+});
+// Returns: { trajectory, maxHeight, flightTime, landingX, damageDealt, ... }
+
+// Validate physics (for regression testing)
+const validation = TestAPI.validatePhysics({
+    angle: 45,
+    power: 100,
+    expectedRange: 500,
+    tolerance: 10
+});
+// Returns: { pass: true/false, actualRange, deviation, message }
+```
+
+#### Terrain Manipulation
+
+```javascript
+// Generate terrain with seed (reproducible tests)
+TestAPI.generateTerrain({ seed: 12345 });
+TestAPI.generateTerrain({ roughness: 0.5, minHeightPercent: 0.2 });
+
+// Get terrain height at position
+TestAPI.getTerrainAt(600);  // { height, canvasY }
+```
+
+#### Tank Positioning
+
+```javascript
+// Set tank positions (auto-adjusts to terrain height)
+TestAPI.setTankPositions({ player: 200, enemy: 1000 });
+
+// Get current positions
+TestAPI.getTankPositions();  // { player: {x,y,terrainHeight}, enemy: {...} }
+```
+
+#### Snapshot Testing
+
+```javascript
+// Capture game state
+TestAPI.snapshot('before-shot');
+
+// Fire or make changes...
+TestAPI.fire();
+
+// Capture after state
+TestAPI.snapshot('after-shot');
+
+// Compare states
+const diff = TestAPI.compareSnapshots('before-shot', 'after-shot');
+// Returns: { terrainChanged: [...], healthChanged: {...}, destroyed: {...} }
+
+// Cleanup
+TestAPI.clearSnapshots();
+TestAPI.listSnapshots();
+```
+
+#### Utility Functions
+
+```javascript
+TestAPI.getWind();        // Current wind value
+TestAPI.getWindForce();   // Wind * force multiplier
+TestAPI.getState();       // Full game state (tanks, turn phase, etc.)
+TestAPI.isInitialized();  // Check if TestAPI is ready
+```
+
+### Debug Console Commands
+
+Available via `Debug.*` in browser console (requires debug mode enabled).
+
+#### State Commands
+
+```javascript
+Debug.skipToShop(10000);  // Jump to shop with $10,000
+Debug.skipToVictory();    // Jump to victory screen
+Debug.skipToDefeat();     // Jump to defeat screen
+Debug.skipToMenu();       // Return to main menu
+```
+
+#### Money Commands
+
+```javascript
+Debug.setMoney(50000);    // Set balance
+Debug.addMoney(5000);     // Add money
+```
+
+#### Weapon Commands
+
+```javascript
+Debug.giveWeapon('nuke', 5);  // Give 5 nukes
+Debug.giveAllWeapons(10);     // Give 10 of each weapon
+Debug.listWeapons();          // Show all weapon IDs
+```
+
+#### Combat Commands
+
+```javascript
+Debug.killEnemy();        // Instantly destroy enemy
+Debug.killSelf();         // Instantly destroy player
+Debug.toggleGodMode();    // Toggle invincibility
+Debug.setHealth(50);      // Set player health
+Debug.setEnemyHealth(25); // Set enemy health
+```
+
+#### Round Commands
+
+```javascript
+Debug.setRound(5);   // Set to round 5 (affects AI difficulty)
+Debug.getRound();    // Show current round info
+Debug.showStats();   // Show run statistics
+```
+
+### Keyboard Shortcuts
+
+All shortcuts require debug mode (`D` to toggle).
+
+| Shortcut | Action |
+|----------|--------|
+| `D` | Toggle debug mode |
+| `Shift+1` | Skip to Shop ($10,000) |
+| `Shift+2` | Skip to Victory |
+| `Shift+3` | Skip to Defeat |
+| `Shift+4` | Return to Menu |
+| `Shift+5` | Give all weapons (10 each) |
+| `Shift+6` | Add $5,000 |
+| `Shift+7` | Kill enemy |
+| `Shift+8` | Toggle god mode |
+| `Shift+9` | Set round to 5 |
+| `Shift+0` | Show run statistics |
+
+#### Debug Overlay Shortcuts
+
+| Shortcut | Overlay |
+|----------|---------|
+| `Shift+T` | Trajectory prediction |
+| `Shift+C` | Collision boxes |
+| `Shift+G` | Coordinate grid |
+| `Shift+V` | Physics vectors (wind, velocity) |
+| `Shift+X` | Touch targets |
+| `Shift+A` | Toggle all overlays |
+
+### URL Parameters for Scene Isolation
+
+Load specific test scenes directly via URL:
+
+```
+?scene=slingshot-test     # Aiming UI test (no wind)
+?scene=physics-sandbox    # Full physics with trajectory display
+?scene=shop               # Shop UI with $10,000
+?scene=terrain-viewer     # Terrain generation testing
+?scene=ai-debug           # Watch AI decision making
+?scene=round-start        # Start at specific round (combine with &round=5)
+```
+
+#### State Parameters
+
+```
+?debug=true         # Enable debug mode on load
+?round=5            # Start at round 5
+?money=50000        # Set starting money
+?difficulty=hard    # Set difficulty (easy/medium/hard)
+?seed=12345         # Terrain generation seed
+?wind=10            # Fixed wind value
+?playerHealth=50    # Player starting health
+?enemyHealth=75     # Enemy starting health
+?weapon=nuke        # Start with specific weapon selected
+```
+
+#### Combinations
+
+```
+# Physics testing with reproducible terrain
+?scene=physics-sandbox&seed=12345&wind=0&debug=true
+
+# Shop testing with lots of money
+?scene=shop&money=100000
+
+# Late-game testing
+?scene=round-start&round=10&difficulty=hard&money=5000
+```
+
+### Example: Validating Physics Change
+
+```javascript
+// 1. Set up reproducible scenario
+TestAPI.generateTerrain({ seed: 42 });
+TestAPI.setTankPositions({ player: 200, enemy: 1000 });
+
+// 2. Take baseline snapshot
+TestAPI.snapshot('baseline');
+
+// 3. Test specific angle/power combination
+TestAPI.aim({ angle: 45, power: 80 });
+const result = TestAPI.fireAndCollect({ angle: 45, power: 80 });
+
+// 4. Validate results
+console.log('Landing X:', result.landingX);
+console.log('Max Height:', result.maxHeight);
+console.log('Flight Time:', result.flightTime);
+console.log('Damage Dealt:', result.damageDealt);
+
+// 5. Physics validation
+const validation = TestAPI.validatePhysics({
+    angle: 45,
+    power: 80,
+    expectedRange: 650,
+    tolerance: 20
+});
+console.log(validation.pass ? 'PASS' : 'FAIL', validation.message);
+```
+
+### Files Reference
+
+| File | Purpose |
+|------|---------|
+| `js/testAPI.js` | Programmatic game control API |
+| `js/debugTools.js` | Console commands and shortcuts |
+| `js/debug.js` | Debug mode toggle and FPS display |
+| `js/debugOverlays.js` | Visual debugging overlays |
+| `js/sceneIsolation.js` | URL parameter parsing and scene routing |
