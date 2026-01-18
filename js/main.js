@@ -7438,10 +7438,9 @@ function setupAIDebugScene(scene, params) {
     // Generate wind
     Wind.generateRandomWind();
 
-    // Set AI difficulty based on URL or default to medium
-    const difficultyMap = { easy: 1, medium: 2, hard: 3 };
-    const difficulty = difficultyMap[params.difficulty] ?? 2;
-    AI.setDifficulty(difficulty);
+    // URL param values map to AI_DIFFICULTY enum strings
+    const difficultyMap = { easy: 'easy', medium: 'medium', hard: 'hard', hard_plus: 'hard_plus' };
+    const difficulty = difficultyMap[params.difficulty] ?? 'medium';
 
     // Update TestAPI references
     TestAPI.setPlayerTank(playerTank);
@@ -7457,8 +7456,12 @@ function setupAIDebugScene(scene, params) {
     // Start AI turn to see decision making
     Turn.setPhase(TURN_PHASES.AI_AIM);
 
-    // Go to playing state
+    // Go to playing state (this will trigger game init which sets AI difficulty based on round)
     Game.setState(GAME_STATES.PLAYING);
+
+    // Override AI difficulty AFTER state transition to use URL parameter value
+    // This must come after Game.setState() because the PLAYING state handler resets difficulty
+    AI.setDifficulty(difficulty);
 
     console.log('[SceneIsolation] AI debug ready');
     console.log(`  - AI difficulty: ${AI.getDifficultyName(difficulty)}`);
@@ -7511,12 +7514,14 @@ function setupRoundStartScene(scene, params) {
     // Generate wind
     Wind.generateRandomWind();
 
-    // Set AI difficulty based on URL or round
+    // Determine difficulty from URL or round
+    let difficulty;
     if (params.difficulty) {
-        const difficultyMap = { easy: 1, medium: 2, hard: 3 };
-        AI.setDifficulty(difficultyMap[params.difficulty] ?? 2);
+        // URL param values map to AI_DIFFICULTY enum strings
+        const difficultyMap = { easy: 'easy', medium: 'medium', hard: 'hard', hard_plus: 'hard_plus' };
+        difficulty = difficultyMap[params.difficulty] ?? 'medium';
     } else {
-        AI.setDifficulty(AI.getAIDifficulty(currentRound));
+        difficulty = AI.getAIDifficulty(currentRound);
     }
 
     // Update TestAPI references
@@ -7531,13 +7536,17 @@ function setupRoundStartScene(scene, params) {
     // Enable game input
     Input.enableGameInput();
 
-    // Go to playing state
+    // Go to playing state (this will trigger game init which sets AI difficulty based on round)
     Game.setState(GAME_STATES.PLAYING);
+
+    // Override AI difficulty AFTER state transition to use URL parameter value
+    // This must come after Game.setState() because the PLAYING state handler resets difficulty
+    AI.setDifficulty(difficulty);
 
     console.log('[SceneIsolation] Round start ready');
     console.log(`  - Round: ${currentRound}`);
     console.log(`  - Enemy health: ${enemyTank.health} HP`);
-    console.log(`  - AI difficulty: ${AI.getDifficultyName(AI.getDifficulty())}`);
+    console.log(`  - AI difficulty: ${AI.getDifficultyName(difficulty)}`);
 }
 
 /**

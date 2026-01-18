@@ -58,7 +58,7 @@ export function parseUrlParams() {
 
     // Difficulty
     const diff = urlParams.get('difficulty');
-    if (diff && ['easy', 'medium', 'hard'].includes(diff.toLowerCase())) {
+    if (diff && ['easy', 'medium', 'hard', 'hard_plus'].includes(diff.toLowerCase())) {
         params.difficulty = diff.toLowerCase();
     }
 
