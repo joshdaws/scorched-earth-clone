@@ -17,6 +17,7 @@ import * as Turn from './turn.js';
 import { getScreenWidth, getScreenHeight } from './screenSize.js';
 import { calculateDamage } from './damage.js';
 import { WeaponRegistry } from './weapons.js';
+import { generateTerrain as generateTerrainFromModule } from './terrain.js';
 
 // =============================================================================
 // MODULE STATE
@@ -36,6 +37,9 @@ let fireProjectileRef = null;
 
 /** @type {Object|null} Reference to player aim state from main.js */
 let playerAimRef = null;
+
+/** @type {Function|null} Callback to update terrain in main.js */
+let onTerrainChangeCallback = null;
 
 // =============================================================================
 // INITIALIZATION
@@ -94,7 +98,8 @@ const module = {
  */
 export function setPlayerTank(tank) {
     playerTank = tank;
-    module.playerTank = tank;
+    // Note: module.playerTank is a getter that delegates to main.js
+    // So we don't need to set it directly
 }
 
 /**
@@ -103,7 +108,8 @@ export function setPlayerTank(tank) {
  */
 export function setEnemyTank(tank) {
     enemyTank = tank;
-    module.enemyTank = tank;
+    // Note: module.enemyTank is a getter that delegates to main.js
+    // So we don't need to set it directly
 }
 
 /**
@@ -112,7 +118,8 @@ export function setEnemyTank(tank) {
  */
 export function setTerrain(t) {
     terrain = t;
-    module.terrain = t;
+    // Note: module.terrain is a getter that delegates to main.js
+    // So we don't need to set it directly
 }
 
 /**
@@ -129,6 +136,16 @@ export function setFireProjectile(fn) {
  */
 export function setPlayerAim(aim) {
     playerAimRef = aim;
+}
+
+
+/**
+ * Set callback for when terrain is regenerated.
+ * This allows main.js to update its currentTerrain reference.
+ * @param {Function} callback - Function that receives new terrain instance
+ */
+export function setOnTerrainChange(callback) {
+    onTerrainChangeCallback = callback;
 }
 
 // =============================================================================
@@ -733,6 +750,177 @@ export function validatePhysics(options = {}) {
 }
 
 // =============================================================================
+// TERRAIN AND TANK MANIPULATION API
+// =============================================================================
+
+/**
+ * Generate new terrain with optional seed for reproducibility.
+ * Updates the internal terrain reference and notifies main.js.
+ *
+ * @param {Object} options - Terrain generation options
+ * @param {number} [options.seed] - Seed for reproducible terrain (random if not specified)
+ * @param {number} [options.roughness=0.5] - Terrain roughness (0.3-0.7)
+ * @param {number} [options.minHeightPercent=0.2] - Minimum height as fraction of screen
+ * @param {number} [options.maxHeightPercent=0.7] - Maximum height as fraction of screen
+ * @returns {Object} Result with seed used and terrain dimensions
+ */
+export function generateTerrain(options = {}) {
+    const {
+        seed = Math.floor(Math.random() * 2147483647),
+        roughness = 0.5,
+        minHeightPercent = 0.2,
+        maxHeightPercent = 0.7
+    } = options;
+
+    // Generate new terrain using the terrain module
+    const newTerrain = generateTerrainFromModule(undefined, undefined, {
+        seed,
+        roughness,
+        minHeightPercent,
+        maxHeightPercent
+    });
+
+    // Update our internal reference (fallback for when getter isn't set)
+    terrain = newTerrain;
+
+    // Notify main.js to update its reference
+    // This will also update what module.terrain getter returns
+    if (onTerrainChangeCallback) {
+        onTerrainChangeCallback(newTerrain);
+    }
+
+    const result = {
+        success: true,
+        seed,
+        width: newTerrain.getWidth(),
+        height: newTerrain.getScreenHeight(),
+        minHeight: newTerrain.getMinHeight(),
+        maxHeight: newTerrain.getMaxHeight(),
+        roughness
+    };
+
+    console.log(`[TestAPI] generateTerrain({ seed: ${seed} }) - ${result.width}x${result.height}, heights: ${result.minHeight.toFixed(0)}-${result.maxHeight.toFixed(0)}`);
+
+    return result;
+}
+
+/**
+ * Get terrain height at a specific X position.
+ *
+ * @param {number} x - X coordinate to query
+ * @returns {Object} Result with height and canvas Y position
+ */
+export function getTerrainAt(x) {
+    const currentTerrain = module.terrain || terrain;
+
+    if (!currentTerrain) {
+        console.warn('[TestAPI] getTerrainAt: No terrain available');
+        return { success: false, error: 'No terrain available' };
+    }
+
+    const clampedX = Math.max(0, Math.min(currentTerrain.getWidth() - 1, Math.floor(x)));
+    const height = currentTerrain.getHeight(clampedX);
+    const canvasY = currentTerrain.getScreenHeight() - height;
+
+    return {
+        success: true,
+        x: clampedX,
+        height,
+        canvasY
+    };
+}
+
+/**
+ * Set tank positions on the terrain.
+ * Tanks are automatically positioned at the correct Y coordinate based on terrain height.
+ *
+ * @param {Object} positions - Tank X positions
+ * @param {number} [positions.player] - Player tank X position
+ * @param {number} [positions.enemy] - Enemy tank X position
+ * @returns {Object} Result with final tank positions
+ */
+export function setTankPositions(positions = {}) {
+    const currentTerrain = module.terrain || terrain;
+    const player = module.playerTank || playerTank;
+    const enemy = module.enemyTank || enemyTank;
+
+    if (!currentTerrain) {
+        console.warn('[TestAPI] setTankPositions: No terrain available');
+        return { success: false, error: 'No terrain available' };
+    }
+
+    const result = {
+        success: true,
+        player: null,
+        enemy: null
+    };
+
+    // Position player tank
+    if (typeof positions.player === 'number' && player) {
+        const x = Math.max(0, Math.min(currentTerrain.getWidth() - 1, Math.floor(positions.player)));
+        const terrainHeight = currentTerrain.getHeight(x);
+        const canvasY = currentTerrain.getScreenHeight() - terrainHeight;
+        player.x = x;
+        player.y = canvasY;
+        result.player = { x, y: canvasY, terrainHeight };
+    }
+
+    // Position enemy tank
+    if (typeof positions.enemy === 'number' && enemy) {
+        const x = Math.max(0, Math.min(currentTerrain.getWidth() - 1, Math.floor(positions.enemy)));
+        const terrainHeight = currentTerrain.getHeight(x);
+        const canvasY = currentTerrain.getScreenHeight() - terrainHeight;
+        enemy.x = x;
+        enemy.y = canvasY;
+        result.enemy = { x, y: canvasY, terrainHeight };
+    }
+
+    // Log what we did
+    if (result.player || result.enemy) {
+        const playerInfo = result.player ? `player: (${result.player.x}, ${result.player.y.toFixed(0)})` : '';
+        const enemyInfo = result.enemy ? `enemy: (${result.enemy.x}, ${result.enemy.y.toFixed(0)})` : '';
+        console.log(`[TestAPI] setTankPositions({ ${[playerInfo, enemyInfo].filter(Boolean).join(', ')} })`);
+    }
+
+    return result;
+}
+
+/**
+ * Get current tank positions.
+ *
+ * @returns {Object} Current positions of both tanks
+ */
+export function getTankPositions() {
+    const currentTerrain = module.terrain || terrain;
+    const player = module.playerTank || playerTank;
+    const enemy = module.enemyTank || enemyTank;
+
+    const result = {
+        success: true,
+        player: null,
+        enemy: null
+    };
+
+    if (player) {
+        result.player = {
+            x: player.x,
+            y: player.y,
+            terrainHeight: currentTerrain ? currentTerrain.getHeight(Math.floor(player.x)) : null
+        };
+    }
+
+    if (enemy) {
+        result.enemy = {
+            x: enemy.x,
+            y: enemy.y,
+            terrainHeight: currentTerrain ? currentTerrain.getHeight(Math.floor(enemy.x)) : null
+        };
+    }
+
+    return result;
+}
+
+// =============================================================================
 // UTILITY FUNCTIONS
 // =============================================================================
 
@@ -804,6 +992,11 @@ const TestAPI = {
     // Trajectory collection and physics validation
     fireAndCollect,
     validatePhysics,
+    // Terrain and tank manipulation
+    generateTerrain,
+    getTerrainAt,
+    setTankPositions,
+    getTankPositions,
     // Utility functions
     getAim,
     getWind,
@@ -816,7 +1009,8 @@ const TestAPI = {
     setEnemyTank,
     setTerrain,
     setFireProjectile,
-    setPlayerAim
+    setPlayerAim,
+    setOnTerrainChange
 };
 
 // Expose on window for console access

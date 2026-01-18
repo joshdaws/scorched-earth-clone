@@ -6845,6 +6845,12 @@ async function init() {
         playerAim: playerAim
     });
 
+    // Set up terrain change callback for TestAPI.generateTerrain()
+    TestAPI.setOnTerrainChange((newTerrain) => {
+        currentTerrain = newTerrain;
+        console.log('[Main] Terrain updated via TestAPI');
+    });
+
     // Initialize debug overlays with game state accessors
     DebugOverlays.init({
         getPlayerTank: () => playerTank,
