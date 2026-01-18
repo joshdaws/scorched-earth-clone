@@ -1,450 +1,254 @@
 #!/bin/bash
 #
 # Ralph Wiggum Loop - Autonomous Issue Processing
-# "I'm helping!" - Ralph Wiggum
-#
-# This script automates working through Beads issues by piping a templated
-# prompt to Claude Code in a loop. Each iteration handles exactly one issue.
+# Based on https://ghuntley.com/ralph/
 #
 # Usage:
-#   ./ralph.sh --epic <epic-id>     Work on issues in a specific epic
-#   ./ralph.sh --type <type>        Work on issues of a specific type (task, bug, feature)
-#   ./ralph.sh --label <label>      Work on issues with a specific label
-#   ./ralph.sh --priority <n>       Work on issues with priority <= n
-#   ./ralph.sh --all                Work on all open issues
-#   ./ralph.sh --max <n>            Set max iterations (default: 50)
-#   ./ralph.sh --help               Show this help message
+#   ./ralph.sh --epic <epic-id>       Work on issues in a specific epic
+#   ./ralph.sh --type bug             Work on all bugs
+#   ./ralph.sh --type feature         Work on all features
+#   ./ralph.sh --label <label>        Work on issues with a label
+#   ./ralph.sh --all                  Work on all open issues
+#   ./ralph.sh --max 20               Set max iterations (default: 50)
 #
-# Multiple filters can be combined:
-#   ./ralph.sh --epic beads-abc --type task --max 20
+# Examples:
+#   ./ralph.sh --epic scorched-earth-abc --max 30
+#   ./ralph.sh --type bug
+#   ./ralph.sh --label frontend --type task
+#
 
 set -e
 
-# Configuration
-RALPH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.ralph" && pwd)"
-PROJECT_ROOT="$(dirname "$RALPH_DIR")"
-PROMPT_TEMPLATE="$RALPH_DIR/PROMPT.md"
-GENERATED_PROMPT="$RALPH_DIR/generated_prompt.md"
-LOG_FILE="$RALPH_DIR/ralph.log"
-PROGRESS_FILE="$RALPH_DIR/progress.txt"
-OUTPUT_FILE="$RALPH_DIR/output.tmp"
+# Defaults
 MAX_ITERATIONS=50
-MAX_RETRIES=3
-INITIAL_RETRY_DELAY=5
-ITERATION_PAUSE=5
-
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
-
-# Scope variables
 EPIC_ID=""
 ISSUE_TYPE=""
 LABEL=""
-PRIORITY=""
 SCOPE_ALL=false
 
-# Logging function with timestamp and color
-log() {
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    echo "[$timestamp] $1" >> "$LOG_FILE"
-    echo -e "${BLUE}[$timestamp]${NC} $1"
-}
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --epic|-e)
+            EPIC_ID="$2"
+            shift 2
+            ;;
+        --type|-t)
+            ISSUE_TYPE="$2"
+            shift 2
+            ;;
+        --label|-l)
+            LABEL="$2"
+            shift 2
+            ;;
+        --all|-a)
+            SCOPE_ALL=true
+            shift
+            ;;
+        --max|-m)
+            MAX_ITERATIONS="$2"
+            shift 2
+            ;;
+        --help|-h)
+            echo "Ralph Wiggum Loop - Autonomous Issue Processing"
+            echo ""
+            echo "Usage:"
+            echo "  ./ralph.sh --epic <epic-id>    Work on issues in a specific epic"
+            echo "  ./ralph.sh --type <type>       Work on issues of a type (bug, feature, task)"
+            echo "  ./ralph.sh --label <label>     Work on issues with a label"
+            echo "  ./ralph.sh --all               Work on all open issues"
+            echo "  ./ralph.sh --max <n>           Max iterations (default: 50)"
+            echo ""
+            echo "Examples:"
+            echo "  ./ralph.sh --epic scorched-earth-abc"
+            echo "  ./ralph.sh --type bug --max 20"
+            echo "  ./ralph.sh --label gameplay"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Use --help for usage information"
+            exit 1
+            ;;
+    esac
+done
 
-# Error handling
-error() {
-    echo -e "${RED}ERROR: $1${NC}" >&2
+# Validate: must specify a scope
+if [ -z "$EPIC_ID" ] && [ -z "$ISSUE_TYPE" ] && [ -z "$LABEL" ] && [ "$SCOPE_ALL" = false ]; then
+    echo "ERROR: You must specify a scope. Use one of:"
+    echo "  --epic <epic-id>    Work on a specific epic"
+    echo "  --type <type>       Work on a type (bug, feature, task)"
+    echo "  --label <label>     Work on issues with a label"
+    echo "  --all               Work on all open issues"
+    echo ""
+    echo "Use --help for more information"
     exit 1
-}
+fi
 
-# Show help
-show_help() {
-    cat << 'EOF'
-Ralph Wiggum Loop - Autonomous Issue Processing
+# Build the bd ready command and scope description
+READY_CMD="bd ready"
+SCOPE_DESC=""
+PARENT_FLAG=""
 
-Usage:
-  ./ralph.sh [OPTIONS]
+if [ -n "$EPIC_ID" ]; then
+    READY_CMD="$READY_CMD --parent $EPIC_ID"
+    SCOPE_DESC="Working on epic: **$EPIC_ID**"
+    PARENT_FLAG=" --parent $EPIC_ID"
 
-Options:
-  --epic <id>       Work on issues in a specific epic (uses --parent filter)
-  --type <type>     Work on issues of a specific type (task, bug, feature)
-  --label <label>   Work on issues with a specific label
-  --priority <n>    Work on issues with priority <= n (0=critical, 4=backlog)
-  --all             Work on all open issues (use with caution!)
-  --max <n>         Set maximum iterations (default: 50)
-  --help            Show this help message
-
-Examples:
-  ./ralph.sh --epic scorched-earth-abc123 --max 20
-  ./ralph.sh --type bug
-  ./ralph.sh --label frontend --type task
-  ./ralph.sh --priority 1 --max 30
-  ./ralph.sh --all --max 100
-
-Notes:
-  - At least one scope filter is required (--epic, --type, --label, --priority, or --all)
-  - Multiple filters can be combined to narrow the scope
-  - The loop stops when: all issues complete, max iterations reached, or completion signal detected
-EOF
-    exit 0
-}
-
-# Parse command line arguments
-parse_args() {
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            --epic|-e)
-                EPIC_ID="$2"
-                shift 2
-                ;;
-            --type|-t)
-                ISSUE_TYPE="$2"
-                shift 2
-                ;;
-            --label|-l)
-                LABEL="$2"
-                shift 2
-                ;;
-            --priority|-p)
-                PRIORITY="$2"
-                shift 2
-                ;;
-            --all|-a)
-                SCOPE_ALL=true
-                shift
-                ;;
-            --max|-m)
-                MAX_ITERATIONS="$2"
-                shift 2
-                ;;
-            --help|-h)
-                show_help
-                ;;
-            *)
-                error "Unknown option: $1. Use --help for usage."
-                ;;
-        esac
-    done
-}
-
-# Validate that at least one scope is specified
-validate_scope() {
-    if [[ -z "$EPIC_ID" && -z "$ISSUE_TYPE" && -z "$LABEL" && -z "$PRIORITY" && "$SCOPE_ALL" == false ]]; then
-        error "No scope specified. Use --epic, --type, --label, --priority, or --all. Use --help for usage."
+    # Validate epic exists
+    if ! bd show "$EPIC_ID" > /dev/null 2>&1; then
+        echo "ERROR: Epic '$EPIC_ID' not found"
+        exit 1
     fi
-}
+fi
 
-# Validate epic exists if specified
-validate_epic() {
-    if [[ -n "$EPIC_ID" ]]; then
-        if ! bd show "$EPIC_ID" &>/dev/null; then
-            error "Epic '$EPIC_ID' not found. Check the ID and try again."
-        fi
-        log "Validated epic: $EPIC_ID"
-    fi
-}
-
-# Build the bd ready command with filters
-build_ready_cmd() {
-    local cmd="bd ready"
-
-    if [[ -n "$EPIC_ID" ]]; then
-        cmd="$cmd --parent $EPIC_ID"
-    fi
-
-    if [[ -n "$ISSUE_TYPE" ]]; then
-        cmd="$cmd --type $ISSUE_TYPE"
-    fi
-
-    if [[ -n "$LABEL" ]]; then
-        cmd="$cmd --label $LABEL"
-    fi
-
-    if [[ -n "$PRIORITY" ]]; then
-        cmd="$cmd --priority $PRIORITY"
-    fi
-
-    echo "$cmd"
-}
-
-# Build human-readable scope description
-build_scope_description() {
-    local parts=()
-
-    if [[ -n "$EPIC_ID" ]]; then
-        parts+=("epic **$EPIC_ID**")
-    fi
-
-    if [[ -n "$ISSUE_TYPE" ]]; then
-        parts+=("type=**$ISSUE_TYPE**")
-    fi
-
-    if [[ -n "$LABEL" ]]; then
-        parts+=("label=**$LABEL**")
-    fi
-
-    if [[ -n "$PRIORITY" ]]; then
-        parts+=("priority<=**$PRIORITY**")
-    fi
-
-    if [[ "$SCOPE_ALL" == true ]]; then
-        parts+=("**all open issues**")
-    fi
-
-    local IFS=", "
-    echo "Working on: ${parts[*]}"
-}
-
-# Get epic context if working on an epic
-get_epic_context() {
-    if [[ -n "$EPIC_ID" ]]; then
-        echo "\\n**Epic:** \`$EPIC_ID\`\\nWhen creating new issues, always link them to this epic with \`--parent $EPIC_ID\`"
+if [ -n "$ISSUE_TYPE" ]; then
+    READY_CMD="$READY_CMD --type $ISSUE_TYPE"
+    if [ -n "$SCOPE_DESC" ]; then
+        SCOPE_DESC="$SCOPE_DESC, type: **$ISSUE_TYPE**"
     else
-        echo ""
+        SCOPE_DESC="Working on type: **$ISSUE_TYPE**"
     fi
-}
+fi
 
-# Get parent flag for issue creation
-get_parent_flag() {
-    if [[ -n "$EPIC_ID" ]]; then
-        echo " --parent $EPIC_ID"
+if [ -n "$LABEL" ]; then
+    READY_CMD="$READY_CMD --label $LABEL"
+    if [ -n "$SCOPE_DESC" ]; then
+        SCOPE_DESC="$SCOPE_DESC, label: **$LABEL**"
     else
-        echo ""
+        SCOPE_DESC="Working on label: **$LABEL**"
     fi
-}
+fi
 
-# Count remaining issues
-count_remaining() {
-    local ready_cmd="$1"
-    # Count lines that start with a number (numbered list items like "1.", "2.", etc.)
-    local count
-    count=$($ready_cmd 2>/dev/null | grep -c '^\s*[0-9]\+\. \[' || true)
-    echo "${count:-0}"
-}
+if [ "$SCOPE_ALL" = true ]; then
+    SCOPE_DESC="Working on: **all open issues**"
+fi
 
-# Run Claude with retry logic and exponential backoff
-run_claude_with_retry() {
-    local prompt_file="$1"
-    local output_file="$2"
-    local attempt=1
-    local delay=$INITIAL_RETRY_DELAY
-    local debug_dir="$RALPH_DIR/debug"
+# Build epic context section (single line to avoid sed issues)
+EPIC_CONTEXT=""
+if [ -n "$EPIC_ID" ]; then
+    EPIC_CONTEXT="\\n**Epic:** \`$EPIC_ID\`\\nWhen creating new issues, always link them to this epic with \`--parent $EPIC_ID\`"
+fi
 
-    # Create debug directory if it doesn't exist
-    mkdir -p "$debug_dir"
+# Ensure we're in the project root
+cd "$(dirname "$0")"
 
-    while [[ $attempt -le $MAX_RETRIES ]]; do
-        log "Claude attempt $attempt of $MAX_RETRIES..."
+# Check required files
+if [ ! -f ".ralph/PROMPT.md" ]; then
+    echo "ERROR: .ralph/PROMPT.md not found"
+    exit 1
+fi
 
-        # Pre-flight diagnostics
-        local prompt_size=$(wc -c < "$prompt_file" 2>/dev/null || echo "0")
-        local prompt_lines=$(wc -l < "$prompt_file" 2>/dev/null || echo "0")
-        log "  Prompt: $prompt_lines lines, $prompt_size bytes"
+# Setup
+LOG_FILE=".ralph/ralph.log"
+OUTPUT_FILE=".ralph/output.tmp"
+GENERATED_PROMPT=".ralph/generated_prompt.md"
+PROGRESS_FILE=".ralph/progress.txt"
+PROMISE_TAG="<promise>SCOPE COMPLETE</promise>"
+ITERATION=0
 
-        if [[ ! -s "$prompt_file" ]]; then
-            log "ERROR: Prompt file is empty or missing!"
-            return 1
-        fi
+# Clear logs for fresh session
+echo "Clearing previous session logs..."
+> "$LOG_FILE"
+> "$PROGRESS_FILE"
 
-        # Run Claude and capture exit code
-        local exit_code=0
-        local timestamp=$(date '+%Y%m%d_%H%M%S')
-        local stderr_file="$debug_dir/stderr_${timestamp}.txt"
+echo "=========================================="
+echo "Ralph Wiggum Loop"
+echo "=========================================="
+echo "Scope: $SCOPE_DESC"
+echo "Filter: $READY_CMD"
+echo "Max iterations: $MAX_ITERATIONS"
+echo "Progress file: $PROGRESS_FILE"
+echo "Press Ctrl+C to stop"
+echo ""
 
-        # Run Claude, capturing stdout and stderr separately for better debugging
-        cat "$prompt_file" | claude --dangerously-skip-permissions > >(tee "$output_file") 2> >(tee "$stderr_file" >&2) || exit_code=$?
-
-        # Check stderr for "No messages returned" - spurious error from Claude Code CLI
-        # Work likely completed even if output capture failed. Just continue to next iteration.
-        if grep -q "No messages returned" "$stderr_file" 2>/dev/null; then
-            log "  'No messages returned' error (likely spurious) - continuing to next iteration"
-            echo -e "${YELLOW}Spurious 'No messages returned' error - work likely completed. Moving on.${NC}"
-            return 0  # Treat as success, move to next iteration
-        fi
-
-        # Success
-        if [[ $exit_code -eq 0 ]]; then
-            log "Claude completed successfully"
-            return 0
-        fi
-
-        # Actual failure - retry with backoff
-        log "Claude exited with code $exit_code"
-        if [[ $attempt -lt $MAX_RETRIES ]]; then
-            echo -e "${YELLOW}Claude failed (exit $exit_code). Retrying in ${delay}s... (attempt $attempt of $MAX_RETRIES)${NC}"
-            sleep $delay
-            delay=$((delay * 2))
-            ((attempt++))
-            continue
-        else
-            log "Max retries reached. Skipping this iteration."
-            echo -e "${RED}Max retries reached. Skipping this iteration.${NC}"
-            return 1
-        fi
-    done
-
-    return 1
-}
-
-# Generate prompt from template
+# Generate the prompt with substitutions
 generate_prompt() {
-    local ready_cmd="$1"
-    local scope_desc="$2"
-    local epic_context="$3"
-    local parent_flag="$4"
-
-    if [[ ! -f "$PROMPT_TEMPLATE" ]]; then
-        error "Prompt template not found: $PROMPT_TEMPLATE"
-    fi
-
-    # Read template and substitute placeholders
-    sed -e "s|{{READY_CMD}}|$ready_cmd|g" \
-        -e "s|{{SCOPE_DESCRIPTION}}|$scope_desc|g" \
-        -e "s|{{PARENT_FLAG}}|$parent_flag|g" \
-        -e "s|{{EPIC_CONTEXT}}|$epic_context|g" \
-        "$PROMPT_TEMPLATE" | sed 's/\\n/\
+    sed -e "s|{{SCOPE_DESCRIPTION}}|$SCOPE_DESC|g" \
+        -e "s|{{READY_CMD}}|$READY_CMD|g" \
+        -e "s|{{EPIC_CONTEXT}}|$EPIC_CONTEXT|g" \
+        -e "s|{{PARENT_FLAG}}|$PARENT_FLAG|g" \
+        .ralph/PROMPT.md | sed 's/\\n/\
 /g' > "$GENERATED_PROMPT"
 }
 
-# Cleanup on exit
-cleanup() {
+# Clean up temp files on exit
+trap "rm -f $OUTPUT_FILE $GENERATED_PROMPT" EXIT
+
+# Log start
+echo "$(date): Ralph loop started - $SCOPE_DESC" >> "$LOG_FILE"
+
+while [ $ITERATION -lt $MAX_ITERATIONS ]; do
+    ITERATION=$((ITERATION + 1))
+
     echo ""
-    log "Ralph loop interrupted. Cleaning up..."
-    rm -f "$OUTPUT_FILE" "$GENERATED_PROMPT"
-    # Show final stats
-    echo ""
-    echo -e "${YELLOW}=== Final Status ===${NC}"
-    bd stats 2>/dev/null || true
-    echo ""
-    if [[ -f "$PROGRESS_FILE" ]]; then
-        local completed=$(grep -c "^## " "$PROGRESS_FILE" 2>/dev/null || echo "0")
-        echo -e "${GREEN}Issues completed this session: $completed${NC}"
-    fi
-    exit 130  # Standard exit code for SIGINT
-}
-
-trap cleanup SIGINT SIGTERM
-
-# Main loop
-main() {
-    parse_args "$@"
-    validate_scope
-    validate_epic
-
-    local ready_cmd=$(build_ready_cmd)
-    local scope_desc=$(build_scope_description)
-    local epic_context=$(get_epic_context)
-    local parent_flag=$(get_parent_flag)
-
-    # Initialize log
-    log "=========================================="
-    log "Ralph Wiggum Loop Starting"
-    log "Scope: $scope_desc"
-    log "Ready command: $ready_cmd"
-    log "Max iterations: $MAX_ITERATIONS"
-    log "=========================================="
-
-    # Initialize progress file for this session
-    echo "" >> "$PROGRESS_FILE"
-    echo "# Ralph Session $(date '+%Y-%m-%d %H:%M:%S')" >> "$PROGRESS_FILE"
-    echo "# Scope: $scope_desc" >> "$PROGRESS_FILE"
-    echo "" >> "$PROGRESS_FILE"
-
-    # Print startup banner
-    echo ""
-    echo -e "${GREEN}==========================================${NC}"
-    echo -e "${GREEN}Ralph Wiggum Loop${NC}"
-    echo -e "${GREEN}==========================================${NC}"
-    echo "Scope: $scope_desc"
-    echo "Filter: $ready_cmd"
-    echo "Max iterations: $MAX_ITERATIONS"
-    echo "Progress file: $PROGRESS_FILE"
-    echo "Press Ctrl+C to stop"
+    echo "=========================================="
+    echo "ITERATION $ITERATION of $MAX_ITERATIONS"
+    echo "$(date)"
+    echo "=========================================="
     echo ""
 
-    local iteration=0
+    # Log iteration
+    echo "$(date): Starting iteration $ITERATION" >> "$LOG_FILE"
 
-    while [[ $iteration -lt $MAX_ITERATIONS ]]; do
-        ((iteration++))
+    # Check for remaining issues in scope (count lines starting with issue numbers)
+    REMAINING=$($READY_CMD 2>/dev/null | grep -c '^\s*[0-9]\+\. \[' || echo "0")
+    REMAINING=${REMAINING:-0}
+    echo "Remaining issues in scope: $REMAINING"
 
+    if [ "$REMAINING" = "0" ]; then
         echo ""
-        echo -e "${YELLOW}==========================================${NC}"
-        echo -e "${YELLOW}ITERATION $iteration of $MAX_ITERATIONS${NC}"
-        echo -e "${YELLOW}$(date '+%Y-%m-%d %H:%M:%S')${NC}"
-        echo -e "${YELLOW}==========================================${NC}"
-
-        # Check remaining issues
-        local remaining=$(count_remaining "$ready_cmd")
-        log "Iteration $iteration: $remaining issues remaining"
-
-        if [[ "$remaining" -eq 0 ]]; then
-            echo ""
-            echo -e "${GREEN}==========================================${NC}"
-            echo -e "${GREEN}ALL ISSUES IN SCOPE COMPLETE!${NC}"
-            echo -e "${GREEN}==========================================${NC}"
-            log "All issues complete. Exiting loop."
-            break
-        fi
-
-        # Show next ready issues
-        echo ""
-        echo -e "${BLUE}Next ready issues:${NC}"
-        $ready_cmd 2>/dev/null | head -5
-        echo ""
-
-        # Generate the prompt
-        generate_prompt "$ready_cmd" "$scope_desc" "$epic_context" "$parent_flag"
-
-        log "Running Claude for iteration $iteration..."
-
-        # Run Claude with retry logic
-        if run_claude_with_retry "$GENERATED_PROMPT" "$OUTPUT_FILE"; then
-            log "Claude iteration $iteration completed successfully"
-        else
-            log "Claude iteration $iteration failed after retries"
-            echo -e "${RED}Iteration $iteration failed. Continuing to next iteration...${NC}"
-        fi
-
-        # Check for completion signal (must be exact match on its own line)
-        if grep -q "^RALPH_SIGNAL::SCOPE_COMPLETE$" "$OUTPUT_FILE" 2>/dev/null; then
-            echo ""
-            echo -e "${GREEN}==========================================${NC}"
-            echo -e "${GREEN}SCOPE COMPLETE SIGNAL DETECTED!${NC}"
-            echo -e "${GREEN}==========================================${NC}"
-            log "Completion signal detected. Exiting loop."
-            rm -f "$OUTPUT_FILE"
-            break
-        fi
-
-        rm -f "$OUTPUT_FILE"
-
-        # Brief pause between iterations to avoid rate limiting
-        log "Pausing ${ITERATION_PAUSE}s before next iteration..."
-        sleep $ITERATION_PAUSE
-    done
-
-    if [[ $iteration -ge $MAX_ITERATIONS ]]; then
-        echo ""
-        echo -e "${YELLOW}==========================================${NC}"
-        echo -e "${YELLOW}MAX ITERATIONS ($MAX_ITERATIONS) REACHED${NC}"
-        echo -e "${YELLOW}==========================================${NC}"
-        log "Max iterations reached. Stopping loop."
+        echo "=========================================="
+        echo "ALL ISSUES IN SCOPE COMPLETE!"
+        echo "=========================================="
+        echo "$(date): All issues complete, exiting loop" >> "$LOG_FILE"
+        break
     fi
 
-    # Final summary
+    # Show what's ready
     echo ""
-    echo -e "${BLUE}=== Final Summary ===${NC}"
-    bd stats 2>/dev/null || true
+    echo "Ready issues:"
+    $READY_CMD --limit 5 2>/dev/null || true
     echo ""
-    if [[ -f "$PROGRESS_FILE" ]]; then
-        local completed=$(grep -c "^## " "$PROGRESS_FILE" 2>/dev/null || echo "0")
-        echo -e "${GREEN}Issues completed this session: $completed${NC}"
-    fi
-    log "Ralph loop finished after $iteration iterations"
-}
 
-# Run main
-main "$@"
+    # Generate prompt with current context
+    generate_prompt
+
+    # Run Claude Code with the generated prompt
+    cat "$GENERATED_PROMPT" | claude --dangerously-skip-permissions 2>&1 | tee "$OUTPUT_FILE"
+
+    # Check for completion promise
+    if grep -q "$PROMISE_TAG" "$OUTPUT_FILE" 2>/dev/null; then
+        echo ""
+        echo "=========================================="
+        echo "SCOPE COMPLETE!"
+        echo "=========================================="
+        echo "$(date): Completion promise detected, exiting loop" >> "$LOG_FILE"
+        break
+    fi
+
+    # Log completion
+    echo "$(date): Completed iteration $ITERATION" >> "$LOG_FILE"
+
+    # Brief pause between iterations
+    sleep 2
+done
+
+echo ""
+echo "=========================================="
+echo "Ralph loop finished after $ITERATION iterations"
+echo "=========================================="
+echo "$(date): Ralph loop finished after $ITERATION iterations" >> "$LOG_FILE"
+
+# Show final status
+echo ""
+echo "Beads status:"
+bd stats 2>/dev/null || echo "Unable to get beads stats"
+
+# Show progress summary
+if [ -f "$PROGRESS_FILE" ]; then
+    echo ""
+    echo "Progress log: $PROGRESS_FILE"
+    TOTAL_COMPLETED=$(grep -c "^## " "$PROGRESS_FILE" 2>/dev/null || echo "0")
+    echo "Total issues completed: $TOTAL_COMPLETED"
+fi
