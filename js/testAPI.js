@@ -23,6 +23,9 @@ import { generateTerrain as generateTerrainFromModule } from './terrain.js';
 // MODULE STATE
 // =============================================================================
 
+/** @type {Object.<string, Object>} Storage for named game state snapshots */
+const snapshots = {};
+
 /** @type {import('./tank.js').Tank|null} Reference to player tank */
 let playerTank = null;
 
@@ -980,6 +983,308 @@ export function isInitialized() {
 }
 
 // =============================================================================
+// SNAPSHOT API
+// =============================================================================
+
+/**
+ * Capture current game state as a named snapshot.
+ * Snapshots include terrain heights, tank positions, health, and other game state.
+ *
+ * @param {string} name - Name for the snapshot (used as key for retrieval)
+ * @returns {Object} Result with success status and snapshot data
+ */
+export function snapshot(name) {
+    if (typeof name !== 'string' || !name.trim()) {
+        console.warn('[TestAPI] snapshot: name must be a non-empty string');
+        return { success: false, error: 'Name must be a non-empty string' };
+    }
+
+    const currentTerrain = module.terrain || terrain;
+    const player = module.playerTank || playerTank;
+    const enemy = module.enemyTank || enemyTank;
+
+    // Capture terrain heights (sample every 10 pixels for efficiency)
+    let terrainHeights = null;
+    if (currentTerrain) {
+        const width = currentTerrain.getWidth();
+        terrainHeights = [];
+        // Store terrain at regular intervals for comparison
+        for (let x = 0; x < width; x += 10) {
+            terrainHeights.push({
+                x,
+                height: currentTerrain.getHeight(x)
+            });
+        }
+    }
+
+    // Capture tank states
+    const playerState = player ? {
+        x: player.x,
+        y: player.y,
+        health: player.health,
+        angle: player.angle,
+        power: player.power,
+        currentWeapon: player.currentWeapon,
+        isDestroyed: player.isDestroyed || false
+    } : null;
+
+    const enemyState = enemy ? {
+        x: enemy.x,
+        y: enemy.y,
+        health: enemy.health,
+        isDestroyed: enemy.isDestroyed || false
+    } : null;
+
+    // Capture wind and turn state
+    const snapshotData = {
+        timestamp: Date.now(),
+        wind: Wind.getWind(),
+        turnPhase: Turn.getPhase(),
+        isPlayerTurn: Turn.isPlayerTurn(),
+        terrain: terrainHeights,
+        player: playerState,
+        enemy: enemyState
+    };
+
+    // Store the snapshot
+    snapshots[name] = snapshotData;
+
+    console.log(`[TestAPI] snapshot('${name}') - captured at ${new Date(snapshotData.timestamp).toISOString()}`);
+
+    return {
+        success: true,
+        name,
+        data: snapshotData
+    };
+}
+
+/**
+ * Compare two named snapshots and return the differences.
+ * Useful for before/after verification of game actions.
+ *
+ * @param {string} beforeName - Name of the "before" snapshot
+ * @param {string} afterName - Name of the "after" snapshot
+ * @returns {Object} Comparison result with detailed changes
+ */
+export function compareSnapshots(beforeName, afterName) {
+    if (typeof beforeName !== 'string' || !beforeName.trim()) {
+        return { success: false, error: 'beforeName must be a non-empty string' };
+    }
+    if (typeof afterName !== 'string' || !afterName.trim()) {
+        return { success: false, error: 'afterName must be a non-empty string' };
+    }
+
+    const before = snapshots[beforeName];
+    const after = snapshots[afterName];
+
+    if (!before) {
+        return { success: false, error: `Snapshot '${beforeName}' not found` };
+    }
+    if (!after) {
+        return { success: false, error: `Snapshot '${afterName}' not found` };
+    }
+
+    // Compare terrain
+    const terrainChanged = [];
+    if (before.terrain && after.terrain) {
+        const minLen = Math.min(before.terrain.length, after.terrain.length);
+        for (let i = 0; i < minLen; i++) {
+            const bh = before.terrain[i];
+            const ah = after.terrain[i];
+            if (bh.height !== ah.height) {
+                terrainChanged.push({
+                    x: bh.x,
+                    before: bh.height,
+                    after: ah.height,
+                    delta: ah.height - bh.height
+                });
+            }
+        }
+    }
+
+    // Compare health
+    const healthChanged = {
+        player: null,
+        enemy: null
+    };
+
+    if (before.player && after.player) {
+        if (before.player.health !== after.player.health) {
+            healthChanged.player = {
+                before: before.player.health,
+                after: after.player.health,
+                delta: after.player.health - before.player.health
+            };
+        }
+    }
+
+    if (before.enemy && after.enemy) {
+        if (before.enemy.health !== after.enemy.health) {
+            healthChanged.enemy = {
+                before: before.enemy.health,
+                after: after.enemy.health,
+                delta: after.enemy.health - before.enemy.health
+            };
+        }
+    }
+
+    // Compare positions
+    const positionsChanged = {
+        player: null,
+        enemy: null
+    };
+
+    if (before.player && after.player) {
+        const dx = after.player.x - before.player.x;
+        const dy = after.player.y - before.player.y;
+        if (dx !== 0 || dy !== 0) {
+            positionsChanged.player = {
+                before: { x: before.player.x, y: before.player.y },
+                after: { x: after.player.x, y: after.player.y },
+                delta: { x: dx, y: dy }
+            };
+        }
+    }
+
+    if (before.enemy && after.enemy) {
+        const dx = after.enemy.x - before.enemy.x;
+        const dy = after.enemy.y - before.enemy.y;
+        if (dx !== 0 || dy !== 0) {
+            positionsChanged.enemy = {
+                before: { x: before.enemy.x, y: before.enemy.y },
+                after: { x: after.enemy.x, y: after.enemy.y },
+                delta: { x: dx, y: dy }
+            };
+        }
+    }
+
+    // Compare wind
+    let windChanged = null;
+    if (before.wind !== after.wind) {
+        windChanged = {
+            before: before.wind,
+            after: after.wind,
+            delta: after.wind - before.wind
+        };
+    }
+
+    // Compare turn state
+    let turnChanged = null;
+    if (before.turnPhase !== after.turnPhase || before.isPlayerTurn !== after.isPlayerTurn) {
+        turnChanged = {
+            before: { phase: before.turnPhase, isPlayerTurn: before.isPlayerTurn },
+            after: { phase: after.turnPhase, isPlayerTurn: after.isPlayerTurn }
+        };
+    }
+
+    // Check for destroyed tanks
+    const destroyed = {
+        player: !before.player?.isDestroyed && after.player?.isDestroyed,
+        enemy: !before.enemy?.isDestroyed && after.enemy?.isDestroyed
+    };
+
+    // Summarize changes
+    const hasChanges = terrainChanged.length > 0 ||
+                      healthChanged.player !== null ||
+                      healthChanged.enemy !== null ||
+                      positionsChanged.player !== null ||
+                      positionsChanged.enemy !== null ||
+                      windChanged !== null ||
+                      turnChanged !== null ||
+                      destroyed.player ||
+                      destroyed.enemy;
+
+    const result = {
+        success: true,
+        hasChanges,
+        timeDelta: after.timestamp - before.timestamp,
+        terrainChanged,
+        healthChanged,
+        positionsChanged,
+        windChanged,
+        turnChanged,
+        destroyed,
+        // Convenience summary
+        summary: {
+            terrainDamagePoints: terrainChanged.length,
+            playerHealthLost: healthChanged.player?.delta ?? 0,
+            enemyHealthLost: healthChanged.enemy?.delta ?? 0,
+            playerMoved: positionsChanged.player !== null,
+            enemyMoved: positionsChanged.enemy !== null,
+            playerDestroyed: destroyed.player,
+            enemyDestroyed: destroyed.enemy
+        }
+    };
+
+    console.log(`[TestAPI] compareSnapshots('${beforeName}', '${afterName}') - ` +
+                `hasChanges: ${hasChanges}, terrainPoints: ${terrainChanged.length}, ` +
+                `playerHealth: ${healthChanged.player?.delta ?? 'unchanged'}, ` +
+                `enemyHealth: ${healthChanged.enemy?.delta ?? 'unchanged'}`);
+
+    return result;
+}
+
+/**
+ * Clear all stored snapshots.
+ * Use this to free memory when done with snapshot testing.
+ *
+ * @returns {Object} Result with count of cleared snapshots
+ */
+export function clearSnapshots() {
+    const count = Object.keys(snapshots).length;
+
+    // Clear all entries
+    for (const key of Object.keys(snapshots)) {
+        delete snapshots[key];
+    }
+
+    console.log(`[TestAPI] clearSnapshots() - cleared ${count} snapshot(s)`);
+
+    return {
+        success: true,
+        cleared: count
+    };
+}
+
+/**
+ * Get a list of all stored snapshot names.
+ *
+ * @returns {Object} Result with list of snapshot names
+ */
+export function listSnapshots() {
+    const names = Object.keys(snapshots);
+
+    return {
+        success: true,
+        count: names.length,
+        names
+    };
+}
+
+/**
+ * Get a specific snapshot by name.
+ *
+ * @param {string} name - Name of the snapshot to retrieve
+ * @returns {Object} Result with snapshot data or error
+ */
+export function getSnapshot(name) {
+    if (typeof name !== 'string' || !name.trim()) {
+        return { success: false, error: 'Name must be a non-empty string' };
+    }
+
+    const data = snapshots[name];
+    if (!data) {
+        return { success: false, error: `Snapshot '${name}' not found` };
+    }
+
+    return {
+        success: true,
+        name,
+        data
+    };
+}
+
+// =============================================================================
 // WINDOW EXPOSURE (for console access)
 // =============================================================================
 
@@ -997,6 +1302,12 @@ const TestAPI = {
     getTerrainAt,
     setTankPositions,
     getTankPositions,
+    // Snapshot testing
+    snapshot,
+    compareSnapshots,
+    clearSnapshots,
+    listSnapshots,
+    getSnapshot,
     // Utility functions
     getAim,
     getWind,

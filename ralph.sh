@@ -258,9 +258,21 @@ run_claude_with_retry() {
         cat "$prompt_file" | claude --dangerously-skip-permissions > >(tee "$output_file") 2> >(tee "$stderr_file" >&2) || exit_code=$?
 
         # Check stderr for "No messages returned" - this is a spurious error from Claude Code CLI
-        # that doesn't actually block execution. Just log and ignore it.
+        # that occurs even when work completed successfully. If output file has content, ignore it.
         if grep -q "No messages returned" "$stderr_file" 2>/dev/null; then
-            log "  (Ignoring spurious 'No messages returned' error - work continues normally)"
+            if [[ -s "$output_file" ]]; then
+                log "  (Ignoring spurious 'No messages returned' - output file has content, work completed)"
+                return 0
+            else
+                log "  'No messages returned' with no output - treating as transient failure"
+                if [[ $attempt -lt $MAX_RETRIES ]]; then
+                    echo -e "${YELLOW}'No messages returned' error. Retrying in ${delay}s... (attempt $attempt of $MAX_RETRIES)${NC}"
+                    sleep $delay
+                    delay=$((delay * 2))
+                    ((attempt++))
+                    continue
+                fi
+            fi
         fi
 
         # Check for other unhandled promise rejections (transient errors)
