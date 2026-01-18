@@ -62,6 +62,10 @@ import * as TitleScene from './titleScene/titleScene.js';
 import { Button } from './ui/Button.js';
 import * as ControlSettings from './controls/controlSettings.js';
 import * as SceneIsolation from './sceneIsolation.js';
+import * as DailyRewards from './engagement/dailyRewards.js';
+import * as DailyChallenges from './engagement/dailyChallenges.js';
+import * as EngagementUI from './engagement/engagementUI.js';
+import * as DebugOverlays from './debugOverlays.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -695,6 +699,19 @@ const menuButtons = {
         textColor: MENU_BUTTON_STYLES.DARK.textColor,
         glowColor: MENU_BUTTON_STYLES.DARK.glowColor,
         autoSize: false
+    }),
+    dailyChallenges: new Button({
+        text: 'DAILY',
+        x: 80,
+        y: CANVAS.DESIGN_HEIGHT - 60,
+        width: 120,
+        height: 40,
+        fontSize: UI.FONT_SIZE_SMALL,
+        bgColor: 'rgba(255, 0, 255, 0.3)',
+        borderColor: '#FF00FF',
+        textColor: '#FF00FF',
+        glowColor: '#FF00FF',
+        autoSize: false
     })
 };
 
@@ -862,6 +879,14 @@ function updateMenuButtonPositions() {
     menuButtons.options.setPosition(centerX, row3Y);
     menuButtons.options.setSize(layout.optionsWidth, layout.secondaryHeight);
     menuButtons.options.fontSize = layout.secondaryFontSize;
+
+    // Daily Challenges button - bottom left corner
+    const dailyButtonWidth = layout.isCompact ? 90 : 120;
+    const dailyButtonHeight = layout.isCompact ? 35 : 40;
+    const dailyMargin = layout.isCompact ? 15 : 25;
+    menuButtons.dailyChallenges.setPosition(dailyButtonWidth / 2 + dailyMargin, height - dailyButtonHeight / 2 - dailyMargin);
+    menuButtons.dailyChallenges.setSize(dailyButtonWidth, dailyButtonHeight);
+    menuButtons.dailyChallenges.fontSize = layout.isCompact ? 10 : 12;
 }
 
 // =============================================================================
@@ -966,6 +991,11 @@ function handleMenuClick(pos) {
         // Show options overlay with volume controls
         optionsOverlayVisible = true;
         console.log('Options overlay opened');
+    } else if (menuButtons.dailyChallenges.containsPoint(pos.x, pos.y)) {
+        // Play click sound
+        Sound.playClickSound();
+        // Show daily challenges panel
+        EngagementUI.showChallengePanel();
     }
 }
 
@@ -1459,6 +1489,11 @@ function renderMenu(ctx) {
     menuButtons.supplyDrop.render(ctx, pulseIntensity);
     menuButtons.options.render(ctx, pulseIntensity);
 
+    // Render daily challenges button with badge for incomplete challenges
+    const challengeCounts = DailyChallenges.getCompletionCounts();
+    const incompleteChallenges = challengeCounts.total - challengeCounts.completed;
+    menuButtons.dailyChallenges.renderWithBadge(ctx, pulseIntensity, incompleteChallenges);
+
     // Token balance display - bottom right corner with neon box (mirroring Best Run box on left)
     const tokenBalance = Tokens.getTokenBalance();
     const tokenPadding = isCompact ? 15 : 25;
@@ -1618,6 +1653,10 @@ function renderMenu(ctx) {
         renderOptionsOverlay(ctx);
     }
 
+    // Render engagement UI (daily rewards popup, challenge panel)
+    EngagementUI.update(0.016); // ~60fps frame time
+    EngagementUI.render(ctx);
+
     // Render CRT effects as final post-processing overlay (fullscreen)
     renderCrtEffects(ctx, width, height, getCrtFullscreenParams());
 }
@@ -1671,6 +1710,15 @@ function setupMenuState() {
             Music.playForState(GAME_STATES.MENU);
             // Start animated 3D title scene
             TitleScene.start();
+
+            // Auto-show daily reward popup if claimable (slight delay for transition)
+            if (EngagementUI.shouldShowDailyReward()) {
+                setTimeout(() => {
+                    if (Game.getState() === GAME_STATES.MENU) {
+                        EngagementUI.showDailyRewardsPopup();
+                    }
+                }, 500);
+            }
         },
         onExit: (toState) => {
             console.log('Exiting MENU state');
@@ -1693,6 +1741,12 @@ function setupMenuState() {
     Input.onMouseDown((x, y, button) => {
         if (Game.getState() !== GAME_STATES.MENU) return;
 
+        // Check engagement UI first (daily rewards popup, challenge panel)
+        if (EngagementUI.isActive()) {
+            EngagementUI.handlePointerDown(x, y);
+            return;
+        }
+
         // Check name entry modal first (has highest priority)
         if (NameEntry.isOpen()) {
             NameEntry.handleClick({ x, y });
@@ -1712,6 +1766,12 @@ function setupMenuState() {
     Input.onTouchStart((x, y) => {
         if (Game.getState() !== GAME_STATES.MENU) return;
 
+        // Check engagement UI first (daily rewards popup, challenge panel)
+        if (EngagementUI.isActive()) {
+            EngagementUI.handlePointerDown(x, y);
+            return;
+        }
+
         // Check name entry modal first (has highest priority)
         if (NameEntry.isOpen()) {
             NameEntry.handleClick({ x, y });
@@ -1729,12 +1789,18 @@ function setupMenuState() {
 
     // Register pointer move for slider dragging
     Input.onMouseMove((x, y) => {
+        if (Game.getState() === GAME_STATES.MENU && EngagementUI.isActive()) {
+            EngagementUI.handlePointerMove(x, y);
+        }
         if (Game.getState() === GAME_STATES.MENU && optionsOverlayVisible) {
             VolumeControls.handlePointerMove(x, y);
         }
     });
 
     Input.onTouchMove((x, y) => {
+        if (Game.getState() === GAME_STATES.MENU && EngagementUI.isActive()) {
+            EngagementUI.handlePointerMove(x, y);
+        }
         if (Game.getState() === GAME_STATES.MENU && optionsOverlayVisible) {
             VolumeControls.handlePointerMove(x, y);
         }
@@ -4881,6 +4947,10 @@ function renderPlaying(ctx) {
     // Render screen flash on top of everything (not affected by shake)
     renderScreenFlash(ctx, Renderer.getWidth(), Renderer.getHeight());
 
+    // Render debug overlays (trajectory, collision boxes, grid, vectors)
+    // These render on top of gameplay but under CRT effects
+    DebugOverlays.render(ctx);
+
     // Render CRT effects as final post-processing overlay (fullscreen)
     renderCrtEffects(ctx, Renderer.getWidth(), Renderer.getHeight(), getCrtFullscreenParams());
 }
@@ -6775,14 +6845,27 @@ async function init() {
         playerAim: playerAim
     });
 
+    // Initialize debug overlays with game state accessors
+    DebugOverlays.init({
+        getPlayerTank: () => playerTank,
+        getEnemyTank: () => enemyTank,
+        getTerrain: () => currentTerrain,
+        getActiveProjectile: () => activeProjectiles[0] || null,
+        playerAim: playerAim
+    });
+
     // Register debug keyboard shortcuts (Shift+1-9 when debug mode is on)
+    // Also handles debug overlay shortcuts (Shift+T/C/G/V/A)
     document.addEventListener('keydown', (event) => {
         // Name entry modal has priority for keyboard input
         if (NameEntry.isOpen()) {
             NameEntry.handleKeyDown(event);
             return;
         }
-        DebugTools.handleKeyDown(event);
+        // Try debug tools shortcuts first, then debug overlays
+        if (!DebugTools.handleKeyDown(event)) {
+            DebugOverlays.handleKeyDown(event);
+        }
     });
 
     // Initialize achievement popup system
@@ -6824,6 +6907,17 @@ async function init() {
     // Initialize lifetime statistics tracking
     LifetimeStats.init();
 
+    // Initialize daily engagement systems
+    DailyRewards.init();
+    DailyChallenges.init();
+    EngagementUI.init({
+        addMoney: (amount) => Money.addMoney(amount, 'daily_reward'),
+        addTokens: (amount) => Tokens.addTokens(amount, 'daily_reward'),
+        grantWeapon: null, // Weapons granted at round start
+        grantRandomTank: () => TankCollection.unlockRandomTank(),
+        grantSupplyDrop: null // Supply drops handled separately
+    });
+
     // Initialize name entry module
     NameEntry.init();
 
@@ -6857,6 +6951,16 @@ async function init() {
                 }
             });
         }, 500);
+    } else {
+        // No name entry needed - check if daily reward should auto-show on startup
+        // (The onEnter handler doesn't fire on initial state since Game.init() sets state directly)
+        if (EngagementUI.shouldShowDailyReward()) {
+            setTimeout(() => {
+                if (Game.getState() === GAME_STATES.MENU && !NameEntry.isOpen()) {
+                    EngagementUI.showDailyRewardsPopup();
+                }
+            }, 500);
+        }
     }
 
     // Register performance tracking callback for achievement unlocks (grants +15% bonus)
