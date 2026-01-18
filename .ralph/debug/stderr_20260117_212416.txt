@@ -1,4 +1,0 @@
-This error originated either by throwing inside of an async function without a catch block, or by rejecting a promise which was not handled with .catch(). The promise rejected with the reason:
-Error: No messages returned
-    at GO9 (file:///Users/joshdaws/.nvm/versions/node/v22.18.0/lib/node_modules/@anthropic-ai/claude-code/cli.js:5390:73)
-    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
