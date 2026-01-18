@@ -41,10 +41,11 @@ async function loadConvexModules() {
 
     try {
         // Dynamic import - will fail gracefully if module can't be resolved
-        const browserModule = await import('convex/browser');
+        // Use @vite-ignore to prevent Rollup from trying to resolve at build time
+        const browserModule = await import(/* @vite-ignore */ 'convex/browser');
         ConvexHttpClient = browserModule.ConvexHttpClient;
 
-        const apiModule = await import('../convex/_generated/api.js');
+        const apiModule = await import(/* @vite-ignore */ '../convex/_generated/api.js');
         api = apiModule.api;
 
         convexAvailable = true;

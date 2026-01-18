@@ -9,6 +9,13 @@ export default defineConfig({
     emptyOutDir: true,
     // Generate sourcemaps for debugging
     sourcemap: true,
+    // Handle Convex dynamic imports - don't try to bundle them
+    rollupOptions: {
+      external: [
+        /^convex/,
+        /convex\/_generated/,
+      ],
+    },
   },
   // Base path for assets (Capacitor serves from root)
   base: './',
