@@ -32,11 +32,15 @@ Run the ready command to get your next issue:
 
 Select the **top issue** from the list.
 
-**IF AND ONLY IF the list is empty** (no issues returned), output this exact line on its own and stop:
+**IF AND ONLY IF the list is empty** (no issues returned), output this exact text and end your response:
 
-RALPH_SIGNAL::SCOPE_COMPLETE
+```
+<promise>SCOPE COMPLETE</promise>
 
-**OTHERWISE** (if there ARE issues), continue to the next step. **NEVER output the signal after completing work - the loop handles iteration.**
+All issues in scope have been completed. The Ralph loop will now exit.
+```
+
+**OTHERWISE** (if there ARE issues), continue to the next step. **NEVER output the promise tag after completing work - it's ONLY for when the issue list is empty.**
 
 **IMMEDIATELY** mark it in progress:
 ```bash
@@ -266,21 +270,24 @@ Then check if the parent epic (if any) is now complete:
 
 ---
 
-## COMPLETION - STOP HERE
+## COMPLETION - End This Iteration
 
-After closing the issue:
+After closing the issue, output this completion message and end your response:
 
-1. **STOP IMMEDIATELY** - Do not start another issue
-2. **Do not run `bd ready` again** - The loop handles this
-3. **Do not "peek" at what's next** - Just stop
+```
+✅ ITERATION COMPLETE
 
-The loop will restart you for the next issue automatically.
+Issue: <issue-id>
+Status: Closed
+Summary: <one-line summary of what you did>
+```
 
-**DO NOT output any completion signal here.** The signal is ONLY for Step 1 when the list is empty.
+**Important:**
+- Do NOT start another issue - the loop will restart you
+- Do NOT run `bd ready` again - the loop handles this
+- Just output the completion message above and end your response
 
-If you completed an issue successfully, just stop. The loop will restart you.
-
-**YOUR ITERATION IS DONE. STOP NOW.**
+The loop will automatically start a new iteration for the next issue.
 
 ---
 
