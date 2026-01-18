@@ -18,6 +18,7 @@ import * as Game from './game.js';
 import * as Money from './money.js';
 import { WeaponRegistry } from './weapons.js';
 import { getRunStats, isRunActive, getRoundNumber } from './runState.js';
+import { LevelRegistry } from './levelRegistry.js';
 
 // =============================================================================
 // MODULE STATE
@@ -134,6 +135,39 @@ export function skipToMenu() {
 
     forceState(GAME_STATES.MENU);
     console.log('[DebugTools] Returned to main menu');
+}
+
+/**
+ * Start a specific level directly.
+ * @param {number} world - World number (1-6)
+ * @param {number} level - Level number (1-10)
+ */
+export function startLevel(world, level) {
+    if (!requireDebugMode()) return;
+
+    const levelId = `world${world}-level${level}`;
+    const levelData = LevelRegistry.getLevel(levelId);
+
+    if (!levelData) {
+        console.error(`[DebugTools] Level not found: ${levelId}`);
+        console.log('[DebugTools] Available worlds: 1-6, levels: 1-10');
+        return;
+    }
+
+    console.log(`[DebugTools] Starting level: ${levelId} - ${levelData.name}`);
+
+    // Dispatch the levelSelected event for main.js to handle
+    window.dispatchEvent(new CustomEvent('levelSelected', {
+        detail: {
+            levelId,
+            level: levelData,
+            worldNum: world,
+            levelNum: level
+        }
+    }));
+
+    // Transition to playing state
+    forceState(GAME_STATES.PLAYING);
 }
 
 /**
