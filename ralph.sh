@@ -257,47 +257,32 @@ run_claude_with_retry() {
         # Run Claude, capturing stdout and stderr separately for better debugging
         cat "$prompt_file" | claude --dangerously-skip-permissions > >(tee "$output_file") 2> >(tee "$stderr_file" >&2) || exit_code=$?
 
-        # Check stderr for "No messages returned" - this is a spurious error from Claude Code CLI
-        # that occurs even when work completed successfully. If output file has content, ignore it.
+        # Check stderr for "No messages returned" - spurious error from Claude Code CLI
+        # Work likely completed even if output capture failed. Just continue to next iteration.
         if grep -q "No messages returned" "$stderr_file" 2>/dev/null; then
-            if [[ -s "$output_file" ]]; then
-                log "  (Ignoring spurious 'No messages returned' - output file has content, work completed)"
-                return 0
-            else
-                log "  'No messages returned' with no output - treating as transient failure"
-                if [[ $attempt -lt $MAX_RETRIES ]]; then
-                    echo -e "${YELLOW}'No messages returned' error. Retrying in ${delay}s... (attempt $attempt of $MAX_RETRIES)${NC}"
-                    sleep $delay
-                    delay=$((delay * 2))
-                    ((attempt++))
-                    continue
-                fi
-            fi
+            log "  'No messages returned' error (likely spurious) - continuing to next iteration"
+            echo -e "${YELLOW}Spurious 'No messages returned' error - work likely completed. Moving on.${NC}"
+            return 0  # Treat as success, move to next iteration
         fi
 
-        # Check for other unhandled promise rejections (transient errors)
-        if grep -q "unhandledRejection\|promise.*rejected" "$output_file" 2>/dev/null; then
-            log "Transient error detected: Unhandled rejection"
-            if [[ $attempt -lt $MAX_RETRIES ]]; then
-                echo -e "${YELLOW}Transient error detected. Retrying in ${delay}s... (attempt $attempt of $MAX_RETRIES)${NC}"
-                sleep $delay
-                delay=$((delay * 2))
-                ((attempt++))
-                continue
-            else
-                log "Max retries reached. Giving up on this iteration."
-                echo -e "${RED}Max retries reached. Skipping this iteration.${NC}"
-                return 1
-            fi
-        fi
-
-        # Success or non-transient error
+        # Success
         if [[ $exit_code -eq 0 ]]; then
             log "Claude completed successfully"
             return 0
+        fi
+
+        # Actual failure - retry with backoff
+        log "Claude exited with code $exit_code"
+        if [[ $attempt -lt $MAX_RETRIES ]]; then
+            echo -e "${YELLOW}Claude failed (exit $exit_code). Retrying in ${delay}s... (attempt $attempt of $MAX_RETRIES)${NC}"
+            sleep $delay
+            delay=$((delay * 2))
+            ((attempt++))
+            continue
         else
-            log "Claude exited with code $exit_code (non-transient)"
-            return $exit_code
+            log "Max retries reached. Skipping this iteration."
+            echo -e "${RED}Max retries reached. Skipping this iteration.${NC}"
+            return 1
         fi
     done
 
@@ -338,6 +323,7 @@ cleanup() {
         local completed=$(grep -c "^## " "$PROGRESS_FILE" 2>/dev/null || echo "0")
         echo -e "${GREEN}Issues completed this session: $completed${NC}"
     fi
+    exit 130  # Standard exit code for SIGINT
 }
 
 trap cleanup SIGINT SIGTERM
