@@ -389,7 +389,7 @@ let purchasedWeapons = new Set();
  * Invalidated when relevant state changes.
  * @type {Map<string, boolean>}
  */
-let unlockCache = new Map();
+const unlockCache = new Map();
 
 /**
  * Whether cache needs to be cleared on next check.
