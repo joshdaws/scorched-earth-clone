@@ -490,6 +490,56 @@ export class Button {
             ctx.restore();
         }
     }
+
+    /**
+     * Render the button with a pulsing red notification dot.
+     * Used to indicate an available reward/action without a count.
+     * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+     * @param {number} pulseIntensity - Glow pulse intensity (0-1)
+     * @param {boolean} showDot - Whether to show the notification dot
+     */
+    renderWithDot(ctx, pulseIntensity = 0, showDot = false) {
+        // Render the base button first
+        this.render(ctx, pulseIntensity);
+
+        // Render notification dot if active
+        if (showDot && !this.disabled) {
+            const bounds = this.getBounds();
+            const dotRadius = 8;
+            const dotX = bounds.x + this.width - 6;
+            const dotY = bounds.y + 6;
+
+            ctx.save();
+
+            // Pulsing glow effect (stronger pulse for attention)
+            const pulseScale = 1 + Math.sin(performance.now() * 0.006) * 0.3;
+            ctx.shadowColor = '#ff4444';
+            ctx.shadowBlur = (12 + pulseIntensity * 8) * pulseScale;
+
+            // Red dot with gradient for depth
+            const gradient = ctx.createRadialGradient(
+                dotX - 2, dotY - 2, 0,
+                dotX, dotY, dotRadius
+            );
+            gradient.addColorStop(0, '#ff6666');
+            gradient.addColorStop(0.5, '#ff4444');
+            gradient.addColorStop(1, '#cc0000');
+
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(dotX, dotY, dotRadius * pulseScale, 0, Math.PI * 2);
+            ctx.fill();
+
+            // White highlight for 3D effect
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+            ctx.beginPath();
+            ctx.arc(dotX - 2, dotY - 2, dotRadius * 0.4, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+    }
 }
 
 // =============================================================================

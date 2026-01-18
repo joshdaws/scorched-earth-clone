@@ -26,7 +26,9 @@ import {
     getBonusReward,
     getCompletionCounts,
     getTimeUntilRefresh,
-    CHALLENGE_DIFFICULTY
+    CHALLENGE_DIFFICULTY,
+    onChallengeComplete,
+    onAllComplete
 } from './dailyChallenges.js';
 import { addMoney } from '../money.js';
 import { addTokens } from '../tokens.js';
@@ -124,7 +126,17 @@ const state = {
     closeButtonHovered: false,
 
     // Shared
-    animationTime: 0
+    animationTime: 0,
+
+    // Coin flip animation
+    coinFlipActive: false,
+    coinFlipStart: 0,
+    coinFlipDuration: 800, // milliseconds
+
+    // Confetti particles for bonus rewards
+    confettiActive: false,
+    confettiStart: 0,
+    confettiParticles: []
 };
 
 // Callbacks for reward processing
@@ -152,6 +164,26 @@ export function init(callbacks = {}) {
         grantRandomTank: callbacks.grantRandomTank || null,
         grantSupplyDrop: callbacks.grantSupplyDrop || null
     };
+
+    // Register sound callbacks for challenge completion
+    onChallengeComplete((challenge) => {
+        playChallengeCompleteSound();
+        console.log('[EngagementUI] Challenge completed:', challenge.description);
+    });
+
+    onAllComplete(() => {
+        // Play bonus fanfare sound after a brief delay
+        setTimeout(() => {
+            playBonusFanfareSound();
+        }, 300);
+
+        // Start confetti animation from screen center
+        const centerX = getScreenWidth() / 2;
+        const centerY = getScreenHeight() / 2;
+        startConfettiAnimation(centerX, centerY);
+
+        console.log('[EngagementUI] All challenges complete - bonus unlocked!');
+    });
 
     console.log('[EngagementUI] Initialized');
 }
@@ -808,6 +840,14 @@ function handleClaimReward() {
     state.justClaimed = true;
     state.claimedReward = claimResult;
 
+    // Start coin flip animation for coin/token rewards
+    const hasCoinReward = claimResult.rewards.some(r =>
+        r.type === REWARD_TYPES.COINS || r.type === REWARD_TYPES.TOKENS
+    );
+    if (hasCoinReward) {
+        startCoinFlipAnimation();
+    }
+
     // Process rewards
     processRewards(claimResult, rewardCallbacks);
 
@@ -863,6 +903,269 @@ function playClaimSound() {
     }
 }
 
+/**
+ * Play celebration sound for challenge completion.
+ */
+function playChallengeCompleteSound() {
+    if (!Sound.isInitialized()) return;
+
+    const ctx = Sound.getContext();
+    const sfxGain = Sound.getSfxGain();
+    if (!ctx || !sfxGain) return;
+
+    try {
+        const now = ctx.currentTime;
+
+        // Quick celebratory arpeggio (shorter than reward fanfare)
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = 'square';
+
+        // Quick ascending arpeggio
+        osc.frequency.setValueAtTime(440, now);        // A4
+        osc.frequency.setValueAtTime(554, now + 0.05); // C#5
+        osc.frequency.setValueAtTime(659, now + 0.1);  // E5
+        osc.frequency.setValueAtTime(880, now + 0.15); // A5
+
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+
+        osc.connect(gain);
+        gain.connect(sfxGain);
+
+        osc.start(now);
+        osc.stop(now + 0.3);
+    } catch (e) {
+        console.warn('[EngagementUI] Failed to play challenge complete sound:', e);
+    }
+}
+
+/**
+ * Play bonus fanfare for completing all challenges.
+ * More elaborate sound to celebrate the achievement.
+ */
+function playBonusFanfareSound() {
+    if (!Sound.isInitialized()) return;
+
+    const ctx = Sound.getContext();
+    const sfxGain = Sound.getSfxGain();
+    if (!ctx || !sfxGain) return;
+
+    try {
+        const now = ctx.currentTime;
+
+        // Create a triumphant fanfare with multiple oscillators
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const osc3 = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc1.type = 'sawtooth';
+        osc2.type = 'triangle';
+        osc3.type = 'sine';
+
+        // Triumphant chord progression
+        // First chord (C major)
+        osc1.frequency.setValueAtTime(523, now);  // C5
+        osc2.frequency.setValueAtTime(659, now);  // E5
+        osc3.frequency.setValueAtTime(784, now);  // G5
+
+        // Rising to second chord (F major)
+        osc1.frequency.setValueAtTime(698, now + 0.2); // F5
+        osc2.frequency.setValueAtTime(880, now + 0.2); // A5
+        osc3.frequency.setValueAtTime(1047, now + 0.2); // C6
+
+        // Final chord (G major - resolution)
+        osc1.frequency.setValueAtTime(784, now + 0.4); // G5
+        osc2.frequency.setValueAtTime(988, now + 0.4); // B5
+        osc3.frequency.setValueAtTime(1175, now + 0.4); // D6
+
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.setValueAtTime(0.3, now + 0.2);
+        gain.gain.setValueAtTime(0.35, now + 0.4);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.8);
+
+        osc1.connect(gain);
+        osc2.connect(gain);
+        osc3.connect(gain);
+        gain.connect(sfxGain);
+
+        osc1.start(now);
+        osc2.start(now);
+        osc3.start(now);
+        osc1.stop(now + 0.8);
+        osc2.stop(now + 0.8);
+        osc3.stop(now + 0.8);
+    } catch (e) {
+        console.warn('[EngagementUI] Failed to play bonus fanfare:', e);
+    }
+}
+
+// =============================================================================
+// ANIMATIONS
+// =============================================================================
+
+/**
+ * Start the coin flip animation.
+ */
+function startCoinFlipAnimation() {
+    state.coinFlipActive = true;
+    state.coinFlipStart = performance.now();
+}
+
+/**
+ * Start confetti animation for bonus rewards.
+ * @param {number} centerX - Center X position for confetti origin
+ * @param {number} centerY - Center Y position for confetti origin
+ */
+function startConfettiAnimation(centerX, centerY) {
+    state.confettiActive = true;
+    state.confettiStart = performance.now();
+    state.confettiParticles = [];
+
+    // Create confetti particles
+    const colors = ['#FF00FF', '#00FFFF', '#F59E0B', '#10B981', '#EF4444', '#8B5CF6'];
+    for (let i = 0; i < 50; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 100 + Math.random() * 200;
+        state.confettiParticles.push({
+            x: centerX,
+            y: centerY,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - 150, // Initial upward velocity
+            rotation: Math.random() * Math.PI * 2,
+            rotationSpeed: (Math.random() - 0.5) * 10,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            size: 4 + Math.random() * 6,
+            life: 1
+        });
+    }
+}
+
+/**
+ * Update animations.
+ * @param {number} deltaTime - Time since last update in seconds
+ */
+function updateAnimations(deltaTime) {
+    // Update coin flip animation
+    if (state.coinFlipActive) {
+        const elapsed = performance.now() - state.coinFlipStart;
+        if (elapsed >= state.coinFlipDuration) {
+            state.coinFlipActive = false;
+        }
+    }
+
+    // Update confetti particles
+    if (state.confettiActive) {
+        const elapsed = performance.now() - state.confettiStart;
+        if (elapsed >= 2000) { // 2 second duration
+            state.confettiActive = false;
+            state.confettiParticles = [];
+        } else {
+            // Update particle physics
+            for (const particle of state.confettiParticles) {
+                particle.x += particle.vx * deltaTime;
+                particle.y += particle.vy * deltaTime;
+                particle.vy += 400 * deltaTime; // Gravity
+                particle.rotation += particle.rotationSpeed * deltaTime;
+                particle.life = Math.max(0, 1 - elapsed / 2000);
+            }
+        }
+    }
+}
+
+/**
+ * Render the coin flip animation.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} x - Center X position
+ * @param {number} y - Center Y position
+ */
+function renderCoinFlipAnimation(ctx, x, y) {
+    if (!state.coinFlipActive) return;
+
+    const elapsed = performance.now() - state.coinFlipStart;
+    const progress = Math.min(1, elapsed / state.coinFlipDuration);
+
+    // Ease-out for smooth landing
+    const easeOut = 1 - Math.pow(1 - progress, 3);
+
+    // Multiple flips (3 full rotations)
+    const flipAngle = easeOut * Math.PI * 6;
+
+    // Bounce effect (coin moves up then settles down)
+    const bounceHeight = Math.sin(easeOut * Math.PI) * 40;
+    const coinY = y - bounceHeight;
+
+    // Calculate scale based on rotation (coin appears thinner when edge-on)
+    const scaleX = Math.abs(Math.cos(flipAngle));
+
+    ctx.save();
+    ctx.translate(x, coinY);
+    ctx.scale(scaleX, 1);
+
+    // Coin size
+    const coinRadius = 25;
+
+    // Draw coin
+    const gradient = ctx.createRadialGradient(-5, -5, 0, 0, 0, coinRadius);
+    gradient.addColorStop(0, '#FFD700');
+    gradient.addColorStop(0.7, '#F59E0B');
+    gradient.addColorStop(1, '#B45309');
+
+    ctx.shadowColor = '#F59E0B';
+    ctx.shadowBlur = 15 + progress * 10;
+
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(0, 0, coinRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Coin edge (3D effect)
+    ctx.strokeStyle = '#B45309';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // Coin symbol (only visible when face is showing)
+    if (scaleX > 0.3) {
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#B45309';
+        ctx.font = 'bold 20px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('$', 0, 2);
+    }
+
+    ctx.restore();
+}
+
+/**
+ * Render confetti particles.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ */
+function renderConfetti(ctx) {
+    if (!state.confettiActive || state.confettiParticles.length === 0) return;
+
+    ctx.save();
+
+    for (const particle of state.confettiParticles) {
+        ctx.save();
+        ctx.translate(particle.x, particle.y);
+        ctx.rotate(particle.rotation);
+        ctx.globalAlpha = particle.life;
+
+        // Draw rectangular confetti piece
+        ctx.fillStyle = particle.color;
+        ctx.shadowColor = particle.color;
+        ctx.shadowBlur = 5;
+        ctx.fillRect(-particle.size / 2, -particle.size / 4, particle.size, particle.size / 2);
+
+        ctx.restore();
+    }
+
+    ctx.restore();
+}
+
 // =============================================================================
 // UTILITY FUNCTIONS
 // =============================================================================
@@ -902,6 +1205,7 @@ function roundRect(ctx, x, y, width, height, radius) {
  */
 export function update(deltaTime) {
     state.animationTime += deltaTime;
+    updateAnimations(deltaTime);
 }
 
 /**
@@ -911,6 +1215,16 @@ export function update(deltaTime) {
 export function render(ctx) {
     renderDailyRewardsPopup(ctx);
     renderChallengePanel(ctx);
+
+    // Render animations on top of popups
+    if (state.popupVisible && state.coinFlipActive && state.popupBounds) {
+        const coinX = state.popupBounds.x + state.popupBounds.width / 2;
+        const coinY = state.popupBounds.y + state.popupBounds.height / 2;
+        renderCoinFlipAnimation(ctx, coinX, coinY);
+    }
+
+    // Render confetti (overlays everything)
+    renderConfetti(ctx);
 }
 
 /**

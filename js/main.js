@@ -701,7 +701,7 @@ const menuButtons = {
         autoSize: false
     }),
     dailyChallenges: new Button({
-        text: 'DAILY',
+        text: 'CHALLENGES',
         x: 80,
         y: CANVAS.DESIGN_HEIGHT - 60,
         width: 120,
@@ -711,6 +711,19 @@ const menuButtons = {
         borderColor: '#FF00FF',
         textColor: '#FF00FF',
         glowColor: '#FF00FF',
+        autoSize: false
+    }),
+    dailyRewards: new Button({
+        text: 'REWARDS',
+        x: 200,
+        y: CANVAS.DESIGN_HEIGHT - 60,
+        width: 120,
+        height: 40,
+        fontSize: UI.FONT_SIZE_SMALL,
+        bgColor: 'rgba(0, 255, 255, 0.3)',
+        borderColor: '#00FFFF',
+        textColor: '#00FFFF',
+        glowColor: '#00FFFF',
         autoSize: false
     })
 };
@@ -880,18 +893,27 @@ function updateMenuButtonPositions() {
     menuButtons.options.setSize(layout.optionsWidth, layout.secondaryHeight);
     menuButtons.options.fontSize = layout.secondaryFontSize;
 
-    // Daily Challenges button - bottom left corner, positioned above Best Run card
-    const dailyButtonWidth = layout.isCompact ? 90 : 120;
+    // Daily engagement buttons - bottom left corner, positioned above Best Run card
+    const dailyButtonWidth = layout.isCompact ? 75 : 95;
     const dailyButtonHeight = layout.isCompact ? 35 : 40;
     const dailyMargin = layout.isCompact ? 15 : 25;
+    const dailyGap = layout.isCompact ? 6 : 8; // Gap between the two daily buttons
     // Best Run card dimensions (must match renderMenuScreen values)
     const bestCardHeight = layout.isCompact ? 40 : 50;
-    const elementGap = 8; // Gap between Daily button and Best Run card
-    // Position Daily button above the Best Run card
+    const elementGap = 8; // Gap between Daily buttons and Best Run card
+    // Position Daily buttons above the Best Run card
     const dailyButtonY = height - dailyMargin - bestCardHeight - elementGap - dailyButtonHeight / 2;
+
+    // Challenges button (left)
     menuButtons.dailyChallenges.setPosition(dailyButtonWidth / 2 + dailyMargin, dailyButtonY);
     menuButtons.dailyChallenges.setSize(dailyButtonWidth, dailyButtonHeight);
-    menuButtons.dailyChallenges.fontSize = layout.isCompact ? 10 : 12;
+    menuButtons.dailyChallenges.fontSize = layout.isCompact ? 9 : 11;
+
+    // Rewards button (right of challenges)
+    const rewardsButtonX = dailyMargin + dailyButtonWidth + dailyGap + dailyButtonWidth / 2;
+    menuButtons.dailyRewards.setPosition(rewardsButtonX, dailyButtonY);
+    menuButtons.dailyRewards.setSize(dailyButtonWidth, dailyButtonHeight);
+    menuButtons.dailyRewards.fontSize = layout.isCompact ? 9 : 11;
 }
 
 // =============================================================================
@@ -1001,6 +1023,11 @@ function handleMenuClick(pos) {
         Sound.playClickSound();
         // Show daily challenges panel
         EngagementUI.showChallengePanel();
+    } else if (menuButtons.dailyRewards.containsPoint(pos.x, pos.y)) {
+        // Play click sound
+        Sound.playClickSound();
+        // Show daily rewards popup
+        EngagementUI.showDailyRewardsPopup();
     }
 }
 
@@ -1498,6 +1525,10 @@ function renderMenu(ctx) {
     const challengeCounts = DailyChallenges.getCompletionCounts();
     const incompleteChallenges = challengeCounts.total - challengeCounts.completed;
     menuButtons.dailyChallenges.renderWithBadge(ctx, pulseIntensity, incompleteChallenges);
+
+    // Render daily rewards button with red dot when reward is claimable
+    const rewardClaimable = DailyRewards.canClaim();
+    menuButtons.dailyRewards.renderWithDot(ctx, pulseIntensity, rewardClaimable);
 
     // Token balance display - bottom right corner with neon box (mirroring Best Run box on left)
     const tokenBalance = Tokens.getTokenBalance();
