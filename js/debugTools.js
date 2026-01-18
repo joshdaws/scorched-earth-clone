@@ -18,7 +18,7 @@ import * as Game from './game.js';
 import * as Money from './money.js';
 import { WeaponRegistry } from './weapons.js';
 import { getRunStats, isRunActive, getRoundNumber } from './runState.js';
-import { LevelRegistry } from './levelRegistry.js';
+import { LevelRegistry } from './levels.js';
 
 // =============================================================================
 // MODULE STATE
@@ -599,6 +599,7 @@ export function help() {
 ║   Debug.skipToVictory()    - Jump to victory screen            ║
 ║   Debug.skipToDefeat()     - Jump to defeat screen             ║
 ║   Debug.skipToMenu()       - Return to main menu               ║
+║   Debug.startLevel(w, l)   - Start world w, level l directly   ║
 ║                                                                ║
 ║ MONEY COMMANDS:                                                ║
 ║   Debug.setMoney(amount)   - Set player balance                ║
