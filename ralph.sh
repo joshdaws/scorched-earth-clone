@@ -214,8 +214,49 @@ while [ $ITERATION -lt $MAX_ITERATIONS ]; do
     # Generate prompt with current context
     generate_prompt
 
-    # Run Claude Code with the generated prompt
-    cat "$GENERATED_PROMPT" | claude --dangerously-skip-permissions 2>&1 | tee "$OUTPUT_FILE"
+    echo "$(date): Running Claude for iteration $ITERATION..." >> "$LOG_FILE"
+
+    # Run Claude with retry logic for transient errors
+    # Key fix: pass prompt as argument (--) instead of piping via stdin
+    PROMPT_CONTENT=$(cat "$GENERATED_PROMPT")
+    MAX_RETRIES=3
+    RETRY_COUNT=0
+    CLAUDE_SUCCESS=false
+
+    while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+        # Run claude in a subshell to isolate crashes
+        # Write to file first (no pipe), then display
+        (
+            exec 2>&1
+            claude --dangerously-skip-permissions -- "$PROMPT_CONTENT"
+        ) > "$OUTPUT_FILE" 2>&1 || true
+
+        # Check if output looks successful (has content and no fatal errors)
+        if [ -s "$OUTPUT_FILE" ] && ! grep -q "No messages returned" "$OUTPUT_FILE"; then
+            cat "$OUTPUT_FILE"
+            echo "$(date): Claude iteration $ITERATION completed" >> "$LOG_FILE"
+            CLAUDE_SUCCESS=true
+            break
+        else
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                BACKOFF=$((RETRY_COUNT * 5))
+                echo "Claude failed or returned no messages. Retry $RETRY_COUNT/$MAX_RETRIES in ${BACKOFF}s..."
+                echo "$(date): Claude failed. Retry $RETRY_COUNT/$MAX_RETRIES in ${BACKOFF}s..." >> "$LOG_FILE"
+                sleep "$BACKOFF"
+            else
+                echo "$(date): Claude iteration $ITERATION failed after $MAX_RETRIES retries" >> "$LOG_FILE"
+                cat "$OUTPUT_FILE"  # Show what we got
+            fi
+        fi
+    done
+
+    # If Claude completely failed, skip to next iteration
+    if [ "$CLAUDE_SUCCESS" = false ]; then
+        echo "$(date): Skipping to next iteration due to Claude failure" >> "$LOG_FILE"
+        sleep 5
+        continue
+    fi
 
     # Check for completion promise
     if grep -q "$PROMISE_TAG" "$OUTPUT_FILE" 2>/dev/null; then
