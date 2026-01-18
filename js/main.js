@@ -880,11 +880,16 @@ function updateMenuButtonPositions() {
     menuButtons.options.setSize(layout.optionsWidth, layout.secondaryHeight);
     menuButtons.options.fontSize = layout.secondaryFontSize;
 
-    // Daily Challenges button - bottom left corner
+    // Daily Challenges button - bottom left corner, positioned above Best Run card
     const dailyButtonWidth = layout.isCompact ? 90 : 120;
     const dailyButtonHeight = layout.isCompact ? 35 : 40;
     const dailyMargin = layout.isCompact ? 15 : 25;
-    menuButtons.dailyChallenges.setPosition(dailyButtonWidth / 2 + dailyMargin, height - dailyButtonHeight / 2 - dailyMargin);
+    // Best Run card dimensions (must match renderMenuScreen values)
+    const bestCardHeight = layout.isCompact ? 40 : 50;
+    const elementGap = 8; // Gap between Daily button and Best Run card
+    // Position Daily button above the Best Run card
+    const dailyButtonY = height - dailyMargin - bestCardHeight - elementGap - dailyButtonHeight / 2;
+    menuButtons.dailyChallenges.setPosition(dailyButtonWidth / 2 + dailyMargin, dailyButtonY);
     menuButtons.dailyChallenges.setSize(dailyButtonWidth, dailyButtonHeight);
     menuButtons.dailyChallenges.fontSize = layout.isCompact ? 10 : 12;
 }
