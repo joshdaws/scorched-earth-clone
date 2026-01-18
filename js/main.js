@@ -414,7 +414,7 @@ function getActiveFireZones() {
  * Each well pulls tanks toward its center on the turn it's active.
  * @type {Array<{x: number, y: number, pullRadius: number, pullStrength: number}>}
  */
-let activeGravityWells = [];
+const activeGravityWells = [];
 
 /**
  * Gravity Well configuration.
@@ -4105,6 +4105,87 @@ function renderTanks(ctx) {
     renderTank(ctx, enemyTank);
 }
 
+/**
+ * Render shield effect around a tank if it has an active shield.
+ * Shield is a glowing bubble/dome that pulses based on shield percentage.
+ *
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {import('./tank.js').Tank} tank - The tank to render shield for
+ */
+function renderTankShield(ctx, tank) {
+    if (!tank || !tank.hasShield()) return;
+
+    const { x, y, team } = tank;
+
+    // Shield dimensions - larger bubble around the tank
+    const shieldRadius = TANK.WIDTH * 0.75;  // 75% of tank width
+    const centerY = y - TANK.BODY_HEIGHT / 2;  // Center on tank body
+
+    // Calculate shield strength for visual intensity
+    const shieldPercent = tank.getShieldPercent();
+
+    // Color based on shield strength (cyan -> yellow -> red as it depletes)
+    let shieldColor;
+    if (shieldPercent > 0.6) {
+        // High shield: cyan
+        shieldColor = '#00ffff';
+    } else if (shieldPercent > 0.3) {
+        // Medium shield: yellow
+        shieldColor = '#ffff00';
+    } else {
+        // Low shield: red/orange
+        shieldColor = '#ff6600';
+    }
+
+    // Pulse animation based on game time
+    const pulseSpeed = shieldPercent < 0.3 ? 6 : 3;  // Faster pulse when low
+    const pulseAmount = 0.1 + (1 - shieldPercent) * 0.1;  // More pulse when lower
+    const pulse = 1 + Math.sin(Date.now() / 1000 * pulseSpeed) * pulseAmount;
+
+    ctx.save();
+
+    // Draw shield bubble
+    ctx.beginPath();
+    ctx.arc(x, centerY, shieldRadius * pulse, 0, Math.PI * 2);
+
+    // Shield fill (semi-transparent)
+    ctx.fillStyle = shieldColor;
+    ctx.globalAlpha = 0.1 + shieldPercent * 0.1;  // 10-20% opacity
+    ctx.fill();
+
+    // Shield glow effect
+    ctx.strokeStyle = shieldColor;
+    ctx.lineWidth = 2 + shieldPercent * 2;  // 2-4px line width
+    ctx.shadowColor = shieldColor;
+    ctx.shadowBlur = 10 + shieldPercent * 10;  // 10-20px glow
+    ctx.globalAlpha = 0.4 + shieldPercent * 0.4;  // 40-80% opacity for stroke
+    ctx.stroke();
+
+    // Add hexagonal pattern lines for tech feel
+    ctx.globalAlpha = 0.2 + shieldPercent * 0.2;
+    ctx.lineWidth = 1;
+    ctx.shadowBlur = 5;
+
+    // Draw a few concentric rings
+    for (let i = 0.5; i < 1; i += 0.25) {
+        ctx.beginPath();
+        ctx.arc(x, centerY, shieldRadius * pulse * i, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+
+    ctx.restore();
+}
+
+/**
+ * Render shields for all tanks in the game.
+ * Called after tank rendering so shields appear on top.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ */
+function renderTankShields(ctx) {
+    renderTankShield(ctx, playerTank);
+    renderTankShield(ctx, enemyTank);
+}
+
 // =============================================================================
 // PROJECTILE RENDERING
 // =============================================================================
@@ -4921,6 +5002,9 @@ function renderPlaying(ctx) {
 
     // Render tanks on terrain
     renderTanks(ctx);
+
+    // Render shield effects around tanks (on top of tanks)
+    renderTankShields(ctx);
 
     // Render active projectile and trail (on top of terrain and tanks)
     renderActiveProjectile(ctx);

@@ -154,15 +154,21 @@ export function calculateDamage(explosion, tank, weapon = null) {
 /**
  * Apply damage from an explosion to a tank.
  * Combines damage calculation with damage application.
+ * Handles shield absorption and shieldBuster weapons.
+ *
+ * Shield mechanics:
+ * - Shields absorb damage before health
+ * - shieldBuster weapons bypass shields entirely (damage goes directly to health)
+ * - Non-shieldBuster weapons have their damage absorbed by shield first
  *
  * @param {Object} explosion - Explosion data (x, y, blastRadius)
  * @param {import('./tank.js').Tank} tank - Tank to damage
  * @param {Object} [weapon] - Weapon data (optional)
- * @returns {{damage: number, actualDamage: number, isDirectHit: boolean}} Damage result
+ * @returns {{damage: number, actualDamage: number, shieldDamage: number, healthDamage: number, isDirectHit: boolean, shieldBusted: boolean}} Damage result
  */
 export function applyExplosionDamage(explosion, tank, weapon = null) {
     if (!tank || tank.isDestroyed()) {
-        return { damage: 0, actualDamage: 0, isDirectHit: false };
+        return { damage: 0, actualDamage: 0, shieldDamage: 0, healthDamage: 0, isDirectHit: false, shieldBusted: false };
     }
 
     // God mode protection: player tank takes no damage when god mode is enabled
@@ -170,14 +176,14 @@ export function applyExplosionDamage(explosion, tank, weapon = null) {
         if (DEBUG.ENABLED) {
             console.log('[Damage] God mode: Player tank protected from damage');
         }
-        return { damage: 0, actualDamage: 0, isDirectHit: false };
+        return { damage: 0, actualDamage: 0, shieldDamage: 0, healthDamage: 0, isDirectHit: false, shieldBusted: false };
     }
 
     // Calculate damage
     const damage = calculateDamage(explosion, tank, weapon);
 
     if (damage <= 0) {
-        return { damage: 0, actualDamage: 0, isDirectHit: false };
+        return { damage: 0, actualDamage: 0, shieldDamage: 0, healthDamage: 0, isDirectHit: false, shieldBusted: false };
     }
 
     // Check if it's a direct hit (for return value) - use bounding box distance
@@ -185,13 +191,54 @@ export function applyExplosionDamage(explosion, tank, weapon = null) {
     const distance = distanceToRect(explosion.x, explosion.y, tankBounds);
     const isDirectHit = distance < DAMAGE.DIRECT_HIT_DISTANCE;
 
-    // Apply damage to tank (tank.takeDamage handles clamping and returns actual damage dealt)
-    const actualDamage = tank.takeDamage(damage);
+    // Check if weapon has shieldBuster flag
+    const isShieldBuster = weapon && weapon.shieldBuster === true;
+
+    let shieldDamage = 0;
+    let healthDamage = 0;
+    let shieldBusted = false;
+    let remainingDamage = damage;
+
+    // Handle shield damage
+    if (tank.hasShield() && !isShieldBuster) {
+        // Normal weapon: shield absorbs damage first
+        const shieldBefore = tank.shield;
+        shieldDamage = Math.min(tank.shield, remainingDamage);
+        tank.shield -= shieldDamage;
+        remainingDamage -= shieldDamage;
+
+        if (DEBUG.ENABLED) {
+            console.log(`[Damage] Shield absorbed ${shieldDamage} damage (${shieldBefore} -> ${tank.shield})`);
+        }
+
+        // Check if shield was destroyed
+        if (shieldBefore > 0 && tank.shield === 0) {
+            shieldBusted = true;
+            if (DEBUG.ENABLED) {
+                console.log('[Damage] Shield DESTROYED!');
+            }
+        }
+    } else if (tank.hasShield() && isShieldBuster) {
+        // Shield buster weapon: bypass shield entirely
+        if (DEBUG.ENABLED) {
+            console.log(`[Damage] Shield Buster: bypassing ${tank.shield} shield points`);
+        }
+    }
+
+    // Apply remaining damage to health
+    if (remainingDamage > 0) {
+        healthDamage = tank.takeDamage(remainingDamage);
+    }
+
+    const actualDamage = shieldDamage + healthDamage;
 
     return {
         damage: damage,
         actualDamage: actualDamage,
-        isDirectHit: isDirectHit
+        shieldDamage: shieldDamage,
+        healthDamage: healthDamage,
+        isDirectHit: isDirectHit,
+        shieldBusted: shieldBusted
     };
 }
 
@@ -202,7 +249,7 @@ export function applyExplosionDamage(explosion, tank, weapon = null) {
  * @param {Object} explosion - Explosion data (x, y, blastRadius)
  * @param {import('./tank.js').Tank[]} tanks - Array of tanks to check
  * @param {Object} [weapon] - Weapon data (optional)
- * @returns {Array<{tank: import('./tank.js').Tank, damage: number, actualDamage: number, isDirectHit: boolean}>} Damage results
+ * @returns {Array<{tank: import('./tank.js').Tank, damage: number, actualDamage: number, shieldDamage: number, healthDamage: number, isDirectHit: boolean, shieldBusted: boolean}>} Damage results
  */
 export function applyExplosionToAllTanks(explosion, tanks, weapon = null) {
     const results = [];
@@ -214,13 +261,16 @@ export function applyExplosionToAllTanks(explosion, tanks, weapon = null) {
     for (const tank of tanks) {
         const result = applyExplosionDamage(explosion, tank, weapon);
 
-        // Only include tanks that took damage
+        // Only include tanks that took damage (either shield or health)
         if (result.actualDamage > 0) {
             results.push({
                 tank: tank,
                 damage: result.damage,
                 actualDamage: result.actualDamage,
-                isDirectHit: result.isDirectHit
+                shieldDamage: result.shieldDamage,
+                healthDamage: result.healthDamage,
+                isDirectHit: result.isDirectHit,
+                shieldBusted: result.shieldBusted
             });
         }
     }

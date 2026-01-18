@@ -10,6 +10,7 @@
 import { CANVAS, COLORS, UI, GAME_STATES, DEBUG } from './constants.js';
 import * as Renderer from './renderer.js';
 import { WeaponRegistry, WEAPON_TYPES } from './weapons.js';
+import { ItemRegistry, applyItem } from './items.js';
 import * as Money from './money.js';
 import * as Game from './game.js';
 import * as Assets from './assets.js';
@@ -192,7 +193,7 @@ const MOMENTUM_MIN_VELOCITY = 0.5;
  */
 const SHOP_TABS = {
     WEAPONS: { id: 'weapons', label: 'WEAPONS', enabled: true },
-    ITEMS: { id: 'items', label: 'ITEMS', enabled: false }  // Disabled for now - Coming Soon
+    ITEMS: { id: 'items', label: 'ITEMS', enabled: true }  // Shields and other items
 };
 
 // =============================================================================
@@ -303,6 +304,12 @@ function updateButtonPositions() {
  * @type {Array<{x: number, y: number, width: number, height: number, weaponId: string}>}
  */
 let weaponCardAreas = [];
+
+/**
+ * Item card hit areas (populated during render).
+ * @type {Array<{x: number, y: number, width: number, height: number, itemId: string}>}
+ */
+let itemCardAreas = [];
 
 /**
  * Tab button hit areas (populated during render).
@@ -487,6 +494,80 @@ export function purchaseWeapon(weaponId) {
     return true;
 }
 
+/**
+ * Attempt to purchase an item (shield, etc.).
+ * @param {string} itemId - ID of the item to purchase
+ * @returns {boolean} True if purchase was successful
+ */
+export function purchaseItem(itemId) {
+    if (!playerTankRef) {
+        if (DEBUG.ENABLED) {
+            console.log('[Shop] No player tank reference');
+        }
+        return false;
+    }
+
+    const item = ItemRegistry.get(itemId);
+    if (!item) {
+        if (DEBUG.ENABLED) {
+            console.log(`[Shop] Unknown item: ${itemId}`);
+        }
+        return false;
+    }
+
+    // Check if player can afford it
+    if (!Money.canAfford(item.cost)) {
+        if (DEBUG.ENABLED) {
+            console.log(`[Shop] Cannot afford ${item.name} ($${item.cost})`);
+        }
+        playErrorSound();
+        purchaseFeedback = {
+            active: true,
+            weaponId: itemId,  // Reuse for visual feedback
+            startTime: Date.now(),
+            success: false
+        };
+        return false;
+    }
+
+    // Store old balance for animation
+    const oldBalance = Money.getMoney();
+
+    // Deduct money
+    Money.spendMoney(item.cost, `Purchased ${item.name}`);
+
+    // Apply item effect (adds shield to tank)
+    applyItem(itemId, playerTankRef);
+
+    // Start balance animation
+    const newBalance = Money.getMoney();
+    balanceAnimation = {
+        active: true,
+        startValue: oldBalance,
+        endValue: newBalance,
+        startTime: Date.now(),
+        duration: ANIMATION_DURATION.BALANCE_TRANSITION
+    };
+
+    // Play purchase sound effect
+    playPurchaseSound();
+
+    if (DEBUG.ENABLED) {
+        console.log(`[Shop] Purchased ${item.name} for $${item.cost}`);
+        console.log(`[Shop] Player shield: ${playerTankRef.shield}/${playerTankRef.maxShield}`);
+    }
+
+    // Show success feedback
+    purchaseFeedback = {
+        active: true,
+        weaponId: itemId,  // Reuse for visual feedback
+        startTime: Date.now(),
+        success: true
+    };
+
+    return true;
+}
+
 // =============================================================================
 // INPUT HANDLING
 // =============================================================================
@@ -525,6 +606,28 @@ function getWeaponAtPoint(x, y) {
             return {
                 weaponId: area.weaponId,
                 canAfford: weapon ? Money.canAfford(weapon.cost) : false
+            };
+        }
+    }
+    return null;
+}
+
+/**
+ * Check if a point is inside an item card.
+ * @param {number} x - X coordinate
+ * @param {number} y - Y coordinate
+ * @returns {{itemId: string, canAfford: boolean}|null} Item info or null
+ */
+function getItemAtPoint(x, y) {
+    for (const area of itemCardAreas) {
+        if (x >= area.x &&
+            x <= area.x + area.width &&
+            y >= area.y &&
+            y <= area.y + area.height) {
+            const item = ItemRegistry.get(area.itemId);
+            return {
+                itemId: area.itemId,
+                canAfford: item ? Money.canAfford(item.cost) : false
             };
         }
     }
@@ -618,12 +721,23 @@ export function handlePointerDown(x, y) {
         };
     }
 
-    // Check weapon cards
-    const weaponInfo = getWeaponAtPoint(x, y);
-    if (weaponInfo) {
-        const weapon = WeaponRegistry.getWeapon(weaponInfo.weaponId);
-        if (weapon && weapon.cost > 0) {  // Can't purchase basic shot
-            pressedElementId = `weapon_${weaponInfo.weaponId}`;
+    // Check weapon cards (only on weapons tab)
+    if (activeTab === 'weapons') {
+        const weaponInfo = getWeaponAtPoint(x, y);
+        if (weaponInfo) {
+            const weapon = WeaponRegistry.getWeapon(weaponInfo.weaponId);
+            if (weapon && weapon.cost > 0) {  // Can't purchase basic shot
+                pressedElementId = `weapon_${weaponInfo.weaponId}`;
+                return true;
+            }
+        }
+    }
+
+    // Check item cards (only on items tab)
+    if (activeTab === 'items') {
+        const itemInfo = getItemAtPoint(x, y);
+        if (itemInfo) {
+            pressedElementId = `item_${itemInfo.itemId}`;
             return true;
         }
     }
@@ -732,8 +846,8 @@ export function handlePointerUp(x, y) {
         }
     }
 
-    // Check weapon card release
-    if (wasPressed.startsWith('weapon_')) {
+    // Check weapon card release (only on weapons tab)
+    if (wasPressed.startsWith('weapon_') && activeTab === 'weapons') {
         const weaponId = wasPressed.replace('weapon_', '');
         const weaponInfo = getWeaponAtPoint(x, y);
 
@@ -743,6 +857,17 @@ export function handlePointerUp(x, y) {
                 purchaseWeapon(weaponId);
                 return true;
             }
+        }
+    }
+
+    // Check item card release (only on items tab)
+    if (wasPressed.startsWith('item_') && activeTab === 'items') {
+        const itemId = wasPressed.replace('item_', '');
+        const itemInfo = getItemAtPoint(x, y);
+
+        if (itemInfo && itemInfo.itemId === itemId) {
+            purchaseItem(itemId);
+            return true;
         }
     }
 
@@ -903,12 +1028,23 @@ export function handleClick(x, y) {
         return true;
     }
 
-    // Check weapon cards
-    const weaponInfo = getWeaponAtPoint(x, y);
-    if (weaponInfo) {
-        const weapon = WeaponRegistry.getWeapon(weaponInfo.weaponId);
-        if (weapon && weapon.cost > 0) {  // Can't purchase basic shot
-            purchaseWeapon(weaponInfo.weaponId);
+    // Check weapon cards (only on weapons tab)
+    if (activeTab === 'weapons') {
+        const weaponInfo = getWeaponAtPoint(x, y);
+        if (weaponInfo) {
+            const weapon = WeaponRegistry.getWeapon(weaponInfo.weaponId);
+            if (weapon && weapon.cost > 0) {  // Can't purchase basic shot
+                purchaseWeapon(weaponInfo.weaponId);
+                return true;
+            }
+        }
+    }
+
+    // Check item cards (only on items tab)
+    if (activeTab === 'items') {
+        const itemInfo = getItemAtPoint(x, y);
+        if (itemInfo) {
+            purchaseItem(itemInfo.itemId);
             return true;
         }
     }
@@ -1489,6 +1625,118 @@ function renderWeaponCard(ctx, weapon, x, y, currentAmmo, canAfford, pulseIntens
 }
 
 /**
+ * Render an item card (shield or other consumable).
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {Object} item - Item definition
+ * @param {number} x - X position
+ * @param {number} y - Y position
+ * @param {number} width - Card width
+ * @param {number} height - Card height
+ * @param {number} pulseIntensity - Glow pulse intensity
+ */
+function renderItemCard(ctx, item, x, y, width, height, pulseIntensity) {
+    const balance = Money.getMoney();
+    const canAfford = balance >= item.cost;
+    const isPressed = pressedElementId === `item_${item.id}`;
+    const isHovered = hoveredWeaponId === item.id;  // Reuse hover state
+
+    ctx.save();
+
+    // Pressed offset
+    const pressOffset = isPressed ? 1 : 0;
+
+    // Card background
+    let bgColor;
+    if (isPressed) {
+        bgColor = 'rgba(40, 40, 70, 0.95)';
+    } else if (isHovered && canAfford) {
+        bgColor = 'rgba(35, 35, 60, 0.95)';
+    } else if (!canAfford) {
+        bgColor = 'rgba(15, 15, 30, 0.85)';
+    } else {
+        bgColor = 'rgba(26, 26, 46, 0.9)';
+    }
+
+    ctx.fillStyle = bgColor;
+    ctx.beginPath();
+    ctx.roundRect(x, y + pressOffset, width, height, 4);
+    ctx.fill();
+
+    // Border with glow
+    const borderColor = item.color || COLORS.NEON_CYAN;
+    let glowBlur = 3;
+    let lineWidth = 1;
+
+    if (!canAfford) {
+        ctx.strokeStyle = COLORS.TEXT_MUTED;
+    } else if (isPressed || isHovered) {
+        ctx.strokeStyle = borderColor;
+        glowBlur = 12 + pulseIntensity * 6;
+        lineWidth = 2;
+    } else {
+        ctx.strokeStyle = borderColor;
+    }
+
+    ctx.lineWidth = lineWidth;
+    if (glowBlur > 0 && canAfford) {
+        ctx.shadowColor = borderColor;
+        ctx.shadowBlur = glowBlur;
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Draw shield icon (circle with glow)
+    const centerX = x + width / 2;
+    const iconY = y + pressOffset + 25;
+    const iconRadius = 18;
+
+    ctx.beginPath();
+    ctx.arc(centerX, iconY, iconRadius, 0, Math.PI * 2);
+    ctx.fillStyle = canAfford ? item.color : COLORS.TEXT_MUTED;
+    ctx.globalAlpha = canAfford ? 0.3 : 0.1;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = canAfford ? item.color : COLORS.TEXT_MUTED;
+    ctx.lineWidth = 2;
+    if (canAfford) {
+        ctx.shadowColor = item.color;
+        ctx.shadowBlur = 8;
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Shield amount text in icon
+    ctx.font = `bold 12px ${UI.FONT_FAMILY}`;
+    ctx.fillStyle = canAfford ? COLORS.TEXT_LIGHT : COLORS.TEXT_MUTED;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`+${item.shieldAmount}`, centerX, iconY);
+
+    // Item name
+    ctx.font = `bold 11px ${UI.FONT_FAMILY}`;
+    ctx.fillStyle = canAfford ? COLORS.TEXT_HIGHLIGHT : COLORS.TEXT_MUTED;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(item.name, centerX, y + pressOffset + 48);
+
+    // Price
+    ctx.font = `10px ${UI.FONT_FAMILY}`;
+    ctx.fillStyle = canAfford ? '#00ff88' : COLORS.NEON_PINK;
+    ctx.fillText(`$${item.cost}`, centerX, y + pressOffset + 64);
+
+    ctx.restore();
+
+    // Register hit area
+    itemCardAreas.push({
+        x: x,
+        y: y,
+        width: width,
+        height: height,
+        itemId: item.id
+    });
+}
+
+/**
  * Render the shop interface.
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  */
@@ -1500,6 +1748,7 @@ export function render(ctx) {
 
     // Clear hit areas for this frame
     weaponCardAreas = [];
+    itemCardAreas = [];
 
     // Update animation time
     animationTime += 16; // Approximate 60fps
@@ -1629,19 +1878,52 @@ export function render(ctx) {
 
     // Only render weapons content if on WEAPONS tab
     if (activeTab !== 'weapons') {
-        // Render "Coming Soon" placeholder for ITEMS tab
+        // Render ITEMS tab content
         ctx.save();
-        ctx.globalAlpha = contentOpacity;  // Apply crossfade opacity
-        ctx.font = `bold 28px ${UI.FONT_FAMILY}`;
-        ctx.fillStyle = COLORS.TEXT_MUTED;
+        ctx.globalAlpha = contentOpacity;
+
+        // Get all available items
+        const allItems = ItemRegistry.getAllItems();
+
+        // Card layout (reuse weapon card dimensions)
+        const cardWidth = SHOP_LAYOUT.CARD.WIDTH;
+        const cardHeight = SHOP_LAYOUT.CARD.HEIGHT;
+        const cardGap = SHOP_LAYOUT.CARD.GAP;
+        const columns = 3;  // 3 columns for items
+        const totalCardWidth = columns * cardWidth + (columns - 1) * cardGap;
+        const gridStartX = panelX - totalCardWidth / 2;
+
+        // Items section title
+        ctx.font = `bold ${UI.FONT_SIZE_LARGE}px ${UI.FONT_FAMILY}`;
+        ctx.fillStyle = COLORS.NEON_CYAN;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('ITEMS COMING SOON', panelX, panelY);
-        ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
-        ctx.fillText('Check back in future updates!', panelX, panelY + 35);
+        ctx.shadowColor = COLORS.NEON_CYAN;
+        ctx.shadowBlur = 10;
+        ctx.fillText('DEFENSE ITEMS', panelX, panelTop + 80);
+
+        // Current shield info
+        if (playerTankRef && playerTankRef.shield > 0) {
+            ctx.font = `${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+            ctx.fillStyle = COLORS.TEXT_HIGHLIGHT;
+            ctx.shadowBlur = 5;
+            ctx.fillText(`Current Shield: ${playerTankRef.shield}/${playerTankRef.maxShield}`, panelX, panelTop + 110);
+        }
+
+        // Render item cards
+        const itemStartY = panelTop + 140;
+        allItems.forEach((item, index) => {
+            const col = index % columns;
+            const row = Math.floor(index / columns);
+            const cardX = gridStartX + col * (cardWidth + cardGap);
+            const cardY = itemStartY + row * (cardHeight + cardGap);
+
+            renderItemCard(ctx, item, cardX, cardY, cardWidth, cardHeight, pulseIntensity);
+        });
+
         ctx.restore();
 
-        // Render Done button only (skip weapons rendering)
+        // Render Done button
         doneButton.render(ctx, pulseIntensity);
 
         // Corner accents

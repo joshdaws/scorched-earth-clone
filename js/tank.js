@@ -152,6 +152,21 @@ export class Tank {
          */
         this.falloutZones = [];
 
+        /**
+         * Current shield points.
+         * Shields absorb damage before health. Shield damage is absorbed first.
+         * Shield-busting weapons (shieldBuster flag) bypass shields entirely.
+         * @type {number}
+         */
+        this.shield = 0;
+
+        /**
+         * Maximum shield capacity.
+         * Used for shield bar rendering. Matches total shield purchased.
+         * @type {number}
+         */
+        this.maxShield = 0;
+
         console.log(`Tank created: team=${team}, position=(${x}, ${y}), health=${this.health}`);
     }
 
@@ -248,6 +263,47 @@ export class Tank {
         this.health = Math.min(this.maxHealth, this.health + healAmount);
 
         return this.health - previousHealth;
+    }
+
+    /**
+     * Add shield points to the tank.
+     * Shields stack up to maxShield capacity.
+     * @param {number} amount - Amount of shield to add
+     * @returns {number} The actual amount added
+     */
+    addShield(amount) {
+        const shieldAmount = Math.max(0, amount);
+
+        // If this is the first shield, set maxShield
+        if (this.maxShield === 0) {
+            this.maxShield = shieldAmount;
+        } else {
+            // Stack shields - increase max capacity
+            this.maxShield += shieldAmount;
+        }
+
+        const previousShield = this.shield;
+        this.shield = Math.min(this.maxShield, this.shield + shieldAmount);
+
+        console.log(`Tank (${this.team}) gained ${this.shield - previousShield} shield, total: ${this.shield}/${this.maxShield}`);
+        return this.shield - previousShield;
+    }
+
+    /**
+     * Check if tank has an active shield.
+     * @returns {boolean} True if shield > 0
+     */
+    hasShield() {
+        return this.shield > 0;
+    }
+
+    /**
+     * Get shield percentage for rendering.
+     * @returns {number} Shield percentage (0-1)
+     */
+    getShieldPercent() {
+        if (this.maxShield === 0) return 0;
+        return this.shield / this.maxShield;
     }
 
     /**

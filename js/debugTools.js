@@ -322,6 +322,44 @@ export function listWeapons() {
 }
 
 // =============================================================================
+// SHIELD COMMANDS
+// =============================================================================
+
+/**
+ * Give the player a shield.
+ * @param {number} [amount=50] - Amount of shield to add
+ */
+export function giveShield(amount = 50) {
+    if (!requireDebugMode()) return;
+
+    const player = getPlayerTank?.();
+    if (!player) {
+        console.warn('[DebugTools] No player tank - start a game first');
+        return;
+    }
+
+    player.addShield(amount);
+    console.log(`[DebugTools] Gave ${amount} shield to player (total: ${player.shield}/${player.maxShield})`);
+}
+
+/**
+ * Give the enemy a shield.
+ * @param {number} [amount=50] - Amount of shield to add
+ */
+export function giveEnemyShield(amount = 50) {
+    if (!requireDebugMode()) return;
+
+    const enemy = getEnemyTank?.();
+    if (!enemy) {
+        console.warn('[DebugTools] No enemy tank - start a game first');
+        return;
+    }
+
+    enemy.addShield(amount);
+    console.log(`[DebugTools] Gave ${amount} shield to enemy (total: ${enemy.shield}/${enemy.maxShield})`);
+}
+
+// =============================================================================
 // ROUND COMMANDS
 // =============================================================================
 
@@ -609,6 +647,10 @@ export function help() {
 ║   Debug.giveWeapon(id, n)  - Give n of weapon to player        ║
 ║   Debug.giveAllWeapons(n)  - Give n of all weapons             ║
 ║   Debug.listWeapons()      - List available weapon IDs         ║
+║                                                                ║
+║ SHIELD COMMANDS:                                               ║
+║   Debug.giveShield(amt)    - Give shield to player             ║
+║   Debug.giveEnemyShield()  - Give shield to enemy              ║
 ║                                                                ║
 ║ ROUND COMMANDS:                                                ║
 ║   Debug.setRound(n)        - Set round number                  ║
