@@ -8,6 +8,7 @@
 
 import { CANVAS, COLORS, PHYSICS } from './constants.js';
 import { WeaponRegistry, WEAPON_TYPES } from './weapons.js';
+import { get as getAsset } from './assets.js';
 
 // =============================================================================
 // PARTICLE CONFIGURATION
@@ -962,31 +963,60 @@ export function updateBackground(deltaTime) {
 
 /**
  * Render the complete synthwave background.
- * Renders layers in order: sky gradient → stars → sun → grid → mountains.
+ * Uses the synthwave background image if loaded, otherwise falls back to
+ * procedural rendering: sky gradient → stars → sun → grid → mountains.
  *
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D rendering context
  * @param {number} width - Canvas width (design coordinates)
  * @param {number} height - Canvas height (design coordinates)
  */
 export function renderBackground(ctx, width, height) {
-    const horizonY = height * BACKGROUND_CONFIG.HORIZON_PERCENT;
-
     ctx.save();
 
-    // Layer 1: Sky gradient (back-most layer)
-    renderSkyGradient(ctx, width, height, horizonY);
+    // Try to use the synthwave background image
+    const bgImage = getAsset('backgrounds.synthwave');
+    if (bgImage && bgImage.complete && bgImage.naturalWidth > 0) {
+        // Draw the background image, scaled to cover the entire canvas
+        // Use "cover" logic: scale to fill while maintaining aspect ratio
+        const imgAspect = bgImage.naturalWidth / bgImage.naturalHeight;
+        const canvasAspect = width / height;
 
-    // Layer 2: Stars (in the sky portion)
-    renderStars(ctx);
+        let drawWidth, drawHeight, drawX, drawY;
 
-    // Layer 3: Synthwave sun at horizon
-    renderSun(ctx, width, horizonY);
+        if (canvasAspect > imgAspect) {
+            // Canvas is wider than image - fit to width, crop top/bottom
+            drawWidth = width;
+            drawHeight = width / imgAspect;
+            drawX = 0;
+            drawY = (height - drawHeight) / 2;
+        } else {
+            // Canvas is taller than image - fit to height, crop sides
+            drawHeight = height;
+            drawWidth = height * imgAspect;
+            drawX = (width - drawWidth) / 2;
+            drawY = 0;
+        }
 
-    // Layer 4: Mountain silhouettes (in front of sun)
-    renderMountains(ctx, width, horizonY);
+        ctx.drawImage(bgImage, drawX, drawY, drawWidth, drawHeight);
+    } else {
+        // Fallback to procedural background
+        const horizonY = height * BACKGROUND_CONFIG.HORIZON_PERCENT;
 
-    // Layer 5: Perspective grid (ground, closest to viewer)
-    renderGrid(ctx, width, height, horizonY);
+        // Layer 1: Sky gradient (back-most layer)
+        renderSkyGradient(ctx, width, height, horizonY);
+
+        // Layer 2: Stars (in the sky portion)
+        renderStars(ctx);
+
+        // Layer 3: Synthwave sun at horizon
+        renderSun(ctx, width, horizonY);
+
+        // Layer 4: Mountain silhouettes (in front of sun)
+        renderMountains(ctx, width, horizonY);
+
+        // Layer 5: Perspective grid (ground, closest to viewer)
+        renderGrid(ctx, width, height, horizonY);
+    }
 
     ctx.restore();
 }

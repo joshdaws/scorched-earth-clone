@@ -6701,13 +6701,14 @@ function setupPausedState() {
         }
     });
 
-    // Register escape key handler for pausing/resuming
+    // Register escape/P key handler for pausing/resuming
     Input.onKeyDown((keyCode) => {
-        if (keyCode !== 'Escape') return;
+        // Both Escape and P key can pause/resume
+        if (keyCode !== 'Escape' && keyCode !== 'KeyP') return;
 
         const state = Game.getState();
 
-        // If paused, handle escape via pause menu
+        // If paused, handle escape/P via pause menu
         if (state === GAME_STATES.PAUSED) {
             const result = PauseMenu.handleEscape();
             handlePauseMenuAction(result);

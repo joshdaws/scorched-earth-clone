@@ -11,7 +11,7 @@
 #   ./ralph.sh --max <n>              Max iterations (default: 50)
 #
 
-set -e
+# Don't use set -e - it causes issues with arithmetic and optional commands
 
 # ============================================================================
 # Configuration
@@ -21,6 +21,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RALPH_DIR="$SCRIPT_DIR/.ralph"
 PROMPT_TEMPLATE="$RALPH_DIR/PROMPT.md"
 LOG_FILE="$RALPH_DIR/ralph.log"
+OUTPUT_FILE="$RALPH_DIR/output.tmp"
 
 MAX_ITERATIONS=50
 EPIC_ID=""
@@ -125,6 +126,15 @@ log() {
 }
 
 # ============================================================================
+# Cleanup
+# ============================================================================
+
+cleanup() {
+    rm -f "$OUTPUT_FILE"
+}
+trap cleanup EXIT
+
+# ============================================================================
 # Main Loop
 # ============================================================================
 
@@ -145,7 +155,8 @@ echo "Scope: $SCOPE_DESC" >> "$LOG_FILE"
 iteration=0
 
 while [[ $iteration -lt $MAX_ITERATIONS ]]; do
-    ((iteration++))
+    # Safe increment (won't fail with set -e)
+    iteration=$((iteration + 1))
 
     echo ""
     echo "========================================"
@@ -154,8 +165,9 @@ while [[ $iteration -lt $MAX_ITERATIONS ]]; do
 
     log "Starting iteration $iteration"
 
-    # Check remaining issues
-    remaining=$($READY_CMD 2>/dev/null | grep -c '^\s*[0-9]' || echo "0")
+    # Check remaining issues - count lines starting with a number
+    remaining=$($READY_CMD 2>/dev/null | grep -cE '^[0-9]+\.' || true)
+    remaining=${remaining:-0}
     log "Issues remaining: $remaining"
 
     if [[ "$remaining" -eq 0 ]]; then
@@ -171,7 +183,7 @@ while [[ $iteration -lt $MAX_ITERATIONS ]]; do
     $READY_CMD 2>/dev/null | head -5
     echo ""
 
-    # Generate prompt
+    # Generate prompt to temp file to avoid huge variable
     prompt=$(generate_prompt)
 
     # Run Claude with retries
@@ -182,39 +194,46 @@ while [[ $iteration -lt $MAX_ITERATIONS ]]; do
     while [[ $retry -lt $max_retries ]]; do
         log "Running Claude (attempt $((retry + 1))/$max_retries)..."
 
-        # Run Claude - pass prompt as argument, capture output
-        output=$(claude --dangerously-skip-permissions -- "$prompt" 2>&1) || true
+        # Run Claude with timeout, output to file then display
+        # Using timeout to prevent hanging forever
+        if timeout 600 claude --dangerously-skip-permissions -- "$prompt" > "$OUTPUT_FILE" 2>&1; then
+            # Check output file has content
+            if [[ -s "$OUTPUT_FILE" ]] && ! grep -q "No messages returned" "$OUTPUT_FILE"; then
+                cat "$OUTPUT_FILE"
+                success=true
 
-        # Check for success
-        if [[ -n "$output" ]] && ! echo "$output" | grep -q "No messages returned"; then
-            echo "$output"
-            success=true
+                # Check for completion signals
+                if grep -q "RALPH_DONE" "$OUTPUT_FILE"; then
+                    log "Iteration complete"
 
-            # Check for completion signals
-            if echo "$output" | grep -q "RALPH_DONE"; then
-                log "Iteration complete"
-
-                # Check if scope is done
-                if echo "$output" | grep -q "No issues remaining"; then
-                    echo ""
-                    echo "All issues in scope complete!"
-                    log "Scope complete - exiting"
-                    exit 0
+                    # Check if scope is done
+                    if grep -q "No issues remaining" "$OUTPUT_FILE"; then
+                        echo ""
+                        echo "All issues in scope complete!"
+                        log "Scope complete - exiting"
+                        exit 0
+                    fi
                 fi
+                break
             fi
-            break
         fi
 
-        ((retry++))
+        # Increment retry counter safely
+        retry=$((retry + 1))
         if [[ $retry -lt $max_retries ]]; then
             wait_time=$((retry * 5))
-            log "Failed - retrying in ${wait_time}s..."
-            sleep $wait_time
+            log "Failed or empty response - retrying in ${wait_time}s..."
+            sleep "$wait_time"
         fi
     done
 
     if [[ "$success" == false ]]; then
         log "Failed after $max_retries attempts - continuing to next iteration"
+        # Show what we got if anything
+        if [[ -s "$OUTPUT_FILE" ]]; then
+            echo "Last output:"
+            tail -20 "$OUTPUT_FILE"
+        fi
         sleep 3
     fi
 

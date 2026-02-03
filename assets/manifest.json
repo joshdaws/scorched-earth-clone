@@ -377,6 +377,11 @@
     }
   },
   "backgrounds": {
+    "synthwave": {
+      "path": "images/backgrounds/synthwave_pixel_medium.png",
+      "width": 2048,
+      "height": 1365
+    },
     "sky": {
       "path": "images/backgrounds/bg-sky.png",
       "width": 1920,
