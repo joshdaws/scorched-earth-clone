@@ -31,14 +31,16 @@ const TOOL_IDS = {
     RAISE: 'raise',
     LOWER: 'lower',
     SMOOTH: 'smooth',
-    FLATTEN: 'flatten'
+    FLATTEN: 'flatten',
+    SKETCH: 'sketch'
 };
 
 const TOOL_LABELS = {
     [TOOL_IDS.RAISE]: 'RAISE',
     [TOOL_IDS.LOWER]: 'LOWER',
     [TOOL_IDS.SMOOTH]: 'SMOOTH',
-    [TOOL_IDS.FLATTEN]: 'FLATTEN'
+    [TOOL_IDS.FLATTEN]: 'FLATTEN',
+    [TOOL_IDS.SKETCH]: 'SKETCH'
 };
 
 const UI_LAYOUT = {
@@ -65,10 +67,11 @@ const editorState = {
     currentLevel: 1,
     activeTool: TOOL_IDS.RAISE,
     brushRadius: 42,
-    brushStrength: 0.010,
+    brushStrength: 0.005,
     isPainting: false,
     isDraggingEnemy: false,
     flattenTargetNorm: null,
+    sketchLastPoint: null,
     pointerX: 0,
     pointerY: 0,
     statusMessage: '',
@@ -422,6 +425,20 @@ function shiftSlot(direction) {
 }
 
 /**
+ * Set active terrain tool and clear tool-specific transient state.
+ * @param {string} toolId - Tool identifier
+ */
+function setActiveTool(toolId) {
+    editorState.activeTool = toolId;
+    editorState.flattenTargetNorm = null;
+    editorState.sketchLastPoint = null;
+
+    if (toolId === TOOL_IDS.SKETCH) {
+        setStatus('Sketch mode: drag to draw a rough terrain line', 'info', 2200);
+    }
+}
+
+/**
  * Compute all UI rectangles used for rendering and hit testing.
  * @returns {object}
  */
@@ -481,7 +498,8 @@ function getUiRects() {
         TOOL_IDS.RAISE,
         TOOL_IDS.LOWER,
         TOOL_IDS.SMOOTH,
-        TOOL_IDS.FLATTEN
+        TOOL_IDS.FLATTEN,
+        TOOL_IDS.SKETCH
     ];
 
     const toolButtons = [];
@@ -498,8 +516,8 @@ function getUiRects() {
         });
     }
 
-    const brushMinus = { x: 20, y: 378, width: 36, height: 32 };
-    const brushPlus = { x: 116, y: 378, width: 36, height: 32 };
+    const brushMinus = { x: 20, y: 430, width: 36, height: 32 };
+    const brushPlus = { x: 116, y: 430, width: 36, height: 32 };
 
     const actions = [
         { id: 'save', label: 'SAVE DRAFT' },
@@ -511,7 +529,7 @@ function getUiRects() {
     ];
 
     const actionButtons = [];
-    const actionStartY = 438;
+    const actionStartY = 492;
     for (let i = 0; i < actions.length; i++) {
         actionButtons.push({
             ...actions[i],
@@ -579,6 +597,35 @@ function sampleHeightAtXNorm(samples, xNorm) {
 }
 
 /**
+ * Apply a linear sketch segment to terrain samples.
+ * @param {number[]} samples - Terrain samples
+ * @param {number} fromXNorm - Starting x in normalized space
+ * @param {number} fromHeightNorm - Starting height in normalized space
+ * @param {number} toXNorm - Ending x in normalized space
+ * @param {number} toHeightNorm - Ending height in normalized space
+ */
+function applySketchSegment(samples, fromXNorm, fromHeightNorm, toXNorm, toHeightNorm) {
+    const sampleCount = samples.length;
+    const startIndex = Math.round(clamp(fromXNorm, 0, 1) * (sampleCount - 1));
+    const endIndex = Math.round(clamp(toXNorm, 0, 1) * (sampleCount - 1));
+
+    if (startIndex === endIndex) {
+        samples[startIndex] = clamp(toHeightNorm, 0, 1);
+        return;
+    }
+
+    const step = startIndex < endIndex ? 1 : -1;
+    const distance = Math.abs(endIndex - startIndex);
+
+    for (let i = 0; i <= distance; i++) {
+        const index = startIndex + i * step;
+        const t = distance === 0 ? 1 : i / distance;
+        const targetHeight = fromHeightNorm + (toHeightNorm - fromHeightNorm) * t;
+        samples[index] = clamp(targetHeight, 0, 1);
+    }
+}
+
+/**
  * Apply active terrain tool at a pointer position.
  * @param {{x:number,y:number}} pos - Pointer position
  * @param {boolean} isInitial - Whether this is the first pointer-down application
@@ -593,6 +640,29 @@ function applyToolAtPointer(pos, isInitial) {
     const centerNorm = toXNorm(pos.x, rects.preview);
     const centerIndex = Math.round(centerNorm * (sampleCount - 1));
     const radiusSamples = Math.max(1, Math.round((editorState.brushRadius / rects.preview.width) * (sampleCount - 1)));
+
+    if (editorState.activeTool === TOOL_IDS.SKETCH) {
+        const currentPoint = {
+            xNorm: centerNorm,
+            heightNorm: toHeightNorm(pos.y, rects.preview)
+        };
+        const lastPoint = isInitial || !editorState.sketchLastPoint
+            ? currentPoint
+            : editorState.sketchLastPoint;
+        const next = [...samples];
+
+        applySketchSegment(
+            next,
+            lastPoint.xNorm,
+            lastPoint.heightNorm,
+            currentPoint.xNorm,
+            currentPoint.heightNorm
+        );
+
+        slot.terrainSamples = next;
+        editorState.sketchLastPoint = currentPoint;
+        return;
+    }
 
     if (editorState.activeTool === TOOL_IDS.FLATTEN && isInitial) {
         editorState.flattenTargetNorm = toHeightNorm(pos.y, rects.preview);
@@ -613,11 +683,11 @@ function applyToolAtPointer(pos, isInitial) {
         } else if (editorState.activeTool === TOOL_IDS.SMOOTH) {
             if (i <= 0 || i >= sampleCount - 1) continue;
             const average = (samples[i - 1] + samples[i] + samples[i + 1]) / 3;
-            const blend = 0.35 * falloff;
+            const blend = 0.24 * falloff;
             next[i] = clamp(samples[i] * (1 - blend) + average * blend, 0, 1);
         } else if (editorState.activeTool === TOOL_IDS.FLATTEN) {
             const target = editorState.flattenTargetNorm ?? toHeightNorm(pos.y, rects.preview);
-            const blend = 0.45 * falloff;
+            const blend = 0.28 * falloff;
             next[i] = clamp(samples[i] * (1 - blend) + target * blend, 0, 1);
         }
     }
@@ -712,7 +782,7 @@ function handlePanelInteraction(hit) {
     }
 
     if (hit.kind === 'tool' && hit.id) {
-        editorState.activeTool = hit.id;
+        setActiveTool(hit.id);
         Sound.playClickSound();
         return;
     }
@@ -824,6 +894,7 @@ function handlePointerUp() {
     editorState.isPainting = false;
     editorState.isDraggingEnemy = false;
     editorState.flattenTargetNorm = null;
+    editorState.sketchLastPoint = null;
 }
 
 /**
@@ -851,13 +922,15 @@ function handleKeyDown(keyCode, event) {
     }
 
     if (keyCode === 'Digit1') {
-        editorState.activeTool = TOOL_IDS.RAISE;
+        setActiveTool(TOOL_IDS.RAISE);
     } else if (keyCode === 'Digit2') {
-        editorState.activeTool = TOOL_IDS.LOWER;
+        setActiveTool(TOOL_IDS.LOWER);
     } else if (keyCode === 'Digit3') {
-        editorState.activeTool = TOOL_IDS.SMOOTH;
+        setActiveTool(TOOL_IDS.SMOOTH);
     } else if (keyCode === 'Digit4') {
-        editorState.activeTool = TOOL_IDS.FLATTEN;
+        setActiveTool(TOOL_IDS.FLATTEN);
+    } else if (keyCode === 'Digit5') {
+        setActiveTool(TOOL_IDS.SKETCH);
     } else if (keyCode === 'KeyP') {
         playtestCurrentSlot();
     }
@@ -957,20 +1030,20 @@ function renderPanel(ctx, rects) {
 
     // Brush controls.
     ctx.fillStyle = '#d8d8e8';
-    ctx.fillText('BRUSH SIZE', 20, 362);
+    ctx.fillText('BRUSH SIZE', 20, 414);
     renderButton(ctx, rects.brushMinus, '-', false);
     renderButton(ctx, rects.brushPlus, '+', false);
 
     ctx.fillStyle = COLORS.NEON_CYAN;
     ctx.font = `bold 14px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
-    ctx.fillText(`${Math.round(editorState.brushRadius)}px`, 86, 394);
+    ctx.fillText(`${Math.round(editorState.brushRadius)}px`, 86, 446);
 
     // Action buttons.
     ctx.textAlign = 'left';
     ctx.fillStyle = '#d8d8e8';
     ctx.font = `bold 12px ${UI.FONT_FAMILY}`;
-    ctx.fillText('ACTIONS', 20, 422);
+    ctx.fillText('ACTIONS', 20, 476);
 
     for (const action of rects.actionButtons) {
         const isPlaytest = action.id === 'playtest';
@@ -1115,13 +1188,26 @@ function renderPreview(ctx, rects) {
     // Brush preview.
     const pointer = { x: editorState.pointerX, y: editorState.pointerY };
     if (isInsideRect(pointer, rects.preview) && !editorState.isDraggingEnemy) {
-        ctx.strokeStyle = editorState.activeTool === TOOL_IDS.LOWER ? COLORS.NEON_PINK : COLORS.NEON_YELLOW;
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([6, 4]);
-        ctx.beginPath();
-        ctx.arc(pointer.x, pointer.y, editorState.brushRadius, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
+        if (editorState.activeTool === TOOL_IDS.SKETCH) {
+            ctx.strokeStyle = COLORS.NEON_YELLOW;
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([6, 4]);
+            ctx.beginPath();
+            ctx.moveTo(pointer.x - 12, pointer.y);
+            ctx.lineTo(pointer.x + 12, pointer.y);
+            ctx.moveTo(pointer.x, pointer.y - 12);
+            ctx.lineTo(pointer.x, pointer.y + 12);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        } else {
+            ctx.strokeStyle = editorState.activeTool === TOOL_IDS.LOWER ? COLORS.NEON_PINK : COLORS.NEON_YELLOW;
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([6, 4]);
+            ctx.beginPath();
+            ctx.arc(pointer.x, pointer.y, editorState.brushRadius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
     }
 
     ctx.restore();
@@ -1231,6 +1317,7 @@ export function setup() {
             editorState.isPainting = false;
             editorState.isDraggingEnemy = false;
             editorState.flattenTargetNorm = null;
+            editorState.sketchLastPoint = null;
 
             Music.playForState(GAME_STATES.MENU);
             if (TitleScene.isActive()) {
@@ -1243,6 +1330,7 @@ export function setup() {
             editorState.isPainting = false;
             editorState.isDraggingEnemy = false;
             editorState.flattenTargetNorm = null;
+            editorState.sketchLastPoint = null;
 
             if (toState === GAME_STATES.MENU && !TitleScene.isActive()) {
                 TitleScene.start();
