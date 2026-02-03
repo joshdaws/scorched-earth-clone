@@ -723,7 +723,10 @@ function renderTankCard(ctx, tank, x, y) {
             ctx.globalAlpha = isOwned ? 1 : 0.6;
             ctx.shadowColor = tank.glowColor || rarityColor;
             ctx.shadowBlur = isOwned ? 8 : 0;
+            const prevSmoothing = ctx.imageSmoothingEnabled;
+            ctx.imageSmoothingEnabled = false;
             ctx.drawImage(sprite, previewX, previewY, previewWidth, previewHeight);
+            ctx.imageSmoothingEnabled = prevSmoothing;
             ctx.shadowBlur = 0;
             ctx.globalAlpha = 1;
         } else {

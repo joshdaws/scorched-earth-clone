@@ -4034,8 +4034,11 @@ function renderTankSprite(ctx, tank, sprite, renderProfile) {
     ctx.shadowColor = outlineColor;
     ctx.shadowBlur = team === 'player' ? 7 : 12;
 
-    // Draw the sprite
+    // Draw sprite with nearest-neighbor sampling for crisp pixel art.
+    const prevSmoothing = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false;
     ctx.drawImage(sprite, spriteX, spriteY);
+    ctx.imageSmoothingEnabled = prevSmoothing;
 
     // Keep sprite colors as-authored by the skin artwork.
 
