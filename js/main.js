@@ -4032,27 +4032,12 @@ function renderTankSprite(ctx, tank, sprite, renderProfile) {
 
     // Apply glow effect around the sprite
     ctx.shadowColor = outlineColor;
-    ctx.shadowBlur = 12;
+    ctx.shadowBlur = team === 'player' ? 7 : 12;
 
     // Draw the sprite
     ctx.drawImage(sprite, spriteX, spriteY);
 
-    // If player has a non-default skin equipped, apply color tint overlay
-    // This uses globalCompositeOperation to colorize the sprite
-    if (team === 'player') {
-        // Save current state again for tint operation
-        ctx.save();
-
-        // Draw the sprite again as a mask
-        ctx.globalCompositeOperation = 'source-atop';
-
-        // Create a semi-transparent color overlay
-        ctx.fillStyle = outlineColor;
-        ctx.globalAlpha = 0.35;  // Subtle tint, not full recolor
-        ctx.fillRect(spriteX, spriteY, sprite.width, sprite.height);
-
-        ctx.restore();
-    }
+    // Keep sprite colors as-authored by the skin artwork.
 
     // Draw dynamic turret assembly on top of sprite.
     const pivot = getTurretPivot(tank);
