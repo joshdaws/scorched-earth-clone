@@ -100,6 +100,73 @@ let enemyTank = null;
 let currentRound = 1;
 
 // =============================================================================
+// ONBOARDING STATE
+// =============================================================================
+
+/**
+ * Storage key for tracking whether the first round has been completed.
+ * @type {string}
+ */
+const FIRST_ROUND_COMPLETED_STORAGE_KEY = 'scorched_earth_has_played_first_round';
+
+/**
+ * Whether the player has completed at least one round.
+ * @type {boolean}
+ */
+let hasCompletedFirstRound = false;
+
+/**
+ * Load onboarding progression from localStorage.
+ */
+function loadOnboardingState() {
+    try {
+        hasCompletedFirstRound = localStorage.getItem(FIRST_ROUND_COMPLETED_STORAGE_KEY) === 'true';
+    } catch (e) {
+        hasCompletedFirstRound = false;
+        console.warn('[Main] Failed to load onboarding state:', e);
+    }
+}
+
+/**
+ * Persist first-round completion milestone.
+ */
+function markFirstRoundCompleted() {
+    if (hasCompletedFirstRound) return;
+
+    hasCompletedFirstRound = true;
+
+    try {
+        localStorage.setItem(FIRST_ROUND_COMPLETED_STORAGE_KEY, 'true');
+    } catch (e) {
+        console.warn('[Main] Failed to persist first-round milestone:', e);
+    }
+}
+
+/**
+ * Show first-time name entry only after the first completed round.
+ * @param {number} [delayMs=500] - Delay before opening the modal
+ * @returns {boolean} True if modal display was scheduled
+ */
+function scheduleDeferredNameEntryIfNeeded(delayMs = 500) {
+    if (!hasCompletedFirstRound || !NameEntry.needsNameEntry()) {
+        return false;
+    }
+
+    setTimeout(() => {
+        if (Game.getState() === GAME_STATES.MENU && !NameEntry.isOpen() && NameEntry.needsNameEntry()) {
+            NameEntry.show({
+                isFirstTime: true,
+                onConfirm: (name) => {
+                    console.log('[Main] Player name set:', name);
+                }
+            });
+        }
+    }, delayMs);
+
+    return true;
+}
+
+// =============================================================================
 // LEVEL MODE STATE
 // =============================================================================
 
@@ -1746,11 +1813,12 @@ function setupMenuState() {
             Music.playForState(GAME_STATES.MENU);
             // Start animated 3D title scene
             TitleScene.start();
+            const didScheduleNameEntry = scheduleDeferredNameEntryIfNeeded();
 
             // Auto-show daily reward popup if claimable (slight delay for transition)
-            if (EngagementUI.shouldShowDailyReward()) {
+            if (!didScheduleNameEntry && EngagementUI.shouldShowDailyReward()) {
                 setTimeout(() => {
-                    if (Game.getState() === GAME_STATES.MENU) {
+                    if (Game.getState() === GAME_STATES.MENU && !NameEntry.isOpen()) {
                         EngagementUI.showDailyRewardsPopup();
                     }
                 }, 500);
@@ -3353,6 +3421,11 @@ function updateProjectile() {
 function checkRoundEnd() {
     const playerDestroyed = playerTank && playerTank.health <= 0;
     const enemyDestroyed = enemyTank && enemyTank.health <= 0;
+
+    // Record onboarding progress once a round reaches a terminal result.
+    if (playerDestroyed || enemyDestroyed) {
+        markFirstRoundCompleted();
+    }
 
     // Check for draw condition first (both tanks destroyed)
     // In roguelike mode, draw counts as player loss since player tank is destroyed
@@ -7047,6 +7120,7 @@ async function init() {
 
     // Initialize name entry module
     NameEntry.init();
+    loadOnboardingState();
 
     // Set up VolumeControls callback for Change Name button
     VolumeControls.setChangeNameCallback(() => {
@@ -7067,27 +7141,15 @@ async function init() {
         closeOptionsOverlay();
     });
 
-    // Check if first-time name entry is needed
-    if (NameEntry.needsNameEntry()) {
-        // Show name entry modal after a brief delay to let the menu render
+    // On initial startup, defer first-time name entry until after first completed round.
+    // (The MENU onEnter handler doesn't fire on initial state since Game.init() sets state directly.)
+    const didScheduleNameEntry = scheduleDeferredNameEntryIfNeeded();
+    if (!didScheduleNameEntry && EngagementUI.shouldShowDailyReward()) {
         setTimeout(() => {
-            NameEntry.show({
-                isFirstTime: true,
-                onConfirm: (name) => {
-                    console.log('[Main] Player name set:', name);
-                }
-            });
+            if (Game.getState() === GAME_STATES.MENU && !NameEntry.isOpen()) {
+                EngagementUI.showDailyRewardsPopup();
+            }
         }, 500);
-    } else {
-        // No name entry needed - check if daily reward should auto-show on startup
-        // (The onEnter handler doesn't fire on initial state since Game.init() sets state directly)
-        if (EngagementUI.shouldShowDailyReward()) {
-            setTimeout(() => {
-                if (Game.getState() === GAME_STATES.MENU && !NameEntry.isOpen()) {
-                    EngagementUI.showDailyRewardsPopup();
-                }
-            }, 500);
-        }
     }
 
     // Register performance tracking callback for achievement unlocks (grants +15% bonus)

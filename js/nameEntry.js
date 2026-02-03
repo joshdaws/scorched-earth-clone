@@ -424,7 +424,7 @@ export function render(ctx) {
     // Subtitle
     ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
     ctx.fillStyle = COLORS.TEXT_MUTED;
-    ctx.fillText(isFirstTime ? 'Your name will appear on the leaderboard' : 'Update your display name',
+    ctx.fillText(isFirstTime ? 'Set your leaderboard name (can change later)' : 'Update your display name',
                  panelX + NAME_PANEL.WIDTH / 2, panelY + 75);
 
     // Input field
