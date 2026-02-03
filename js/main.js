@@ -13,7 +13,7 @@ import * as Debug from './debug.js';
 import * as Turn from './turn.js';
 import { COLORS, DEBUG, CANVAS, UI, GAME_STATES, TURN_PHASES, PHYSICS, TANK, PROJECTILE, GAME } from './constants.js';
 import { generateTerrain } from './terrain.js';
-import { placeTanksOnTerrain, updateTankTerrainPosition, calculateFallDamage, areAnyTanksFalling } from './tank.js';
+import { createPlayerTank, createEnemyTank, placeTanksOnTerrain, updateTankTerrainPosition, calculateFallDamage, areAnyTanksFalling } from './tank.js';
 import { Projectile, createProjectileFromTank, checkTankCollision, createSplitProjectiles, createChainReactionProjectiles, shouldChainReact } from './projectile.js';
 import { applyExplosionDamage, applyExplosionToAllTanks, DAMAGE } from './damage.js';
 import * as Wind from './wind.js';
@@ -44,7 +44,9 @@ import * as CollectionScreen from './collection-screen.js';
 import * as SupplyDropScreen from './supply-drop-screen.js';
 import * as LevelSelectScreen from './level-select-screen.js';
 import * as LevelCompleteScreen from './level-complete-screen.js';
+import * as LevelEditorScreen from './level-editor-screen.js';
 import { LevelRegistry } from './levels.js';
+import { buildTerrainFromSlot, getSpawnForSlot } from './level-layouts.js';
 import { Stars } from './stars.js';
 import * as CombatAchievements from './combat-achievements.js';
 import * as PrecisionAchievements from './precision-achievements.js';
@@ -202,6 +204,30 @@ let levelModeStats = {
 };
 
 /**
+ * True when gameplay was started from the level editor's playtest action.
+ * Enables return-to-editor shortcuts and draft slot overrides.
+ * @type {boolean}
+ */
+let isLevelEditorPlaytestMode = false;
+
+/**
+ * Optional slot override used for level editor playtests.
+ * Applied only when entering PLAYING from editor.
+ * @type {{terrainSamples:number[], enemyXNorm:number}|null}
+ */
+let levelEditorSlotOverride = null;
+
+/**
+ * Return button config for editor playtests (shown in gameplay states).
+ */
+const LEVEL_EDITOR_RETURN_BUTTON = {
+    width: 160,
+    height: 36,
+    top: 16,
+    right: 16
+};
+
+/**
  * Reset level mode stats for a new level.
  */
 function resetLevelModeStats() {
@@ -220,6 +246,55 @@ function resetLevelModeStats() {
 function getLevelModeAccuracy() {
     if (levelModeStats.shotsFired === 0) return 0;
     return levelModeStats.shotsHit / levelModeStats.shotsFired;
+}
+
+/**
+ * Get the return-to-editor button rectangle for playtest mode.
+ * @returns {{x:number,y:number,width:number,height:number}}
+ */
+function getLevelEditorReturnButtonRect() {
+    return {
+        x: Renderer.getWidth() - LEVEL_EDITOR_RETURN_BUTTON.right - LEVEL_EDITOR_RETURN_BUTTON.width,
+        y: LEVEL_EDITOR_RETURN_BUTTON.top,
+        width: LEVEL_EDITOR_RETURN_BUTTON.width,
+        height: LEVEL_EDITOR_RETURN_BUTTON.height
+    };
+}
+
+/**
+ * Check if a point is inside the return-to-editor button.
+ * @param {number} x - Pointer x in design space
+ * @param {number} y - Pointer y in design space
+ * @returns {boolean}
+ */
+function isInsideLevelEditorReturnButton(x, y) {
+    if (!isLevelEditorPlaytestMode) return false;
+    const rect = getLevelEditorReturnButtonRect();
+    return (
+        x >= rect.x &&
+        x <= rect.x + rect.width &&
+        y >= rect.y &&
+        y <= rect.y + rect.height
+    );
+}
+
+/**
+ * Return from playtest gameplay to the level editor.
+ */
+function returnToLevelEditorFromPlaytest() {
+    if (!isLevelEditorPlaytestMode) return;
+
+    isLevelEditorPlaytestMode = false;
+    levelEditorSlotOverride = null;
+    Game.setState(GAME_STATES.LEVEL_EDITOR);
+}
+
+/**
+ * Clear level editor playtest state.
+ */
+function clearLevelEditorPlaytestState() {
+    isLevelEditorPlaytestMode = false;
+    levelEditorSlotOverride = null;
 }
 
 // =============================================================================
@@ -619,6 +694,33 @@ function renderPauseButton(ctx) {
     // Right bar
     ctx.fillRect(centerX + gap / 2, centerY - barHeight / 2, barWidth, barHeight);
 
+    ctx.restore();
+}
+
+/**
+ * Render return-to-editor button for level editor playtests.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ */
+function renderLevelEditorReturnButton(ctx) {
+    if (!isLevelEditorPlaytestMode) return;
+
+    const rect = getLevelEditorReturnButtonRect();
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(10, 10, 26, 0.78)';
+    ctx.beginPath();
+    ctx.roundRect(rect.x, rect.y, rect.width, rect.height, 8);
+    ctx.fill();
+
+    ctx.strokeStyle = COLORS.NEON_YELLOW;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = COLORS.NEON_YELLOW;
+    ctx.font = `bold 12px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('RETURN TO EDITOR', rect.x + rect.width / 2, rect.y + rect.height / 2);
     ctx.restore();
 }
 
@@ -1810,6 +1912,12 @@ function setupMenuState() {
     Game.registerStateHandlers(GAME_STATES.MENU, {
         onEnter: (fromState) => {
             console.log('Entered MENU state');
+            if (fromState === GAME_STATES.LEVEL_EDITOR) {
+                isLevelMode = false;
+                currentLevelId = null;
+                currentLevelData = null;
+                clearLevelEditorPlaytestState();
+            }
             // Play menu music
             Music.playForState(GAME_STATES.MENU);
             // Start animated 3D title scene
@@ -5123,6 +5231,7 @@ function renderPlaying(ctx) {
 
     // Render pause button
     renderPauseButton(ctx);
+    renderLevelEditorReturnButton(ctx);
 
     // Render touch aiming visuals (drag zone, rubber band, etc.)
     // This is rendered first so button-based controls appear on top
@@ -5171,6 +5280,12 @@ function handlePlayingPointerDown(pos) {
     const state = Game.getState();
     const pausableStates = [GAME_STATES.PLAYING, GAME_STATES.AIMING, GAME_STATES.FIRING];
     if (!pausableStates.includes(state)) return;
+
+    // Level editor playtest shortcut: return to editor from gameplay states.
+    if (isInsideLevelEditorReturnButton(pos.x, pos.y)) {
+        returnToLevelEditorFromPlaytest();
+        return;
+    }
 
     // Check pause button first (always available during gameplay)
     if (isInsidePauseButton(pos.x, pos.y)) {
@@ -5362,11 +5477,13 @@ function setupPlayingState() {
             }
 
             // Determine if this is a new game or continuation
-            // New game comes from MENU, DIFFICULTY_SELECT, LEVEL_SELECT, or LEVEL_COMPLETE
+            // New game comes from menu/select/editor/game-over entry points.
             const isNewGame = fromState === GAME_STATES.MENU ||
                              fromState === GAME_STATES.DIFFICULTY_SELECT ||
                              fromState === GAME_STATES.LEVEL_SELECT ||
-                             fromState === GAME_STATES.LEVEL_COMPLETE;
+                             fromState === GAME_STATES.LEVEL_COMPLETE ||
+                             fromState === GAME_STATES.LEVEL_EDITOR ||
+                             fromState === GAME_STATES.GAME_OVER;
 
             // Initialize game systems if this is a new game
             if (isNewGame) {
@@ -5427,36 +5544,75 @@ function setupPlayingState() {
                 console.log('[Main] Preserving player inventory for new round:', savedPlayerInventory);
             }
 
-            // Generate new terrain for this game
-            // Uses midpoint displacement algorithm for natural-looking hills and valleys
-            // Terrain adapts to dynamic screen dimensions (no fixed width/height)
-            let terrainOptions = {
-                roughness: 0.5,  // Balanced jaggedness (0.4-0.6 recommended)
-                minHeightPercent: 0.2,  // Terrain starts at 20% of screen height minimum
-                maxHeightPercent: 0.7   // Terrain peaks at 70% of screen height maximum
-            };
+            // Build terrain + tank placement.
+            // Level mode uses slot layouts (including editor playtest overrides).
+            // Endless mode keeps procedural generation + dynamic placement.
+            let usedLayoutTerrain = false;
 
-            // In level mode, use level-specific terrain config
-            if (isLevelMode && currentLevelData && currentLevelData.terrain) {
-                const levelTerrain = currentLevelData.terrain;
-                const terrainStyle = LevelRegistry.getTerrainStyle(levelTerrain.style);
-                terrainOptions = {
-                    roughness: terrainStyle.roughness,
-                    // Convert absolute pixel values to percentages of screen height
-                    minHeightPercent: levelTerrain.minHeight / Renderer.getHeight(),
-                    maxHeightPercent: levelTerrain.maxHeight / Renderer.getHeight()
-                };
-                console.log(`[Main] Level mode terrain: ${levelTerrain.style}`, terrainOptions);
+            if (isLevelMode && currentLevelId) {
+                try {
+                    const slotOverride = isLevelEditorPlaytestMode ? levelEditorSlotOverride : null;
+
+                    currentTerrain = buildTerrainFromSlot(
+                        currentLevelId,
+                        Renderer.getWidth(),
+                        Renderer.getHeight(),
+                        {
+                            slotOverride,
+                            applyGuardrail: true
+                        }
+                    );
+
+                    const spawn = getSpawnForSlot(
+                        currentLevelId,
+                        currentTerrain,
+                        Renderer.getWidth(),
+                        Renderer.getHeight(),
+                        {
+                            slotOverride
+                        }
+                    );
+
+                    playerTank = createPlayerTank(spawn.player.x, spawn.player.y);
+                    enemyTank = createEnemyTank(spawn.enemy.x, spawn.enemy.y);
+                    usedLayoutTerrain = true;
+
+                    console.log(`[Main] Level layout loaded for ${currentLevelId}`, spawn.meta);
+                } catch (error) {
+                    console.warn(`[Main] Failed to load level layout for ${currentLevelId}, falling back to procedural terrain:`, error);
+                }
             }
 
-            currentTerrain = generateTerrain(undefined, undefined, terrainOptions);
+            if (!usedLayoutTerrain) {
+                // Generate new terrain for this game
+                // Uses midpoint displacement algorithm for natural-looking hills and valleys
+                // Terrain adapts to dynamic screen dimensions (no fixed width/height)
+                let terrainOptions = {
+                    roughness: 0.5,  // Balanced jaggedness (0.4-0.6 recommended)
+                    minHeightPercent: 0.2,  // Terrain starts at 20% of screen height minimum
+                    maxHeightPercent: 0.7   // Terrain peaks at 70% of screen height maximum
+                };
 
-            // Place tanks on the generated terrain
-            // Player on left third (15-25%), Enemy on right third (75-85%)
-            // Tank positions are recalculated each new round with new terrain
-            const tanks = placeTanksOnTerrain(currentTerrain);
-            playerTank = tanks.player;
-            enemyTank = tanks.enemy;
+                // In level mode fallback, use level-specific terrain config
+                if (isLevelMode && currentLevelData && currentLevelData.terrain) {
+                    const levelTerrain = currentLevelData.terrain;
+                    const terrainStyle = LevelRegistry.getTerrainStyle(levelTerrain.style);
+                    terrainOptions = {
+                        roughness: terrainStyle.roughness,
+                        // Convert absolute pixel values to percentages of screen height
+                        minHeightPercent: levelTerrain.minHeight / Renderer.getHeight(),
+                        maxHeightPercent: levelTerrain.maxHeight / Renderer.getHeight()
+                    };
+                    console.log(`[Main] Level mode fallback terrain: ${levelTerrain.style}`, terrainOptions);
+                }
+
+                currentTerrain = generateTerrain(undefined, undefined, terrainOptions);
+
+                // Place tanks on generated terrain for non-layout modes
+                const tanks = placeTanksOnTerrain(currentTerrain);
+                playerTank = tanks.player;
+                enemyTank = tanks.enemy;
+            }
 
             // Apply enemy health based on mode
             // Level mode: use level-defined health; Roguelike: scale with round number
@@ -5624,6 +5780,7 @@ function returnToMenu() {
 
     // Reset selected difficulty so player must choose again
     resetSelectedDifficulty();
+    clearLevelEditorPlaytestState();
 
     VictoryDefeat.hide();
     Game.setState(GAME_STATES.MENU);
@@ -5731,6 +5888,7 @@ function handleLevelSelected(event) {
     currentLevelId = levelId;
     currentLevelData = level;
     isLevelMode = true;
+    clearLevelEditorPlaytestState();
 
     // Reset round to 1 for level mode
     currentRound = 1;
@@ -5765,6 +5923,9 @@ function setupLevelCompleteCallbacks() {
         currentLevelData = LevelRegistry.getLevel(levelId);
         currentRound = 1;
         isLevelMode = true;
+        if (!isLevelEditorPlaytestMode) {
+            levelEditorSlotOverride = null;
+        }
 
         // Reset level mode stats for fresh tracking
         resetLevelModeStats();
@@ -5783,6 +5944,7 @@ function setupLevelCompleteCallbacks() {
         currentLevelData = LevelRegistry.getLevel(levelId);
         currentRound = 1;
         isLevelMode = true;
+        clearLevelEditorPlaytestState();
 
         // Reset level mode stats for fresh tracking
         resetLevelModeStats();
@@ -5793,6 +5955,13 @@ function setupLevelCompleteCallbacks() {
 
     // Menu button - return to level select
     LevelCompleteScreen.onMenu(() => {
+        if (isLevelEditorPlaytestMode) {
+            console.log('[Main] Returning to level editor from playtest');
+            LevelCompleteScreen.hide();
+            returnToLevelEditorFromPlaytest();
+            return;
+        }
+
         console.log('[Main] Returning to level select');
         LevelCompleteScreen.hide();
 
@@ -5800,6 +5969,7 @@ function setupLevelCompleteCallbacks() {
         isLevelMode = false;
         currentLevelId = null;
         currentLevelData = null;
+        clearLevelEditorPlaytestState();
 
         Game.setState(GAME_STATES.LEVEL_SELECT);
     });
@@ -5942,6 +6112,15 @@ function updateGameOver(deltaTime) {
  * Called when "New Run" is clicked on game over screen.
  */
 function startNewRun() {
+    if (isLevelEditorPlaytestMode && currentLevelId) {
+        console.log('[Main] Restarting level editor playtest');
+        currentRound = 1;
+        resetLevelModeStats();
+        GameOver.hide();
+        Game.setState(GAME_STATES.PLAYING);
+        return;
+    }
+
     console.log('[Main] Starting new run');
     // Reset round counter
     currentRound = 1;
@@ -5949,6 +6128,7 @@ function startNewRun() {
     Money.init();
     // Hide game over screen
     GameOver.hide();
+    clearLevelEditorPlaytestState();
     // Return to menu for now (later this will start directly into a new run)
     Game.setState(GAME_STATES.MENU);
 }
@@ -5979,6 +6159,11 @@ function setupGameOverState() {
     // Register callback for "Main Menu" button
     GameOver.onMainMenu(() => {
         GameOver.hide();
+        if (isLevelEditorPlaytestMode) {
+            returnToLevelEditorFromPlaytest();
+            return;
+        }
+        clearLevelEditorPlaytestState();
         Game.setState(GAME_STATES.MENU);
     });
 
@@ -6699,6 +6884,14 @@ function resumeGame() {
  * Quit to the main menu from pause.
  */
 function quitToMenu() {
+    if (isLevelEditorPlaytestMode) {
+        PauseMenu.hide();
+        Game.resumeLoop();
+        prePauseState = null;
+        returnToLevelEditorFromPlaytest();
+        return;
+    }
+
     PauseMenu.hide();
     Game.resumeLoop();
 
@@ -6722,6 +6915,7 @@ function quitToMenu() {
 
     // Reset round counter for new game
     currentRound = 1;
+    clearLevelEditorPlaytestState();
 
     prePauseState = null;
     Game.setState(GAME_STATES.MENU);
@@ -7014,6 +7208,7 @@ async function init() {
     CollectionScreen.setup();
     SupplyDropScreen.setup();
     LevelSelectScreen.setup();
+    LevelEditorScreen.setup();
     LevelCompleteScreen.setup();
     setupPlayingState();
     setupPausedState();
@@ -7028,6 +7223,28 @@ async function init() {
 
     // Listen for level selection from Level Select screen
     window.addEventListener('levelSelected', handleLevelSelected);
+
+    // Listen for level editor playtest requests.
+    window.addEventListener('levelEditorPlaytestRequested', (event) => {
+        const { levelId, slotLayout } = event.detail || {};
+        if (!levelId) return;
+
+        const level = LevelRegistry.getLevel(levelId);
+        if (!level) {
+            console.warn(`[Main] Level editor playtest requested unknown level: ${levelId}`);
+            return;
+        }
+
+        currentLevelId = levelId;
+        currentLevelData = level;
+        currentRound = 1;
+        isLevelMode = true;
+        isLevelEditorPlaytestMode = true;
+        levelEditorSlotOverride = slotLayout || null;
+        resetLevelModeStats();
+
+        Game.setState(GAME_STATES.PLAYING);
+    });
 
     // Register 'D' key to toggle debug mode
     Input.onKeyDown((keyCode) => {
@@ -7279,6 +7496,10 @@ function handleSceneIsolation(scene, params) {
 
         case 'round-start':
             setupRoundStartScene(scene, params);
+            break;
+
+        case 'level-editor':
+            setupLevelEditorScene(scene, params);
             break;
 
         default:
@@ -7627,6 +7848,22 @@ function setupRoundStartScene(scene, params) {
 }
 
 /**
+ * Setup level editor scene.
+ * Opens URL-only editor route with optional slot preselection.
+ */
+function setupLevelEditorScene(scene, params) {
+    console.log('[SceneIsolation] Setting up level editor');
+
+    const requestedSlot = params.slot ?? null;
+    if (requestedSlot) {
+        console.log(`[SceneIsolation] Opening editor at slot ${requestedSlot}`);
+    }
+
+    LevelEditorScreen.configureSceneEntry(requestedSlot);
+    Game.setState(GAME_STATES.LEVEL_EDITOR);
+}
+
+/**
  * Update game logic each frame
  * @param {number} deltaTime - Time since last frame in ms
  */
@@ -7699,6 +7936,7 @@ function render(ctx) {
     // Skip on menu screens to avoid visual clutter
     const isMenuState = currentState === GAME_STATES.MENU ||
                         currentState === GAME_STATES.DIFFICULTY_SELECT ||
+                        currentState === GAME_STATES.LEVEL_EDITOR ||
                         currentState === GAME_STATES.HIGH_SCORES ||
                         currentState === GAME_STATES.ACHIEVEMENTS ||
                         currentState === GAME_STATES.COLLECTION ||

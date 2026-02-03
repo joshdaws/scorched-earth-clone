@@ -7,6 +7,7 @@
  * - ?scene=physics-sandbox - Fire projectiles and see trajectories
  * - ?scene=shop - Shop UI with mock inventory
  * - ?scene=terrain-viewer - Terrain generation testing
+ * - ?scene=level-editor&slot=world1-level1 - Internal level editor
  * - ?debug=true&round=5 - Start at specific round with debug
  *
  * This module parses URL parameters and provides routing for test scenes.
@@ -22,6 +23,7 @@
  */
 const params = {
     scene: null,        // Test scene to load (e.g., 'slingshot-test')
+    slot: null,         // Optional level slot ID (e.g., world1-level1)
     debug: false,       // Enable debug mode
     round: null,        // Start at specific round
     difficulty: null,   // Set difficulty (easy, medium, hard)
@@ -42,6 +44,7 @@ export function parseUrlParams() {
 
     // Scene selection
     params.scene = urlParams.get('scene');
+    params.slot = urlParams.get('slot');
 
     // Debug mode
     params.debug = urlParams.has('debug') &&
@@ -195,6 +198,14 @@ export function getTerrainSeed() {
     return params.seed;
 }
 
+/**
+ * Get the requested level slot (for scene routes that use it).
+ * @returns {string|null} Level slot ID or null
+ */
+export function getRequestedSlot() {
+    return params.slot;
+}
+
 // =============================================================================
 // SCENE DEFINITIONS
 // =============================================================================
@@ -318,8 +329,36 @@ export const SCENES = {
             skipMenu: true,
             useRoundParam: true
         }
+    },
+
+    /**
+     * Level Editor
+     * URL-only route for balancing level terrain and tank placements.
+     */
+    'level-editor': {
+        name: 'Level Editor',
+        description: 'Edit level terrain and spawn layouts',
+        initialState: 'level_editor',
+        setup: {
+            terrain: true,
+            playerTank: true,
+            enemyTank: true,
+            skipMenu: true,
+            editorMode: true,
+            usesSlotParam: true
+        }
     }
 };
+
+/**
+ * Check whether the level editor route is enabled in this build.
+ * Available in dev by default, or via VITE_ENABLE_LEVEL_EDITOR=true.
+ * @returns {boolean}
+ */
+function isLevelEditorRouteEnabled() {
+    const env = import.meta.env || {};
+    return Boolean(env.DEV || env.VITE_ENABLE_LEVEL_EDITOR === 'true');
+}
 
 /**
  * Get scene configuration by name.
@@ -327,6 +366,9 @@ export const SCENES = {
  * @returns {Object|null} Scene configuration or null if not found
  */
 export function getScene(sceneName) {
+    if (sceneName === 'level-editor' && !isLevelEditorRouteEnabled()) {
+        return null;
+    }
     return SCENES[sceneName] || null;
 }
 
@@ -389,6 +431,7 @@ const SceneIsolation = {
     getStartingMoney,
     getFixedWind,
     getTerrainSeed,
+    getRequestedSlot,
     getScene,
     getCurrentScene,
     listScenes,

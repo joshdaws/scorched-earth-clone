@@ -89,6 +89,7 @@ const validTransitions = {
         GAME_STATES.MODE_SELECT,        // Go to mode selection (Start Game)
         GAME_STATES.DIFFICULTY_SELECT,  // Go to difficulty selection first
         GAME_STATES.LEVEL_SELECT,       // Level-based progression mode
+        GAME_STATES.LEVEL_EDITOR,       // URL-only level editor route
         GAME_STATES.HIGH_SCORES,        // View high scores
         GAME_STATES.ACHIEVEMENTS,       // View achievements
         GAME_STATES.COLLECTION,         // View tank collection
@@ -113,8 +114,13 @@ const validTransitions = {
         GAME_STATES.MENU,     // Can go back to menu
         GAME_STATES.MODE_SELECT  // Can go back to mode selection
     ],
+    [GAME_STATES.LEVEL_EDITOR]: [
+        GAME_STATES.PLAYING,  // Playtest from editor
+        GAME_STATES.MENU      // Exit editor
+    ],
     [GAME_STATES.LEVEL_COMPLETE]: [
         GAME_STATES.LEVEL_SELECT, // Return to level select (Menu button)
+        GAME_STATES.LEVEL_EDITOR, // Return to level editor after playtest
         GAME_STATES.PLAYING,      // Retry same level or next level
         GAME_STATES.AIMING,       // Start directly into aiming
         GAME_STATES.MENU          // Can go back to main menu
@@ -144,6 +150,7 @@ const validTransitions = {
         GAME_STATES.PAUSED,
         GAME_STATES.ROUND_TRANSITION,  // After winning a round
         GAME_STATES.LEVEL_COMPLETE,    // After completing a level (level-based mode)
+        GAME_STATES.LEVEL_EDITOR,      // Return to editor from playtest
         GAME_STATES.VICTORY,
         GAME_STATES.DEFEAT,
         GAME_STATES.GAME_OVER,
@@ -170,6 +177,7 @@ const validTransitions = {
         GAME_STATES.PLAYING,
         GAME_STATES.AIMING,
         GAME_STATES.FIRING,
+        GAME_STATES.LEVEL_EDITOR, // Return to editor from paused playtest
         GAME_STATES.MENU  // Can exit to menu from pause
     ],
     [GAME_STATES.ROUND_END]: [
@@ -195,16 +203,20 @@ const validTransitions = {
     ],
     [GAME_STATES.VICTORY]: [
         GAME_STATES.MENU,
+        GAME_STATES.LEVEL_EDITOR,      // Return to editor from playtest
         GAME_STATES.ROUND_TRANSITION, // Go to round transition screen
         GAME_STATES.SHOP,       // Could allow shop after victory
         GAME_STATES.GAME_OVER
     ],
     [GAME_STATES.DEFEAT]: [
         GAME_STATES.MENU,
+        GAME_STATES.LEVEL_EDITOR, // Return to editor from playtest
         GAME_STATES.SHOP,       // Allow shop after defeat too
         GAME_STATES.GAME_OVER
     ],
     [GAME_STATES.GAME_OVER]: [
+        GAME_STATES.PLAYING,
+        GAME_STATES.LEVEL_EDITOR,
         GAME_STATES.MENU
     ]
 };

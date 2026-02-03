@@ -23,7 +23,8 @@
     "ios:sync": "npm run build && npx cap copy ios",
     "open:ios": "npx cap open ios",
     "preview": "vite preview",
-    "generate-config": "node scripts/generate-config.js"
+    "generate-config": "node scripts/generate-config.js",
+    "generate:level-layouts": "node scripts/generate-level-layout-baseline.js"
   },
   "repository": {
     "type": "git",
