@@ -12,7 +12,9 @@ import * as Game from './game.js';
 import * as Input from './input.js';
 import * as Sound from './sound.js';
 import * as Music from './music.js';
+import * as Assets from './assets.js';
 import { getAllTanks, getTanksByRarity, getTank, RARITY, RARITY_COLORS, RARITY_ORDER } from './tank-skins.js';
+import { getEquippedSkinAssetKey, isRealSprite } from './tank-visuals.js';
 import {
     ownsTank,
     getOwnedCount,
@@ -709,24 +711,35 @@ function renderTankCard(ctx, tank, x, y) {
     const visualHeight = 55;
 
     if (isOwned || isShopItem) {
-        // Draw tank placeholder (colored rectangle based on tank's glow color)
-        const tankColor = tank.glowColor || rarityColor;
-        ctx.fillStyle = tankColor;
-        ctx.globalAlpha = isOwned ? 0.6 : 0.4;
-        ctx.fillRect(x + 40, visualY + 10, 100, 35);
-        ctx.globalAlpha = 1;
+        const spriteKey = getEquippedSkinAssetKey(tank);
+        const sprite = spriteKey ? Assets.get(spriteKey) : null;
 
-        // Tank body outline
-        ctx.strokeStyle = tankColor;
-        ctx.lineWidth = 2;
-        ctx.globalAlpha = isOwned ? 1 : 0.6;
-        ctx.strokeRect(x + 40, visualY + 10, 100, 35);
+        if (isRealSprite(sprite)) {
+            const previewWidth = 108;
+            const previewHeight = 54;
+            const previewX = x + (CONFIG.CARD_WIDTH - previewWidth) / 2;
+            const previewY = visualY + 4;
 
-        // Simple tank turret
-        ctx.fillStyle = tankColor;
-        ctx.globalAlpha = isOwned ? 1 : 0.6;
-        ctx.fillRect(x + 70, visualY + 5, 40, 10);
-        ctx.globalAlpha = 1;
+            ctx.globalAlpha = isOwned ? 1 : 0.6;
+            ctx.shadowColor = tank.glowColor || rarityColor;
+            ctx.shadowBlur = isOwned ? 8 : 0;
+            ctx.drawImage(sprite, previewX, previewY, previewWidth, previewHeight);
+            ctx.shadowBlur = 0;
+            ctx.globalAlpha = 1;
+        } else {
+            // Fallback placeholder card if sprite is missing.
+            const tankColor = tank.glowColor || rarityColor;
+            ctx.fillStyle = tankColor;
+            ctx.globalAlpha = isOwned ? 0.6 : 0.4;
+            ctx.fillRect(x + 40, visualY + 10, 100, 35);
+            ctx.globalAlpha = 1;
+
+            ctx.strokeStyle = tankColor;
+            ctx.lineWidth = 2;
+            ctx.globalAlpha = isOwned ? 1 : 0.6;
+            ctx.strokeRect(x + 40, visualY + 10, 100, 35);
+            ctx.globalAlpha = 1;
+        }
     } else {
         // Silhouette (locked tank in collection view)
         ctx.fillStyle = 'rgba(50, 50, 70, 0.5)';

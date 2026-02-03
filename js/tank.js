@@ -11,6 +11,7 @@ import { spawnTankDestructionExplosion } from './effects.js';
 import { playExplosionSound } from './sound.js';
 import { getScreenWidth, getScreenHeight } from './screenSize.js';
 import { getUIScale, scaled, scaledTouch, isVeryShortScreen } from './uiPosition.js';
+import { getTurretPivot } from './tank-visuals.js';
 
 /**
  * Team identifiers for tanks.
@@ -418,16 +419,14 @@ export class Tank {
         // Convert angle to radians
         const radians = (this.angle * Math.PI) / 180;
 
-        // Calculate offset from tank center to turret tip
-        // The turret pivots from the tank's top-center (top of body, not sprite)
-        // Use BODY_HEIGHT for placeholder consistency; sprites use same pivot point
-        const bodyHeight = TANK.BODY_HEIGHT || TANK.HEIGHT;
+        // Shared pivot keeps projectile origin aligned with rendered turret.
+        const turretPivot = getTurretPivot(this);
         const turretOffsetX = Math.cos(radians) * TANK.TURRET_LENGTH;
         const turretOffsetY = -Math.sin(radians) * TANK.TURRET_LENGTH; // Negative because canvas Y is inverted
 
         return {
-            x: this.x + turretOffsetX,
-            y: this.y - bodyHeight + turretOffsetY // Turret base is at top of tank body
+            x: turretPivot.x + turretOffsetX,
+            y: turretPivot.y + turretOffsetY
         };
     }
 
