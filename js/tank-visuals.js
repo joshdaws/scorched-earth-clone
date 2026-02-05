@@ -6,6 +6,7 @@
 import * as Assets from './assets.js';
 import * as TankCollection from './tank-collection.js';
 import { TANK } from './constants.js';
+import { getTurretAnchorForSkin } from './tank-design-runtime.js';
 
 /**
  * Build the manifest asset key for a tank skin.
@@ -51,6 +52,16 @@ export function getPlayerSpriteKey() {
  * @returns {{x: number, y: number}}
  */
 export function getTurretPivot(tank) {
+    if (tank?.team === 'player') {
+        const equippedSkin = TankCollection.getEquippedTank();
+        const anchor = getTurretAnchorForSkin(equippedSkin?.id || 'standard');
+
+        return {
+            x: tank.x + (anchor.anchorX - 32),
+            y: (tank.y - 32) + anchor.anchorY
+        };
+    }
+
     return {
         x: tank.x,
         y: tank.y - TANK.BODY_HEIGHT

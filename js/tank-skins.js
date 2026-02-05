@@ -7,6 +7,7 @@
  */
 
 import { DEBUG } from './constants.js';
+import { GENERATED_TANK_SKINS } from './tank-skins-generated.js';
 
 // =============================================================================
 // RARITY CONFIGURATION
@@ -408,13 +409,52 @@ const LEGENDARY_TANKS = [
 /**
  * All tanks combined into a single array.
  */
-const ALL_TANKS = [
+const CURATED_TANKS = [
     ...COMMON_TANKS,
     ...UNCOMMON_TANKS,
     ...RARE_TANKS,
     ...EPIC_TANKS,
     ...LEGENDARY_TANKS
 ];
+
+function normalizeGeneratedTank(rawTank) {
+    if (!rawTank || typeof rawTank !== 'object') return null;
+    if (typeof rawTank.id !== 'string' || !rawTank.id) return null;
+    if (!RARITY_ORDER.includes(rawTank.rarity)) return null;
+
+    return {
+        id: rawTank.id,
+        name: rawTank.name || rawTank.id,
+        description: rawTank.description || 'Tank Forge generated skin.',
+        rarity: rawTank.rarity,
+        assetPath: rawTank.assetPath || `images/tanks/generated/tank-${rawTank.rarity}-${rawTank.id}.png`,
+        glowColor: rawTank.glowColor || RARITY_COLORS[rawTank.rarity],
+        animated: Boolean(rawTank.animated),
+        specialEffects: rawTank.specialEffects || null
+    };
+}
+
+function mergeCuratedAndGeneratedTanks(curatedTanks, generatedTanks) {
+    const merged = new Map();
+
+    curatedTanks.forEach((tank) => merged.set(tank.id, tank));
+
+    if (Array.isArray(generatedTanks)) {
+        generatedTanks.forEach((rawTank) => {
+            const normalized = normalizeGeneratedTank(rawTank);
+            if (!normalized) {
+                console.warn('[TankSkins] Ignoring invalid generated tank entry:', rawTank);
+                return;
+            }
+
+            merged.set(normalized.id, normalized);
+        });
+    }
+
+    return Array.from(merged.values());
+}
+
+const ALL_TANKS = mergeCuratedAndGeneratedTanks(CURATED_TANKS, GENERATED_TANK_SKINS);
 
 /**
  * Tank lookup map for O(1) access by ID.
@@ -428,11 +468,11 @@ ALL_TANKS.forEach(tank => tankMap.set(tank.id, tank));
  * @type {Object<string, Object[]>}
  */
 const tanksByRarity = {
-    [RARITY.COMMON]: COMMON_TANKS,
-    [RARITY.UNCOMMON]: UNCOMMON_TANKS,
-    [RARITY.RARE]: RARE_TANKS,
-    [RARITY.EPIC]: EPIC_TANKS,
-    [RARITY.LEGENDARY]: LEGENDARY_TANKS
+    [RARITY.COMMON]: ALL_TANKS.filter((tank) => tank.rarity === RARITY.COMMON),
+    [RARITY.UNCOMMON]: ALL_TANKS.filter((tank) => tank.rarity === RARITY.UNCOMMON),
+    [RARITY.RARE]: ALL_TANKS.filter((tank) => tank.rarity === RARITY.RARE),
+    [RARITY.EPIC]: ALL_TANKS.filter((tank) => tank.rarity === RARITY.EPIC),
+    [RARITY.LEGENDARY]: ALL_TANKS.filter((tank) => tank.rarity === RARITY.LEGENDARY)
 };
 
 // =============================================================================
@@ -487,11 +527,11 @@ export function getTankCount() {
  */
 export function getTankCountByRarity() {
     return {
-        [RARITY.COMMON]: COMMON_TANKS.length,
-        [RARITY.UNCOMMON]: UNCOMMON_TANKS.length,
-        [RARITY.RARE]: RARE_TANKS.length,
-        [RARITY.EPIC]: EPIC_TANKS.length,
-        [RARITY.LEGENDARY]: LEGENDARY_TANKS.length
+        [RARITY.COMMON]: tanksByRarity[RARITY.COMMON].length,
+        [RARITY.UNCOMMON]: tanksByRarity[RARITY.UNCOMMON].length,
+        [RARITY.RARE]: tanksByRarity[RARITY.RARE].length,
+        [RARITY.EPIC]: tanksByRarity[RARITY.EPIC].length,
+        [RARITY.LEGENDARY]: tanksByRarity[RARITY.LEGENDARY].length
     };
 }
 

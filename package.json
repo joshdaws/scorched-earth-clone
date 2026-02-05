@@ -24,7 +24,8 @@
     "open:ios": "npx cap open ios",
     "preview": "vite preview",
     "generate-config": "node scripts/generate-config.js",
-    "generate:level-layouts": "node scripts/generate-level-layout-baseline.js"
+    "generate:level-layouts": "node scripts/generate-level-layout-baseline.js",
+    "tank-designs:import": "node scripts/import-tank-design-pack.js"
   },
   "repository": {
     "type": "git",

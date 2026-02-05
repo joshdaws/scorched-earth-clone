@@ -45,6 +45,7 @@ import * as SupplyDropScreen from './supply-drop-screen.js';
 import * as LevelSelectScreen from './level-select-screen.js';
 import * as LevelCompleteScreen from './level-complete-screen.js';
 import * as LevelEditorScreen from './level-editor-screen.js';
+import * as TankEditorScreen from './tank-editor-screen.js';
 import { LevelRegistry } from './levels.js';
 import { buildTerrainFromSlot, getSpawnForSlot } from './level-layouts.js';
 import { Stars } from './stars.js';
@@ -56,7 +57,11 @@ import * as HiddenAchievements from './hidden-achievements.js';
 import { onAchievementUnlock, clearRoundAchievements, getRoundAchievements, getUnviewedCount, markAllAchievementsViewed } from './achievements.js';
 import * as Tokens from './tokens.js';
 import * as TankCollection from './tank-collection.js';
+import { getTank as getTankSkin } from './tank-skins.js';
 import { getPlayerSpriteKey, getTurretPivot, isRealSprite } from './tank-visuals.js';
+import { getActiveTankDesign, getCompiledTankCanvasForSkin, setRuntimeTankDesign } from './tank-design-runtime.js';
+import { PLAYER_RUNTIME_OVERRIDE_KEY } from './tank-design-store.js';
+import { renderTankEffects } from './tank-effect-renderer.js';
 import * as PerformanceTracking from './performance-tracking.js';
 import * as PitySystem from './pity-system.js';
 import * as LifetimeStats from './lifetime-stats.js';
@@ -211,11 +216,23 @@ let levelModeStats = {
 let isLevelEditorPlaytestMode = false;
 
 /**
+ * True when gameplay was started from Tank Forge playtest.
+ * @type {boolean}
+ */
+let isTankEditorPlaytestMode = false;
+
+/**
  * Optional slot override used for level editor playtests.
  * Applied only when entering PLAYING from editor.
  * @type {{terrainSamples:number[], enemyXNorm:number}|null}
  */
 let levelEditorSlotOverride = null;
+
+/**
+ * Optional skin ID selected for Tank Forge playtest.
+ * @type {string|null}
+ */
+let tankEditorPlaytestSkinId = null;
 
 /**
  * Return button config for editor playtests (shown in gameplay states).
@@ -268,7 +285,7 @@ function getLevelEditorReturnButtonRect() {
  * @returns {boolean}
  */
 function isInsideLevelEditorReturnButton(x, y) {
-    if (!isLevelEditorPlaytestMode) return false;
+    if (!isLevelEditorPlaytestMode && !isTankEditorPlaytestMode) return false;
     const rect = getLevelEditorReturnButtonRect();
     return (
         x >= rect.x &&
@@ -281,12 +298,12 @@ function isInsideLevelEditorReturnButton(x, y) {
 /**
  * Return from playtest gameplay to the level editor.
  */
-function returnToLevelEditorFromPlaytest() {
-    if (!isLevelEditorPlaytestMode) return;
+function returnToEditorFromPlaytest() {
+    if (!isLevelEditorPlaytestMode && !isTankEditorPlaytestMode) return;
 
-    isLevelEditorPlaytestMode = false;
-    levelEditorSlotOverride = null;
-    Game.setState(GAME_STATES.LEVEL_EDITOR);
+    const returnState = isTankEditorPlaytestMode ? GAME_STATES.TANK_EDITOR : GAME_STATES.LEVEL_EDITOR;
+    clearLevelEditorPlaytestState();
+    Game.setState(returnState);
 }
 
 /**
@@ -294,7 +311,10 @@ function returnToLevelEditorFromPlaytest() {
  */
 function clearLevelEditorPlaytestState() {
     isLevelEditorPlaytestMode = false;
+    isTankEditorPlaytestMode = false;
     levelEditorSlotOverride = null;
+    tankEditorPlaytestSkinId = null;
+    setRuntimeTankDesign(PLAYER_RUNTIME_OVERRIDE_KEY, null);
 }
 
 // =============================================================================
@@ -702,7 +722,7 @@ function renderPauseButton(ctx) {
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  */
 function renderLevelEditorReturnButton(ctx) {
-    if (!isLevelEditorPlaytestMode) return;
+    if (!isLevelEditorPlaytestMode && !isTankEditorPlaytestMode) return;
 
     const rect = getLevelEditorReturnButtonRect();
 
@@ -1912,7 +1932,7 @@ function setupMenuState() {
     Game.registerStateHandlers(GAME_STATES.MENU, {
         onEnter: (fromState) => {
             console.log('Entered MENU state');
-            if (fromState === GAME_STATES.LEVEL_EDITOR) {
+            if (fromState === GAME_STATES.LEVEL_EDITOR || fromState === GAME_STATES.TANK_EDITOR) {
                 isLevelMode = false;
                 currentLevelId = null;
                 currentLevelData = null;
@@ -4090,31 +4110,44 @@ function renderTank(ctx, tank) {
 
     const { team } = tank;
 
-    // Get equipped skin glow color for player tank
+    // Get equipped/playtest skin glow color for player tank
     let glowColor = null;
+    let activePlayerSkinId = null;
     if (team === 'player') {
-        const equippedSkin = TankCollection.getEquippedTank();
+        const equippedSkin = tankEditorPlaytestSkinId
+            ? getTankSkin(tankEditorPlaytestSkinId)
+            : TankCollection.getEquippedTank();
         if (equippedSkin && equippedSkin.glowColor) {
             glowColor = equippedSkin.glowColor;
         }
+        activePlayerSkinId = equippedSkin?.id || 'standard';
     }
 
     // Try to use sprite asset if available
     const spriteKey = team === 'player' ? getPlayerSpriteKey() : 'tanks.enemy';
-    const sprite = Assets.get(spriteKey);
+    const customSprite = team === 'player' && activePlayerSkinId
+        ? getCompiledTankCanvasForSkin(activePlayerSkinId, performance.now())
+        : null;
+    const sprite = customSprite || Assets.get(spriteKey);
     const renderProfile = getTankRenderProfile(tank, glowColor);
 
     // If sprite is loaded and is a real image (not a placeholder), render it
     // Note: Placeholder images have diagonal lines and are generated by assets.js
     // For now, we always use geometric rendering since sprites aren't ready yet
     // When sprites are available, this will automatically use them
-    if (isRealSprite(sprite)) {
+    if (customSprite || isRealSprite(sprite)) {
         renderTankSprite(ctx, tank, sprite, renderProfile);
-        return;
+    } else {
+        // Fall back to geometric placeholder rendering
+        renderTankPlaceholder(ctx, tank, renderProfile);
     }
 
-    // Fall back to geometric placeholder rendering
-    renderTankPlaceholder(ctx, tank, renderProfile);
+    if (team === 'player' && activePlayerSkinId) {
+        const activeDesign = getActiveTankDesign(activePlayerSkinId);
+        if (activeDesign?.effects?.length) {
+            renderTankEffects(ctx, tank, activeDesign.effects, performance.now());
+        }
+    }
 }
 
 /**
@@ -5283,7 +5316,7 @@ function handlePlayingPointerDown(pos) {
 
     // Level editor playtest shortcut: return to editor from gameplay states.
     if (isInsideLevelEditorReturnButton(pos.x, pos.y)) {
-        returnToLevelEditorFromPlaytest();
+        returnToEditorFromPlaytest();
         return;
     }
 
@@ -5483,6 +5516,7 @@ function setupPlayingState() {
                              fromState === GAME_STATES.LEVEL_SELECT ||
                              fromState === GAME_STATES.LEVEL_COMPLETE ||
                              fromState === GAME_STATES.LEVEL_EDITOR ||
+                             fromState === GAME_STATES.TANK_EDITOR ||
                              fromState === GAME_STATES.GAME_OVER;
 
             // Initialize game systems if this is a new game
@@ -5955,10 +5989,10 @@ function setupLevelCompleteCallbacks() {
 
     // Menu button - return to level select
     LevelCompleteScreen.onMenu(() => {
-        if (isLevelEditorPlaytestMode) {
-            console.log('[Main] Returning to level editor from playtest');
+        if (isLevelEditorPlaytestMode || isTankEditorPlaytestMode) {
+            console.log('[Main] Returning to editor from playtest');
             LevelCompleteScreen.hide();
-            returnToLevelEditorFromPlaytest();
+            returnToEditorFromPlaytest();
             return;
         }
 
@@ -6121,6 +6155,15 @@ function startNewRun() {
         return;
     }
 
+    if (isTankEditorPlaytestMode) {
+        console.log('[Main] Restarting tank editor playtest');
+        currentRound = 1;
+        isLevelMode = false;
+        GameOver.hide();
+        Game.setState(GAME_STATES.PLAYING);
+        return;
+    }
+
     console.log('[Main] Starting new run');
     // Reset round counter
     currentRound = 1;
@@ -6159,8 +6202,8 @@ function setupGameOverState() {
     // Register callback for "Main Menu" button
     GameOver.onMainMenu(() => {
         GameOver.hide();
-        if (isLevelEditorPlaytestMode) {
-            returnToLevelEditorFromPlaytest();
+        if (isLevelEditorPlaytestMode || isTankEditorPlaytestMode) {
+            returnToEditorFromPlaytest();
             return;
         }
         clearLevelEditorPlaytestState();
@@ -6884,11 +6927,11 @@ function resumeGame() {
  * Quit to the main menu from pause.
  */
 function quitToMenu() {
-    if (isLevelEditorPlaytestMode) {
+    if (isLevelEditorPlaytestMode || isTankEditorPlaytestMode) {
         PauseMenu.hide();
         Game.resumeLoop();
         prePauseState = null;
-        returnToLevelEditorFromPlaytest();
+        returnToEditorFromPlaytest();
         return;
     }
 
@@ -7209,6 +7252,7 @@ async function init() {
     SupplyDropScreen.setup();
     LevelSelectScreen.setup();
     LevelEditorScreen.setup();
+    TankEditorScreen.setup();
     LevelCompleteScreen.setup();
     setupPlayingState();
     setupPausedState();
@@ -7240,10 +7284,37 @@ async function init() {
         currentRound = 1;
         isLevelMode = true;
         isLevelEditorPlaytestMode = true;
+        isTankEditorPlaytestMode = false;
         levelEditorSlotOverride = slotLayout || null;
+        tankEditorPlaytestSkinId = null;
         resetLevelModeStats();
 
         Game.setState(GAME_STATES.PLAYING);
+    });
+
+    // Listen for Tank Forge playtest requests.
+    window.addEventListener('tankEditorPlaytestRequested', (event) => {
+        const { skinId, design } = event.detail || {};
+        if (!design) return;
+
+        currentLevelId = null;
+        currentLevelData = null;
+        currentRound = 1;
+        isLevelMode = false;
+        isLevelEditorPlaytestMode = false;
+        isTankEditorPlaytestMode = true;
+        levelEditorSlotOverride = null;
+        tankEditorPlaytestSkinId = skinId || null;
+
+        // Runtime override is set by Tank Forge before dispatch; this call guards stale state.
+        setRuntimeTankDesign(PLAYER_RUNTIME_OVERRIDE_KEY, design);
+
+        Game.setState(GAME_STATES.PLAYING);
+    });
+
+    window.addEventListener('tankEditorExportRequested', (event) => {
+        const count = event?.detail?.designs?.length || 0;
+        console.log(`[Main] Tank Forge export requested (${count} designs)`);
     });
 
     // Register 'D' key to toggle debug mode
@@ -7500,6 +7571,10 @@ function handleSceneIsolation(scene, params) {
 
         case 'level-editor':
             setupLevelEditorScene(scene, params);
+            break;
+
+        case 'tank-editor':
+            setupTankEditorScene(scene, params);
             break;
 
         default:
@@ -7853,6 +7928,7 @@ function setupRoundStartScene(scene, params) {
  */
 function setupLevelEditorScene(scene, params) {
     console.log('[SceneIsolation] Setting up level editor');
+    clearLevelEditorPlaytestState();
 
     const requestedSlot = params.slot ?? null;
     if (requestedSlot) {
@@ -7861,6 +7937,29 @@ function setupLevelEditorScene(scene, params) {
 
     LevelEditorScreen.configureSceneEntry(requestedSlot);
     Game.setState(GAME_STATES.LEVEL_EDITOR);
+}
+
+/**
+ * Setup tank editor scene.
+ * Opens URL-only Tank Forge route with optional tank/family preselection.
+ */
+function setupTankEditorScene(scene, params) {
+    console.log('[SceneIsolation] Setting up tank editor');
+    clearLevelEditorPlaytestState();
+
+    if (params.tank) {
+        console.log(`[SceneIsolation] Opening tank editor at tank ${params.tank}`);
+    }
+
+    if (params.family) {
+        console.log(`[SceneIsolation] Using tank editor family ${params.family}`);
+    }
+
+    TankEditorScreen.configureSceneEntry({
+        skinId: params.tank ?? null,
+        familyId: params.family ?? null
+    });
+    Game.setState(GAME_STATES.TANK_EDITOR);
 }
 
 /**
@@ -7937,6 +8036,7 @@ function render(ctx) {
     const isMenuState = currentState === GAME_STATES.MENU ||
                         currentState === GAME_STATES.DIFFICULTY_SELECT ||
                         currentState === GAME_STATES.LEVEL_EDITOR ||
+                        currentState === GAME_STATES.TANK_EDITOR ||
                         currentState === GAME_STATES.HIGH_SCORES ||
                         currentState === GAME_STATES.ACHIEVEMENTS ||
                         currentState === GAME_STATES.COLLECTION ||

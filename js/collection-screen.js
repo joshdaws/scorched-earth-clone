@@ -15,6 +15,7 @@ import * as Music from './music.js';
 import * as Assets from './assets.js';
 import { getAllTanks, getTanksByRarity, getTank, RARITY, RARITY_COLORS, RARITY_ORDER } from './tank-skins.js';
 import { getEquippedSkinAssetKey, isRealSprite } from './tank-visuals.js';
+import { getActiveTankDesign, getCompiledTankCanvasForSkin } from './tank-design-runtime.js';
 import {
     ownsTank,
     getOwnedCount,
@@ -711,10 +712,26 @@ function renderTankCard(ctx, tank, x, y) {
     const visualHeight = 55;
 
     if (isOwned || isShopItem) {
+        const runtimeSprite = getCompiledTankCanvasForSkin(tank.id, performance.now());
         const spriteKey = getEquippedSkinAssetKey(tank);
         const sprite = spriteKey ? Assets.get(spriteKey) : null;
 
-        if (isRealSprite(sprite)) {
+        if (runtimeSprite) {
+            const previewWidth = 108;
+            const previewHeight = 54;
+            const previewX = x + (CONFIG.CARD_WIDTH - previewWidth) / 2;
+            const previewY = visualY + 4;
+
+            ctx.globalAlpha = isOwned ? 1 : 0.75;
+            ctx.shadowColor = tank.glowColor || rarityColor;
+            ctx.shadowBlur = isOwned ? 8 : 0;
+            const prevSmoothing = ctx.imageSmoothingEnabled;
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(runtimeSprite, previewX, previewY, previewWidth, previewHeight);
+            ctx.imageSmoothingEnabled = prevSmoothing;
+            ctx.shadowBlur = 0;
+            ctx.globalAlpha = 1;
+        } else if (isRealSprite(sprite)) {
             const previewWidth = 108;
             const previewHeight = 54;
             const previewX = x + (CONFIG.CARD_WIDTH - previewWidth) / 2;
@@ -929,6 +946,12 @@ function renderDetailsPanel(ctx) {
             ctx.fillStyle = COLORS.NEON_CYAN;
             ctx.font = `12px ${UI.FONT_FAMILY}`;
             ctx.fillText(`Special: ${tank.specialEffects.join(', ')}`, detailsLeft, detailsTop + 105);
+        }
+
+        if (isOwned && getActiveTankDesign(tank.id)) {
+            ctx.fillStyle = COLORS.NEON_ORANGE;
+            ctx.font = `11px ${UI.FONT_FAMILY}`;
+            ctx.fillText('Tank Forge draft active', detailsLeft, detailsTop + 122);
         }
 
         if (isScrapShopMode) {

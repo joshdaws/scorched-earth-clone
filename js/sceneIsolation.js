@@ -8,6 +8,7 @@
  * - ?scene=shop - Shop UI with mock inventory
  * - ?scene=terrain-viewer - Terrain generation testing
  * - ?scene=level-editor&slot=world1-level1 - Internal level editor
+ * - ?scene=tank-editor&tank=standard&family=retro-commander - Internal tank forge
  * - ?debug=true&round=5 - Start at specific round with debug
  *
  * This module parses URL parameters and provides routing for test scenes.
@@ -24,6 +25,8 @@
 const params = {
     scene: null,        // Test scene to load (e.g., 'slingshot-test')
     slot: null,         // Optional level slot ID (e.g., world1-level1)
+    tank: null,         // Optional tank ID for tank editor route
+    family: null,       // Optional family ID for tank editor route
     debug: false,       // Enable debug mode
     round: null,        // Start at specific round
     difficulty: null,   // Set difficulty (easy, medium, hard)
@@ -45,6 +48,8 @@ export function parseUrlParams() {
     // Scene selection
     params.scene = urlParams.get('scene');
     params.slot = urlParams.get('slot');
+    params.tank = urlParams.get('tank');
+    params.family = urlParams.get('family');
 
     // Debug mode
     params.debug = urlParams.has('debug') &&
@@ -206,6 +211,22 @@ export function getRequestedSlot() {
     return params.slot;
 }
 
+/**
+ * Get the requested tank ID for the tank editor route.
+ * @returns {string|null} Tank ID or null
+ */
+export function getRequestedTank() {
+    return params.tank;
+}
+
+/**
+ * Get the requested family ID for the tank editor route.
+ * @returns {string|null} Family ID or null
+ */
+export function getRequestedFamily() {
+    return params.family;
+}
+
 // =============================================================================
 // SCENE DEFINITIONS
 // =============================================================================
@@ -347,6 +368,24 @@ export const SCENES = {
             editorMode: true,
             usesSlotParam: true
         }
+    },
+
+    /**
+     * Tank Editor
+     * URL-only route for creating unlockable tank skins and effects.
+     */
+    'tank-editor': {
+        name: 'Tank Editor',
+        description: 'Design unlockable tank skins and playtest visuals',
+        initialState: 'tank_editor',
+        setup: {
+            terrain: true,
+            playerTank: true,
+            enemyTank: true,
+            skipMenu: true,
+            editorMode: true,
+            usesTankParam: true
+        }
     }
 };
 
@@ -361,12 +400,25 @@ function isLevelEditorRouteEnabled() {
 }
 
 /**
+ * Check whether the tank editor route is enabled in this build.
+ * Available in dev by default, or via VITE_ENABLE_TANK_EDITOR=true.
+ * @returns {boolean}
+ */
+function isTankEditorRouteEnabled() {
+    const env = import.meta.env || {};
+    return Boolean(env.DEV || env.VITE_ENABLE_TANK_EDITOR === 'true');
+}
+
+/**
  * Get scene configuration by name.
  * @param {string} sceneName - Scene name
  * @returns {Object|null} Scene configuration or null if not found
  */
 export function getScene(sceneName) {
     if (sceneName === 'level-editor' && !isLevelEditorRouteEnabled()) {
+        return null;
+    }
+    if (sceneName === 'tank-editor' && !isTankEditorRouteEnabled()) {
         return null;
     }
     return SCENES[sceneName] || null;
@@ -432,6 +484,8 @@ const SceneIsolation = {
     getFixedWind,
     getTerrainSeed,
     getRequestedSlot,
+    getRequestedTank,
+    getRequestedFamily,
     getScene,
     getCurrentScene,
     listScenes,
