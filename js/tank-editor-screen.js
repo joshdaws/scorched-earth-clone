@@ -43,6 +43,11 @@ const TOOL_TABS = {
     AGENTS: 'agents'
 };
 
+const PAINT_TOOLS = {
+    BRUSH: 'brush',
+    ERASER: 'eraser'
+};
+
 const PANEL_LAYOUT = {
     LEFT_WIDTH: 320,
     RIGHT_WIDTH: 320,
@@ -89,6 +94,7 @@ const state = {
     activeTab: TOOL_TABS.PARTS,
     design: null,
     paintColor: '#10b981',
+    paintTool: PAINT_TOOLS.BRUSH,
     brushRadius: 1,
     isPainting: false,
     pointerX: 0,
@@ -98,6 +104,9 @@ const state = {
     statusUntil: 0,
     agentVariantIndex: 0,
     importInput: null,
+    imageInput: null,
+    imageVariants: [],
+    imageVariantIndex: 0,
     currentSpriteRect: null,
     resumeSnapshot: null
 };
@@ -121,19 +130,23 @@ function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
 }
 
-function ensurePaintLayer() {
-    const existing = state.design.layers.find((layer) => layer.id === 'paint-layer');
+function ensureLayer(id, type, blend = 'normal') {
+    const existing = state.design.layers.find((layer) => layer.id === id);
     if (existing) return existing;
 
     const layer = {
-        id: 'paint-layer',
-        type: 'paint',
-        blend: 'normal',
+        id,
+        type,
+        blend,
         visible: true,
         pixels: '[]'
     };
     state.design.layers.push(layer);
     return layer;
+}
+
+function ensurePaintLayer() {
+    return ensureLayer('paint-layer', 'paint', 'normal');
 }
 
 function decodeLayerPixels(layer) {
@@ -151,6 +164,418 @@ function encodeLayerPixels(layer, pixels) {
     layer.pixels = JSON.stringify(pixels);
 }
 
+function clampByte(value) {
+    return Math.max(0, Math.min(255, Math.round(value)));
+}
+
+function quantizeByte(value, step = 24) {
+    const normalized = Math.round(value / step) * step;
+    return clampByte(normalized);
+}
+
+function rgbToHex(r, g, b) {
+    const toHex = (value) => clampByte(value).toString(16).padStart(2, '0');
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+function hexToRgb(hex) {
+    if (typeof hex !== 'string') {
+        return { r: 0, g: 255, b: 255 };
+    }
+
+    const cleaned = hex.replace('#', '').trim();
+    if (cleaned.length !== 6) {
+        return { r: 0, g: 255, b: 255 };
+    }
+
+    return {
+        r: parseInt(cleaned.slice(0, 2), 16),
+        g: parseInt(cleaned.slice(2, 4), 16),
+        b: parseInt(cleaned.slice(4, 6), 16)
+    };
+}
+
+function mixHex(hexA, hexB, amount = 0.5) {
+    const a = hexToRgb(hexA);
+    const b = hexToRgb(hexB);
+    const t = clamp(amount, 0, 1);
+    return rgbToHex(
+        a.r + (b.r - a.r) * t,
+        a.g + (b.g - a.g) * t,
+        a.b + (b.b - a.b) * t
+    );
+}
+
+function getHueFromHex(hex) {
+    const { r, g, b } = hexToRgb(hex);
+    const rN = r / 255;
+    const gN = g / 255;
+    const bN = b / 255;
+    const max = Math.max(rN, gN, bN);
+    const min = Math.min(rN, gN, bN);
+    const delta = max - min;
+    if (delta === 0) return 0;
+
+    let hue;
+    if (max === rN) {
+        hue = ((gN - bN) / delta) % 6;
+    } else if (max === gN) {
+        hue = (bN - rN) / delta + 2;
+    } else {
+        hue = (rN - gN) / delta + 4;
+    }
+    const degrees = Math.round(hue * 60);
+    return degrees < 0 ? degrees + 360 : degrees;
+}
+
+function isTankMaskPixel(x, y) {
+    const inTreads = x >= 6 && x <= 57 && y >= 22 && y <= 29;
+    const inHull = x >= 8 && x <= 55 && y >= 12 && y <= 22;
+    const inTopHull = x >= 16 && x <= 46 && y >= 8 && y <= 15;
+    const inBarrel = x >= 39 && x <= 60 && y >= 9 && y <= 13;
+    return inTreads || inHull || inTopHull || inBarrel;
+}
+
+function createEditorCanvas() {
+    if (typeof document === 'undefined') return null;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = EDITOR_CANVAS.WIDTH;
+    canvas.height = EDITOR_CANVAS.HEIGHT;
+    return canvas;
+}
+
+function drawImageCover(ctx, image, width, height) {
+    const scale = Math.max(width / image.width, height / image.height);
+    const drawW = image.width * scale;
+    const drawH = image.height * scale;
+    const drawX = (width - drawW) / 2;
+    const drawY = (height - drawH) / 2;
+    ctx.drawImage(image, drawX, drawY, drawW, drawH);
+}
+
+function loadImageFromFile(file) {
+    return new Promise((resolve, reject) => {
+        if (typeof Image === 'undefined') {
+            reject(new Error('Image upload is unavailable in this environment.'));
+            return;
+        }
+
+        const objectUrl = URL.createObjectURL(file);
+        const image = new Image();
+        image.onload = () => {
+            URL.revokeObjectURL(objectUrl);
+            resolve(image);
+        };
+        image.onerror = () => {
+            URL.revokeObjectURL(objectUrl);
+            reject(new Error('Could not load that image file.'));
+        };
+        image.src = objectUrl;
+    });
+}
+
+function extractPaletteFromCanvas(canvas, limit = 6) {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return ['#ef4444', '#f59e0b', '#22d3ee'];
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const buckets = new Map();
+
+    for (let y = 0; y < canvas.height; y++) {
+        for (let x = 0; x < canvas.width; x++) {
+            if (!isTankMaskPixel(x, y)) continue;
+
+            const index = (y * canvas.width + x) * 4;
+            const alpha = imageData.data[index + 3];
+            if (alpha < 24) continue;
+
+            const r = quantizeByte(imageData.data[index], 20);
+            const g = quantizeByte(imageData.data[index + 1], 20);
+            const b = quantizeByte(imageData.data[index + 2], 20);
+            const key = `${r},${g},${b}`;
+            buckets.set(key, (buckets.get(key) || 0) + 1);
+        }
+    }
+
+    const sorted = Array.from(buckets.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, limit)
+        .map(([key]) => {
+            const [r, g, b] = key.split(',').map((value) => parseInt(value, 10));
+            return rgbToHex(r, g, b);
+        });
+
+    if (sorted.length === 0) {
+        return ['#ef4444', '#f59e0b', '#22d3ee'];
+    }
+
+    return sorted;
+}
+
+function getFamilyFromPalette(palette) {
+    const primary = palette[0] || '#ef4444';
+    const hue = getHueFromHex(primary);
+
+    if (hue <= 35 || hue >= 330) return TANK_EDITOR_FAMILIES.ARCADE_CHAOS;
+    if (hue >= 175 && hue <= 300) return TANK_EDITOR_FAMILIES.LEGEND_LAB;
+    return TANK_EDITOR_FAMILIES.RETRO_COMMANDER;
+}
+
+function buildPaletteFromImagePalette(imagePalette) {
+    const primary = imagePalette[0] || '#ef4444';
+    const secondary = imagePalette[1] || '#f59e0b';
+    const accent = imagePalette[2] || '#22d3ee';
+    const bright = imagePalette[3] || mixHex(accent, '#ffffff', 0.35);
+    const base = mixHex(primary, '#111827', 0.72);
+
+    return [base, primary, secondary, accent, bright];
+}
+
+function applyFamilyParts(design, familyId, variantIndex) {
+    design.familyId = familyId;
+
+    if (familyId === TANK_EDITOR_FAMILIES.ARCADE_CHAOS) {
+        const parts = [
+            { hullPreset: 'wedge', treadPreset: 'segmented', wheelPreset: 'dual', barrelPreset: 'split' },
+            { hullPreset: 'scout', treadPreset: 'segmented', wheelPreset: 'micro', barrelPreset: 'needle' },
+            { hullPreset: 'wedge', treadPreset: 'hover', wheelPreset: null, barrelPreset: 'split' }
+        ];
+        Object.assign(design.parts, parts[variantIndex % parts.length]);
+        return;
+    }
+
+    if (familyId === TANK_EDITOR_FAMILIES.LEGEND_LAB) {
+        const parts = [
+            { hullPreset: 'heavy', treadPreset: 'spiked', wheelPreset: 'heavy', barrelPreset: 'heavy' },
+            { hullPreset: 'heavy', treadPreset: 'hover', wheelPreset: null, barrelPreset: 'needle' },
+            { hullPreset: 'standard', treadPreset: 'spiked', wheelPreset: 'heavy', barrelPreset: 'split' }
+        ];
+        Object.assign(design.parts, parts[variantIndex % parts.length]);
+        return;
+    }
+
+    const parts = [
+        { hullPreset: 'standard', treadPreset: 'classic', wheelPreset: 'dual', barrelPreset: 'standard' },
+        { hullPreset: 'scout', treadPreset: 'classic', wheelPreset: 'micro', barrelPreset: 'needle' },
+        { hullPreset: 'standard', treadPreset: 'hover', wheelPreset: null, barrelPreset: 'standard' }
+    ];
+    Object.assign(design.parts, parts[variantIndex % parts.length]);
+}
+
+function buildEffectsForVariant(familyId, palette, variantIndex) {
+    const primary = palette[1] || '#ef4444';
+    const accent = palette[3] || '#22d3ee';
+    const support = palette[2] || '#f59e0b';
+
+    if (familyId === TANK_EDITOR_FAMILIES.ARCADE_CHAOS) {
+        const variants = [
+            [{ type: 'neonPulse', color: primary, intensity: 0.55, speed: 1.7 }],
+            [
+                { type: 'neonPulse', color: primary, intensity: 0.7, speed: 2.1 },
+                { type: 'laserStripe', color: accent, intensity: 0.55, speed: 1.8 }
+            ],
+            [
+                { type: 'laserStripe', color: accent, intensity: 0.6, speed: 2.2 },
+                { type: 'sparkArc', color: support, intensity: 0.65, speed: 2.3 }
+            ]
+        ];
+        return variants[variantIndex % variants.length];
+    }
+
+    if (familyId === TANK_EDITOR_FAMILIES.LEGEND_LAB) {
+        const variants = [
+            [{ type: 'scanline', color: accent, intensity: 0.45, speed: 1.2 }],
+            [
+                { type: 'plasmaVent', color: accent, intensity: 0.75, speed: 2.2 },
+                { type: 'scanline', color: support, intensity: 0.5, speed: 1.5 }
+            ],
+            [
+                { type: 'plasmaVent', color: accent, intensity: 0.8, speed: 2.6 },
+                { type: 'sparkArc', color: primary, intensity: 0.65, speed: 2.2 }
+            ]
+        ];
+        return variants[variantIndex % variants.length];
+    }
+
+    const variants = [
+        [{ type: 'scanline', color: accent, intensity: 0.35, speed: 1.1 }],
+        [{ type: 'scanline', color: accent, intensity: 0.45, speed: 1.2 }],
+        [
+            { type: 'scanline', color: accent, intensity: 0.4, speed: 1.25 },
+            { type: 'laserStripe', color: support, intensity: 0.45, speed: 1.4 }
+        ]
+    ];
+    return variants[variantIndex % variants.length];
+}
+
+function buildPaintPixelsFromCanvas(canvas, accentColor, variantIndex) {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return [];
+
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    const accent = hexToRgb(accentColor);
+    const pixels = [];
+
+    for (let y = 0; y < canvas.height; y++) {
+        for (let x = 0; x < canvas.width; x++) {
+            if (!isTankMaskPixel(x, y)) continue;
+
+            const index = (y * canvas.width + x) * 4;
+            const alpha = data[index + 3];
+            if (alpha < 24) continue;
+
+            let r = data[index];
+            let g = data[index + 1];
+            let b = data[index + 2];
+
+            if (variantIndex === 1) {
+                r = clampByte((r - 128) * 1.18 + 128);
+                g = clampByte((g - 128) * 1.18 + 128);
+                b = clampByte((b - 128) * 1.18 + 128);
+            } else if (variantIndex === 2) {
+                const stripe = ((x + y) % 6) === 0;
+                const blend = stripe ? 0.45 : 0.18;
+                r = clampByte(r + (accent.r - r) * blend);
+                g = clampByte(g + (accent.g - g) * blend);
+                b = clampByte(b + (accent.b - b) * blend);
+            }
+
+            pixels.push({
+                x,
+                y,
+                color: rgbToHex(
+                    quantizeByte(r, 18),
+                    quantizeByte(g, 18),
+                    quantizeByte(b, 18)
+                )
+            });
+        }
+    }
+
+    return pixels;
+}
+
+function buildDecalPixels(palette, variantIndex) {
+    const accent = palette[3] || '#22d3ee';
+    const support = palette[2] || '#f59e0b';
+    const decals = [];
+
+    if (variantIndex === 0) {
+        for (let x = 18; x <= 45; x++) {
+            decals.push({ x, y: 15, color: accent });
+        }
+    } else if (variantIndex === 1) {
+        for (let x = 16; x <= 47; x++) {
+            if (x % 2 === 0) decals.push({ x, y: 14, color: support });
+            if (x % 3 !== 0) decals.push({ x, y: 17, color: accent });
+        }
+    } else {
+        for (let i = 0; i < 16; i++) {
+            const x = 20 + i;
+            const y = 11 + Math.floor(i / 3);
+            decals.push({ x, y, color: accent });
+            if (i % 2 === 0) decals.push({ x, y: y + 1, color: support });
+        }
+    }
+
+    return decals;
+}
+
+function setDesignLayerPixels(design, layerId, type, blend, pixels) {
+    let layer = design.layers.find((entry) => entry.id === layerId);
+    if (!layer) {
+        layer = {
+            id: layerId,
+            type,
+            blend,
+            visible: true,
+            pixels: '[]'
+        };
+        design.layers.push(layer);
+    }
+
+    layer.type = type;
+    layer.blend = blend;
+    layer.visible = true;
+    layer.pixels = JSON.stringify(pixels);
+}
+
+function generateImageVariants(image, fileName) {
+    const workCanvas = createEditorCanvas();
+    if (!workCanvas) {
+        throw new Error('Image pipeline is only available in browser mode.');
+    }
+
+    const ctx = workCanvas.getContext('2d');
+    if (!ctx) {
+        throw new Error('Could not initialize image processing canvas.');
+    }
+
+    ctx.clearRect(0, 0, workCanvas.width, workCanvas.height);
+    drawImageCover(ctx, image, workCanvas.width, workCanvas.height);
+
+    const extractedPalette = extractPaletteFromCanvas(workCanvas);
+    const familyId = getFamilyFromPalette(extractedPalette);
+    const basePalette = buildPaletteFromImagePalette(extractedPalette);
+
+    const sourceDesign = cloneTankDesign(state.design);
+    const variants = [0, 1, 2].map((variantIndex) => {
+        const design = cloneTankDesign(sourceDesign);
+
+        const rotatedPalette = [
+            basePalette[0],
+            basePalette[(variantIndex % 3) + 1] || basePalette[1],
+            basePalette[((variantIndex + 1) % 3) + 1] || basePalette[2],
+            basePalette[((variantIndex + 2) % 3) + 1] || basePalette[3],
+            basePalette[4]
+        ];
+        design.palette = rotatedPalette;
+
+        applyFamilyParts(design, familyId, variantIndex);
+        design.effects = buildEffectsForVariant(familyId, rotatedPalette, variantIndex);
+
+        const paintPixels = buildPaintPixelsFromCanvas(workCanvas, rotatedPalette[3], variantIndex);
+        const decalPixels = buildDecalPixels(rotatedPalette, variantIndex);
+        setDesignLayerPixels(design, 'paint-layer', 'paint', 'normal', paintPixels);
+        setDesignLayerPixels(design, 'decal-layer', 'decal', variantIndex === 2 ? 'screen' : 'add', decalPixels);
+
+        design.meta.updatedAt = Date.now();
+        design.meta.tags = Array.from(new Set([
+            ...(Array.isArray(design.meta.tags) ? design.meta.tags : []),
+            'image-import',
+            `source:${fileName || 'uploaded-image'}`,
+            `variant:${variantIndex + 1}`
+        ]));
+
+        return design;
+    });
+
+    return variants;
+}
+
+function applyImageVariant(index) {
+    if (!Array.isArray(state.imageVariants) || state.imageVariants.length === 0) {
+        setStatus('No generated image variants yet.', 'warn', 2000);
+        return;
+    }
+
+    const normalizedIndex = ((index % state.imageVariants.length) + state.imageVariants.length) % state.imageVariants.length;
+    state.imageVariantIndex = normalizedIndex;
+    state.design = normalizeTankDesign(cloneTankDesign(state.imageVariants[normalizedIndex]), {
+        skinId: state.selectedSkinId,
+        familyId: state.selectedFamilyId
+    });
+    state.selectedFamilyId = state.design.familyId;
+    state.paintTool = PAINT_TOOLS.BRUSH;
+
+    setStatus(
+        `Applied image variant ${normalizedIndex + 1}/${state.imageVariants.length}`,
+        'success',
+        2500
+    );
+}
+
 function paintAtPixel(px, py) {
     if (!state.design) return;
     if (px < 0 || px >= EDITOR_CANVAS.WIDTH || py < 0 || py >= EDITOR_CANVAS.HEIGHT) return;
@@ -165,12 +590,17 @@ function paintAtPixel(px, py) {
             if (x < 0 || x >= EDITOR_CANVAS.WIDTH || y < 0 || y >= EDITOR_CANVAS.HEIGHT) continue;
 
             const index = pixels.findIndex((entry) => entry.x === x && entry.y === y);
-            const next = { x, y, color: state.paintColor };
-
-            if (index >= 0) {
-                pixels[index] = next;
+            if (state.paintTool === PAINT_TOOLS.ERASER) {
+                if (index >= 0) {
+                    pixels.splice(index, 1);
+                }
             } else {
-                pixels.push(next);
+                const next = { x, y, color: state.paintColor };
+                if (index >= 0) {
+                    pixels[index] = next;
+                } else {
+                    pixels.push(next);
+                }
             }
         }
     }
@@ -202,6 +632,8 @@ function loadDesignForSelectedSkin() {
     });
 
     state.selectedFamilyId = state.design.familyId;
+    state.imageVariants = [];
+    state.imageVariantIndex = 0;
 }
 
 function cycleSkin(direction) {
@@ -397,6 +829,53 @@ function triggerImport() {
     state.importInput?.click();
 }
 
+function ensureImageInput() {
+    if (state.imageInput) return;
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.style.display = 'none';
+
+    input.addEventListener('change', async (event) => {
+        const target = /** @type {HTMLInputElement} */ (event.target);
+        const file = target.files?.[0];
+        if (!file) return;
+
+        try {
+            const image = await loadImageFromFile(file);
+            state.imageVariants = generateImageVariants(image, file.name);
+            state.imageVariantIndex = 0;
+            applyImageVariant(0);
+            setStatus(
+                `Generated ${state.imageVariants.length} variants from ${file.name}.`,
+                'success',
+                3200
+            );
+        } catch (error) {
+            setStatus(`Image import failed: ${error.message}`, 'error', 4200);
+        } finally {
+            target.value = '';
+        }
+    });
+
+    document.body.appendChild(input);
+    state.imageInput = input;
+}
+
+function triggerImageImport() {
+    ensureImageInput();
+    state.imageInput?.click();
+}
+
+function applyNextImageVariant() {
+    if (!state.imageVariants.length) {
+        setStatus('Import an image first to generate variants.', 'warn', 2200);
+        return;
+    }
+    applyImageVariant(state.imageVariantIndex + 1);
+}
+
 function playtestCurrentDesign() {
     const guardrail = enforceTurretAnchorGuardrail(state.design);
     state.design = guardrail.design;
@@ -413,7 +892,10 @@ function playtestCurrentDesign() {
         design: cloneTankDesign(state.design),
         tab: state.activeTab,
         paintColor: state.paintColor,
-        brushRadius: state.brushRadius
+        paintTool: state.paintTool,
+        brushRadius: state.brushRadius,
+        imageVariantIndex: state.imageVariantIndex,
+        imageVariants: cloneTankDesign(state.imageVariants)
     };
 
     window.dispatchEvent(new CustomEvent('tankEditorPlaytestRequested', {
@@ -580,6 +1062,28 @@ function buildButtons(rects) {
         });
 
         y += 70;
+        const toolButtonWidth = (rects.leftPanel.width - 26) / 2;
+        addButton(buttons, 'paint-tool-brush', 'BRUSH', {
+            x: rects.leftPanel.x + 10,
+            y,
+            width: toolButtonWidth,
+            height: PANEL_LAYOUT.BUTTON_HEIGHT
+        }, () => {
+            state.paintTool = PAINT_TOOLS.BRUSH;
+            Sound.playClickSound();
+        }, state.paintTool === PAINT_TOOLS.BRUSH, '#22d3ee');
+
+        addButton(buttons, 'paint-tool-eraser', 'ERASER', {
+            x: rects.leftPanel.x + 14 + toolButtonWidth,
+            y,
+            width: toolButtonWidth,
+            height: PANEL_LAYOUT.BUTTON_HEIGHT
+        }, () => {
+            state.paintTool = PAINT_TOOLS.ERASER;
+            Sound.playClickSound();
+        }, state.paintTool === PAINT_TOOLS.ERASER, '#f43f5e');
+
+        y += 36;
         addButton(buttons, 'paint-brush', `BRUSH: ${state.brushRadius}px`, {
             x: rects.leftPanel.x + 10,
             y,
@@ -589,6 +1093,22 @@ function buildButtons(rects) {
             state.brushRadius = state.brushRadius === 1 ? 2 : 1;
             Sound.playClickSound();
         });
+
+        y += 36;
+        addButton(buttons, 'paint-import-image', 'IMPORT IMAGE', {
+            x: rects.leftPanel.x + 10,
+            y,
+            width: rects.leftPanel.width - 20,
+            height: PANEL_LAYOUT.BUTTON_HEIGHT
+        }, triggerImageImport, false, '#a78bfa');
+
+        y += 36;
+        addButton(buttons, 'paint-next-variant', `NEXT VARIANT (${state.imageVariants.length > 0 ? `${state.imageVariantIndex + 1}/${state.imageVariants.length}` : '0/0'})`, {
+            x: rects.leftPanel.x + 10,
+            y,
+            width: rects.leftPanel.width - 20,
+            height: PANEL_LAYOUT.BUTTON_HEIGHT
+        }, applyNextImageVariant, state.imageVariants.length > 0, '#f59e0b');
     }
 
     if (state.activeTab === TOOL_TABS.EFFECTS) {
@@ -772,6 +1292,26 @@ function handleKeyDown(keyCode) {
     // P
     if (keyCode === 80) {
         playtestCurrentDesign();
+        return;
+    }
+
+    // B
+    if (keyCode === 66) {
+        state.paintTool = PAINT_TOOLS.BRUSH;
+        setStatus('Paint tool: brush', 'info', 1200);
+        return;
+    }
+
+    // E
+    if (keyCode === 69) {
+        state.paintTool = PAINT_TOOLS.ERASER;
+        setStatus('Paint tool: eraser', 'info', 1200);
+        return;
+    }
+
+    // I
+    if (keyCode === 73) {
+        triggerImageImport();
     }
 }
 
@@ -837,8 +1377,9 @@ function renderLeftPanel(ctx, rects, buttons) {
         rects.leftPanel.y + rects.leftPanel.height - 130
     );
 
-    ctx.fillText('Paint tab: click-drag on sprite grid.', rects.leftPanel.x + 10, rects.leftPanel.y + rects.leftPanel.height - 110);
-    ctx.fillText('Other tabs: click sprite to move turret anchor.', rects.leftPanel.x + 10, rects.leftPanel.y + rects.leftPanel.height - 94);
+    ctx.fillText(`Paint tool: ${state.paintTool.toUpperCase()} | brush ${state.brushRadius}px`, rects.leftPanel.x + 10, rects.leftPanel.y + rects.leftPanel.height - 110);
+    ctx.fillText('Paint tab: click-drag to paint or erase pixels.', rects.leftPanel.x + 10, rects.leftPanel.y + rects.leftPanel.height - 94);
+    ctx.fillText('Import image: builds 3 themed variants to cycle.', rects.leftPanel.x + 10, rects.leftPanel.y + rects.leftPanel.height - 78);
 
     ctx.restore();
 }
@@ -981,6 +1522,11 @@ function renderRightPanel(ctx, rects) {
     ctx.fillText(`Family: ${state.design.familyId}`, rects.rightPanel.x + 10, rects.rightPanel.y + 274);
     ctx.fillText(`Effects: ${state.design.effects.length}`, rects.rightPanel.x + 10, rects.rightPanel.y + 294);
     ctx.fillText(`Palette: ${state.design.palette.join(', ')}`, rects.rightPanel.x + 10, rects.rightPanel.y + 314);
+    ctx.fillText(
+        `Image variants: ${state.imageVariants.length > 0 ? `${state.imageVariantIndex + 1}/${state.imageVariants.length}` : 'none'}`,
+        rects.rightPanel.x + 10,
+        rects.rightPanel.y + 334
+    );
 
     if (state.status && performance.now() <= state.statusUntil) {
         const kindColor = state.statusKind === 'error'
@@ -1041,9 +1587,15 @@ function onEnter() {
         });
         state.activeTab = state.resumeSnapshot.tab || TOOL_TABS.PARTS;
         state.paintColor = state.resumeSnapshot.paintColor || '#10b981';
+        state.paintTool = state.resumeSnapshot.paintTool || PAINT_TOOLS.BRUSH;
         state.brushRadius = state.resumeSnapshot.brushRadius || 1;
+        state.imageVariantIndex = state.resumeSnapshot.imageVariantIndex || 0;
+        state.imageVariants = Array.isArray(state.resumeSnapshot.imageVariants)
+            ? cloneTankDesign(state.resumeSnapshot.imageVariants)
+            : [];
         state.resumeSnapshot = null;
         ensureImportInput();
+        ensureImageInput();
         Music.playForState(GAME_STATES.MENU);
         setStatus('Returned from playtest with unsaved edits restored.', 'success', 1800);
         return;
@@ -1062,6 +1614,7 @@ function onEnter() {
 
     loadDesignForSelectedSkin();
     ensureImportInput();
+    ensureImageInput();
 
     state.sceneEntrySkinId = null;
     state.sceneEntryFamilyId = null;
