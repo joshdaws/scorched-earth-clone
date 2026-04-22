@@ -379,10 +379,10 @@
       "width": 2048,
       "height": 1365
     },
-    "sky": {
-      "path": "images/backgrounds/bg-sky.png",
-      "width": 1920,
-      "height": 1080
+    "gameplay": {
+      "path": "images/backgrounds/bg-gameplay.png",
+      "width": 1536,
+      "height": 1024
     }
   },
   "audio": {

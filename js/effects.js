@@ -973,7 +973,7 @@ export function updateBackground(deltaTime) {
 export function renderBackground(ctx, width, height) {
     ctx.save();
 
-    if (renderLayeredBackgroundAssets(ctx, width, height)) {
+    if (renderBakedGameplayBackground(ctx, width, height)) {
         ctx.restore();
         return;
     }
@@ -1027,26 +1027,20 @@ export function renderBackground(ctx, width, height) {
 }
 
 /**
- * Render generated sky art with procedural ground elements.
+ * Render the baked generated gameplay background when available.
  * @param {CanvasRenderingContext2D} ctx - Canvas context
  * @param {number} width - Canvas width
  * @param {number} height - Canvas height
- * @returns {boolean} Whether generated layers were rendered
+ * @returns {boolean} Whether the baked background was rendered
  */
-function renderLayeredBackgroundAssets(ctx, width, height) {
-    const sky = getAsset('backgrounds.sky');
+function renderBakedGameplayBackground(ctx, width, height) {
+    const background = getAsset('backgrounds.gameplay');
 
-    if (!isRenderableImage(sky)) {
+    if (!isRenderableImage(background)) {
         return false;
     }
 
-    const horizonY = height * BACKGROUND_CONFIG.HORIZON_PERCENT;
-
-    drawImageCover(ctx, sky, 0, 0, width, height);
-    renderSun(ctx, width, horizonY);
-    renderMountains(ctx, width, horizonY);
-    renderGrid(ctx, width, height, horizonY);
-
+    drawImageCover(ctx, background, 0, 0, width, height);
     return true;
 }
 
