@@ -5,10 +5,30 @@
       "width": 64,
       "height": 32
     },
+    "playerBody": {
+      "path": "images/tanks/tank-player-body.png",
+      "width": 64,
+      "height": 32
+    },
+    "playerTurret": {
+      "path": "images/tanks/tank-player-turret.png",
+      "width": 28,
+      "height": 12
+    },
     "enemy": {
       "path": "images/tanks/tank-enemy.png",
       "width": 64,
       "height": 32
+    },
+    "enemyBody": {
+      "path": "images/tanks/tank-enemy-body.png",
+      "width": 64,
+      "height": 32
+    },
+    "enemyTurret": {
+      "path": "images/tanks/tank-enemy-turret.png",
+      "width": 28,
+      "height": 12
     }
   },
   "tankSkins": {
