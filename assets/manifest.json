@@ -383,16 +383,6 @@
       "path": "images/backgrounds/bg-sky.png",
       "width": 1920,
       "height": 1080
-    },
-    "mountains": {
-      "path": "images/backgrounds/bg-mountains.png",
-      "width": 1920,
-      "height": 400
-    },
-    "grid": {
-      "path": "images/backgrounds/bg-grid.png",
-      "width": 1920,
-      "height": 1080
     }
   },
   "audio": {

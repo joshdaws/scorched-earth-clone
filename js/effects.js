@@ -1027,7 +1027,7 @@ export function renderBackground(ctx, width, height) {
 }
 
 /**
- * Render generated background layers when the full set is available.
+ * Render generated sky art with procedural ground elements.
  * @param {CanvasRenderingContext2D} ctx - Canvas context
  * @param {number} width - Canvas width
  * @param {number} height - Canvas height
@@ -1035,28 +1035,17 @@ export function renderBackground(ctx, width, height) {
  */
 function renderLayeredBackgroundAssets(ctx, width, height) {
     const sky = getAsset('backgrounds.sky');
-    const mountains = getAsset('backgrounds.mountains');
-    const grid = getAsset('backgrounds.grid');
 
-    if (!isRenderableImage(sky) || !isRenderableImage(mountains) || !isRenderableImage(grid)) {
+    if (!isRenderableImage(sky)) {
         return false;
     }
 
     const horizonY = height * BACKGROUND_CONFIG.HORIZON_PERCENT;
 
     drawImageCover(ctx, sky, 0, 0, width, height);
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(0, 0, width, horizonY + height * 0.06);
-    ctx.clip();
-    ctx.globalAlpha = 0.38;
-    ctx.globalCompositeOperation = 'screen';
-    const mountainHeight = Math.min(height * 0.24, width * (mountains.naturalHeight / mountains.naturalWidth));
-    drawImageCover(ctx, mountains, 0, horizonY - mountainHeight * 0.82, width, mountainHeight);
-    ctx.restore();
-
-    drawGeneratedGroundGrid(ctx, grid, width, height, horizonY);
+    renderSun(ctx, width, horizonY);
+    renderMountains(ctx, width, horizonY);
+    renderGrid(ctx, width, height, horizonY);
 
     return true;
 }
@@ -1097,38 +1086,6 @@ function drawImageCover(ctx, image, x, y, width, height) {
     }
 
     ctx.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, x, y, width, height);
-}
-
-/**
- * Draw only the ground-plane portion of the generated grid asset.
- * @param {CanvasRenderingContext2D} ctx - Canvas context
- * @param {HTMLImageElement} image - Grid image
- * @param {number} width - Canvas width
- * @param {number} height - Canvas height
- * @param {number} horizonY - Ground horizon y
- */
-function drawGeneratedGroundGrid(ctx, image, width, height, horizonY) {
-    const sourceY = image.naturalHeight * 0.48;
-    const sourceHeight = image.naturalHeight - sourceY;
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(0, horizonY, width, height - horizonY);
-    ctx.clip();
-    ctx.globalAlpha = 0.7;
-    ctx.globalCompositeOperation = 'screen';
-    ctx.drawImage(
-        image,
-        0,
-        sourceY,
-        image.naturalWidth,
-        sourceHeight,
-        0,
-        horizonY,
-        width,
-        height - horizonY
-    );
-    ctx.restore();
 }
 
 /**
