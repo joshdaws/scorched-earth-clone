@@ -1042,17 +1042,21 @@ function renderLayeredBackgroundAssets(ctx, width, height) {
         return false;
     }
 
+    const horizonY = height * BACKGROUND_CONFIG.HORIZON_PERCENT;
+
     drawImageCover(ctx, sky, 0, 0, width, height);
 
-    const horizonY = height * BACKGROUND_CONFIG.HORIZON_PERCENT;
-    const mountainHeight = Math.min(height * 0.35, width * (mountains.naturalHeight / mountains.naturalWidth));
-    ctx.globalAlpha = 0.24;
-    drawImageCover(ctx, mountains, 0, horizonY - mountainHeight * 0.36, width, mountainHeight);
-    ctx.globalAlpha = 1;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, width, horizonY + height * 0.06);
+    ctx.clip();
+    ctx.globalAlpha = 0.38;
+    ctx.globalCompositeOperation = 'screen';
+    const mountainHeight = Math.min(height * 0.24, width * (mountains.naturalHeight / mountains.naturalWidth));
+    drawImageCover(ctx, mountains, 0, horizonY - mountainHeight * 0.82, width, mountainHeight);
+    ctx.restore();
 
-    ctx.globalAlpha = 0.5;
-    drawImageCover(ctx, grid, 0, 0, width, height);
-    ctx.globalAlpha = 1;
+    drawGeneratedGroundGrid(ctx, grid, width, height, horizonY);
 
     return true;
 }
@@ -1093,6 +1097,38 @@ function drawImageCover(ctx, image, x, y, width, height) {
     }
 
     ctx.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, x, y, width, height);
+}
+
+/**
+ * Draw only the ground-plane portion of the generated grid asset.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {HTMLImageElement} image - Grid image
+ * @param {number} width - Canvas width
+ * @param {number} height - Canvas height
+ * @param {number} horizonY - Ground horizon y
+ */
+function drawGeneratedGroundGrid(ctx, image, width, height, horizonY) {
+    const sourceY = image.naturalHeight * 0.48;
+    const sourceHeight = image.naturalHeight - sourceY;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, horizonY, width, height - horizonY);
+    ctx.clip();
+    ctx.globalAlpha = 0.7;
+    ctx.globalCompositeOperation = 'screen';
+    ctx.drawImage(
+        image,
+        0,
+        sourceY,
+        image.naturalWidth,
+        sourceHeight,
+        0,
+        horizonY,
+        width,
+        height - horizonY
+    );
+    ctx.restore();
 }
 
 /**
