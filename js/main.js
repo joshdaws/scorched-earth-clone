@@ -4429,6 +4429,17 @@ const PROJECTILE_VISUAL = {
     GLOW_BLUR: 12
 };
 
+const PROJECTILE_ASSET_KEYS = {
+    'basic-shot': 'projectiles.basic',
+    mirv: 'projectiles.mirv',
+    roller: 'projectiles.roller',
+    'heavy-roller': 'projectiles.roller',
+    digger: 'projectiles.digger',
+    'heavy-digger': 'projectiles.digger',
+    nuke: 'projectiles.nuke',
+    'mini-nuke': 'projectiles.miniNuke'
+};
+
 /**
  * Convert a hex color string to RGB values.
  * @param {string} hex - Hex color (e.g., '#ff00ff')
@@ -4441,6 +4452,19 @@ function hexToRgb(hex) {
         g: parseInt(result[2], 16),
         b: parseInt(result[3], 16)
     } : { r: 249, g: 240, b: 2 }; // Default to yellow if parsing fails
+}
+
+/**
+ * Resolve generated projectile sprite for supported weapons.
+ * @param {string} weaponId - Weapon id
+ * @returns {HTMLImageElement|null}
+ */
+function getProjectileSprite(weaponId) {
+    const key = PROJECTILE_ASSET_KEYS[weaponId];
+    if (!key) return null;
+
+    const sprite = Assets.get(key);
+    return isRealSprite(sprite) ? sprite : null;
 }
 
 /**
@@ -4575,6 +4599,12 @@ function renderProjectile(ctx, projectile) {
     const weapon = WeaponRegistry.getWeapon(projectile.weaponId);
     const projectileColor = projectile.projectileColor || weapon?.projectileColor || PROJECTILE_VISUAL.COLOR;
     const rgb = hexToRgb(projectileColor);
+    const sprite = getProjectileSprite(projectile.weaponId);
+
+    if (sprite) {
+        renderProjectileAsset(ctx, projectile, sprite, x, y, projectileColor);
+        return;
+    }
 
     ctx.save();
 
@@ -4791,6 +4821,36 @@ function renderProjectile(ctx, projectile) {
 }
 
 /**
+ * Render a generated projectile sprite with the same glow language as procedural shots.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {import('./projectile.js').Projectile} projectile - Active projectile
+ * @param {HTMLImageElement} sprite - Loaded projectile sprite
+ * @param {number} x - Projectile x
+ * @param {number} y - Projectile y
+ * @param {string} projectileColor - Glow color
+ */
+function renderProjectileAsset(ctx, projectile, sprite, x, y, projectileColor) {
+    const { vx, vy } = projectile.getVelocity();
+    let rotation = Math.atan2(vy, vx);
+
+    if (projectile.isRolling) {
+        rotation = projectile.getRollRotation();
+    }
+
+    const displayWidth = Math.max(sprite.width, PROJECTILE_VISUAL.DIAMETER);
+    const displayHeight = Math.max(sprite.height, PROJECTILE_VISUAL.DIAMETER);
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rotation);
+    ctx.shadowColor = projectileColor;
+    ctx.shadowBlur = PROJECTILE_VISUAL.GLOW_BLUR;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(sprite, -displayWidth / 2, -displayHeight / 2, displayWidth, displayHeight);
+    ctx.restore();
+}
+
+/**
  * Render the MIRV split effect (expanding flash/ring).
  * Creates a visual feedback when MIRV splits into multiple warheads.
  *
@@ -4958,7 +5018,49 @@ function renderExplosionEffect(ctx) {
         ctx.stroke();
     }
 
+    renderGeneratedExplosionOverlay(ctx, x, y, radius, progress, isNuclear);
+
     ctx.restore();
+}
+
+/**
+ * Overlay generated GPT Image 2 explosion art on the procedural blast.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {number} x - Explosion center x
+ * @param {number} y - Explosion center y
+ * @param {number} radius - Blast radius
+ * @param {number} progress - Animation progress from 0 to 1
+ * @param {boolean} isNuclear - Whether this is a nuclear explosion
+ */
+function renderGeneratedExplosionOverlay(ctx, x, y, radius, progress, isNuclear) {
+    const assetKey = getExplosionAssetKey(radius, isNuclear);
+    const sprite = Assets.get(assetKey);
+
+    if (!isRealSprite(sprite)) return;
+
+    const scaleProgress = isNuclear
+        ? 0.72 + progress * 0.38
+        : 0.62 + progress * 0.48;
+    const drawSize = radius * (isNuclear ? 3.4 : 2.65) * scaleProgress;
+    const alpha = Math.max(0, isNuclear ? 0.82 - progress * 0.28 : 0.74 - progress * 0.42);
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.globalCompositeOperation = 'screen';
+    ctx.drawImage(sprite, x - drawSize / 2, y - drawSize / 2, drawSize, drawSize);
+    ctx.restore();
+}
+
+/**
+ * Choose the generated explosion asset by weapon scale.
+ * @param {number} radius - Blast radius
+ * @param {boolean} isNuclear - Whether this is a nuclear explosion
+ * @returns {string} Asset key
+ */
+function getExplosionAssetKey(radius, isNuclear) {
+    if (isNuclear || radius >= 80) return 'effects.explosion-large';
+    if (radius >= 45) return 'effects.explosion-medium';
+    return 'effects.explosion-small';
 }
 
 // renderScreenFlash() is now imported from effects.js

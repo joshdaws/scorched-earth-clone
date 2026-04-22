@@ -280,21 +280,18 @@
   "effects": {
     "explosion-small": {
       "path": "images/effects/explosion-small.png",
-      "width": 32,
-      "height": 32,
-      "frames": 8
+      "width": 128,
+      "height": 128
     },
     "explosion-medium": {
       "path": "images/effects/explosion-medium.png",
-      "width": 64,
-      "height": 64,
-      "frames": 10
+      "width": 256,
+      "height": 256
     },
     "explosion-large": {
       "path": "images/effects/explosion-large.png",
-      "width": 128,
-      "height": 128,
-      "frames": 12
+      "width": 512,
+      "height": 512
     },
     "dirt-particle": {
       "path": "images/effects/dirt-particle.png",

@@ -973,6 +973,11 @@ export function updateBackground(deltaTime) {
 export function renderBackground(ctx, width, height) {
     ctx.save();
 
+    if (renderLayeredBackgroundAssets(ctx, width, height)) {
+        ctx.restore();
+        return;
+    }
+
     // Try to use the synthwave background image
     const bgImage = getAsset('backgrounds.synthwave');
     if (bgImage && bgImage.complete && bgImage.naturalWidth > 0) {
@@ -1019,6 +1024,75 @@ export function renderBackground(ctx, width, height) {
     }
 
     ctx.restore();
+}
+
+/**
+ * Render generated background layers when the full set is available.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} width - Canvas width
+ * @param {number} height - Canvas height
+ * @returns {boolean} Whether generated layers were rendered
+ */
+function renderLayeredBackgroundAssets(ctx, width, height) {
+    const sky = getAsset('backgrounds.sky');
+    const mountains = getAsset('backgrounds.mountains');
+    const grid = getAsset('backgrounds.grid');
+
+    if (!isRenderableImage(sky) || !isRenderableImage(mountains) || !isRenderableImage(grid)) {
+        return false;
+    }
+
+    drawImageCover(ctx, sky, 0, 0, width, height);
+
+    const horizonY = height * BACKGROUND_CONFIG.HORIZON_PERCENT;
+    const mountainHeight = Math.min(height * 0.35, width * (mountains.naturalHeight / mountains.naturalWidth));
+    ctx.globalAlpha = 0.24;
+    drawImageCover(ctx, mountains, 0, horizonY - mountainHeight * 0.36, width, mountainHeight);
+    ctx.globalAlpha = 1;
+
+    ctx.globalAlpha = 0.5;
+    drawImageCover(ctx, grid, 0, 0, width, height);
+    ctx.globalAlpha = 1;
+
+    return true;
+}
+
+/**
+ * Check whether an image asset is loaded and safe to render.
+ * @param {HTMLImageElement|null} image - Image asset
+ * @returns {boolean}
+ */
+function isRenderableImage(image) {
+    return Boolean(image && image.complete && image.naturalWidth > 0);
+}
+
+/**
+ * Draw an image using CSS-like cover behavior.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {HTMLImageElement} image - Image to draw
+ * @param {number} x - Target x
+ * @param {number} y - Target y
+ * @param {number} width - Target width
+ * @param {number} height - Target height
+ */
+function drawImageCover(ctx, image, x, y, width, height) {
+    const imgAspect = image.naturalWidth / image.naturalHeight;
+    const targetAspect = width / height;
+
+    let sourceX = 0;
+    let sourceY = 0;
+    let sourceWidth = image.naturalWidth;
+    let sourceHeight = image.naturalHeight;
+
+    if (targetAspect > imgAspect) {
+        sourceHeight = image.naturalWidth / targetAspect;
+        sourceY = (image.naturalHeight - sourceHeight) / 2;
+    } else {
+        sourceWidth = image.naturalHeight * targetAspect;
+        sourceX = (image.naturalWidth - sourceWidth) / 2;
+    }
+
+    ctx.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, x, y, width, height);
 }
 
 /**
