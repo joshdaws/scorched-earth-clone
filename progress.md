@@ -8,4 +8,5 @@ Original prompt: Upgrade game graphical assets with ChatGPT Image Gen 2 and impr
 - Filed `scorched-earth-7wu` to replace the old test explosion sprite sheet with a fresh generated animation before wiring sprite-frame explosions.
 - Follow-up correction: made the FIRE button polish much more visible with a bright inset launch surface, heavier hardware frame, stronger glow/charge rail, and shifted it left to avoid crowding the pause button. Also strengthened shared Button interiors so menu buttons read as filled controls rather than plain stroked rectangles.
 - Broader UI polish pass: upgraded menu stat/resource tiles, gameplay HUD chrome, health bars, wind rail, weapon dock, weapon slots, and angle readout so the non-title UI matches the quality of the new title/background. Kept this pass canvas-native; no new bitmap UI assets were necessary.
+- Top HUD follow-up: upgraded the player info, enemy health, and turn/wind panels to sharper chamfered cockpit-style instrument frames, added a cash chip, and made enemy status read as a complete module.
 - No open TODOs from the button polish pass.

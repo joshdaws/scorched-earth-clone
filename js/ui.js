@@ -460,6 +460,105 @@ function drawChromePanel(ctx, x, y, width, height, accent, options = {}) {
 }
 
 /**
+ * Build an angled cockpit panel path.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} x - Left X
+ * @param {number} y - Top Y
+ * @param {number} width - Width
+ * @param {number} height - Height
+ * @param {number} cut - Corner cut size
+ */
+function buildChamferPath(ctx, x, y, width, height, cut) {
+    ctx.moveTo(x + cut, y);
+    ctx.lineTo(x + width - cut, y);
+    ctx.lineTo(x + width, y + cut);
+    ctx.lineTo(x + width, y + height - cut);
+    ctx.lineTo(x + width - cut, y + height);
+    ctx.lineTo(x + cut, y + height);
+    ctx.lineTo(x, y + height - cut);
+    ctx.lineTo(x, y + cut);
+    ctx.closePath();
+}
+
+/**
+ * Draw a sharper top-HUD instrument panel.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} x - Left X
+ * @param {number} y - Top Y
+ * @param {number} width - Width
+ * @param {number} height - Height
+ * @param {string} accent - Accent color
+ */
+function drawInstrumentPanel(ctx, x, y, width, height, accent) {
+    const cut = Math.min(18, height * 0.22);
+
+    ctx.save();
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.52)';
+    ctx.beginPath();
+    buildChamferPath(ctx, x + 5, y + 7, width - 10, height, cut);
+    ctx.fill();
+
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = withAlpha(accent, 0.16);
+    ctx.beginPath();
+    buildChamferPath(ctx, x - 2, y - 2, width + 4, height + 4, cut + 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    const bg = ctx.createLinearGradient(0, y, 0, y + height);
+    bg.addColorStop(0, withAlpha(accent, 0.34));
+    bg.addColorStop(0.18, 'rgba(42, 38, 68, 0.92)');
+    bg.addColorStop(0.48, 'rgba(9, 10, 27, 0.95)');
+    bg.addColorStop(1, 'rgba(3, 4, 13, 0.98)');
+    ctx.fillStyle = bg;
+    ctx.beginPath();
+    buildChamferPath(ctx, x, y, width, height, cut);
+    ctx.fill();
+
+    const topSheen = ctx.createLinearGradient(x, y, x + width, y + height * 0.45);
+    topSheen.addColorStop(0, 'rgba(255, 255, 255, 0.22)');
+    topSheen.addColorStop(0.28, 'rgba(255, 255, 255, 0.04)');
+    topSheen.addColorStop(0.78, 'rgba(255, 255, 255, 0.12)');
+    topSheen.addColorStop(1, 'rgba(255, 255, 255, 0.02)');
+    ctx.fillStyle = topSheen;
+    ctx.beginPath();
+    buildChamferPath(ctx, x + 4, y + 4, width - 8, Math.max(10, height * 0.34), Math.max(4, cut - 4));
+    ctx.fill();
+
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 2;
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = 9;
+    ctx.beginPath();
+    buildChamferPath(ctx, x, y, width, height, cut);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    buildChamferPath(ctx, x + 4, y + 4, width - 8, height - 8, Math.max(4, cut - 4));
+    ctx.stroke();
+
+    const railWidth = width * 0.62;
+    const railX = x + (width - railWidth) / 2;
+    const rail = ctx.createLinearGradient(railX, 0, railX + railWidth, 0);
+    rail.addColorStop(0, withAlpha(accent, 0));
+    rail.addColorStop(0.5, withAlpha(accent, 0.82));
+    rail.addColorStop(1, withAlpha(accent, 0));
+    ctx.fillStyle = rail;
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.roundRect(railX, y + height - 7, railWidth, 3, 2);
+    ctx.fill();
+
+    ctx.restore();
+}
+
+/**
  * Draw a rounded rectangle panel with synthwave styling.
  * Supports pressed state for touch feedback.
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
@@ -489,9 +588,7 @@ function drawGameStatePanel(ctx, contentHeight = 0) {
     const height = Math.max(panel.MIN_HEIGHT, panel.MIN_HEIGHT + contentHeight);
     const drawX = panel.X - panel.WIDTH / 2;  // Center horizontally
 
-    drawChromePanel(ctx, drawX, panel.Y, panel.WIDTH, height, COLORS.NEON_CYAN, {
-        radius: panel.BORDER_RADIUS
-    });
+    drawInstrumentPanel(ctx, drawX, panel.Y, panel.WIDTH, height, COLORS.NEON_CYAN);
 
     // Return bounds for content placement
     return {
@@ -840,9 +937,7 @@ export function renderPlayerInfoPanel(ctx, playerTank, money, isPlayerTurn = tru
     const totalHeight = panel.PADDING * 2 + healthSection + panel.SECTION_GAP +
                         currencySection + panel.SECTION_GAP + aimingSection;
 
-    drawChromePanel(ctx, panel.X, panel.Y, panel.WIDTH, totalHeight, COLORS.NEON_CYAN, {
-        radius: panel.BORDER_RADIUS
-    });
+    drawInstrumentPanel(ctx, panel.X, panel.Y, panel.WIDTH, totalHeight, COLORS.NEON_CYAN);
 
     // =========================================================================
     // SECTION 1: HEALTH BAR
@@ -851,13 +946,14 @@ export function renderPlayerInfoPanel(ctx, playerTank, money, isPlayerTurn = tru
     const contentX = panel.X + panel.PADDING;
     const contentWidth = panel.WIDTH - panel.PADDING * 2;
 
-    const playerPercent = playerTank ? (playerTank.health / TANK.MAX_HEALTH) * 100 : 100;
+    const playerMaxHealth = playerTank?.maxHealth || TANK.MAX_HEALTH;
+    const playerPercent = playerTank ? (playerTank.health / playerMaxHealth) * 100 : 100;
 
     ctx.save();
 
     // Health label and percentage
     ctx.fillStyle = COLORS.TEXT_LIGHT;
-    ctx.font = `bold ${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+    ctx.font = `bold ${UI.FONT_SIZE_SMALL + 1}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillText('PLAYER', contentX, currentY);
@@ -938,21 +1034,42 @@ export function renderPlayerInfoPanel(ctx, playerTank, money, isPlayerTurn = tru
     const moneyText = `$${moneyValue.toLocaleString()}`;
 
     // Draw money text right-aligned with dollar sign glow effect
+    const cashX = contentX;
+    const cashY = currentY - 2;
+    const cashW = contentWidth;
+    const cashH = 24;
+    const cashBg = ctx.createLinearGradient(0, cashY, 0, cashY + cashH);
+    cashBg.addColorStop(0, 'rgba(245, 213, 71, 0.18)');
+    cashBg.addColorStop(1, 'rgba(7, 7, 18, 0.78)');
+    ctx.fillStyle = cashBg;
+    ctx.beginPath();
+    ctx.roundRect(cashX, cashY, cashW, cashH, 6);
+    ctx.fill();
+    ctx.strokeStyle = withAlpha(COLORS.NEON_YELLOW, 0.42);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = withAlpha(COLORS.NEON_YELLOW, 0.78);
+    ctx.font = `bold ${UI.FONT_SIZE_SMALL - 1}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('CASH', cashX + 8, cashY + cashH / 2);
+
     ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'right';
-    ctx.textBaseline = 'top';
+    ctx.textBaseline = 'middle';
 
     // First pass: draw with glow on dollar sign color
     ctx.fillStyle = COLORS.NEON_YELLOW;
     ctx.shadowColor = COLORS.NEON_YELLOW;
     ctx.shadowBlur = 4;
-    ctx.fillText(moneyText, panel.X + panel.WIDTH - panel.PADDING, currentY);
+    ctx.fillText(moneyText, panel.X + panel.WIDTH - panel.PADDING - 6, cashY + cashH / 2);
 
     // Second pass: overdraw just the number portion in white (no $ sign)
     ctx.shadowBlur = 0;
     ctx.fillStyle = COLORS.TEXT_LIGHT;
     const numberOnly = moneyValue.toLocaleString();
-    ctx.fillText(numberOnly, panel.X + panel.WIDTH - panel.PADDING, currentY);
+    ctx.fillText(numberOnly, panel.X + panel.WIDTH - panel.PADDING - 6, cashY + cashH / 2);
 
     ctx.restore();
 
@@ -1099,18 +1216,20 @@ function drawHealthBar(ctx, x, y, width, height, percent, color, label) {
         ctx.fillRect(x + 5, y + 3, Math.max(0, fillWidth - 10), 1);
     }
 
-    // Label text
-    ctx.fillStyle = COLORS.TEXT_LIGHT;
-    ctx.font = `bold ${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.shadowColor = 'transparent';
-    ctx.fillText(label, x, y - 6);
+    if (label) {
+        // Label text
+        ctx.fillStyle = COLORS.TEXT_LIGHT;
+        ctx.font = `bold ${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = 'transparent';
+        ctx.fillText(label, x, y - 6);
 
-    // Health percentage
-    ctx.textAlign = 'right';
-    ctx.fillStyle = percent > 30 ? COLORS.TEXT_LIGHT : COLORS.NEON_PINK;
-    ctx.fillText(`${Math.round(percent)}%`, x + width, y - 6);
+        // Health percentage
+        ctx.textAlign = 'right';
+        ctx.fillStyle = percent > 30 ? COLORS.TEXT_LIGHT : COLORS.NEON_PINK;
+        ctx.fillText(`${Math.round(percent)}%`, x + width, y - 6);
+    }
 
     ctx.restore();
 }
@@ -1202,16 +1321,31 @@ export function renderEnemyHealthBar(ctx, enemyTank) {
     // Use tank's maxHealth for proper scaling with roguelike health progression
     const maxHealth = enemyTank.maxHealth || TANK.MAX_HEALTH;
     const enemyPercent = (enemyTank.health / maxHealth) * 100;
-    drawHealthBar(
-        ctx,
-        fromRight(padding + barWidth),
-        y + 10,
-        barWidth,
-        barHeight,
-        enemyPercent,
-        COLORS.PLAYER_2,
-        'ENEMY'
-    );
+    const panelWidth = barWidth + 52;
+    const panelHeight = 46;
+    const panelX = fromRight(padding + panelWidth);
+    const panelY = Math.max(10, y - 8);
+    const contentX = panelX + 16;
+    const contentY = panelY + 12;
+
+    drawInstrumentPanel(ctx, panelX, panelY, panelWidth, panelHeight, COLORS.PLAYER_2);
+
+    ctx.save();
+
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.font = `bold ${UI.FONT_SIZE_SMALL + 1}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = COLORS.PLAYER_2;
+    ctx.shadowBlur = 4;
+    ctx.fillText('ENEMY', contentX, contentY);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = enemyPercent > 30 ? COLORS.TEXT_LIGHT : COLORS.NEON_YELLOW;
+    ctx.fillText(`${Math.round(enemyPercent)}%`, panelX + panelWidth - 16, contentY);
+    ctx.restore();
+
+    drawHealthBar(ctx, contentX, panelY + 25, panelWidth - 32, barHeight, enemyPercent, COLORS.PLAYER_2, '');
 }
 
 // =============================================================================
