@@ -198,11 +198,30 @@ function renderAngleArc(ctx, tank, angle) {
 
     ctx.save();
 
+    // Subtle radar glass behind the arc.
+    const glassGradient = ctx.createRadialGradient(centerX, centerY, arc.RADIUS * 0.12, centerX, centerY, arc.RADIUS * 1.35);
+    glassGradient.addColorStop(0, 'rgba(5, 217, 232, 0.14)');
+    glassGradient.addColorStop(0.56, 'rgba(12, 10, 32, 0.1)');
+    glassGradient.addColorStop(1, 'rgba(5, 217, 232, 0)');
+    ctx.fillStyle = glassGradient;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, arc.RADIUS * 1.18, Math.PI, 0, false);
+    ctx.lineTo(centerX + arc.RADIUS * 1.18, centerY);
+    ctx.lineTo(centerX - arc.RADIUS * 1.18, centerY);
+    ctx.closePath();
+    ctx.fill();
+
     // Draw full arc background (semi-circle from 0 to 180 degrees)
     ctx.beginPath();
     ctx.arc(centerX, centerY, arc.RADIUS, Math.PI, 0, false);
-    ctx.strokeStyle = 'rgba(100, 100, 140, 0.4)';
-    ctx.lineWidth = arc.ARC_WIDTH;
+    ctx.strokeStyle = 'rgba(12, 14, 32, 0.88)';
+    ctx.lineWidth = arc.ARC_WIDTH + 7;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, arc.RADIUS, Math.PI, 0, false);
+    ctx.strokeStyle = 'rgba(155, 160, 205, 0.35)';
+    ctx.lineWidth = arc.ARC_WIDTH + 2;
     ctx.stroke();
 
     // Draw angle tick marks at 0, 45, 90, 135, 180
@@ -217,9 +236,12 @@ function renderAngleArc(ctx, tank, angle) {
                    centerY - Math.sin(rad) * innerR);
         ctx.lineTo(centerX + Math.cos(Math.PI - rad) * outerR,
                    centerY - Math.sin(rad) * outerR);
-        ctx.strokeStyle = tickAngle === 90 ? COLORS.NEON_YELLOW : 'rgba(150, 150, 180, 0.6)';
+        ctx.strokeStyle = tickAngle === 90 ? COLORS.NEON_YELLOW : 'rgba(165, 176, 214, 0.68)';
         ctx.lineWidth = tickAngle === 90 ? 3 : 2;
+        ctx.shadowColor = ctx.strokeStyle;
+        ctx.shadowBlur = tickAngle === 90 ? 5 : 0;
         ctx.stroke();
+        ctx.shadowBlur = 0;
 
         // Draw angle label (faded to reduce visual noise)
         if (tickAngle % 45 === 0) {
@@ -232,11 +254,16 @@ function renderAngleArc(ctx, tank, angle) {
             const isNearest = angleDiff <= 22.5; // Within half of 45° tick spacing
             const labelOpacity = isNearest ? 0.9 : 0.35;
 
-            ctx.fillStyle = `rgba(150, 150, 180, ${labelOpacity})`;
-            ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+            ctx.fillStyle = isNearest ? accentColor : `rgba(165, 176, 214, ${labelOpacity})`;
+            ctx.font = `${isNearest ? 'bold ' : ''}${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
+            if (isNearest) {
+                ctx.shadowColor = accentColor;
+                ctx.shadowBlur = 4;
+            }
             ctx.fillText(`${tickAngle}°`, labelX, labelY);
+            ctx.shadowBlur = 0;
         }
     }
 
@@ -259,6 +286,13 @@ function renderAngleArc(ctx, tank, angle) {
     const pointerX = centerX + Math.cos(Math.PI - angleRad) * pointerR;
     const pointerY = centerY - Math.sin(angleRad) * pointerR;
 
+    ctx.strokeStyle = withAlphaFallback(accentColor, 0.42);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY);
+    ctx.lineTo(pointerX, pointerY);
+    ctx.stroke();
+
     ctx.beginPath();
     ctx.arc(pointerX, pointerY, 8, 0, Math.PI * 2);
     ctx.fillStyle = accentColor;
@@ -271,16 +305,48 @@ function renderAngleArc(ctx, tank, angle) {
     ctx.arc(pointerX, pointerY, 4, 0, Math.PI * 2);
     ctx.fill();
 
-    // Draw current angle text below arc
-    ctx.fillStyle = accentColor;
+    // Draw current angle text in a compact instrument pill below arc
+    const readoutText = `${Math.round(angle)}°`;
+    const readoutWidth = 62;
+    const readoutHeight = 26;
+    const readoutX = centerX - readoutWidth / 2;
+    const readoutY = centerY + arc.RADIUS + 10;
+
+    const readoutGradient = ctx.createLinearGradient(0, readoutY, 0, readoutY + readoutHeight);
+    readoutGradient.addColorStop(0, withAlphaFallback(accentColor, 0.28));
+    readoutGradient.addColorStop(1, 'rgba(5, 6, 18, 0.88)');
+    ctx.fillStyle = readoutGradient;
+    ctx.beginPath();
+    ctx.roundRect(readoutX, readoutY, readoutWidth, readoutHeight, 7);
+    ctx.fill();
+    ctx.strokeStyle = accentColor;
+    ctx.lineWidth = 1.5;
+    ctx.shadowColor = accentColor;
+    ctx.shadowBlur = 7;
+    ctx.stroke();
+
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
     ctx.font = `bold ${UI.FONT_SIZE_LARGE}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
+    ctx.textBaseline = 'middle';
     ctx.shadowColor = accentColor;
     ctx.shadowBlur = 8;
-    ctx.fillText(`${Math.round(angle)}°`, centerX, centerY + arc.RADIUS + 20);
+    ctx.fillText(readoutText, centerX, readoutY + readoutHeight / 2 + 1);
 
     ctx.restore();
+}
+
+/**
+ * Apply alpha to a CSS color; supports project hex constants.
+ * @param {string} color - Color string
+ * @param {number} alpha - Alpha value
+ * @returns {string} rgba string
+ */
+function withAlphaFallback(color, alpha) {
+    const hex = color?.trim?.().match?.(/^#([0-9a-f]{6})$/i);
+    if (!hex) return color;
+    const value = Number.parseInt(hex[1], 16);
+    return `rgba(${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255}, ${alpha})`;
 }
 
 // =============================================================================

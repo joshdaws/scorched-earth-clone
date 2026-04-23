@@ -1516,6 +1516,144 @@ function renderMenuButton(ctx, button, pulseIntensity, badgeCount = 0) {
 }
 
 /**
+ * Draw a compact metric tile for menu resources and progress.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {Object} config - Tile configuration
+ * @param {number} config.x - Left X
+ * @param {number} config.y - Top Y
+ * @param {number} config.width - Tile width
+ * @param {number} config.height - Tile height
+ * @param {string} config.accent - Accent/glow color
+ * @param {string} config.label - Small uppercase label
+ * @param {string} config.value - Primary value
+ * @param {'coin'|'star'|'none'} [config.icon='none'] - Optional icon
+ * @param {number} [config.pulseIntensity=0] - Pulse intensity
+ */
+function drawMenuMetricTile(ctx, config) {
+    const {
+        x,
+        y,
+        width,
+        height,
+        accent,
+        label,
+        value,
+        icon = 'none',
+        pulseIntensity = 0
+    } = config;
+    const radius = 8;
+    const glow = 6 + pulseIntensity * 5;
+    const iconSize = Math.min(20, height * 0.34);
+    const hasIcon = icon !== 'none';
+    const valueX = hasIcon ? x + width * 0.42 : x + 10;
+    const valueY = y + height * 0.58;
+
+    ctx.save();
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.48)';
+    ctx.beginPath();
+    ctx.roundRect(x + 4, y + 5, width - 8, height, radius);
+    ctx.fill();
+
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = glow;
+    ctx.fillStyle = `${accent}26`;
+    ctx.beginPath();
+    ctx.roundRect(x - 2, y - 2, width + 4, height + 4, radius + 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    const bg = ctx.createLinearGradient(0, y, 0, y + height);
+    bg.addColorStop(0, `${accent}35`);
+    bg.addColorStop(0.24, 'rgba(31, 25, 52, 0.94)');
+    bg.addColorStop(1, 'rgba(5, 6, 18, 0.96)');
+    ctx.fillStyle = bg;
+    ctx.beginPath();
+    ctx.roundRect(x, y, width, height, radius);
+    ctx.fill();
+
+    const sheen = ctx.createLinearGradient(x, y, x + width, y + height);
+    sheen.addColorStop(0, 'rgba(255, 255, 255, 0.24)');
+    sheen.addColorStop(0.36, 'rgba(255, 255, 255, 0.04)');
+    sheen.addColorStop(1, 'rgba(255, 255, 255, 0.02)');
+    ctx.fillStyle = sheen;
+    ctx.beginPath();
+    ctx.roundRect(x + 3, y + 3, width - 6, Math.max(5, height * 0.38), radius - 2);
+    ctx.fill();
+
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 2;
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = glow;
+    ctx.beginPath();
+    ctx.roundRect(x, y, width, height, radius);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(x + 3, y + 3, width - 6, height - 6, radius - 3);
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.58)';
+    ctx.font = `bold 10px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(label, x + width / 2, y + 7);
+
+    if (hasIcon) {
+        const iconX = x + width * 0.27;
+        const iconY = valueY - 1;
+        ctx.save();
+        ctx.fillStyle = icon === 'star' ? COLORS.NEON_YELLOW : '#F59E0B';
+        ctx.shadowColor = ctx.fillStyle;
+        ctx.shadowBlur = 7;
+        ctx.beginPath();
+        if (icon === 'star') {
+            drawStarPath(ctx, iconX, iconY, iconSize * 0.55, iconSize * 0.24);
+        } else {
+            ctx.arc(iconX, iconY, iconSize * 0.48, 0, Math.PI * 2);
+        }
+        ctx.fill();
+        ctx.restore();
+    }
+
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.font = `bold ${Math.max(14, Math.round(height * 0.28))}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = hasIcon ? 'left' : 'left';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = 3;
+    ctx.fillText(value, valueX, valueY);
+
+    ctx.restore();
+}
+
+/**
+ * Build a star path.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} cx - Center X
+ * @param {number} cy - Center Y
+ * @param {number} outerRadius - Outer radius
+ * @param {number} innerRadius - Inner radius
+ */
+function drawStarPath(ctx, cx, cy, outerRadius, innerRadius) {
+    let angle = -Math.PI / 2;
+    const step = Math.PI / 5;
+
+    for (let i = 0; i < 10; i++) {
+        const radius = i % 2 === 0 ? outerRadius : innerRadius;
+        const x = cx + Math.cos(angle) * radius;
+        const y = cy + Math.sin(angle) * radius;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+        angle += step;
+    }
+    ctx.closePath();
+}
+
+/**
  * Configuration for synthwave title text effect.
  * Based on docs/examples/synthwave-title-text.html
  */
@@ -1752,157 +1890,63 @@ function renderMenu(ctx) {
     const rewardClaimable = DailyRewards.canClaim();
     menuButtons.dailyRewards.renderWithDot(ctx, pulseIntensity, rewardClaimable);
 
-    // Token balance display - bottom right corner with neon box (mirroring Best Run box on left)
+    // Token balance display - bottom right corner
     const tokenBalance = Tokens.getTokenBalance();
     const tokenPadding = isCompact ? 15 : 25;
-    const tokenFontSize = isCompact ? UI.FONT_SIZE_SMALL : UI.FONT_SIZE_MEDIUM;
     const tokenCardWidth = isCompact ? 75 : 90;
     const tokenCardHeight = isCompact ? 50 : 60;
 
-    // Position: bottom right corner (mirroring Best Run's bottom left position)
     const tokenCardX = width - tokenPadding - tokenCardWidth;
     const tokenCardY = height - tokenPadding - tokenCardHeight;
 
-    ctx.save();
+    drawMenuMetricTile(ctx, {
+        x: tokenCardX,
+        y: tokenCardY,
+        width: tokenCardWidth,
+        height: tokenCardHeight,
+        accent: COLORS.NEON_CYAN,
+        label: 'TOKENS',
+        value: `${tokenBalance}`,
+        icon: 'coin',
+        pulseIntensity
+    });
 
-    // Card background with neon border (like Best Run box)
-    ctx.fillStyle = 'rgba(10, 10, 26, 0.85)';
-    ctx.beginPath();
-    ctx.roundRect(tokenCardX, tokenCardY, tokenCardWidth, tokenCardHeight, 8);
-    ctx.fill();
-
-    // Neon border with cyan glow effect
-    ctx.strokeStyle = COLORS.NEON_CYAN;
-    ctx.lineWidth = 2;
-    ctx.shadowColor = COLORS.NEON_CYAN;
-    ctx.shadowBlur = 8;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-
-    // Coin icon (circle with glow) - positioned on left side of card
-    const coinRadius = isCompact ? 8 : 10;
-    const coinX = tokenCardX + 18;
-    const coinY = tokenCardY + tokenCardHeight / 2 - 2;
-
-    ctx.fillStyle = '#F59E0B';
-    ctx.shadowColor = '#F59E0B';
-    ctx.shadowBlur = 6;
-    ctx.beginPath();
-    ctx.arc(coinX, coinY, coinRadius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-
-    // Token count - large number next to coin
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `bold ${tokenFontSize + 2}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`${tokenBalance}`, coinX + coinRadius + 8, coinY);
-
-    // "TOKENS" label - below the coin/number row
-    ctx.fillStyle = '#888899';
-    ctx.font = `${isCompact ? 9 : 11}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText('TOKENS', tokenCardX + tokenCardWidth / 2, tokenCardY + tokenCardHeight - 6);
-    ctx.restore();
-
-    // Best run display - bottom left corner as a styled card
+    // Best run display - bottom left corner
     const bestRound = HighScores.getBestRoundCount();
-    const bestRunFontSize = isCompact ? UI.FONT_SIZE_SMALL - 2 : UI.FONT_SIZE_SMALL;
     const bestCardPadding = isCompact ? 15 : 25;
     const bestCardHeight = isCompact ? 40 : 50;
     const bestCardWidth = isCompact ? 90 : 110;
-
-    ctx.save();
-    // Card background
-    ctx.fillStyle = 'rgba(10, 10, 26, 0.85)';
-    ctx.beginPath();
-    ctx.roundRect(bestCardPadding, height - bestCardPadding - bestCardHeight, bestCardWidth, bestCardHeight, 8);
-    ctx.fill();
-
-    // Neon border with glow effect
-    ctx.strokeStyle = COLORS.NEON_YELLOW;
-    ctx.lineWidth = 2;
-    ctx.shadowColor = COLORS.NEON_YELLOW;
-    ctx.shadowBlur = 8;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-
-    // Best Run label
-    ctx.fillStyle = '#888899';
-    ctx.font = `${bestRunFontSize}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText('Best Run:', bestCardPadding + 10, height - bestCardPadding - bestCardHeight + 8);
-
-    // Best Run value
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `bold ${bestRunFontSize + 4}px ${UI.FONT_FAMILY}`;
-    ctx.textBaseline = 'bottom';
     const roundsText = bestRound > 0 ? `${bestRound} rounds` : '--';
-    ctx.fillText(roundsText, bestCardPadding + 10, height - bestCardPadding - 6);
-    ctx.restore();
 
-    // Total Stars display - bottom center as a styled card
+    drawMenuMetricTile(ctx, {
+        x: bestCardPadding,
+        y: height - bestCardPadding - bestCardHeight,
+        width: bestCardWidth,
+        height: bestCardHeight,
+        accent: COLORS.NEON_YELLOW,
+        label: 'BEST RUN',
+        value: roundsText,
+        pulseIntensity
+    });
+
+    // Total Stars display - bottom center
     const totalStars = Stars.getTotalStars();
     const starsCardWidth = isCompact ? 85 : 100;
     const starsCardHeight = isCompact ? 50 : 60;
     const starsCardX = (width - starsCardWidth) / 2;
     const starsCardY = height - tokenPadding - starsCardHeight;
-    const starsFontSize = isCompact ? UI.FONT_SIZE_SMALL : UI.FONT_SIZE_MEDIUM;
 
-    ctx.save();
-    // Card background
-    ctx.fillStyle = 'rgba(10, 10, 26, 0.85)';
-    ctx.beginPath();
-    ctx.roundRect(starsCardX, starsCardY, starsCardWidth, starsCardHeight, 8);
-    ctx.fill();
-
-    // Neon border with pink glow effect (matching level mode color)
-    ctx.strokeStyle = COLORS.NEON_PINK;
-    ctx.lineWidth = 2;
-    ctx.shadowColor = COLORS.NEON_PINK;
-    ctx.shadowBlur = 8;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-
-    // Star icon - positioned on left side of card
-    const starIconX = starsCardX + 18;
-    const starIconY = starsCardY + starsCardHeight / 2 - 2;
-    const starRadius = isCompact ? 8 : 10;
-
-    // Draw 5-pointed star
-    ctx.fillStyle = COLORS.NEON_YELLOW;
-    ctx.shadowColor = COLORS.NEON_YELLOW;
-    ctx.shadowBlur = 6;
-    ctx.beginPath();
-    for (let i = 0; i < 5; i++) {
-        const angle = (i * 4 * Math.PI / 5) - Math.PI / 2;
-        const r = i === 0 ? starRadius : starRadius;
-        const x = starIconX + Math.cos(angle) * r;
-        const y = starIconY + Math.sin(angle) * r;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-    }
-    ctx.closePath();
-    ctx.fill();
-    ctx.shadowBlur = 0;
-
-    // Star count - large number next to star icon
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `bold ${starsFontSize + 2}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`${totalStars}`, starIconX + starRadius + 8, starIconY);
-
-    // "STARS" label - below the star/number row
-    ctx.fillStyle = '#888899';
-    ctx.font = `${isCompact ? 9 : 11}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText('STARS', starsCardX + starsCardWidth / 2, starsCardY + starsCardHeight - 6);
-    ctx.restore();
+    drawMenuMetricTile(ctx, {
+        x: starsCardX,
+        y: starsCardY,
+        width: starsCardWidth,
+        height: starsCardHeight,
+        accent: COLORS.NEON_PINK,
+        label: 'STARS',
+        value: `${totalStars}`,
+        icon: 'star',
+        pulseIntensity
+    });
 
     ctx.restore();
 
