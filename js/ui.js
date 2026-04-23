@@ -1313,10 +1313,10 @@ export function renderEnemyHealthBar(ctx, enemyTank) {
     if (!ctx || !enemyTank) return;
 
     const layout = getHUD();
+    const playerPanel = HUD.PLAYER_INFO_PANEL;
     const barWidth = layout.HEALTH_BAR.WIDTH;
     const barHeight = layout.HEALTH_BAR.HEIGHT;
     const padding = layout.HEALTH_BAR.PADDING;
-    const y = layout.HEALTH_BAR.Y;
 
     // Use tank's maxHealth for proper scaling with roguelike health progression
     const maxHealth = enemyTank.maxHealth || TANK.MAX_HEALTH;
@@ -1324,7 +1324,7 @@ export function renderEnemyHealthBar(ctx, enemyTank) {
     const panelWidth = barWidth + 52;
     const panelHeight = 46;
     const panelX = fromRight(padding + panelWidth);
-    const panelY = Math.max(10, y - 8);
+    const panelY = playerPanel.Y;
     const contentX = panelX + 16;
     const contentY = panelY + 12;
 
