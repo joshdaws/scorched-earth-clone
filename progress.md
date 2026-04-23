@@ -4,4 +4,6 @@ Original prompt: Upgrade game graphical assets with ChatGPT Image Gen 2 and impr
 - Generated and processed cohesive weapon icons, UI placeholders, dirt particle, and split player/enemy tank body and turret sprites.
 - Added manifest entries and renderer support for default player/enemy split tank sprites.
 - Verified with `npm run check`, `npm run build`, and a Vite/Playwright gameplay screenshot.
-- No open TODOs from this pass.
+- Polished the shared canvas Button renderer and gameplay FIRE button with layered bevels, highlights, stronger armed/pressed states, and menu hover handling.
+- Filed `scorched-earth-7wu` to replace the old test explosion sprite sheet with a fresh generated animation before wiring sprite-frame explosions.
+- No open TODOs from the button polish pass.

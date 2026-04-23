@@ -394,54 +394,113 @@ export class Button {
             glowIntensity = Math.min(1, pulseIntensity * BUTTON_DEFAULTS.hoverGlowBoost + 0.3);
         }
 
-        // Button background with rounded corners
-        ctx.fillStyle = bgColor;
+        const isPrimary = this.width >= 300;
+        const pressedOffset = this._pressed && !this.disabled ? Math.max(1, Math.round(this.height * 0.04)) : 0;
+        const radius = Math.min(this.borderRadius, this.height * 0.24);
+        const bodyY = btnY + pressedOffset;
+        const bodyHeight = this.height - pressedOffset;
+
+        if (!this.disabled) {
+            ctx.shadowColor = glowColor;
+            ctx.shadowBlur = (isPrimary ? 24 : 15) + glowIntensity * (isPrimary ? 18 : 12);
+            ctx.fillStyle = glowColor;
+            ctx.globalAlpha = 0.12 + glowIntensity * 0.08;
+            ctx.beginPath();
+            ctx.roundRect(btnX - 4, bodyY - 2, this.width + 8, bodyHeight + 4, radius + 4);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+            ctx.shadowBlur = 0;
+        }
+
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
         ctx.beginPath();
-        ctx.roundRect(btnX, btnY, this.width, this.height, this.borderRadius);
+        ctx.roundRect(btnX + 4, btnY + this.height * 0.12, this.width - 8, this.height, radius);
         ctx.fill();
 
-        // Neon border effect with outer glow
+        const bodyGradient = ctx.createLinearGradient(0, bodyY, 0, bodyY + bodyHeight);
+        if (this.disabled) {
+            bodyGradient.addColorStop(0, BUTTON_DEFAULTS.disabledBgColor);
+            bodyGradient.addColorStop(1, 'rgba(10, 10, 20, 0.75)');
+        } else {
+            bodyGradient.addColorStop(0, 'rgba(52, 45, 84, 0.96)');
+            bodyGradient.addColorStop(0.45, bgColor);
+            bodyGradient.addColorStop(1, 'rgba(5, 6, 18, 0.96)');
+        }
+
+        ctx.fillStyle = bodyGradient;
+        ctx.beginPath();
+        ctx.roundRect(btnX, bodyY, this.width, bodyHeight, radius);
+        ctx.fill();
+
         if (!this.disabled) {
-            // Outer glow layer - softer, wider glow
+            const sheenGradient = ctx.createLinearGradient(btnX, bodyY, btnX + this.width, bodyY + bodyHeight);
+            sheenGradient.addColorStop(0, 'rgba(255, 255, 255, 0.22)');
+            sheenGradient.addColorStop(0.28, 'rgba(255, 255, 255, 0.04)');
+            sheenGradient.addColorStop(0.62, 'rgba(255, 255, 255, 0.1)');
+            sheenGradient.addColorStop(1, 'rgba(255, 255, 255, 0.02)');
+            ctx.fillStyle = sheenGradient;
+            ctx.beginPath();
+            ctx.roundRect(btnX + 3, bodyY + 3, this.width - 6, Math.max(4, bodyHeight * 0.42), Math.max(2, radius - 3));
+            ctx.fill();
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.roundRect(btnX + 2, bodyY + 2, this.width - 4, bodyHeight - 4, Math.max(2, radius - 2));
+            ctx.clip();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.055)';
+            ctx.lineWidth = 1;
+            for (let y = bodyY + 7; y < bodyY + bodyHeight; y += 6) {
+                ctx.beginPath();
+                ctx.moveTo(btnX + 8, y);
+                ctx.lineTo(btnX + this.width - 8, y);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        if (!this.disabled) {
             ctx.shadowColor = glowColor;
             ctx.shadowBlur = BUTTON_DEFAULTS.glowBlur + glowIntensity * BUTTON_DEFAULTS.glowPulseRange;
             ctx.shadowOffsetX = 0;
             ctx.shadowOffsetY = 0;
             ctx.strokeStyle = borderColor;
-            ctx.lineWidth = this.borderWidth;
+            ctx.lineWidth = this.borderWidth + (isPrimary ? 1 : 0);
             ctx.beginPath();
-            ctx.roundRect(btnX, btnY, this.width, this.height, this.borderRadius);
+            ctx.roundRect(btnX, bodyY, this.width, bodyHeight, radius);
             ctx.stroke();
 
-            // Inner border - crisp line without shadow
             ctx.shadowBlur = 0;
-            ctx.strokeStyle = borderColor;
-            ctx.lineWidth = this.borderWidth;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+            ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.roundRect(btnX, btnY, this.width, this.height, this.borderRadius);
+            ctx.roundRect(btnX + 3, bodyY + 3, this.width - 6, bodyHeight - 6, Math.max(2, radius - 3));
+            ctx.stroke();
+
+            ctx.strokeStyle = borderColor;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(btnX + radius, bodyY + 1.5);
+            ctx.lineTo(btnX + this.width - radius, bodyY + 1.5);
             ctx.stroke();
         } else {
-            // Disabled button border
             ctx.strokeStyle = BUTTON_DEFAULTS.disabledBorderColor;
             ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.roundRect(btnX, btnY, this.width, this.height, this.borderRadius);
+            ctx.roundRect(btnX, bodyY, this.width, bodyHeight, radius);
             ctx.stroke();
         }
 
-        // Reset shadow for text
         ctx.shadowBlur = 0;
 
-        // Button text with subtle glow
         if (!this.disabled) {
             ctx.shadowColor = glowColor;
-            ctx.shadowBlur = BUTTON_DEFAULTS.textGlowBlur + glowIntensity * BUTTON_DEFAULTS.textGlowPulseRange;
+            ctx.shadowBlur = (isPrimary ? 7 : BUTTON_DEFAULTS.textGlowBlur) + glowIntensity * BUTTON_DEFAULTS.textGlowPulseRange;
         }
         ctx.fillStyle = textColor;
         ctx.font = `bold ${this.fontSize}px ${this.fontFamily}`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(this.text, this.x, this.y);
+        ctx.fillText(this.text, this.x, this.y + pressedOffset);
 
         ctx.restore();
     }

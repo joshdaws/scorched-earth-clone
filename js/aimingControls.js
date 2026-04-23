@@ -300,55 +300,118 @@ function renderFireButton(ctx, canFire) {
     const isPressed = controlState.fireButtonPressed;
     const isHovered = controlState.fireButtonHovered;
 
-    // Pulsing intensity when can fire
-    const pulse = canFire ? (Math.sin(animationTime * 4) * 0.15 + 0.85) : 0.5;
+    const pulse = canFire ? (Math.sin(animationTime * 4) * 0.16 + 0.84) : 0.35;
 
     ctx.save();
 
     const btnX = btn.X - btn.WIDTH / 2;
     const btnY = btn.Y - btn.HEIGHT / 2;
+    const radius = Math.min(btn.BORDER_RADIUS, btn.HEIGHT * 0.26);
+    const offsetY = isPressed && canFire ? Math.max(2, Math.round(btn.HEIGHT * 0.06)) : 0;
+    const bodyY = btnY + offsetY;
+    const bodyHeight = btn.HEIGHT - offsetY;
+    const borderColor = canFire ? COLORS.NEON_PINK : COLORS.TEXT_MUTED;
+    const glowColor = canFire ? COLORS.NEON_PINK : 'rgba(120, 120, 150, 0.5)';
 
-    // Button shadow/press effect - more pronounced for touch feedback
-    const offsetY = isPressed ? 4 : 0;
-
-    // Button background - brighter when pressed
-    ctx.fillStyle = isPressed ? 'rgba(255, 42, 109, 0.4)' : 'rgba(10, 10, 26, 0.9)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
     ctx.beginPath();
-    ctx.roundRect(btnX, btnY + offsetY, btn.WIDTH, btn.HEIGHT, btn.BORDER_RADIUS);
+    ctx.roundRect(btnX + 6, btnY + btn.HEIGHT * 0.13, btn.WIDTH - 12, btn.HEIGHT, radius);
     ctx.fill();
 
-    // Inner highlight when pressed
-    if (isPressed && canFire) {
-        ctx.fillStyle = 'rgba(255, 42, 109, 0.25)';
+    if (canFire) {
+        ctx.shadowColor = glowColor;
+        ctx.shadowBlur = (isPressed ? 30 : 18) * pulse;
+        ctx.fillStyle = glowColor;
+        ctx.globalAlpha = isPressed ? 0.22 : 0.12 + pulse * 0.05;
+        ctx.beginPath();
+        ctx.roundRect(btnX - 5, bodyY - 4, btn.WIDTH + 10, bodyHeight + 8, radius + 5);
         ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.shadowBlur = 0;
     }
 
-    // Neon border with glow - stronger when pressed
-    const borderColor = canFire ? COLORS.NEON_PINK : COLORS.TEXT_MUTED;
+    const bodyGradient = ctx.createLinearGradient(0, bodyY, 0, bodyY + bodyHeight);
+    if (canFire) {
+        bodyGradient.addColorStop(0, isPressed ? 'rgba(112, 28, 72, 0.98)' : 'rgba(74, 25, 59, 0.98)');
+        bodyGradient.addColorStop(0.46, 'rgba(18, 12, 31, 0.98)');
+        bodyGradient.addColorStop(1, 'rgba(7, 5, 14, 0.98)');
+    } else {
+        bodyGradient.addColorStop(0, 'rgba(44, 44, 62, 0.78)');
+        bodyGradient.addColorStop(1, 'rgba(10, 10, 20, 0.82)');
+    }
+
+    ctx.fillStyle = bodyGradient;
+    ctx.beginPath();
+    ctx.roundRect(btnX, bodyY, btn.WIDTH, bodyHeight, radius);
+    ctx.fill();
+
+    if (canFire) {
+        const chargeWidth = (btn.WIDTH - 18) * (0.66 + pulse * 0.24);
+        const chargeX = btn.X - chargeWidth / 2;
+        const railY = bodyY + bodyHeight - Math.max(11, bodyHeight * 0.2);
+
+        const railGradient = ctx.createLinearGradient(chargeX, 0, chargeX + chargeWidth, 0);
+        railGradient.addColorStop(0, 'rgba(255, 42, 109, 0)');
+        railGradient.addColorStop(0.5, isPressed ? 'rgba(255, 235, 245, 0.85)' : 'rgba(255, 42, 109, 0.72)');
+        railGradient.addColorStop(1, 'rgba(255, 42, 109, 0)');
+
+        ctx.fillStyle = railGradient;
+        ctx.shadowColor = glowColor;
+        ctx.shadowBlur = isPressed ? 12 : 8 * pulse;
+        ctx.beginPath();
+        ctx.roundRect(chargeX, railY, chargeWidth, 4, 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 3; i++) {
+            const notchX = btnX + btn.WIDTH * (0.17 + i * 0.12);
+            ctx.beginPath();
+            ctx.moveTo(notchX, bodyY + 9);
+            ctx.lineTo(notchX + 18, bodyY + bodyHeight - 11);
+            ctx.stroke();
+        }
+    }
+
     ctx.strokeStyle = borderColor;
-    ctx.lineWidth = isPressed ? 5 : 4;
     ctx.shadowColor = borderColor;
-    ctx.shadowBlur = isPressed ? 25 : (canFire ? 15 * pulse : 0);
+    ctx.shadowBlur = canFire ? (isPressed ? 24 : 14 * pulse) : 0;
+    ctx.lineWidth = canFire ? 4 : 2;
+    ctx.beginPath();
+    ctx.roundRect(btnX, bodyY, btn.WIDTH, bodyHeight, radius);
     ctx.stroke();
     ctx.shadowBlur = 0;
 
-    // Inner glow when hovered (desktop) or pressed (touch)
+    ctx.strokeStyle = canFire ? 'rgba(255, 255, 255, 0.24)' : 'rgba(255, 255, 255, 0.08)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(btnX + 4, bodyY + 4, btn.WIDTH - 8, bodyHeight - 8, Math.max(2, radius - 4));
+    ctx.stroke();
+
     if ((isHovered || isPressed) && canFire) {
-        ctx.strokeStyle = 'rgba(255, 42, 109, 0.5)';
-        ctx.lineWidth = 10;
+        ctx.strokeStyle = 'rgba(255, 206, 225, 0.55)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(btnX + radius, bodyY + 3);
+        ctx.lineTo(btnX + btn.WIDTH - radius, bodyY + 3);
         ctx.stroke();
     }
 
-    // Button text - larger for touch
     ctx.fillStyle = canFire ? COLORS.TEXT_LIGHT : COLORS.TEXT_MUTED;
     ctx.font = `bold ${UI.FONT_SIZE_LARGE + 8}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     if (canFire) {
         ctx.shadowColor = COLORS.NEON_PINK;
-        ctx.shadowBlur = isPressed ? 15 : 8 * pulse;
+        ctx.shadowBlur = isPressed ? 16 : 9 * pulse;
     }
-    ctx.fillText('FIRE!', btn.X, btn.Y + offsetY);
+    ctx.fillText('FIRE!', btn.X, btn.Y - 2 + offsetY);
+
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = canFire ? 'rgba(255, 206, 225, 0.9)' : 'rgba(170, 170, 190, 0.45)';
+    ctx.font = `bold ${Math.max(9, Math.round(UI.FONT_SIZE_SMALL * 0.85))}px ${UI.FONT_FAMILY}`;
+    ctx.fillText(canFire ? 'ARMED' : 'LOCKED', btn.X, btn.Y + btn.HEIGHT * 0.24 + offsetY);
 
     ctx.restore();
 }

@@ -1111,6 +1111,24 @@ function updateMenuButtonPositions() {
     menuButtons.dailyRewards.fontSize = layout.isCompact ? 9 : 11;
 }
 
+function getMenuButtonList() {
+    return Object.values(menuButtons);
+}
+
+function clearMenuButtonInteractionState() {
+    for (const button of getMenuButtonList()) {
+        button.setHovered(false);
+        button.setPressed(false);
+    }
+}
+
+function updateMenuButtonHover(x, y) {
+    updateMenuButtonPositions();
+    for (const button of getMenuButtonList()) {
+        button.handlePointerMove(x, y);
+    }
+}
+
 // =============================================================================
 // OPTIONS OVERLAY STATE
 // =============================================================================
@@ -1177,18 +1195,22 @@ function handleMenuClick(pos) {
 
     // Ensure button positions are current for the screen size
     updateMenuButtonPositions();
+    clearMenuButtonInteractionState();
 
     if (menuButtons.start.containsPoint(pos.x, pos.y)) {
+        menuButtons.start.setPressed(true);
         // Play click sound
         Sound.playClickSound();
         // Start fade-out transition, then go to MODE_SELECT state
         startMenuTransition(GAME_STATES.MODE_SELECT);
     } else if (menuButtons.highScores.containsPoint(pos.x, pos.y)) {
+        menuButtons.highScores.setPressed(true);
         // Play click sound
         Sound.playClickSound();
         // Go to HIGH_SCORES state
         Game.setState(GAME_STATES.HIGH_SCORES);
     } else if (menuButtons.achievements.containsPoint(pos.x, pos.y)) {
+        menuButtons.achievements.setPressed(true);
         // Play click sound
         Sound.playClickSound();
         // Mark achievements as viewed when opening the screen
@@ -1196,6 +1218,7 @@ function handleMenuClick(pos) {
         // Go to ACHIEVEMENTS state
         Game.setState(GAME_STATES.ACHIEVEMENTS);
     } else if (menuButtons.collection.containsPoint(pos.x, pos.y)) {
+        menuButtons.collection.setPressed(true);
         // Play click sound
         Sound.playClickSound();
         // Mark new tanks as viewed when opening collection
@@ -1203,22 +1226,26 @@ function handleMenuClick(pos) {
         // Go to COLLECTION state
         Game.setState(GAME_STATES.COLLECTION);
     } else if (menuButtons.supplyDrop.containsPoint(pos.x, pos.y)) {
+        menuButtons.supplyDrop.setPressed(true);
         // Play click sound
         Sound.playClickSound();
         // Go to SUPPLY_DROP state
         Game.setState(GAME_STATES.SUPPLY_DROP);
     } else if (menuButtons.options.containsPoint(pos.x, pos.y) && !menuButtons.options.disabled) {
+        menuButtons.options.setPressed(true);
         // Play click sound
         Sound.playClickSound();
         // Show options overlay with volume controls
         optionsOverlayVisible = true;
         console.log('Options overlay opened');
     } else if (menuButtons.dailyChallenges.containsPoint(pos.x, pos.y)) {
+        menuButtons.dailyChallenges.setPressed(true);
         // Play click sound
         Sound.playClickSound();
         // Show daily challenges panel
         EngagementUI.showChallengePanel();
     } else if (menuButtons.dailyRewards.containsPoint(pos.x, pos.y)) {
+        menuButtons.dailyRewards.setPressed(true);
         // Play click sound
         Sound.playClickSound();
         // Show daily rewards popup
@@ -1965,6 +1992,7 @@ function setupMenuState() {
                 optionsOverlayVisible = false;
                 VolumeControls.reset();
             }
+            clearMenuButtonInteractionState();
             // Keep TitleScene running for mode select and difficulty select (seamless visual transition)
             // Stop it only when going to other states
             if (toState !== GAME_STATES.MODE_SELECT && toState !== GAME_STATES.DIFFICULTY_SELECT) {
@@ -2032,6 +2060,9 @@ function setupMenuState() {
         }
         if (Game.getState() === GAME_STATES.MENU && optionsOverlayVisible) {
             VolumeControls.handlePointerMove(x, y);
+        }
+        if (Game.getState() === GAME_STATES.MENU && !EngagementUI.isActive() && !optionsOverlayVisible && !NameEntry.isOpen()) {
+            updateMenuButtonHover(x, y);
         }
     });
 
