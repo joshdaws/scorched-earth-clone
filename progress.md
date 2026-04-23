@@ -6,4 +6,5 @@ Original prompt: Upgrade game graphical assets with ChatGPT Image Gen 2 and impr
 - Verified with `npm run check`, `npm run build`, and a Vite/Playwright gameplay screenshot.
 - Polished the shared canvas Button renderer and gameplay FIRE button with layered bevels, highlights, stronger armed/pressed states, and menu hover handling.
 - Filed `scorched-earth-7wu` to replace the old test explosion sprite sheet with a fresh generated animation before wiring sprite-frame explosions.
+- Follow-up correction: made the FIRE button polish much more visible with a bright inset launch surface, heavier hardware frame, stronger glow/charge rail, and shifted it left to avoid crowding the pause button. Also strengthened shared Button interiors so menu buttons read as filled controls rather than plain stroked rectangles.
 - No open TODOs from the button polish pass.
