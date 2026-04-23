@@ -10,4 +10,5 @@ Original prompt: Upgrade game graphical assets with ChatGPT Image Gen 2 and impr
 - Broader UI polish pass: upgraded menu stat/resource tiles, gameplay HUD chrome, health bars, wind rail, weapon dock, weapon slots, and angle readout so the non-title UI matches the quality of the new title/background. Kept this pass canvas-native; no new bitmap UI assets were necessary.
 - Top HUD follow-up: upgraded the player info, enemy health, and turn/wind panels to sharper chamfered cockpit-style instrument frames, added a cash chip, and made enemy status read as a complete module.
 - Explosion animation pass: generated a new 4x4 transparent synthwave explosion atlas with the Image API, replaced the old test sprite sheet, added manifest frame metadata, and rendered frame-based explosions over the existing procedural shockwave/particles with static PNG fallbacks.
+- Explosion correction: user rejected the generated 4x4 animation because frames drift and get cut off. Reverted runtime explosions to the previous static small/medium/large overlay path and filed `scorched-earth-bob` for a future centered atlas.
 - No open TODOs from the button polish pass.
