@@ -313,6 +313,16 @@
       "width": 512,
       "height": 512
     },
+    "explosion-spritesheet": {
+      "path": "images/effects/explosion-spritesheet.png",
+      "width": 1024,
+      "height": 1024,
+      "frameWidth": 256,
+      "frameHeight": 256,
+      "frames": 16,
+      "columns": 4,
+      "rows": 4
+    },
     "dirt-particle": {
       "path": "images/effects/dirt-particle.png",
       "width": 4,

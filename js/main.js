@@ -106,6 +106,19 @@ const TANK_TURRET_SPRITE = {
     PIVOT_Y: 6
 };
 
+const EXPLOSION_ANIMATION = {
+    SPRITE_KEY: 'effects.explosion-spritesheet',
+    FALLBACK_SMALL: 'effects.explosion-small',
+    FALLBACK_MEDIUM: 'effects.explosion-medium',
+    FALLBACK_LARGE: 'effects.explosion-large',
+    DEFAULT_FRAME_WIDTH: 256,
+    DEFAULT_FRAME_HEIGHT: 256,
+    DEFAULT_FRAMES: 16,
+    DEFAULT_COLUMNS: 4,
+    STANDARD_DURATION: 620,
+    NUCLEAR_DURATION: 1100
+};
+
 /**
  * Current round number (1-based)
  * @type {number}
@@ -3122,7 +3135,9 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
 
     // Trigger explosion visual effect for all weapons (before terrain destruction)
     // Nuclear weapons get longer duration and special mushroom cloud
-    const explosionDuration = isNuclear ? 800 : 400;
+    const explosionDuration = isNuclear
+        ? EXPLOSION_ANIMATION.NUCLEAR_DURATION
+        : EXPLOSION_ANIMATION.STANDARD_DURATION;
     explosionEffect = {
         active: true,
         x: pos.x,
@@ -5185,6 +5200,10 @@ function renderExplosionEffect(ctx) {
  * @param {boolean} isNuclear - Whether this is a nuclear explosion
  */
 function renderGeneratedExplosionOverlay(ctx, x, y, radius, progress, isNuclear) {
+    if (renderExplosionSpriteSheet(ctx, x, y, radius, progress, isNuclear)) {
+        return;
+    }
+
     const assetKey = getExplosionAssetKey(radius, isNuclear);
     const sprite = Assets.get(assetKey);
 
@@ -5204,15 +5223,84 @@ function renderGeneratedExplosionOverlay(ctx, x, y, radius, progress, isNuclear)
 }
 
 /**
+ * Render the generated frame-by-frame explosion atlas.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {number} x - Explosion center x
+ * @param {number} y - Explosion center y
+ * @param {number} radius - Blast radius
+ * @param {number} progress - Animation progress from 0 to 1
+ * @param {boolean} isNuclear - Whether this is a nuclear explosion
+ * @returns {boolean} True when the spritesheet rendered
+ */
+function renderExplosionSpriteSheet(ctx, x, y, radius, progress, isNuclear) {
+    const sprite = Assets.get(EXPLOSION_ANIMATION.SPRITE_KEY);
+    if (!isRealSprite(sprite)) return false;
+
+    const meta = Assets.getMeta(EXPLOSION_ANIMATION.SPRITE_KEY) || {};
+    const frameWidth = meta.frameWidth || EXPLOSION_ANIMATION.DEFAULT_FRAME_WIDTH;
+    const frameHeight = meta.frameHeight || EXPLOSION_ANIMATION.DEFAULT_FRAME_HEIGHT;
+    const frameCount = meta.frames || EXPLOSION_ANIMATION.DEFAULT_FRAMES;
+    const columns = meta.columns || EXPLOSION_ANIMATION.DEFAULT_COLUMNS;
+
+    const easedProgress = Math.min(1, Math.max(0, progress));
+    const frameIndex = Math.min(frameCount - 1, Math.floor(easedProgress * frameCount));
+    const sourceX = (frameIndex % columns) * frameWidth;
+    const sourceY = Math.floor(frameIndex / columns) * frameHeight;
+
+    const smokeHold = isNuclear ? 1 : Math.max(0, 1 - Math.pow(easedProgress, 4) * 0.25);
+    const alpha = Math.min(0.96, smokeHold);
+    const baseScale = isNuclear ? 5.0 : 4.35;
+    const pulseScale = isNuclear
+        ? 0.86 + easedProgress * 0.2
+        : 0.8 + Math.sin(Math.min(1, easedProgress) * Math.PI) * 0.16 + easedProgress * 0.06;
+    const drawWidth = radius * baseScale * pulseScale;
+    const drawHeight = drawWidth * (frameHeight / frameWidth);
+    const drawX = x - drawWidth / 2;
+    const drawY = y - drawHeight * 0.68;
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    ctx.globalAlpha = alpha * (isNuclear ? 0.74 : 0.58);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.drawImage(
+        sprite,
+        sourceX,
+        sourceY,
+        frameWidth,
+        frameHeight,
+        drawX,
+        drawY,
+        drawWidth,
+        drawHeight
+    );
+    ctx.globalAlpha = alpha * (isNuclear ? 0.82 : 0.76);
+    ctx.globalCompositeOperation = 'screen';
+    ctx.drawImage(
+        sprite,
+        sourceX,
+        sourceY,
+        frameWidth,
+        frameHeight,
+        drawX,
+        drawY,
+        drawWidth,
+        drawHeight
+    );
+    ctx.restore();
+
+    return true;
+}
+
+/**
  * Choose the generated explosion asset by weapon scale.
  * @param {number} radius - Blast radius
  * @param {boolean} isNuclear - Whether this is a nuclear explosion
  * @returns {string} Asset key
  */
 function getExplosionAssetKey(radius, isNuclear) {
-    if (isNuclear || radius >= 80) return 'effects.explosion-large';
-    if (radius >= 45) return 'effects.explosion-medium';
-    return 'effects.explosion-small';
+    if (isNuclear || radius >= 80) return EXPLOSION_ANIMATION.FALLBACK_LARGE;
+    if (radius >= 45) return EXPLOSION_ANIMATION.FALLBACK_MEDIUM;
+    return EXPLOSION_ANIMATION.FALLBACK_SMALL;
 }
 
 // renderScreenFlash() is now imported from effects.js
