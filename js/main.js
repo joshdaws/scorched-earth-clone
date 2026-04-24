@@ -74,6 +74,7 @@ import * as DailyRewards from './engagement/dailyRewards.js';
 import * as DailyChallenges from './engagement/dailyChallenges.js';
 import * as EngagementUI from './engagement/engagementUI.js';
 import * as DebugOverlays from './debugOverlays.js';
+import { GAMEPLAY_EVENTS, emitGameplayEvent } from './gameplayEvents.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -2889,6 +2890,23 @@ function fireProjectile(tank) {
     return true;
 }
 
+function emitTankDamageEvent(result, weaponId, source) {
+    if (!result?.tank || result.actualDamage <= 0) return;
+
+    emitGameplayEvent(GAMEPLAY_EVENTS.TANK_DAMAGED, {
+        tank: result.tank,
+        team: result.tank.team,
+        weaponId,
+        damage: result.damage,
+        actualDamage: result.actualDamage,
+        shieldDamage: result.shieldDamage,
+        healthDamage: result.healthDamage,
+        isDirectHit: result.isDirectHit,
+        shieldBusted: result.shieldBusted,
+        source
+    });
+}
+
 /**
  * Handle a single projectile's explosion (on terrain or tank hit).
  * Creates crater, applies damage, updates tank positions.
@@ -2912,6 +2930,17 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
         blastRadius: blastRadius
     };
 
+    emitGameplayEvent(GAMEPLAY_EVENTS.PROJECTILE_IMPACT, {
+        projectile,
+        weapon,
+        weaponId,
+        owner: projectile.owner,
+        impact: { x: pos.x, y: pos.y },
+        blastRadius,
+        isNuclear,
+        directHitTank
+    });
+
     // Track who fired this projectile for money awards
     const isPlayerShot = projectile.owner === 'player';
 
@@ -2925,6 +2954,7 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
 
         // Apply explosion damage to the directly hit tank
         const damageResult = applyExplosionDamage(explosion, directHitTank, weapon);
+        emitTankDamageEvent(damageResult, weaponId, 'direct');
 
         // Award money and record stats if player hit the enemy tank
         if (isPlayerShot && directHitTank.team === 'enemy' && damageResult.actualDamage > 0) {
@@ -2977,6 +3007,9 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
         }
 
         const splashResults = applyExplosionToAllTanks(explosion, allTanks, weapon);
+        for (const result of splashResults) {
+            emitTankDamageEvent(result, weaponId, 'splash');
+        }
 
         // Award money and record stats for splash damage
         if (isPlayerShot) {
@@ -3033,6 +3066,9 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
         }
 
         const damageResults = applyExplosionToAllTanks(explosion, allTanks, weapon);
+        for (const result of damageResults) {
+            emitTankDamageEvent(result, weaponId, 'splash');
+        }
 
         // Award money and record stats for any damage on enemy if player shot
         if (isPlayerShot) {
@@ -3255,6 +3291,14 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
                 updateTankTerrainPosition(enemyTank, currentTerrain);
             }
 
+            emitGameplayEvent(GAMEPLAY_EVENTS.TERRAIN_CHANGED, {
+                source: 'liquid-dirt',
+                x: pos.x,
+                y: pos.y,
+                radius: dirtRadius,
+                terrain: currentTerrain
+            });
+
             console.log(`Liquid Dirt added ${dirtHeight}px terrain at (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)})`);
         }
 
@@ -3331,6 +3375,14 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
                 updateTankTerrainPosition(enemyTank, currentTerrain);
             }
 
+            emitGameplayEvent(GAMEPLAY_EVENTS.TERRAIN_CHANGED, {
+                source: 'ion-cannon',
+                x: pos.x,
+                y: pos.y,
+                radius: beamWidth,
+                terrain: currentTerrain
+            });
+
             console.log(`Ion Cannon beam at (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)})`);
         }
     }
@@ -3348,6 +3400,17 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
     }
 
     // Check for chain reaction - spawn child projectiles from explosion
+    emitGameplayEvent(GAMEPLAY_EVENTS.PROJECTILE_IMPACT_RESOLVED, {
+        projectile,
+        weapon,
+        weaponId,
+        owner: projectile.owner,
+        impact: { x: pos.x, y: pos.y },
+        blastRadius,
+        isNuclear,
+        directHitTank
+    });
+
     if (shouldChainReact(projectile)) {
         const chainChildren = createChainReactionProjectiles(projectile, pos);
         return chainChildren;
@@ -5277,6 +5340,15 @@ export function destroyTerrainAt(x, y, radius) {
         if (fallingResult.modified) {
             console.log('Falling dirt physics applied');
         }
+
+        emitGameplayEvent(GAMEPLAY_EVENTS.TERRAIN_CHANGED, {
+            source: 'explosion',
+            x,
+            y,
+            radius,
+            fallingDirt: fallingResult,
+            terrain: currentTerrain
+        });
     }
 
     return wasDestroyed;
@@ -7436,6 +7508,30 @@ function setupAudioInit(canvas) {
     document.addEventListener('keydown', initAudio);
 }
 
+async function loadTitleFontWithTimeout(timeoutMs = 1200) {
+    if (!document.fonts?.load) {
+        return false;
+    }
+
+    let timeoutId = null;
+    const timeout = new Promise((resolve) => {
+        timeoutId = setTimeout(() => resolve(false), timeoutMs);
+    });
+
+    try {
+        const loaded = await Promise.race([
+            document.fonts.load(`120px ${UI.TITLE_FONT_FAMILY}`).then(() => true),
+            timeout
+        ]);
+
+        return loaded;
+    } finally {
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+        }
+    }
+}
+
 /**
  * Initialize all game modules
  */
@@ -7482,8 +7578,12 @@ async function init() {
     // Preload Audiowide font to prevent flash of unstyled text (FOUT) on title screen
     // Use document.fonts.load() to explicitly load the font before rendering
     try {
-        await document.fonts.load(`120px ${UI.TITLE_FONT_FAMILY}`);
-        console.log('Audiowide font loaded successfully');
+        const fontLoaded = await loadTitleFontWithTimeout();
+        if (fontLoaded) {
+            console.log('Audiowide font loaded successfully');
+        } else {
+            console.warn('Audiowide font load timed out, continuing with fallback font');
+        }
     } catch (err) {
         console.warn('Font preloading failed, title may flash:', err);
     }

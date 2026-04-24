@@ -13,7 +13,22 @@
     "playerTurret": {
       "path": "images/tanks/tank-player-turret.png",
       "width": 28,
-      "height": 12
+      "height": 12,
+      "scalePolicy": "pixel-perfect",
+      "pivot": {
+        "x": 6,
+        "y": 6
+      },
+      "anchors": {
+        "embeddedBase": {
+          "x": 6,
+          "y": 6
+        },
+        "muzzle": {
+          "x": 26,
+          "y": 6
+        }
+      }
     },
     "enemy": {
       "path": "images/tanks/tank-enemy.png",
@@ -28,7 +43,22 @@
     "enemyTurret": {
       "path": "images/tanks/tank-enemy-turret.png",
       "width": 28,
-      "height": 12
+      "height": 12,
+      "scalePolicy": "pixel-perfect",
+      "pivot": {
+        "x": 6,
+        "y": 6
+      },
+      "anchors": {
+        "embeddedBase": {
+          "x": 6,
+          "y": 6
+        },
+        "muzzle": {
+          "x": 26,
+          "y": 6
+        }
+      }
     }
   },
   "tankSkins": {
@@ -301,17 +331,50 @@
     "explosion-small": {
       "path": "images/effects/explosion-small.png",
       "width": 128,
-      "height": 128
+      "height": 128,
+      "scalePolicy": "smooth",
+      "anchor": {
+        "x": 64,
+        "y": 64
+      },
+      "safeBounds": {
+        "x": 0,
+        "y": 0,
+        "width": 128,
+        "height": 128
+      }
     },
     "explosion-medium": {
       "path": "images/effects/explosion-medium.png",
       "width": 256,
-      "height": 256
+      "height": 256,
+      "scalePolicy": "smooth",
+      "anchor": {
+        "x": 128,
+        "y": 128
+      },
+      "safeBounds": {
+        "x": 0,
+        "y": 0,
+        "width": 256,
+        "height": 256
+      }
     },
     "explosion-large": {
       "path": "images/effects/explosion-large.png",
       "width": 512,
-      "height": 512
+      "height": 512,
+      "scalePolicy": "smooth",
+      "anchor": {
+        "x": 256,
+        "y": 256
+      },
+      "safeBounds": {
+        "x": 0,
+        "y": 0,
+        "width": 512,
+        "height": 512
+      }
     },
     "dirt-particle": {
       "path": "images/effects/dirt-particle.png",

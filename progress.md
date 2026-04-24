@@ -13,3 +13,9 @@ Original prompt: Upgrade game graphical assets with ChatGPT Image Gen 2 and impr
 - Explosion correction: user rejected the generated 4x4 animation because frames drift and get cut off. Reverted runtime explosions to the previous static small/medium/large overlay path and filed `scorched-earth-bob` for a future centered atlas.
 - HUD alignment tweak: locked the enemy health module to the same top Y as the player info panel so the two top-corner modules align on a shared horizontal baseline.
 - No open TODOs from the button polish pass.
+
+2026-04-24:
+- Architecture modernization roadmap created under bead `scorched-earth-qtq`, with child tasks for impact extraction, gameplay events, generated asset metadata, Tron-style terrain de-res effects, angle-of-repose dirt physics, main.js splitting, iOS hardening, and visual regression scenes.
+- Began foundation work on `scorched-earth-qtq.2`: added a lightweight gameplay event bus and wired projectile impact, impact resolved, tank damaged, and terrain changed events from existing impact paths without changing current gameplay behavior.
+- Began `scorched-earth-qtq.3`: added asset metadata normalization/validation for generated art, including anchors, pivots, frame grids, safe bounds, scale policies, and source provenance. Added sample turret pivot and explosion anchor metadata to the manifest.
+- Browser smoke found startup could hang when external Google font loading is blocked. Filed and fixed `scorched-earth-qtq.7.1` by adding a timeout fallback around title font preload so the game can initialize offline/local.

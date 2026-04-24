@@ -6,6 +6,8 @@
  * Audio assets are handled separately by sound.js.
  */
 
+import { normalizeAssetMetadata } from './assetMetadata.js';
+
 // =============================================================================
 // MODULE STATE
 // =============================================================================
@@ -342,6 +344,18 @@ export function getMeta(key) {
     }
 
     return current || null;
+}
+
+/**
+ * Get normalized asset metadata from the manifest.
+ * @param {string} key - Dot-notation key
+ * @returns {Object|null} Normalized metadata or null if not found
+ */
+export function getAssetMetadata(key) {
+    const meta = getMeta(key);
+    if (!meta) return null;
+
+    return normalizeAssetMetadata(key, meta);
 }
 
 /**
