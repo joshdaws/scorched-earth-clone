@@ -75,6 +75,14 @@ import * as EngagementUI from './engagement/engagementUI.js';
 import * as DebugOverlays from './debugOverlays.js';
 import { GAMEPLAY_EVENTS, emitGameplayEvent } from './gameplayEvents.js';
 import { resolveProjectileImpact } from './impactResolution.js';
+import {
+    buildTerrainDerezSamples,
+    captureTerrainDerezSnapshot,
+    clearTerrainDerezEffects,
+    registerTerrainDerezEventHandlers,
+    renderTerrainDerezEffects,
+    updateTerrainDerezEffects
+} from './terrainDerezEffect.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -4841,7 +4849,11 @@ export function destroyTerrainAt(x, y, radius) {
         return false;
     }
 
+    const derezSnapshot = captureTerrainDerezSnapshot(currentTerrain, x, radius);
     const wasDestroyed = currentTerrain.destroyTerrain(x, y, radius);
+    const destructionSamples = wasDestroyed
+        ? buildTerrainDerezSamples(derezSnapshot, currentTerrain)
+        : [];
 
     // Apply falling dirt physics after terrain destruction
     if (wasDestroyed) {
@@ -4855,6 +4867,7 @@ export function destroyTerrainAt(x, y, radius) {
             x,
             y,
             radius,
+            destructionSamples,
             fallingDirt: fallingResult,
             terrain: currentTerrain
         });
@@ -5056,6 +5069,9 @@ function renderPlaying(ctx) {
 
     // Render terrain (in front of background)
     renderTerrain(ctx);
+
+    // Render terrain de-res chunks from crater samples before tanks/projectiles
+    renderTerrainDerezEffects(ctx);
 
     // Render fallout zones (on top of terrain, behind tanks)
     renderFalloutZones(ctx);
@@ -5567,6 +5583,7 @@ function setupPlayingState() {
             clearPersistentTrails();
             clearFalloutZones();
             clearFireZones();
+            clearTerrainDerezEffects();
             explosionEffect = null;
             // Clear explosion particles
             clearParticles();
@@ -6789,6 +6806,7 @@ function quitToMenu() {
     clearBackground();
     clearPersistentTrails();
     clearFalloutZones();
+    clearTerrainDerezEffects();
     explosionEffect = null;
 
     // Reset round counter for new game
@@ -7286,6 +7304,9 @@ async function init() {
     // Initialize name entry module
     NameEntry.init();
     loadOnboardingState();
+
+    // Route terrain destruction events into anchored visual effects.
+    registerTerrainDerezEventHandlers();
 
     // Set up VolumeControls callback for Change Name button
     VolumeControls.setChangeNameCallback(() => {
@@ -7847,6 +7868,9 @@ function update(deltaTime) {
 
     // Update particle system
     updateParticles(deltaTime);
+
+    // Update anchored terrain de-res pixel effects
+    updateTerrainDerezEffects(deltaTime);
 
     // Update persistent trails (Tracer weapon feature - fades over time)
     updatePersistentTrails();
