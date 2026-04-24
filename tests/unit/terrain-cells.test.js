@@ -87,6 +87,73 @@ describe('terrainCells', () => {
     expect(terrain.getHeight(12)).toBeLessThan(240);
   });
 
+  it('collapses unsupported cells downward inside a column', () => {
+    const grid = new TerrainCellGrid({
+      width: 24,
+      screenHeight: 48,
+      cellSize: 8
+    });
+
+    grid.setCell(1, 1, true);
+    grid.setCell(1, 5, true);
+    grid.recalculateColumnTops();
+
+    const result = grid.settleUnsupported({
+      minCol: 1,
+      maxCol: 1
+    });
+
+    expect(result.modified).toBe(true);
+    expect(grid.isSolid(1, 1)).toBe(false);
+    expect(grid.isSolid(1, 4)).toBe(true);
+    expect(grid.isSolid(1, 5)).toBe(true);
+    expect(grid.getHeightAt(12)).toBe(16);
+  });
+
+  it('redistributes steep unsupported columns into a stable stepped slope', () => {
+    const grid = new TerrainCellGrid({
+      width: 16,
+      screenHeight: 64,
+      cellSize: 8
+    });
+
+    grid.setColumnSolidCount(0, 8);
+    grid.setColumnSolidCount(1, 1);
+
+    const result = grid.settleUnsupported({
+      minCol: 0,
+      maxCol: 1,
+      maxSlopeCells: 2
+    });
+
+    const leftCount = grid.getColumnSolidCount(0);
+    const rightCount = grid.getColumnSolidCount(1);
+    expect(result.modified).toBe(true);
+    expect(leftCount + rightCount).toBe(9);
+    expect(Math.abs(leftCount - rightCount)).toBeLessThanOrEqual(2);
+  });
+
+  it('carves side impacts from cliffs before settling the remaining cells', () => {
+    const heights = new Array(64).fill(0).map((_, x) => x < 32 ? 48 : 16);
+    const terrain = createTerrain(heights, 64);
+    const grid = TerrainCellGrid.fromTerrain(terrain, {
+      cellSize: 8
+    });
+
+    const beforeHeight = grid.getHeightAt(28);
+    const removed = grid.destroyCircle(28, 36, 11);
+    const settled = grid.settleUnsupported({
+      minCol: 0,
+      maxCol: 7,
+      maxSlopeCells: 3
+    });
+    grid.writeHeightsToTerrain(terrain);
+
+    expect(removed.length).toBeGreaterThan(0);
+    expect(settled.modified).toBe(true);
+    expect(terrain.getHeight(28)).toBeLessThan(beforeHeight);
+  });
+
   it('reuses cached terrain grids until explicitly rebuilt', () => {
     const terrain = createTerrain(new Array(40).fill(200), 400);
     const first = getOrCreateTerrainCellGrid(terrain);

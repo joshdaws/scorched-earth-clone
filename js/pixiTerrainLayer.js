@@ -4,7 +4,7 @@ import {
 } from './terrainCells.js';
 
 const BODY_COLOR = 0x140527;
-const BODY_ALT_COLOR = 0x061b35;
+const BODY_ALT_COLOR = 0x0b1435;
 const CYAN = 0x05d9e8;
 const PINK = 0xff2a6d;
 const PURPLE = 0xb967ff;
@@ -12,8 +12,7 @@ const YELLOW = 0xf8ff4a;
 const MAX_FRAGMENTS = 1400;
 const MAX_SPAWN_CELLS = 520;
 const DEFAULT_FRAGMENT_LIFETIME_MS = 1250;
-const SURFACE_GLOW_ROWS = 10;
-const HORIZON_GLOW_ROWS = 24;
+const SURFACE_GLOW_ROWS = 9;
 
 let app = null;
 let Pixi = null;
@@ -81,17 +80,37 @@ function addLineRect(graphics, x, y, width, height, color, alpha) {
     graphics.rect(x, y, Math.max(1, width), Math.max(1, height)).fill({ color, alpha });
 }
 
-function getGridColor(depthRows, y, screenHeight, row) {
-    const horizonFactor = clamp(1 - (screenHeight - y) / (HORIZON_GLOW_ROWS * getTerrainCellSize()), 0, 1);
-    const depthFactor = clamp(depthRows / SURFACE_GLOW_ROWS, 0, 1);
-    if (horizonFactor > 0.1) return CYAN;
-    return (row + Math.floor(depthRows * 0.7)) % 3 === 0 || depthFactor > 0.75 ? PINK : PURPLE;
+function mixColor(a, b, amount) {
+    const t = clamp(amount, 0, 1);
+    const ar = (a >> 16) & 0xff;
+    const ag = (a >> 8) & 0xff;
+    const ab = a & 0xff;
+    const br = (b >> 16) & 0xff;
+    const bg = (b >> 8) & 0xff;
+    const bb = b & 0xff;
+
+    return (
+        (Math.round(ar + (br - ar) * t) << 16) |
+        (Math.round(ag + (bg - ag) * t) << 8) |
+        Math.round(ab + (bb - ab) * t)
+    );
 }
 
-function getGridAlpha(depthRows, y, screenHeight) {
+function getBodyColor(depthRows, col, row) {
+    const depthFactor = clamp(depthRows / 32, 0, 1);
+    const band = ((col + row) % 4) / 18;
+    return mixColor(BODY_COLOR, BODY_ALT_COLOR, depthFactor * 0.65 + band);
+}
+
+function getGridColor(depthRows) {
+    const depthFactor = clamp(depthRows / 28, 0, 1);
+    const upperColor = mixColor(PINK, PURPLE, clamp(depthRows / SURFACE_GLOW_ROWS, 0, 1));
+    return mixColor(upperColor, CYAN, depthFactor * 0.72);
+}
+
+function getGridAlpha(depthRows) {
     const surfaceGlow = Math.max(0, 1 - depthRows / SURFACE_GLOW_ROWS);
-    const horizonGlow = clamp(1 - (screenHeight - y) / (HORIZON_GLOW_ROWS * getTerrainCellSize()), 0, 1);
-    return clamp(0.24 + surfaceGlow * 0.46 + horizonGlow * 0.28, 0.22, 0.9);
+    return clamp(0.1 + surfaceGlow * 0.38, 0.08, 0.5);
 }
 
 function rebuildTerrainGraphics(terrain) {
@@ -104,30 +123,20 @@ function rebuildTerrainGraphics(terrain) {
     terrainGraphics.clear();
 
     const renderCell = ({ topLeftX, topLeftY, size, row, col, surfaceY }) => {
-        const columnBand = Math.floor(topLeftX / (size * 4));
-        const band = row + columnBand;
         const isEdge = topLeftY <= surfaceY;
         const depthRows = Math.max(0, Math.floor((topLeftY - surfaceY) / size));
-        const baseColor = band % 2 === 0 ? BODY_COLOR : BODY_ALT_COLOR;
-        const gridColor = getGridColor(depthRows, topLeftY, screenHeight, row);
-        const gridAlpha = getGridAlpha(depthRows, topLeftY, screenHeight);
-        const fillAlpha = clamp(0.28 + depthRows * 0.008, 0.28, 0.52);
-        const lineWidth = isEdge || depthRows < 2 ? 2 : 1;
+        const baseColor = getBodyColor(depthRows, col, row);
+        const gridColor = getGridColor(depthRows);
+        const gridAlpha = getGridAlpha(depthRows);
 
-        addCellRect(terrainGraphics, topLeftX, topLeftY, size, baseColor, fillAlpha);
+        addCellRect(terrainGraphics, topLeftX, topLeftY, size, baseColor, 1);
+        addLineRect(terrainGraphics, topLeftX, topLeftY, size, 1, gridColor, gridAlpha);
+        addLineRect(terrainGraphics, topLeftX, topLeftY, 1, size, gridColor, gridAlpha * 0.55);
 
         if (isEdge) {
-            addLineRect(terrainGraphics, topLeftX, topLeftY, size, 3, PINK, 0.98);
-            addLineRect(terrainGraphics, topLeftX, topLeftY + 3, size, 1, CYAN, 0.75);
-            addLineRect(terrainGraphics, topLeftX, topLeftY - 1, size, 1, PINK, 0.55);
-        } else {
-            addLineRect(terrainGraphics, topLeftX, topLeftY, size, lineWidth, gridColor, gridAlpha);
-        }
-
-        addLineRect(terrainGraphics, topLeftX, topLeftY, lineWidth, size, gridColor, gridAlpha * 0.9);
-
-        if ((band + col) % 8 === 0) {
-            addLineRect(terrainGraphics, topLeftX + size - 1, topLeftY, 1, size, CYAN, gridAlpha * 0.35);
+            addLineRect(terrainGraphics, topLeftX, topLeftY, size, 2, PINK, 0.94);
+            addLineRect(terrainGraphics, topLeftX, topLeftY + 2, size, 1, CYAN, 0.5);
+            addLineRect(terrainGraphics, topLeftX, topLeftY - 1, size, 1, PURPLE, 0.42);
         }
     };
 

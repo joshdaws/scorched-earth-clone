@@ -4868,9 +4868,15 @@ export function destroyTerrainAt(x, y, radius) {
     const cellSnapshot = captureTerrainCellSnapshot(currentTerrain, x, radius);
     const terrainGrid = getOrCreateTerrainCellGrid(currentTerrain);
     let removedCells = terrainGrid?.destroyCircle(x, y, radius) ?? [];
+    let fallingResult = { modified: false, fallingColumns: [] };
     let wasDestroyed = removedCells.length > 0;
 
     if (wasDestroyed) {
+        const settlingRadius = radius * 3;
+        fallingResult = terrainGrid.settleUnsupported({
+            minCol: Math.floor((x - settlingRadius) / terrainGrid.cellSize),
+            maxCol: Math.floor((x + settlingRadius) / terrainGrid.cellSize)
+        });
         terrainGrid.writeHeightsToTerrain(currentTerrain);
     } else {
         wasDestroyed = currentTerrain.destroyTerrain(x, y, radius);
@@ -4878,7 +4884,15 @@ export function destroyTerrainAt(x, y, radius) {
             ? buildRemovedTerrainCells(cellSnapshot, currentTerrain)
             : [];
         if (wasDestroyed) {
-            rebuildTerrainCellGrid(currentTerrain);
+            const fallbackGrid = rebuildTerrainCellGrid(currentTerrain);
+            if (fallbackGrid) {
+                const settlingRadius = radius * 3;
+                fallingResult = fallbackGrid.settleUnsupported({
+                    minCol: Math.floor((x - settlingRadius) / fallbackGrid.cellSize),
+                    maxCol: Math.floor((x + settlingRadius) / fallbackGrid.cellSize)
+                });
+                fallbackGrid.writeHeightsToTerrain(currentTerrain);
+            }
         }
     }
 
@@ -4886,12 +4900,9 @@ export function destroyTerrainAt(x, y, radius) {
         ? buildTerrainDerezSamples(derezSnapshot, currentTerrain)
         : [];
 
-    // Apply falling dirt physics after terrain destruction
     if (wasDestroyed) {
-        const fallingResult = currentTerrain.applyFallingDirt(x, radius);
         if (fallingResult.modified) {
-            console.log('Falling dirt physics applied');
-            rebuildTerrainCellGrid(currentTerrain);
+            console.log('Terrain cell settling applied');
         }
         markPixiTerrainLayerDirty();
 

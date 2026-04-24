@@ -1,5 +1,6 @@
 const DEFAULT_CELL_SIZE = 8;
 const DEFAULT_MAX_REMOVED_CELLS = 900;
+const DEFAULT_MAX_SLOPE_CELLS = 3;
 const terrainGridCache = new WeakMap();
 
 function clamp(value, min, max) {
@@ -207,6 +208,153 @@ export class TerrainCellGrid {
             }
             this.columnTopRows[col] = topRow;
         }
+    }
+
+    getColumnSolidCount(col) {
+        if (col < 0 || col >= this.columns) return 0;
+
+        let count = 0;
+        for (let row = 0; row < this.rows; row++) {
+            if (this.isSolid(col, row)) count++;
+        }
+        return count;
+    }
+
+    isColumnPacked(col, solidCount = this.getColumnSolidCount(col)) {
+        const count = clamp(Math.floor(solidCount), 0, this.rows);
+        const firstSolidRow = this.rows - count;
+
+        for (let row = 0; row < this.rows; row++) {
+            const shouldBeSolid = row >= firstSolidRow;
+            if (this.isSolid(col, row) !== shouldBeSolid) return false;
+        }
+
+        return true;
+    }
+
+    setColumnSolidCount(col, solidCount) {
+        if (col < 0 || col >= this.columns) return false;
+
+        const count = clamp(Math.floor(solidCount), 0, this.rows);
+        const firstSolidRow = this.rows - count;
+        let changed = false;
+
+        for (let row = 0; row < this.rows; row++) {
+            const shouldBeSolid = row >= firstSolidRow;
+            const index = this.index(col, row);
+            const value = shouldBeSolid ? 1 : 0;
+            if (this.cells[index] !== value) {
+                this.cells[index] = value;
+                changed = true;
+            }
+        }
+
+        this.columnTopRows[col] = count > 0 ? firstSolidRow : this.rows;
+        return changed;
+    }
+
+    /**
+     * Collapse unsupported terrain cells downward, then redistribute steep
+     * height differences into a stable stepped slope. The model preserves cell
+     * mass inside the affected range and produces a packed grid that the legacy
+     * heightmap can still read as a single surface.
+     *
+     * @param {{minCol?: number, maxCol?: number, maxSlopeCells?: number, maxIterations?: number}} [options]
+     * @returns {{modified: boolean, fallingColumns: Array<{col: number, x: number, currentHeight: number, targetHeight: number}>, settledCells: number, iterations: number, minCol: number, maxCol: number, maxSlopeCells: number}}
+     */
+    settleUnsupported(options = {}) {
+        if (this.columns <= 0 || this.rows <= 0) {
+            return {
+                modified: false,
+                fallingColumns: [],
+                settledCells: 0,
+                iterations: 0,
+                minCol: 0,
+                maxCol: -1,
+                maxSlopeCells: DEFAULT_MAX_SLOPE_CELLS
+            };
+        }
+
+        const minCol = clamp(Math.floor(options.minCol ?? 0), 0, this.columns - 1);
+        const maxCol = clamp(Math.floor(options.maxCol ?? this.columns - 1), minCol, this.columns - 1);
+        const maxSlopeCells = Math.max(1, Math.floor(options.maxSlopeCells ?? DEFAULT_MAX_SLOPE_CELLS));
+        const maxIterations = Math.max(1, Math.floor(options.maxIterations ?? this.columns * 2));
+        const width = maxCol - minCol + 1;
+        const counts = new Int16Array(width);
+        const beforeCounts = new Int16Array(width);
+        let modified = false;
+        let settledCells = 0;
+
+        for (let index = 0; index < width; index++) {
+            const col = minCol + index;
+            const count = this.getColumnSolidCount(col);
+            counts[index] = count;
+            beforeCounts[index] = count;
+            if (!this.isColumnPacked(col, count)) {
+                modified = true;
+                settledCells += count;
+            }
+        }
+
+        let iterations = 0;
+        for (; iterations < maxIterations; iterations++) {
+            let changed = false;
+
+            for (let index = 0; index < width - 1; index++) {
+                const diff = counts[index] - counts[index + 1];
+                if (Math.abs(diff) <= maxSlopeCells) continue;
+
+                const transfer = Math.max(1, Math.floor((Math.abs(diff) - maxSlopeCells + 1) / 2));
+                if (diff > 0) {
+                    const amount = Math.min(transfer, counts[index], this.rows - counts[index + 1]);
+                    if (amount <= 0) continue;
+                    counts[index] -= amount;
+                    counts[index + 1] += amount;
+                    settledCells += amount;
+                } else {
+                    const amount = Math.min(transfer, counts[index + 1], this.rows - counts[index]);
+                    if (amount <= 0) continue;
+                    counts[index] += amount;
+                    counts[index + 1] -= amount;
+                    settledCells += amount;
+                }
+
+                changed = true;
+                modified = true;
+            }
+
+            if (!changed) break;
+        }
+
+        const fallingColumns = [];
+        for (let index = 0; index < width; index++) {
+            const col = minCol + index;
+            const currentHeight = beforeCounts[index] * this.cellSize;
+            const targetHeight = counts[index] * this.cellSize;
+            if (currentHeight !== targetHeight || !this.isColumnPacked(col, counts[index])) {
+                fallingColumns.push({
+                    col,
+                    x: col * this.cellSize + this.cellSize * 0.5,
+                    currentHeight,
+                    targetHeight
+                });
+            }
+            if (this.setColumnSolidCount(col, counts[index])) {
+                modified = true;
+            }
+        }
+
+        this.recalculateColumnTops(minCol, maxCol);
+
+        return {
+            modified,
+            fallingColumns,
+            settledCells,
+            iterations: iterations + 1,
+            minCol,
+            maxCol,
+            maxSlopeCells
+        };
     }
 
     /**
