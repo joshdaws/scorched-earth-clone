@@ -2,7 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   buildRemovedTerrainCells,
   captureTerrainCellSnapshot,
-  getTerrainCellSize
+  getOrCreateTerrainCellGrid,
+  getTerrainCellSize,
+  rebuildTerrainCellGrid,
+  TerrainCellGrid
 } from '../../js/terrainCells.js';
 
 function createTerrain(heights, screenHeight = 600) {
@@ -65,5 +68,34 @@ describe('terrainCells', () => {
 
     expect(cells.length).toBeLessThanOrEqual(40);
     expect(cells.length).toBeGreaterThan(0);
+  });
+
+  it('builds a persistent grid from terrain and exports compatible heights', () => {
+    const terrain = createTerrain(new Array(32).fill(240), 400);
+    const grid = TerrainCellGrid.fromTerrain(terrain, {
+      cellSize: 8
+    });
+
+    expect(grid.columns).toBe(4);
+    expect(grid.rows).toBe(50);
+    expect(grid.getHeightAt(4)).toBe(240);
+
+    const removed = grid.destroyCircle(12, 172, 14);
+
+    expect(removed.length).toBeGreaterThan(0);
+    grid.writeHeightsToTerrain(terrain);
+    expect(terrain.getHeight(12)).toBeLessThan(240);
+  });
+
+  it('reuses cached terrain grids until explicitly rebuilt', () => {
+    const terrain = createTerrain(new Array(40).fill(200), 400);
+    const first = getOrCreateTerrainCellGrid(terrain);
+    terrain.setHeight(12, 160);
+    const cached = getOrCreateTerrainCellGrid(terrain);
+    const rebuilt = rebuildTerrainCellGrid(terrain);
+
+    expect(cached).toBe(first);
+    expect(rebuilt).not.toBe(first);
+    expect(rebuilt.getHeightAt(12)).toBe(160);
   });
 });

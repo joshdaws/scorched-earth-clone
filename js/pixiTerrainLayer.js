@@ -1,4 +1,7 @@
-import { getTerrainCellSize } from './terrainCells.js';
+import {
+    getOrCreateTerrainCellGrid,
+    getTerrainCellSize
+} from './terrainCells.js';
 
 const BODY_COLOR = 0x140527;
 const BODY_ALT_COLOR = 0x061b35;
@@ -9,6 +12,8 @@ const YELLOW = 0xf8ff4a;
 const MAX_FRAGMENTS = 1400;
 const MAX_SPAWN_CELLS = 520;
 const DEFAULT_FRAGMENT_LIFETIME_MS = 1250;
+const SURFACE_GLOW_ROWS = 10;
+const HORIZON_GLOW_ROWS = 24;
 
 let app = null;
 let Pixi = null;
@@ -69,7 +74,24 @@ function resizeLayer(width, height) {
 }
 
 function addCellRect(graphics, x, y, size, color, alpha) {
-    graphics.rect(x, y, Math.max(1, size - 1), Math.max(1, size - 1)).fill({ color, alpha });
+    graphics.rect(x, y, size, size).fill({ color, alpha });
+}
+
+function addLineRect(graphics, x, y, width, height, color, alpha) {
+    graphics.rect(x, y, Math.max(1, width), Math.max(1, height)).fill({ color, alpha });
+}
+
+function getGridColor(depthRows, y, screenHeight, row) {
+    const horizonFactor = clamp(1 - (screenHeight - y) / (HORIZON_GLOW_ROWS * getTerrainCellSize()), 0, 1);
+    const depthFactor = clamp(depthRows / SURFACE_GLOW_ROWS, 0, 1);
+    if (horizonFactor > 0.1) return CYAN;
+    return (row + Math.floor(depthRows * 0.7)) % 3 === 0 || depthFactor > 0.75 ? PINK : PURPLE;
+}
+
+function getGridAlpha(depthRows, y, screenHeight) {
+    const surfaceGlow = Math.max(0, 1 - depthRows / SURFACE_GLOW_ROWS);
+    const horizonGlow = clamp(1 - (screenHeight - y) / (HORIZON_GLOW_ROWS * getTerrainCellSize()), 0, 1);
+    return clamp(0.24 + surfaceGlow * 0.46 + horizonGlow * 0.28, 0.22, 0.9);
 }
 
 function rebuildTerrainGraphics(terrain) {
@@ -77,39 +99,55 @@ function rebuildTerrainGraphics(terrain) {
 
     const width = getTerrainWidth(terrain);
     const screenHeight = getTerrainScreenHeight(terrain);
-    const cellSize = getTerrainCellSize();
+    const grid = getOrCreateTerrainCellGrid(terrain);
+    const cellSize = grid?.cellSize ?? getTerrainCellSize();
     terrainGraphics.clear();
 
-    for (let x = 0; x < width; x += cellSize) {
-        const sampleX = Math.min(width - 1, x + cellSize * 0.5);
-        const terrainHeight = terrain.getHeight(sampleX);
-        const surfaceY = screenHeight - terrainHeight;
-        const topY = clamp(Math.floor(surfaceY / cellSize) * cellSize, 0, screenHeight);
-        const columnBand = Math.floor(x / (cellSize * 3));
+    const renderCell = ({ topLeftX, topLeftY, size, row, col, surfaceY }) => {
+        const columnBand = Math.floor(topLeftX / (size * 4));
+        const band = row + columnBand;
+        const isEdge = topLeftY <= surfaceY;
+        const depthRows = Math.max(0, Math.floor((topLeftY - surfaceY) / size));
+        const baseColor = band % 2 === 0 ? BODY_COLOR : BODY_ALT_COLOR;
+        const gridColor = getGridColor(depthRows, topLeftY, screenHeight, row);
+        const gridAlpha = getGridAlpha(depthRows, topLeftY, screenHeight);
+        const fillAlpha = clamp(0.28 + depthRows * 0.008, 0.28, 0.52);
+        const lineWidth = isEdge || depthRows < 2 ? 2 : 1;
 
-        for (let y = topY; y < screenHeight; y += cellSize) {
-            const row = Math.floor(y / cellSize);
-            const band = row + columnBand;
-            const isEdge = y === topY;
-            const isAccentRow = row % 7 === 0;
-            const baseColor = band % 2 === 0 ? BODY_COLOR : BODY_ALT_COLOR;
-            const glowColor = band % 5 === 0 ? CYAN : PINK;
+        addCellRect(terrainGraphics, topLeftX, topLeftY, size, baseColor, fillAlpha);
 
-            addCellRect(terrainGraphics, x, y, cellSize, baseColor, isEdge ? 0.8 : 0.52);
+        if (isEdge) {
+            addLineRect(terrainGraphics, topLeftX, topLeftY, size, 3, PINK, 0.98);
+            addLineRect(terrainGraphics, topLeftX, topLeftY + 3, size, 1, CYAN, 0.75);
+            addLineRect(terrainGraphics, topLeftX, topLeftY - 1, size, 1, PINK, 0.55);
+        } else {
+            addLineRect(terrainGraphics, topLeftX, topLeftY, size, lineWidth, gridColor, gridAlpha);
+        }
 
-            if (isEdge) {
-                terrainGraphics.rect(x, y, Math.max(1, cellSize - 1), 2).fill({
-                    color: PINK,
-                    alpha: 0.95
-                });
-                terrainGraphics.rect(x, y + 2, Math.max(1, cellSize - 1), 1).fill({
-                    color: CYAN,
-                    alpha: 0.55
-                });
-            } else if (isAccentRow) {
-                terrainGraphics.rect(x, y, Math.max(1, cellSize - 1), 1).fill({
-                    color: glowColor,
-                    alpha: 0.26
+        addLineRect(terrainGraphics, topLeftX, topLeftY, lineWidth, size, gridColor, gridAlpha * 0.9);
+
+        if ((band + col) % 8 === 0) {
+            addLineRect(terrainGraphics, topLeftX + size - 1, topLeftY, 1, size, CYAN, gridAlpha * 0.35);
+        }
+    };
+
+    if (grid) {
+        grid.forEachOccupiedCell(renderCell);
+    } else {
+        for (let x = 0; x < width; x += cellSize) {
+            const sampleX = Math.min(width - 1, x + cellSize * 0.5);
+            const terrainHeight = terrain.getHeight(sampleX);
+            const surfaceY = screenHeight - terrainHeight;
+            const topY = clamp(Math.floor(surfaceY / cellSize) * cellSize, 0, screenHeight);
+
+            for (let y = topY; y < screenHeight; y += cellSize) {
+                renderCell({
+                    topLeftX: x,
+                    topLeftY: y,
+                    size: cellSize,
+                    row: Math.floor(y / cellSize),
+                    col: Math.floor(x / cellSize),
+                    surfaceY: topY
                 });
             }
         }

@@ -1,5 +1,6 @@
 const DEFAULT_CELL_SIZE = 8;
 const DEFAULT_MAX_REMOVED_CELLS = 900;
+const terrainGridCache = new WeakMap();
 
 function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
@@ -113,4 +114,215 @@ export function buildRemovedTerrainCells(snapshot, terrain, options = {}) {
 
 export function getTerrainCellSize() {
     return DEFAULT_CELL_SIZE;
+}
+
+export class TerrainCellGrid {
+    /**
+     * @param {{width: number, screenHeight: number, cellSize?: number}} options
+     */
+    constructor({ width, screenHeight, cellSize = DEFAULT_CELL_SIZE }) {
+        this.width = Math.max(0, Math.floor(width));
+        this.screenHeight = Math.max(0, Math.floor(screenHeight));
+        this.cellSize = Math.max(2, Math.floor(cellSize));
+        this.columns = Math.ceil(this.width / this.cellSize);
+        this.rows = Math.ceil(this.screenHeight / this.cellSize);
+        this.cells = new Uint8Array(this.columns * this.rows);
+        this.columnTopRows = new Int16Array(this.columns);
+        this.columnTopRows.fill(this.rows);
+    }
+
+    static fromTerrain(terrain, options = {}) {
+        const width = getTerrainWidth(terrain);
+        const screenHeight = getTerrainScreenHeight(terrain);
+        if (!terrain || width <= 0 || screenHeight <= 0) return null;
+
+        const grid = new TerrainCellGrid({
+            width,
+            screenHeight,
+            cellSize: options.cellSize ?? DEFAULT_CELL_SIZE
+        });
+
+        for (let col = 0; col < grid.columns; col++) {
+            const sampleX = Math.min(width - 1, col * grid.cellSize + grid.cellSize * 0.5);
+            const terrainHeight = getTerrainHeight(terrain, sampleX);
+            const surfaceY = screenHeight - terrainHeight;
+            const topRow = clamp(Math.floor(surfaceY / grid.cellSize), 0, grid.rows);
+
+            for (let row = topRow; row < grid.rows; row++) {
+                grid.setCell(col, row, true);
+            }
+        }
+
+        grid.recalculateColumnTops();
+        return grid;
+    }
+
+    index(col, row) {
+        return row * this.columns + col;
+    }
+
+    isInBounds(col, row) {
+        return col >= 0 && row >= 0 && col < this.columns && row < this.rows;
+    }
+
+    isSolid(col, row) {
+        return this.isInBounds(col, row) && this.cells[this.index(col, row)] === 1;
+    }
+
+    setCell(col, row, solid) {
+        if (!this.isInBounds(col, row)) return false;
+        this.cells[this.index(col, row)] = solid ? 1 : 0;
+        return true;
+    }
+
+    getCellCenter(col, row) {
+        return {
+            x: col * this.cellSize + this.cellSize * 0.5,
+            y: row * this.cellSize + this.cellSize * 0.5
+        };
+    }
+
+    getSurfaceYForColumn(col) {
+        if (col < 0 || col >= this.columns) return this.screenHeight;
+        const topRow = this.columnTopRows[col];
+        return topRow >= this.rows ? this.screenHeight : topRow * this.cellSize;
+    }
+
+    getHeightAt(x) {
+        const col = clamp(Math.floor(x / this.cellSize), 0, this.columns - 1);
+        return this.screenHeight - this.getSurfaceYForColumn(col);
+    }
+
+    recalculateColumnTops(startCol = 0, endCol = this.columns - 1) {
+        const minCol = clamp(Math.floor(startCol), 0, this.columns - 1);
+        const maxCol = clamp(Math.floor(endCol), 0, this.columns - 1);
+
+        for (let col = minCol; col <= maxCol; col++) {
+            let topRow = this.rows;
+            for (let row = 0; row < this.rows; row++) {
+                if (this.isSolid(col, row)) {
+                    topRow = row;
+                    break;
+                }
+            }
+            this.columnTopRows[col] = topRow;
+        }
+    }
+
+    /**
+     * Remove occupied cells inside a circular blast.
+     *
+     * @param {number} x
+     * @param {number} y
+     * @param {number} radius
+     * @returns {Array<{x: number, y: number, topLeftX: number, topLeftY: number, size: number, depth: number, distance: number, col: number, row: number}>}
+     */
+    destroyCircle(x, y, radius) {
+        if (radius <= 0) return [];
+
+        const startCol = clamp(Math.floor((x - radius) / this.cellSize), 0, this.columns - 1);
+        const endCol = clamp(Math.floor((x + radius) / this.cellSize), 0, this.columns - 1);
+        const startRow = clamp(Math.floor((y - radius) / this.cellSize), 0, this.rows - 1);
+        const endRow = clamp(Math.floor((y + radius) / this.cellSize), 0, this.rows - 1);
+        const removed = [];
+
+        for (let col = startCol; col <= endCol; col++) {
+            const surfaceY = this.getSurfaceYForColumn(col);
+            for (let row = startRow; row <= endRow; row++) {
+                if (!this.isSolid(col, row)) continue;
+
+                const center = this.getCellCenter(col, row);
+                const distance = Math.hypot(center.x - x, center.y - y);
+                if (distance > radius) continue;
+
+                this.setCell(col, row, false);
+                removed.push({
+                    x: center.x,
+                    y: center.y,
+                    topLeftX: col * this.cellSize,
+                    topLeftY: row * this.cellSize,
+                    size: this.cellSize,
+                    depth: Math.max(this.cellSize, center.y - surfaceY),
+                    distance,
+                    col,
+                    row
+                });
+            }
+        }
+
+        if (removed.length > 0) {
+            this.recalculateColumnTops(startCol, endCol);
+        }
+
+        return removed;
+    }
+
+    /**
+     * Export this grid back into the legacy heightmap shape.
+     *
+     * @param {import('./terrain.js').Terrain} terrain
+     */
+    writeHeightsToTerrain(terrain) {
+        if (!terrain) return;
+
+        for (let col = 0; col < this.columns; col++) {
+            const height = this.screenHeight - this.getSurfaceYForColumn(col);
+            const startX = col * this.cellSize;
+            const endX = Math.min(this.width - 1, startX + this.cellSize - 1);
+
+            for (let x = startX; x <= endX; x++) {
+                terrain.setHeight(x, height);
+            }
+        }
+    }
+
+    /**
+     * Iterate occupied cells with stable grid coordinates.
+     *
+     * @param {(cell: {x: number, y: number, topLeftX: number, topLeftY: number, size: number, col: number, row: number, surfaceY: number}) => void} visitor
+     */
+    forEachOccupiedCell(visitor) {
+        for (let col = 0; col < this.columns; col++) {
+            const surfaceY = this.getSurfaceYForColumn(col);
+            for (let row = 0; row < this.rows; row++) {
+                if (!this.isSolid(col, row)) continue;
+                const topLeftX = col * this.cellSize;
+                const topLeftY = row * this.cellSize;
+                visitor({
+                    x: topLeftX + this.cellSize * 0.5,
+                    y: topLeftY + this.cellSize * 0.5,
+                    topLeftX,
+                    topLeftY,
+                    size: this.cellSize,
+                    col,
+                    row,
+                    surfaceY
+                });
+            }
+        }
+    }
+}
+
+export function getOrCreateTerrainCellGrid(terrain, options = {}) {
+    if (!terrain) return null;
+    const cached = terrainGridCache.get(terrain);
+    const cellSize = Math.max(2, Math.floor(options.cellSize ?? DEFAULT_CELL_SIZE));
+    if (
+        cached &&
+        cached.width === getTerrainWidth(terrain) &&
+        cached.screenHeight === getTerrainScreenHeight(terrain) &&
+        cached.cellSize === cellSize
+    ) {
+        return cached;
+    }
+
+    return rebuildTerrainCellGrid(terrain, options);
+}
+
+export function rebuildTerrainCellGrid(terrain, options = {}) {
+    const grid = TerrainCellGrid.fromTerrain(terrain, options);
+    if (grid) {
+        terrainGridCache.set(terrain, grid);
+    }
+    return grid;
 }

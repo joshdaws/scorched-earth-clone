@@ -85,7 +85,9 @@ import {
 } from './terrainDerezEffect.js';
 import {
     buildRemovedTerrainCells,
-    captureTerrainCellSnapshot
+    captureTerrainCellSnapshot,
+    getOrCreateTerrainCellGrid,
+    rebuildTerrainCellGrid
 } from './terrainCells.js';
 import {
     initPixiTerrainLayer,
@@ -4864,12 +4866,24 @@ export function destroyTerrainAt(x, y, radius) {
 
     const derezSnapshot = captureTerrainDerezSnapshot(currentTerrain, x, radius);
     const cellSnapshot = captureTerrainCellSnapshot(currentTerrain, x, radius);
-    const wasDestroyed = currentTerrain.destroyTerrain(x, y, radius);
+    const terrainGrid = getOrCreateTerrainCellGrid(currentTerrain);
+    let removedCells = terrainGrid?.destroyCircle(x, y, radius) ?? [];
+    let wasDestroyed = removedCells.length > 0;
+
+    if (wasDestroyed) {
+        terrainGrid.writeHeightsToTerrain(currentTerrain);
+    } else {
+        wasDestroyed = currentTerrain.destroyTerrain(x, y, radius);
+        removedCells = wasDestroyed
+            ? buildRemovedTerrainCells(cellSnapshot, currentTerrain)
+            : [];
+        if (wasDestroyed) {
+            rebuildTerrainCellGrid(currentTerrain);
+        }
+    }
+
     const destructionSamples = wasDestroyed
         ? buildTerrainDerezSamples(derezSnapshot, currentTerrain)
-        : [];
-    const removedCells = wasDestroyed
-        ? buildRemovedTerrainCells(cellSnapshot, currentTerrain)
         : [];
 
     // Apply falling dirt physics after terrain destruction
@@ -4877,6 +4891,7 @@ export function destroyTerrainAt(x, y, radius) {
         const fallingResult = currentTerrain.applyFallingDirt(x, radius);
         if (fallingResult.modified) {
             console.log('Falling dirt physics applied');
+            rebuildTerrainCellGrid(currentTerrain);
         }
         markPixiTerrainLayerDirty();
 
