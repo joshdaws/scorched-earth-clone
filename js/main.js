@@ -14,8 +14,7 @@ import * as Turn from './turn.js';
 import { COLORS, DEBUG, CANVAS, UI, GAME_STATES, TURN_PHASES, PHYSICS, TANK, PROJECTILE, GAME } from './constants.js';
 import { generateTerrain } from './terrain.js';
 import { createPlayerTank, createEnemyTank, placeTanksOnTerrain, updateTankTerrainPosition, calculateFallDamage, areAnyTanksFalling } from './tank.js';
-import { Projectile, createProjectileFromTank, checkTankCollision, createSplitProjectiles, createChainReactionProjectiles, shouldChainReact } from './projectile.js';
-import { applyExplosionDamage, applyExplosionToAllTanks, DAMAGE } from './damage.js';
+import { Projectile, createProjectileFromTank, checkTankCollision, createSplitProjectiles } from './projectile.js';
 import * as Wind from './wind.js';
 import { WeaponRegistry, WEAPON_TYPES } from './weapons.js';
 import * as AI from './ai.js';
@@ -24,7 +23,7 @@ import * as AimingControls from './aimingControls.js?v=20260111a';
 import * as VictoryDefeat from './victoryDefeat.js';
 import * as Money from './money.js';
 import * as Shop from './shop.js';
-import { spawnExplosionParticles, updateParticles, renderParticles, clearParticles, getParticleCount, screenShakeForBlastRadius, getScreenShakeOffset, clearScreenShake, screenFlash, renderScreenFlash, clearScreenFlash, initBackground, updateBackground, renderBackground, clearBackground, renderCrtEffects, setCrtEnabled, isCrtEnabled, toggleCrt } from './effects.js';
+import { updateParticles, renderParticles, clearParticles, getParticleCount, screenShakeForBlastRadius, getScreenShakeOffset, clearScreenShake, renderScreenFlash, clearScreenFlash, initBackground, updateBackground, renderBackground, clearBackground, renderCrtEffects, setCrtEnabled, isCrtEnabled, toggleCrt } from './effects.js';
 import * as Music from './music.js';
 import * as VolumeControls from './volumeControls.js';
 import * as PauseMenu from './pauseMenu.js';
@@ -75,6 +74,7 @@ import * as DailyChallenges from './engagement/dailyChallenges.js';
 import * as EngagementUI from './engagement/engagementUI.js';
 import * as DebugOverlays from './debugOverlays.js';
 import { GAMEPLAY_EVENTS, emitGameplayEvent } from './gameplayEvents.js';
+import { resolveProjectileImpact } from './impactResolution.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -2890,23 +2890,6 @@ function fireProjectile(tank) {
     return true;
 }
 
-function emitTankDamageEvent(result, weaponId, source) {
-    if (!result?.tank || result.actualDamage <= 0) return;
-
-    emitGameplayEvent(GAMEPLAY_EVENTS.TANK_DAMAGED, {
-        tank: result.tank,
-        team: result.tank.team,
-        weaponId,
-        damage: result.damage,
-        actualDamage: result.actualDamage,
-        shieldDamage: result.shieldDamage,
-        healthDamage: result.healthDamage,
-        isDirectHit: result.isDirectHit,
-        shieldBusted: result.shieldBusted,
-        source
-    });
-}
-
 /**
  * Handle a single projectile's explosion (on terrain or tank hit).
  * Creates crater, applies damage, updates tank positions.
@@ -2919,504 +2902,30 @@ function emitTankDamageEvent(result, weaponId, source) {
  * @returns {import('./projectile.js').Projectile[]} Chain reaction projectiles to spawn, or empty array
  */
 function handleProjectileExplosion(projectile, pos, directHitTank) {
-    const weaponId = projectile.weaponId;
-    const weapon = WeaponRegistry.getWeapon(weaponId);
-    const blastRadius = weapon ? weapon.blastRadius : 30;
-    const isNuclear = weapon && weapon.type === WEAPON_TYPES.NUCLEAR;
-
-    const explosion = {
-        x: pos.x,
-        y: pos.y,
-        blastRadius: blastRadius
-    };
-
-    emitGameplayEvent(GAMEPLAY_EVENTS.PROJECTILE_IMPACT, {
+    return resolveProjectileImpact({
         projectile,
-        weapon,
-        weaponId,
-        owner: projectile.owner,
-        impact: { x: pos.x, y: pos.y },
-        blastRadius,
-        isNuclear,
-        directHitTank
+        pos,
+        directHitTank,
+        playerTank,
+        enemyTank,
+        currentTerrain,
+        isLevelMode,
+        levelModeStats,
+        tracerTrailDuration: TRACER_TRAIL_DURATION,
+        services: {
+            destroyTerrainAt,
+            updateTankTerrainPosition,
+            setExplosionEffect: effect => {
+                explosionEffect = effect;
+            },
+            addPersistentTrail: trail => {
+                persistentTrails.push(trail);
+            },
+            createFalloutZone,
+            createFireZone,
+            createGravityWell
+        }
     });
-
-    // Track who fired this projectile for money awards
-    const isPlayerShot = projectile.owner === 'player';
-
-    // Track if player shot hit enemy for shotHit stat
-    let playerHitEnemy = false;
-    let wasDirectHit = false; // For precision achievement detection
-
-    if (directHitTank) {
-        // Store health before damage for achievement detection (Overkill)
-        const healthBeforeDamage = directHitTank.health;
-
-        // Apply explosion damage to the directly hit tank
-        const damageResult = applyExplosionDamage(explosion, directHitTank, weapon);
-        emitTankDamageEvent(damageResult, weaponId, 'direct');
-
-        // Award money and record stats if player hit the enemy tank
-        if (isPlayerShot && directHitTank.team === 'enemy' && damageResult.actualDamage > 0) {
-            const hitReward = Money.awardHitReward(damageResult.actualDamage);
-            ProgressionAchievements.onMoneyEarned(hitReward);
-            LifetimeStats.recordMoneyEarned(hitReward);
-            recordStat('damageDealt', damageResult.actualDamage);
-            playerHitEnemy = true;
-            wasDirectHit = damageResult.isDirectHit;
-
-            // Level mode: track damage dealt
-            if (isLevelMode) {
-                levelModeStats.damageDealt += damageResult.actualDamage;
-            }
-
-            // Lifetime stats: record damage dealt
-            LifetimeStats.recordDamageDealt(damageResult.actualDamage);
-
-            // Combat achievement detection: damage dealt to enemy
-            CombatAchievements.onDamageDealt(damageResult, directHitTank, healthBeforeDamage);
-
-            // Weapon achievement: track damage dealt by weapon (for kill credit)
-            WeaponAchievements.onDamageDealtToEnemy(weaponId, damageResult.actualDamage, directHitTank.health);
-        }
-
-        // Track damage taken by player
-        if (directHitTank.team === 'player' && damageResult.actualDamage > 0) {
-            recordStat('damageTaken', damageResult.actualDamage);
-
-            // Lifetime stats: record damage taken
-            LifetimeStats.recordDamageTaken(damageResult.actualDamage);
-
-            // Performance tracking: player took damage (affects flawless status and heavy damage penalty)
-            PerformanceTracking.onDamageTaken(damageResult.actualDamage, TANK.START_HEALTH);
-
-            // Combat achievement detection: player took damage
-            CombatAchievements.onPlayerDamageTaken(damageResult.actualDamage, directHitTank.health);
-
-            // Hidden achievement detection: check for self-inflicted damage
-            HiddenAchievements.onPlayerSelfDamage(isPlayerShot, directHitTank.health, damageResult.actualDamage);
-        }
-
-        // Also check for splash damage to other tanks
-        const allTanks = [playerTank, enemyTank].filter(t => t !== null && t !== directHitTank);
-
-        // Store health before splash damage for achievement detection
-        const splashHealthBefore = {};
-        for (const tank of allTanks) {
-            splashHealthBefore[tank.team] = tank.health;
-        }
-
-        const splashResults = applyExplosionToAllTanks(explosion, allTanks, weapon);
-        for (const result of splashResults) {
-            emitTankDamageEvent(result, weaponId, 'splash');
-        }
-
-        // Award money and record stats for splash damage
-        if (isPlayerShot) {
-            for (const result of splashResults) {
-                if (result.tank.team === 'enemy' && result.actualDamage > 0) {
-                    const splashReward = Money.awardHitReward(result.actualDamage);
-                    ProgressionAchievements.onMoneyEarned(splashReward);
-                    LifetimeStats.recordMoneyEarned(splashReward);
-                    recordStat('damageDealt', result.actualDamage);
-                    playerHitEnemy = true;
-
-                    // Level mode: track splash damage dealt
-                    if (isLevelMode) {
-                        levelModeStats.damageDealt += result.actualDamage;
-                    }
-
-                    // Lifetime stats: record splash damage dealt
-                    LifetimeStats.recordDamageDealt(result.actualDamage);
-
-                    // Combat achievement detection: splash damage dealt to enemy
-                    CombatAchievements.onDamageDealt(result, result.tank, splashHealthBefore[result.tank.team]);
-
-                    // Weapon achievement: track splash damage dealt by weapon (for kill credit)
-                    WeaponAchievements.onDamageDealtToEnemy(weaponId, result.actualDamage, result.tank.health);
-                }
-            }
-        }
-
-        // Track splash damage taken by player
-        for (const result of splashResults) {
-            if (result.tank.team === 'player' && result.actualDamage > 0) {
-                recordStat('damageTaken', result.actualDamage);
-
-                // Lifetime stats: record splash damage taken
-                LifetimeStats.recordDamageTaken(result.actualDamage);
-
-                // Combat achievement detection: player took splash damage
-                CombatAchievements.onPlayerDamageTaken(result.actualDamage, result.tank.health);
-
-                // Hidden achievement detection: check for self-inflicted splash damage
-                HiddenAchievements.onPlayerSelfDamage(isPlayerShot, result.tank.health, result.actualDamage);
-            }
-        }
-
-        console.log(`Tank hit! ${directHitTank.team} took ${damageResult.actualDamage} damage${damageResult.isDirectHit ? ' (DIRECT HIT!)' : ''}, health: ${directHitTank.health}`);
-    } else {
-        // Apply splash damage to all tanks near the explosion
-        const allTanks = [playerTank, enemyTank].filter(t => t !== null);
-
-        // Store health before damage for achievement detection
-        const healthBefore = {};
-        for (const tank of allTanks) {
-            healthBefore[tank.team] = tank.health;
-        }
-
-        const damageResults = applyExplosionToAllTanks(explosion, allTanks, weapon);
-        for (const result of damageResults) {
-            emitTankDamageEvent(result, weaponId, 'splash');
-        }
-
-        // Award money and record stats for any damage on enemy if player shot
-        if (isPlayerShot) {
-            for (const result of damageResults) {
-                if (result.tank.team === 'enemy' && result.actualDamage > 0) {
-                    const terrainHitReward = Money.awardHitReward(result.actualDamage);
-                    ProgressionAchievements.onMoneyEarned(terrainHitReward);
-                    LifetimeStats.recordMoneyEarned(terrainHitReward);
-                    recordStat('damageDealt', result.actualDamage);
-                    playerHitEnemy = true;
-
-                    // Level mode: track terrain splash damage dealt
-                    if (isLevelMode) {
-                        levelModeStats.damageDealt += result.actualDamage;
-                    }
-
-                    // Lifetime stats: record terrain splash damage dealt
-                    LifetimeStats.recordDamageDealt(result.actualDamage);
-
-                    // Combat achievement detection: damage dealt to enemy
-                    CombatAchievements.onDamageDealt(result, result.tank, healthBefore[result.tank.team]);
-
-                    // Weapon achievement: track damage dealt by weapon (for kill credit)
-                    WeaponAchievements.onDamageDealtToEnemy(weaponId, result.actualDamage, result.tank.health);
-                }
-            }
-        }
-
-        // Track damage taken by player
-        for (const result of damageResults) {
-            if (result.tank.team === 'player' && result.actualDamage > 0) {
-                recordStat('damageTaken', result.actualDamage);
-
-                // Lifetime stats: record terrain splash damage taken
-                LifetimeStats.recordDamageTaken(result.actualDamage);
-
-                // Performance tracking: player took splash damage
-                PerformanceTracking.onDamageTaken(result.actualDamage, TANK.START_HEALTH);
-
-                // Combat achievement detection: player took damage
-                CombatAchievements.onPlayerDamageTaken(result.actualDamage, result.tank.health);
-
-                // Hidden achievement detection: check for self-inflicted damage
-                HiddenAchievements.onPlayerSelfDamage(isPlayerShot, result.tank.health, result.actualDamage);
-            }
-            console.log(`Splash damage: ${result.tank.team} tank took ${result.actualDamage} damage, health: ${result.tank.health}`);
-        }
-    }
-
-    // Record shotHit if player shot hit the enemy (only once per projectile)
-    if (isPlayerShot && playerHitEnemy) {
-        recordStat('shotHit');
-
-        // Level mode: track hits for accuracy calculation
-        if (isLevelMode) {
-            levelModeStats.shotsHit++;
-        }
-
-        // Lifetime stats: record shot that hit
-        LifetimeStats.recordShot(true);
-
-        // Performance tracking: player hit enemy
-        PerformanceTracking.updateAccuracy(true);
-
-        // Precision achievement detection: player hit enemy
-        PrecisionAchievements.onPlayerHitEnemy({
-            isDirectHit: wasDirectHit,
-            playerTank: playerTank,
-            enemyTank: enemyTank
-        });
-
-        // Hidden achievement detection: player hit enemy (resets consecutive misses)
-        HiddenAchievements.onPlayerHitEnemy();
-    } else if (isPlayerShot) {
-        // Lifetime stats: record shot that missed
-        LifetimeStats.recordShot(false);
-
-        // Performance tracking: player missed
-        PerformanceTracking.updateAccuracy(false);
-
-        // Precision achievement detection: player missed
-        PrecisionAchievements.onPlayerMissed();
-
-        // Hidden achievement detection: player missed (tracks consecutive misses)
-        HiddenAchievements.onPlayerMissed();
-    }
-
-    // Trigger explosion visual effect for all weapons (before terrain destruction)
-    // Nuclear weapons get longer duration and special mushroom cloud
-    const explosionDuration = isNuclear ? 800 : 400;
-    explosionEffect = {
-        active: true,
-        x: pos.x,
-        y: pos.y,
-        radius: blastRadius,
-        startTime: performance.now(),
-        duration: explosionDuration,
-        isNuclear: isNuclear,
-        hasMushroomCloud: weapon?.mushroomCloud || false
-    };
-
-    // Save trail for Tracer weapons (showsTrajectory flag)
-    // Trail persists for TRACER_TRAIL_DURATION after explosion so player can learn trajectory
-    if (weapon?.showsTrajectory && projectile) {
-        const trail = projectile.getTrail();
-        if (trail && trail.length > 0) {
-            // Deep copy the trail positions (they'll be cleared from the projectile soon)
-            const trailCopy = trail.map(p => ({ x: p.x, y: p.y }));
-            // Add the final impact position to the trail
-            trailCopy.push({ x: pos.x, y: pos.y });
-            persistentTrails.push({
-                trail: trailCopy,
-                startTime: performance.now(),
-                duration: TRACER_TRAIL_DURATION,
-                color: weapon.trailColor || '#ffffff'
-            });
-            console.log(`Tracer trail saved with ${trailCopy.length} points`);
-        }
-    }
-
-    // Spawn explosion particles
-    spawnExplosionParticles(pos.x, pos.y, blastRadius, isNuclear);
-
-    // Screen shake for ALL weapons (intensity/duration based on blast radius)
-    // Smaller weapons get subtle shakes, larger weapons get dramatic shakes
-    screenShakeForBlastRadius(blastRadius);
-
-    // Haptic feedback for explosions (mobile devices)
-    Haptics.hapticExplosion(blastRadius);
-
-    // Destroy terrain (unless weapon has noTerrainDamage flag - e.g., Neutron Bomb, EMP)
-    if (currentTerrain && !weapon?.noTerrainDamage) {
-        destroyTerrainAt(pos.x, pos.y, blastRadius);
-
-        // Update tank positions to match new terrain height
-        if (playerTank && currentTerrain) {
-            updateTankTerrainPosition(playerTank, currentTerrain);
-        }
-        if (enemyTank && currentTerrain) {
-            updateTankTerrainPosition(enemyTank, currentTerrain);
-        }
-    } else if (weapon?.noTerrainDamage) {
-        console.log(`${weapon.name} - no terrain damage (noTerrainDamage flag)`);
-    }
-
-    // Nuclear weapon special effects (flash only - shake handled above for all weapons)
-    if (isNuclear) {
-        console.log(`Nuclear explosion at (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}) - ${weapon.name}`);
-
-        // Screen flash effect (white flash) - triggers for nuclear weapons only
-        if (weapon.screenFlash) {
-            screenFlash('white', 300);
-        }
-
-        // EMP effect - disables advanced weapons for 2 turns
-        if (weapon.emp) {
-            const allTanks = [playerTank, enemyTank].filter(t => t !== null);
-            for (const tank of allTanks) {
-                // Check if tank is within blast radius
-                const dx = tank.x - pos.x;
-                const dy = tank.y - pos.y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-
-                if (distance <= blastRadius) {
-                    tank.applyEmp(2); // Disable weapons for 2 turns
-                }
-            }
-        }
-
-        // Tactical Nuke fallout - create a fallout zone that persists
-        if (weapon.burning && weaponId === 'tactical-nuke') {
-            createFalloutZone(pos.x, pos.y, blastRadius * 0.6, 2); // 60% of blast radius, 2 turns
-        }
-
-        // Play nuclear explosion sound
-        Sound.playNuclearExplosionSound(blastRadius);
-    } else {
-        // Standard explosion sound for non-nuclear weapons
-        Sound.playExplosionSound(blastRadius);
-    }
-
-    // ==========================================================================
-    // SPECIAL WEAPON EFFECTS
-    // ==========================================================================
-
-    const isSpecial = weapon && weapon.type === WEAPON_TYPES.SPECIAL;
-
-    if (isSpecial) {
-        // Napalm - Create burning fire zone
-        if (weapon.burning && weaponId === 'napalm') {
-            createFireZone(pos.x, pos.y, blastRadius);
-            console.log(`Napalm fire zone created at (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)})`);
-        }
-
-        // Liquid Dirt - Add terrain at impact point to bury enemy
-        if (weapon.buriesTank && weaponId === 'liquid-dirt') {
-            const dirtRadius = 50; // Width of dirt pile
-            const dirtHeight = 100; // Height of dirt added
-
-            // Add terrain in a mound shape at impact point
-            for (let dx = -dirtRadius; dx <= dirtRadius; dx++) {
-                const x = Math.floor(pos.x + dx);
-                if (x >= 0 && x < currentTerrain.getWidth()) {
-                    // Create a mound shape: higher in the center, lower at edges
-                    const distFromCenter = Math.abs(dx) / dirtRadius;
-                    const heightMultiplier = 1 - (distFromCenter * distFromCenter); // Parabolic falloff
-                    const addedHeight = dirtHeight * heightMultiplier;
-
-                    const currentHeight = currentTerrain.getHeight(x);
-                    const newHeight = currentHeight + addedHeight;
-                    currentTerrain.setHeight(x, newHeight);
-                }
-            }
-
-            // Update tank positions after terrain change
-            if (playerTank && currentTerrain) {
-                updateTankTerrainPosition(playerTank, currentTerrain);
-            }
-            if (enemyTank && currentTerrain) {
-                updateTankTerrainPosition(enemyTank, currentTerrain);
-            }
-
-            emitGameplayEvent(GAMEPLAY_EVENTS.TERRAIN_CHANGED, {
-                source: 'liquid-dirt',
-                x: pos.x,
-                y: pos.y,
-                radius: dirtRadius,
-                terrain: currentTerrain
-            });
-
-            console.log(`Liquid Dirt added ${dirtHeight}px terrain at (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)})`);
-        }
-
-        // Teleporter - Move the firing tank to the impact point
-        if (weapon.teleport && weaponId === 'teleporter') {
-            // Find the tank that fired this projectile
-            const firingTank = projectile.owner === 'player' ? playerTank : enemyTank;
-
-            if (firingTank && !firingTank.isDestroyed()) {
-                // Teleport to impact X position, but snap to terrain height
-                const teleportX = Math.max(32, Math.min(currentTerrain.getWidth() - 32, pos.x));
-                firingTank.x = teleportX;
-
-                // Update Y to match terrain at new position
-                updateTankTerrainPosition(firingTank, currentTerrain);
-
-                console.log(`${firingTank.team} tank teleported to (${teleportX.toFixed(1)}, ${firingTank.y.toFixed(1)})`);
-
-                // Visual effect for teleportation
-                screenFlash('#9900ff', 200); // Purple flash for teleport
-            }
-        }
-
-        // Wind Bomb - Change wind direction and strength
-        if (weapon.windEffect && weaponId === 'wind-bomb') {
-            // Generate a new random wind value
-            const currentWind = Wind.getWind();
-            const newWind = (Math.random() * 20) - 10; // Range -10 to +10
-            Wind.setWind(newWind);
-
-            console.log(`Wind Bomb changed wind from ${currentWind.toFixed(1)} to ${newWind.toFixed(1)}`);
-
-            // Visual feedback
-            screenFlash('#87ceeb', 150); // Light blue flash for wind change
-        }
-
-        // Gravity Well - Pull nearby tanks toward impact point
-        if (weapon.gravityWell && weaponId === 'gravity-well') {
-            createGravityWell(pos.x, pos.y);
-
-            // Visual effect for gravity well
-            screenFlash('#330066', 300); // Dark purple flash
-        }
-
-        // Lightning Strike - Vertical strike from sky (already handled by vertical flag in projectile)
-        if (weapon.vertical && weaponId === 'lightning-strike') {
-            // The lightning strike visual effect
-            screenFlash('#00ffff', 100); // Bright cyan flash
-
-            console.log(`Lightning Strike at (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)})`);
-        }
-
-        // Ion Cannon - Continuous beam from orbit (vertical + beam)
-        if (weapon.vertical && weapon.beam && weaponId === 'ion-cannon') {
-            // Ion Cannon has longer sustained flash effect
-            screenFlash('#ff00ff', 400); // Magenta flash for Ion Cannon
-
-            // Additional terrain damage in a line from top of screen to impact
-            const beamWidth = 10;
-            for (let dx = -beamWidth; dx <= beamWidth; dx++) {
-                const x = Math.floor(pos.x + dx);
-                if (x >= 0 && x < currentTerrain.getWidth()) {
-                    const currentHeight = currentTerrain.getHeight(x);
-                    // Reduce terrain height by 30 pixels in the beam path
-                    currentTerrain.setHeight(x, Math.max(0, currentHeight - 30));
-                }
-            }
-
-            // Update tank positions after terrain destruction
-            if (playerTank && currentTerrain) {
-                updateTankTerrainPosition(playerTank, currentTerrain);
-            }
-            if (enemyTank && currentTerrain) {
-                updateTankTerrainPosition(enemyTank, currentTerrain);
-            }
-
-            emitGameplayEvent(GAMEPLAY_EVENTS.TERRAIN_CHANGED, {
-                source: 'ion-cannon',
-                x: pos.x,
-                y: pos.y,
-                radius: beamWidth,
-                terrain: currentTerrain
-            });
-
-            console.log(`Ion Cannon beam at (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)})`);
-        }
-    }
-
-    // Shield Buster - Extra damage is handled in damage calculation (shieldBuster flag)
-    // Note: Shield system not yet implemented, but the weapon flag is ready
-
-    // Play hit or miss sound based on whether a tank was hit
-    if (directHitTank) {
-        // Tank was directly hit - play metallic hit sound
-        Sound.playHitSound();
-    } else {
-        // Terrain hit only - play dull thud miss sound
-        Sound.playMissSound();
-    }
-
-    // Check for chain reaction - spawn child projectiles from explosion
-    emitGameplayEvent(GAMEPLAY_EVENTS.PROJECTILE_IMPACT_RESOLVED, {
-        projectile,
-        weapon,
-        weaponId,
-        owner: projectile.owner,
-        impact: { x: pos.x, y: pos.y },
-        blastRadius,
-        isNuclear,
-        directHitTank
-    });
-
-    if (shouldChainReact(projectile)) {
-        const chainChildren = createChainReactionProjectiles(projectile, pos);
-        return chainChildren;
-    }
-
-    return [];
 }
 
 /**
