@@ -83,6 +83,15 @@ import {
     renderTerrainDerezEffects,
     updateTerrainDerezEffects
 } from './terrainDerezEffect.js';
+import {
+    buildRemovedTerrainCells,
+    captureTerrainCellSnapshot
+} from './terrainCells.js';
+import {
+    initPixiTerrainLayer,
+    markPixiTerrainLayerDirty,
+    renderPixiTerrainLayerToCanvas
+} from './pixiTerrainLayer.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -3544,6 +3553,10 @@ function renderTerrain(ctx) {
     if (!currentTerrain) return;
 
     const terrain = currentTerrain;
+    if (renderPixiTerrainLayerToCanvas(ctx, terrain)) {
+        return;
+    }
+
     const width = terrain.getWidth();
     const screenHeight = terrain.getScreenHeight();
 
@@ -4850,9 +4863,13 @@ export function destroyTerrainAt(x, y, radius) {
     }
 
     const derezSnapshot = captureTerrainDerezSnapshot(currentTerrain, x, radius);
+    const cellSnapshot = captureTerrainCellSnapshot(currentTerrain, x, radius);
     const wasDestroyed = currentTerrain.destroyTerrain(x, y, radius);
     const destructionSamples = wasDestroyed
         ? buildTerrainDerezSamples(derezSnapshot, currentTerrain)
+        : [];
+    const removedCells = wasDestroyed
+        ? buildRemovedTerrainCells(cellSnapshot, currentTerrain)
         : [];
 
     // Apply falling dirt physics after terrain destruction
@@ -4861,6 +4878,7 @@ export function destroyTerrainAt(x, y, radius) {
         if (fallingResult.modified) {
             console.log('Falling dirt physics applied');
         }
+        markPixiTerrainLayerDirty();
 
         emitGameplayEvent(GAMEPLAY_EVENTS.TERRAIN_CHANGED, {
             source: 'explosion',
@@ -4868,6 +4886,7 @@ export function destroyTerrainAt(x, y, radius) {
             y,
             radius,
             destructionSamples,
+            removedCells,
             fallingDirt: fallingResult,
             terrain: currentTerrain
         });
@@ -7118,6 +7137,13 @@ async function init() {
     // Initialize synthwave background (static layer behind gameplay)
     initBackground(Renderer.getWidth(), Renderer.getHeight());
 
+    // Initialize the GPU-backed terrain visuals. Gameplay keeps the Canvas 2D
+    // renderer; Pixi is composited into the terrain pass when available.
+    await initPixiTerrainLayer({
+        width: Renderer.getWidth(),
+        height: Renderer.getHeight()
+    });
+
     // Initialize Three.js title scene (animated 3D background for menu)
     TitleScene.init();
     TitleScene.start();
@@ -7225,6 +7251,7 @@ async function init() {
     // Set up terrain change callback for TestAPI.generateTerrain()
     TestAPI.setOnTerrainChange((newTerrain) => {
         currentTerrain = newTerrain;
+        markPixiTerrainLayerDirty();
         console.log('[Main] Terrain updated via TestAPI');
     });
 

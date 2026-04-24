@@ -7,6 +7,11 @@
  */
 
 import { GAMEPLAY_EVENTS, onGameplayEvent } from './gameplayEvents.js';
+import {
+    clearPixiTerrainLayer,
+    spawnPixiTerrainDerezEffect,
+    updatePixiTerrainLayer
+} from './pixiTerrainLayer.js';
 
 const DEFAULT_SAMPLE_STEP = 4;
 const DEFAULT_MAX_SAMPLES = 120;
@@ -106,12 +111,25 @@ export function buildTerrainDerezSamples(snapshot, terrain) {
 /**
  * Spawn a terrain de-res effect from terrain samples.
  *
- * @param {{x: number, y: number, radius: number, samples: Array<{x: number, y: number, depth: number}>}} params
+ * @param {{x: number, y: number, radius: number, samples?: Array<{x: number, y: number, depth: number}>, cells?: Array<{x: number, y: number, size: number, depth?: number}>}} params
  */
-export function spawnTerrainDerezEffect({ x, y, radius, samples }) {
-    if (!Array.isArray(samples) || samples.length === 0) return;
+export function spawnTerrainDerezEffect({ x, y, radius, samples, cells }) {
+    if (Array.isArray(cells) && cells.length > 0) {
+        const acceptedByPixi = spawnPixiTerrainDerezEffect({ x, y, radius, cells });
+        if (acceptedByPixi) return;
+    }
 
-    const particles = samples.map((sample, index) => {
+    const fallbackSamples = Array.isArray(samples) && samples.length > 0
+        ? samples
+        : cells?.map(cell => ({
+            x: cell.x,
+            y: cell.y,
+            depth: cell.depth ?? cell.size ?? 8
+        }));
+
+    if (!Array.isArray(fallbackSamples) || fallbackSamples.length === 0) return;
+
+    const particles = fallbackSamples.map((sample, index) => {
         const seed = sample.x * 0.73 + sample.y * 1.91 + radius * 0.37 + index * 11.17;
         const jitterX = (hash01(seed) - 0.5) * 5;
         const jitterY = (hash01(seed + 5.31) - 0.5) * 7;
@@ -155,7 +173,8 @@ export function registerTerrainDerezEventHandlers() {
             x: payload.x,
             y: payload.y,
             radius: payload.radius,
-            samples: payload.destructionSamples
+            samples: payload.destructionSamples,
+            cells: payload.removedCells
         });
     });
 }
@@ -165,6 +184,8 @@ export function registerTerrainDerezEventHandlers() {
  * @param {number} deltaTime
  */
 export function updateTerrainDerezEffects(deltaTime) {
+    updatePixiTerrainLayer(deltaTime);
+
     for (const effect of activeEffects) {
         effect.age += deltaTime;
     }
@@ -232,6 +253,7 @@ export function renderTerrainDerezEffects(ctx) {
 
 export function clearTerrainDerezEffects() {
     activeEffects.length = 0;
+    clearPixiTerrainLayer();
 }
 
 export function getTerrainDerezEffectCount() {

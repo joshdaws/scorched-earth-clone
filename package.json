@@ -50,6 +50,7 @@
     "@capacitor/haptics": "^8.0.0",
     "@capacitor/ios": "^8.0.0",
     "convex": "^1.31.3",
+    "pixi.js": "^8.18.1",
     "sharp": "^0.34.5",
     "three": "^0.182.0"
   },
