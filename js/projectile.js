@@ -1499,9 +1499,11 @@ export function calculateTrajectory(startX, startY, angle, power, wind = 0, maxS
     // Add starting point
     points.push({ x: proj.x, y: proj.y });
 
+    const windForce = wind * PHYSICS.WIND_FORCE_MULTIPLIER;
+
     // Simulate trajectory
     for (let i = 0; i < maxSteps && proj.isActive(); i++) {
-        proj.update(wind);
+        proj.update(windForce);
         points.push({ x: proj.x, y: proj.y });
 
         // Early exit if below screen (terrain collision will be checked elsewhere)
