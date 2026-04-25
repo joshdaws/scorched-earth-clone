@@ -36,6 +36,7 @@ The smoke runner starts Vite on a local port, waits for `window.TestAPI` or visu
 npm run smoke:browser -- --scenario visual --scene visual-impact
 npm run smoke:browser -- --scenario projectile --quality low
 npm run smoke:browser -- --scenario projectile --quality balanced --max-dropped-backlog-ms 80
+npm run smoke:browser -- --scenario controls --quality balanced
 npm run smoke:browser -- --scenario idle --quality balanced
 ```
 
@@ -66,6 +67,7 @@ npm run perf:budget -- --input metrics.json --scene gameplay
 - `gameplay-idle`: load `/?scene=physics-sandbox&wind=0`, wait 5 seconds without input.
 - `projectile-flight`: load the physics sandbox, call `TestAPI.aim({ angle: 42, power: 70 })`, then `TestAPI.fireDirect()`, and sample until the shot resolves.
 - `terrain-impact`: load the physics sandbox, call `TestAPI.destroyTerrain({ x: 620, y: 500, radius: 90 })`, and sample through the de-rez fade.
+- `controls`: load the physics sandbox, assert keyboard angle/power changes, Tab/Shift+Tab weapon cycling, mouse angle arc dragging, touch slingshot aiming, secondary-touch release safety, and release-to-fire.
 
 The projectile smoke can also fail when fixed-step catch-up exceeds a threshold by passing `--max-dropped-backlog-ms`. Use that on shot-smoothness work so the screenshot and metrics prove the fired shot did not visibly sprint after a frame hitch.
 

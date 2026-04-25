@@ -12,12 +12,16 @@
 
 import { PHYSICS, TANK } from './constants.js';
 import { getAssetGroupStatus, getLoadedCount, getLoadingStatus } from './assets.js';
-import { queueGameInput, INPUT_EVENTS } from './input.js';
+import { queueGameInput, INPUT_EVENTS, isGameInputEnabled } from './input.js';
 import * as Wind from './wind.js';
 import * as Turn from './turn.js';
+import * as AimingControls from './aimingControls.js?v=20260111a';
+import * as TouchAiming from './touchAiming.js';
+import * as ControlSettings from './controls/controlSettings.js';
 import { getScreenWidth, getScreenHeight } from './screenSize.js';
 import { calculateDamage } from './damage.js';
 import { WeaponRegistry } from './weapons.js';
+import * as HUD from './ui.js?v=20260111d';
 import { generateTerrain as generateTerrainFromModule } from './terrain.js';
 import {
     getRenderQualitySummary,
@@ -31,7 +35,7 @@ import {
     getPerformanceSnapshot,
     resetPerformanceMetrics
 } from './performanceMetrics.js';
-import { getLoopTimingSnapshot } from './game.js';
+import { getLoopTimingSnapshot, getState as getGameState } from './game.js';
 
 // =============================================================================
 // MODULE STATE
@@ -1044,6 +1048,49 @@ export function getState() {
 }
 
 /**
+ * Get current control state and layout for browser QA smokes.
+ * @returns {Object}
+ */
+export function getControlState() {
+    const gameState = getState();
+    const aim = playerAimRef
+        ? { angle: playerAimRef.angle, power: playerAimRef.power }
+        : getAim();
+
+    return {
+        success: true,
+        inputEnabled: isGameInputEnabled(),
+        controlMode: ControlSettings.getControlMode(),
+        trajectoryMode: ControlSettings.getTrajectoryMode(),
+        slingshotEnabled: ControlSettings.isSlingshotEnabled(),
+        slidersVisible: ControlSettings.areSlidersVisible(),
+        aimingControlsEnabled: AimingControls.isEnabled(),
+        touchAiming: TouchAiming.getState(),
+        layout: AimingControls.getControlLayout(),
+        weaponBar: {
+            layout: HUD.getWeaponBarLayout(),
+            slots: HUD.getWeaponSlotPositions()
+        },
+        aim,
+        gameState: getGameState(),
+        state: gameState
+    };
+}
+
+/**
+ * Set the runtime control mode for browser QA smokes.
+ * @param {string} mode
+ * @returns {Object}
+ */
+export function setControlMode(mode) {
+    ControlSettings.setControlMode(mode);
+    return {
+        success: ControlSettings.getControlMode() === mode,
+        controlMode: ControlSettings.getControlMode()
+    };
+}
+
+/**
  * Check if TestAPI is properly initialized.
  * @returns {boolean} True if initialized with game references
  */
@@ -1481,6 +1528,8 @@ const TestAPI = {
     getWind,
     getWindForce,
     getState,
+    getControlState,
+    setControlMode,
     getRenderQuality,
     setRenderQuality,
     getPerformanceMetrics,

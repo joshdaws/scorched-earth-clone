@@ -93,6 +93,9 @@ const touch = {
     isActive: false
 };
 
+/** @type {number|null} Identifier for the touch currently driving pointer state */
+let activeTouchIdentifier = null;
+
 // Unified pointer state (normalized from mouse or touch)
 // Coordinates are in canvas design space (1200x800)
 const pointer = {
@@ -255,8 +258,13 @@ function updatePointerFromMouse() {
 // Touch handlers
 function handleTouchStart(e) {
     e.preventDefault();
-    touch.isActive = true;
-    updateTouchPosition(e);
+
+    if (!touch.isActive) {
+        const nextTouch = e.changedTouches?.[0] || e.touches?.[0];
+        activeTouchIdentifier = nextTouch?.identifier ?? null;
+        touch.isActive = true;
+        updateTouchPosition(e);
+    }
 
     // Update unified pointer state (touch takes priority over mouse)
     pointer.isDown = true;
@@ -268,7 +276,24 @@ function handleTouchStart(e) {
 
 function handleTouchEnd(e) {
     e.preventDefault();
+
+    const endedActiveTouch = activeTouchIdentifier === null ||
+        Array.from(e.changedTouches || []).some(endedTouch => endedTouch.identifier === activeTouchIdentifier);
+
+    if (!endedActiveTouch) {
+        return;
+    }
+
+    if (e.touches && e.touches.length > 0) {
+        activeTouchIdentifier = e.touches[0].identifier;
+        updateTouchPosition(e);
+        updatePointerFromTouch();
+        touchMoveCallbacks.forEach(cb => cb(pointer.x, pointer.y));
+        return;
+    }
+
     touch.isActive = false;
+    activeTouchIdentifier = null;
 
     // Update unified pointer state
     pointer.isDown = false;
@@ -280,6 +305,8 @@ function handleTouchEnd(e) {
 
 function handleTouchMove(e) {
     e.preventDefault();
+    if (!touch.isActive) return;
+
     updateTouchPosition(e);
 
     // Update unified pointer position from touch
@@ -291,9 +318,13 @@ function handleTouchMove(e) {
 
 function updateTouchPosition(e) {
     if (e.touches.length > 0) {
+        const activeTouch = activeTouchIdentifier === null
+            ? e.touches[0]
+            : Array.from(e.touches).find(candidate => candidate.identifier === activeTouchIdentifier) || e.touches[0];
         const rect = e.target.getBoundingClientRect();
-        touch.x = e.touches[0].clientX - rect.left;
-        touch.y = e.touches[0].clientY - rect.top;
+        activeTouchIdentifier = activeTouch.identifier;
+        touch.x = activeTouch.clientX - rect.left;
+        touch.y = activeTouch.clientY - rect.top;
     }
 }
 
@@ -493,6 +524,7 @@ export function disableGameInput() {
     // Clear any held keys when disabling
     aimingState.angleDirection = 0;
     aimingState.powerDirection = 0;
+    activeSlider = null;
 }
 
 /**

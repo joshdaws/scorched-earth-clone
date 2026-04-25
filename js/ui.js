@@ -1997,6 +1997,14 @@ export function getWeaponSlotAtPosition(x, y) {
 }
 
 /**
+ * Get cached weapon slot hit boxes from the last weapon bar render.
+ * @returns {Array<{x: number, y: number, size: number, weaponId: string}>}
+ */
+export function getWeaponSlotPositions() {
+    return weaponSlotPositions.map(slot => ({ ...slot }));
+}
+
+/**
  * Check if a point is inside any weapon slot.
  * @param {number} x - X coordinate in design space
  * @param {number} y - Y coordinate in design space

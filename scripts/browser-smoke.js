@@ -48,13 +48,14 @@ function parseArgs(argv) {
 
 function usage() {
     console.log(`Usage:
-  npm run smoke:browser -- [--scenario impact|projectile|idle|visual] [--scene physics-sandbox&wind=0] [--quality balanced] [--headed]
+  npm run smoke:browser -- [--scenario impact|projectile|idle|visual|controls] [--scene physics-sandbox&wind=0] [--quality balanced] [--headed]
 
 Examples:
   npm run smoke:browser
   npm run smoke:browser -- --scenario visual --scene visual-impact
   npm run smoke:browser -- --scenario projectile --quality low
   npm run smoke:browser -- --scenario projectile --max-dropped-backlog-ms 80
+  npm run smoke:browser -- --scenario controls
 
 If Chromium is missing after a clean checkout, run:
   npm run smoke:browser:install
@@ -154,6 +155,11 @@ async function runScenario(page, { scenario, quality }) {
         return;
     }
 
+    if (scenario === 'controls') {
+        await runControlsScenario(page, quality);
+        return;
+    }
+
     await page.evaluate(async () => {
         const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
         const api = window.TestAPI;
@@ -169,6 +175,238 @@ async function runScenario(page, { scenario, quality }) {
 
         await wait(2400);
     });
+}
+
+async function getControlState(page) {
+    return page.evaluate(() => window.TestAPI.getControlState());
+}
+
+async function designToClient(page, point) {
+    return page.evaluate(({ x, y }) => {
+        const canvas = document.querySelector('canvas');
+        const rect = canvas.getBoundingClientRect();
+        const scale = Math.min(rect.width / 1200, rect.height / 800);
+        const offsetX = (rect.width - 1200 * scale) / 2;
+        const offsetY = (rect.height - 800 * scale) / 2;
+        return {
+            x: rect.left + offsetX + x * scale,
+            y: rect.top + offsetY + y * scale
+        };
+    }, point);
+}
+
+function angleArcPoint(tank, radius, angle) {
+    const radians = angle * Math.PI / 180;
+    return {
+        x: tank.x + Math.cos(radians) * radius,
+        y: tank.y - 32 - Math.sin(radians) * radius
+    };
+}
+
+function assertControl(condition, message) {
+    if (!condition) {
+        throw new Error(`[controls] ${message}`);
+    }
+}
+
+async function dispatchTouch(page, type, activeTouches, changedTouches) {
+    await page.evaluate(({ eventType, touches, changed }) => {
+        const canvas = document.querySelector('canvas');
+        const toTouch = touch => {
+            const base = {
+                identifier: touch.identifier,
+                target: canvas,
+                clientX: touch.x,
+                clientY: touch.y,
+                screenX: touch.x,
+                screenY: touch.y,
+                pageX: touch.x,
+                pageY: touch.y,
+                radiusX: 8,
+                radiusY: 8,
+                rotationAngle: 0,
+                force: 1
+            };
+            if (typeof window.Touch === 'function') {
+                return new window.Touch(base);
+            }
+            return base;
+        };
+
+        const active = touches.map(toTouch);
+        const changedItems = changed.map(toTouch);
+        const event = new Event(eventType, { bubbles: true, cancelable: true });
+        Object.defineProperties(event, {
+            touches: { value: active },
+            targetTouches: { value: active },
+            changedTouches: { value: changedItems }
+        });
+        canvas.dispatchEvent(event);
+    }, {
+        eventType: type,
+        touches: activeTouches,
+        changed: changedTouches
+    });
+}
+
+async function prepareControlsScenario(page, quality, { reload = false } = {}) {
+    if (reload) {
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        await waitForGameReady(page, 'controls');
+    }
+
+    await page.evaluate(({ selectedQuality }) => {
+        window.TestAPI.setRenderQuality(selectedQuality);
+        window.TestAPI.setControlMode('hybrid');
+        window.TestAPI.aim({ angle: 45, power: 50 });
+        window.TestAPI.resetPerformance();
+    }, { selectedQuality: quality });
+    await page.waitForTimeout(250);
+}
+
+async function runControlsScenario(page, quality) {
+    await prepareControlsScenario(page, quality);
+
+    let controls = await getControlState(page);
+    assertControl(controls.inputEnabled, 'game input should be enabled during player aim');
+    assertControl(controls.state.canFire, 'player should be able to fire at start of controls smoke');
+
+    const initialAngle = controls.aim.angle;
+    await page.keyboard.down('ArrowLeft');
+    await page.waitForTimeout(250);
+    await page.keyboard.up('ArrowLeft');
+    await page.waitForTimeout(100);
+    controls = await getControlState(page);
+    assertControl(controls.aim.angle > initialAngle, 'ArrowLeft should increase angle');
+
+    const angleAfterLeft = controls.aim.angle;
+    await page.keyboard.down('ArrowRight');
+    await page.waitForTimeout(250);
+    await page.keyboard.up('ArrowRight');
+    await page.waitForTimeout(100);
+    controls = await getControlState(page);
+    assertControl(controls.aim.angle < angleAfterLeft, 'ArrowRight should decrease angle');
+
+    const initialPower = controls.aim.power;
+    await page.keyboard.down('ArrowUp');
+    await page.waitForTimeout(250);
+    await page.keyboard.up('ArrowUp');
+    await page.waitForTimeout(100);
+    controls = await getControlState(page);
+    assertControl(controls.aim.power > initialPower, 'ArrowUp should increase power');
+
+    const powerAfterUp = controls.aim.power;
+    await page.keyboard.down('ArrowDown');
+    await page.waitForTimeout(250);
+    await page.keyboard.up('ArrowDown');
+    await page.waitForTimeout(100);
+    controls = await getControlState(page);
+    assertControl(controls.aim.power < powerAfterUp, 'ArrowDown should decrease power');
+
+    const weaponBefore = controls.state.player.weapon;
+    await page.keyboard.press('Tab');
+    await page.waitForTimeout(150);
+    controls = await getControlState(page);
+    const weaponAfterTab = controls.state.player.weapon;
+    assertControl(weaponAfterTab !== weaponBefore, 'Tab should cycle to the next weapon');
+
+    await page.keyboard.press('Shift+Tab');
+    await page.waitForTimeout(150);
+    controls = await getControlState(page);
+    assertControl(controls.state.player.weapon === weaponBefore, 'Shift+Tab should cycle to the previous weapon');
+
+    await page.keyboard.press('KeyP');
+    await page.waitForTimeout(150);
+    controls = await getControlState(page);
+    assertControl(controls.gameState === 'paused', 'P should pause gameplay');
+
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(150);
+    controls = await getControlState(page);
+    assertControl(controls.gameState === 'playing', 'Escape should resume from pause');
+
+    await page.keyboard.press('Space');
+    await page.waitForTimeout(250);
+    controls = await getControlState(page);
+    assertControl(!controls.state.canFire, 'Space should fire and disable firing');
+
+    await prepareControlsScenario(page, quality, { reload: true });
+    controls = await getControlState(page);
+    const fireButton = await designToClient(page, {
+        x: controls.layout.FIRE_BUTTON.X,
+        y: controls.layout.FIRE_BUTTON.Y
+    });
+    await page.mouse.click(fireButton.x, fireButton.y);
+    await page.waitForTimeout(250);
+    controls = await getControlState(page);
+    assertControl(!controls.state.canFire, 'fire button click should fire and disable firing');
+
+    await prepareControlsScenario(page, quality, { reload: true });
+    controls = await getControlState(page);
+    const weaponSlot = controls.weaponBar.slots.find(slot => slot.weaponId !== controls.state.player.weapon);
+    assertControl(weaponSlot, 'weapon bar should expose a selectable non-current weapon slot');
+    const weaponSlotCenter = await designToClient(page, {
+        x: weaponSlot.x + weaponSlot.size / 2,
+        y: weaponSlot.y + weaponSlot.size / 2
+    });
+    await page.mouse.click(weaponSlotCenter.x, weaponSlotCenter.y);
+    await page.waitForTimeout(150);
+    controls = await getControlState(page);
+    assertControl(controls.state.player.weapon === weaponSlot.weaponId, 'weapon slot click should select that weapon');
+
+    await page.evaluate(() => window.TestAPI.aim({ angle: 45, power: 50 }));
+    await page.waitForTimeout(100);
+    controls = await getControlState(page);
+    const arcRadius = controls.layout.ANGLE_ARC.RADIUS;
+    const arcStart = await designToClient(page, angleArcPoint(controls.state.player, arcRadius, 45));
+    const arcEnd = await designToClient(page, angleArcPoint(controls.state.player, arcRadius, 70));
+    await page.mouse.move(arcStart.x, arcStart.y);
+    await page.mouse.down();
+    await page.mouse.move(arcEnd.x, arcEnd.y, { steps: 8 });
+    await page.mouse.up();
+    await page.waitForTimeout(150);
+    controls = await getControlState(page);
+    assertControl(Math.abs(controls.aim.angle - 70) <= 8, `angle arc drag should set angle near 70, got ${controls.aim.angle}`);
+
+    const tankCenter = await designToClient(page, {
+        x: controls.state.player.x,
+        y: controls.state.player.y - 16
+    });
+    const dragPoint = await designToClient(page, {
+        x: controls.state.player.x - 95,
+        y: controls.state.player.y - 90
+    });
+    const secondTouch = await designToClient(page, {
+        x: controls.state.player.x + 180,
+        y: controls.state.player.y - 20
+    });
+
+    await dispatchTouch(page, 'touchstart', [{ identifier: 1, ...tankCenter }], [{ identifier: 1, ...tankCenter }]);
+    await page.waitForTimeout(60);
+    await dispatchTouch(page, 'touchmove', [{ identifier: 1, ...dragPoint }], [{ identifier: 1, ...dragPoint }]);
+    await page.waitForTimeout(150);
+    controls = await getControlState(page);
+    assertControl(controls.touchAiming.isActive, 'touch drag near tank should activate slingshot aiming');
+    assertControl(controls.state.canFire, 'touch drag should not fire before release');
+    assertControl(Math.abs(controls.aim.power - 50) > 1, 'touch drag should update power before release');
+
+    await dispatchTouch(
+        page,
+        'touchstart',
+        [{ identifier: 1, ...dragPoint }, { identifier: 2, ...secondTouch }],
+        [{ identifier: 2, ...secondTouch }]
+    );
+    await page.waitForTimeout(50);
+    await dispatchTouch(page, 'touchend', [{ identifier: 1, ...dragPoint }], [{ identifier: 2, ...secondTouch }]);
+    await page.waitForTimeout(80);
+    controls = await getControlState(page);
+    assertControl(controls.touchAiming.isActive, 'ending a secondary touch should not cancel the active drag');
+    assertControl(controls.state.canFire, 'ending a secondary touch should not fire');
+
+    await dispatchTouch(page, 'touchend', [], [{ identifier: 1, ...dragPoint }]);
+    await page.waitForTimeout(250);
+    controls = await getControlState(page);
+    assertControl(!controls.state.canFire, 'releasing the active slingshot drag should fire and disable firing');
 }
 
 function assertSmokeBudgets(metrics, args) {
@@ -208,7 +446,10 @@ async function main() {
     try {
         await waitForServer(`http://${args.host}:${args.port}/`, args.timeoutMs);
         browser = await chromium.launch({ headless: !args.headed });
-        const page = await browser.newPage({ viewport: { width: 1280, height: 768 } });
+        const page = await browser.newPage({
+            viewport: { width: 1280, height: 768 },
+            hasTouch: args.scenario === 'controls'
+        });
 
         page.on('console', message => {
             consoleMessages.push({

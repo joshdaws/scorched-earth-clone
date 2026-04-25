@@ -7337,6 +7337,17 @@ function setupSlingshotTestScene(scene, params) {
     // Go to playing state
     Game.setState(GAME_STATES.PLAYING);
 
+    // Reapply deterministic scene hooks after PLAYING creates round entities.
+    if (params.wind !== null) {
+        Wind.setWind(params.wind);
+    } else {
+        Wind.setWind(0);
+    }
+    TestAPI.setPlayerTank(playerTank);
+    TestAPI.setEnemyTank(enemyTank);
+    TestAPI.setTerrain(currentTerrain);
+    Input.enableGameInput();
+
     console.log('[SceneIsolation] Slingshot test ready - use TestAPI.aim() and TestAPI.fire() to test');
 }
 
@@ -7367,12 +7378,6 @@ function setupPhysicsSandboxScene(scene, params) {
     playerTank = tanks.player;
     enemyTank = tanks.enemy;
 
-    // Give player all weapons with high ammo
-    const allWeapons = WeaponRegistry.getAllWeapons();
-    for (const weapon of allWeapons) {
-        playerTank.inventory[weapon.id] = 999;
-    }
-
     // Set wind (use URL param or enable normal wind)
     if (params.wind !== null) {
         Wind.setWind(params.wind);
@@ -7397,6 +7402,22 @@ function setupPhysicsSandboxScene(scene, params) {
 
     // Go to playing state
     Game.setState(GAME_STATES.PLAYING);
+
+    // PLAYING onEnter creates the actual round entities, so test-only state has
+    // to be applied after entering the state.
+    const allWeapons = WeaponRegistry.getAllWeapons();
+    for (const weapon of allWeapons) {
+        playerTank.inventory[weapon.id] = 999;
+    }
+
+    if (params.wind !== null) {
+        Wind.setWind(params.wind);
+    }
+
+    TestAPI.setPlayerTank(playerTank);
+    TestAPI.setEnemyTank(enemyTank);
+    TestAPI.setTerrain(currentTerrain);
+    Input.enableGameInput();
 
     console.log('[SceneIsolation] Physics sandbox ready');
     console.log('  - TestAPI.simulateProjectile({ angle, power }) - simulate without firing');
