@@ -3,6 +3,7 @@ import {
     getTerrainCellSize
 } from './terrainCells.js';
 import { getRenderQualityProfile } from './renderQuality.js';
+import { recordMeasure, setPerformanceGauge } from './performanceMetrics.js';
 
 const BODY_COLOR = 0x140527;
 const BODY_ALT_COLOR = 0x0b1435;
@@ -203,6 +204,7 @@ function syncParticleChildren() {
 
 function rebuildTerrainGraphics(terrain) {
     if (!ready || !terrainGraphics || !terrain) return;
+    const rebuildStart = performance.now();
 
     const width = getTerrainWidth(terrain);
     const screenHeight = getTerrainScreenHeight(terrain);
@@ -252,6 +254,7 @@ function rebuildTerrainGraphics(terrain) {
 
     terrainDirty = false;
     lastTerrain = terrain;
+    recordMeasure('pixiTerrainRebuild', performance.now() - rebuildStart);
 }
 
 function ensureReady() {
@@ -371,6 +374,7 @@ export function spawnPixiTerrainDerezEffect({ x, y, radius, cells }) {
     }
 
     syncParticleChildren();
+    setPerformanceGauge('pixiFragments', activeFragments.length);
     return true;
 }
 
@@ -411,6 +415,7 @@ export function updatePixiTerrainLayer(deltaTime) {
     if (removedAny) {
         syncParticleChildren();
     }
+    setPerformanceGauge('pixiFragments', activeFragments.length);
 }
 
 /**
@@ -431,8 +436,11 @@ export function renderPixiTerrainLayerToCanvas(ctx, terrain) {
         rebuildTerrainGraphics(terrain);
     }
 
+    const renderStart = performance.now();
     app.render();
+    recordMeasure('pixiTerrainRender', performance.now() - renderStart);
     ctx.drawImage(app.canvas, 0, 0, width, height);
+    setPerformanceGauge('pixiFragments', activeFragments.length);
     return true;
 }
 
@@ -443,6 +451,7 @@ export function clearPixiTerrainLayer() {
         particleContainer.update();
     }
     terrainDirty = true;
+    setPerformanceGauge('pixiFragments', 0);
 }
 
 export function getPixiTerrainFragmentCount() {

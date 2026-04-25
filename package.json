@@ -21,6 +21,7 @@
     "build:debug": "BUILD_SOURCEMAP=true vite build && npm run copy-static",
     "copy-static": "cp config.js www/ && node scripts/copy-production-assets.js",
     "budget:release": "node scripts/check-release-budget.js",
+    "perf:budget": "node scripts/check-performance-budget.js",
     "build:ios": "npm run build && npx cap sync ios",
     "ios:sync": "npm run build && npx cap copy ios",
     "open:ios": "npx cap open ios",

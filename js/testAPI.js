@@ -22,6 +22,13 @@ import {
     getRenderQualitySummary,
     setRenderQuality as setRenderQualityProfile
 } from './renderQuality.js';
+import { getParticleCount } from './effects.js';
+import { getTerrainDerezEffectCount } from './terrainDerezEffect.js';
+import {
+    evaluatePerformanceBudget,
+    getPerformanceSnapshot,
+    resetPerformanceMetrics
+} from './performanceMetrics.js';
 
 // =============================================================================
 // MODULE STATE
@@ -1375,6 +1382,47 @@ export function setRenderQuality(id) {
     }
 }
 
+/**
+ * Get rolling runtime performance metrics and live visual effect counts.
+ * @returns {Object}
+ */
+export function getPerformanceMetrics() {
+    const pixiFragments = getDerezFragmentCountRef ? getDerezFragmentCountRef() : 0;
+
+    return {
+        success: true,
+        metrics: getPerformanceSnapshot({
+            particles: getParticleCount(),
+            terrainDerezEffects: getTerrainDerezEffectCount(),
+            pixiFragments
+        })
+    };
+}
+
+/**
+ * Reset rolling performance metrics before a smoke scenario.
+ * @returns {Object}
+ */
+export function resetPerformance() {
+    resetPerformanceMetrics();
+    return { success: true };
+}
+
+/**
+ * Evaluate the current performance snapshot against budgets.
+ * @param {Object} budgets
+ * @returns {Object}
+ */
+export function checkPerformanceBudget(budgets = {}) {
+    const metrics = getPerformanceMetrics().metrics;
+    const result = evaluatePerformanceBudget(metrics, budgets);
+    return {
+        success: true,
+        metrics,
+        ...result
+    };
+}
+
 // =============================================================================
 // WINDOW EXPOSURE (for console access)
 // =============================================================================
@@ -1408,6 +1456,9 @@ const TestAPI = {
     getState,
     getRenderQuality,
     setRenderQuality,
+    getPerformanceMetrics,
+    resetPerformance,
+    checkPerformanceBudget,
     isInitialized,
     // Initialization (typically called by main.js)
     init,

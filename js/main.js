@@ -95,6 +95,7 @@ import {
     markPixiTerrainLayerDirty,
     renderPixiTerrainLayerToCanvas
 } from './pixiTerrainLayer.js';
+import { recordMeasure, setPerformanceGauge } from './performanceMetrics.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -4860,8 +4861,14 @@ function renderActiveProjectile(ctx) {
  * @returns {boolean} True if terrain was destroyed, false otherwise
  */
 export function destroyTerrainAt(x, y, radius) {
+    const terrainImpactStart = performance.now();
+    let impactRemovedCellCount = 0;
+
     if (!currentTerrain) {
         console.warn('Cannot destroy terrain: no terrain loaded');
+        recordMeasure('terrainImpact', performance.now() - terrainImpactStart);
+        setPerformanceGauge('terrainImpactDestroyed', 0);
+        setPerformanceGauge('terrainImpactRemovedCells', 0);
         return false;
     }
 
@@ -4871,6 +4878,7 @@ export function destroyTerrainAt(x, y, radius) {
     let removedCells = terrainGrid?.destroyCircle(x, y, radius) ?? [];
     let fallingResult = { modified: false, fallingColumns: [] };
     let wasDestroyed = removedCells.length > 0;
+    impactRemovedCellCount = removedCells.length;
 
     if (wasDestroyed) {
         const settlingRadius = radius * 3;
@@ -4884,6 +4892,7 @@ export function destroyTerrainAt(x, y, radius) {
         removedCells = wasDestroyed
             ? buildRemovedTerrainCells(cellSnapshot, currentTerrain)
             : [];
+        impactRemovedCellCount = removedCells.length;
         if (wasDestroyed) {
             const fallbackGrid = rebuildTerrainCellGrid(currentTerrain);
             if (fallbackGrid) {
@@ -4919,6 +4928,9 @@ export function destroyTerrainAt(x, y, radius) {
         });
     }
 
+    recordMeasure('terrainImpact', performance.now() - terrainImpactStart);
+    setPerformanceGauge('terrainImpactDestroyed', wasDestroyed ? 1 : 0);
+    setPerformanceGauge('terrainImpactRemovedCells', impactRemovedCellCount);
     return wasDestroyed;
 }
 

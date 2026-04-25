@@ -7,6 +7,12 @@
  */
 
 import { GAME_STATES, TIMING } from './constants.js';
+import {
+    recordDroppedBacklog,
+    recordFrame,
+    recordGameUpdate,
+    recordMeasure
+} from './performanceMetrics.js';
 
 // =============================================================================
 // MODULE STATE
@@ -417,6 +423,7 @@ export function startLoop(updateFn, renderFn, ctx) {
 
     function loop(currentTime) {
         if (!isRunning) return;
+        recordFrame(currentTime);
 
         // Skip updates while paused but keep rendering for pause menu overlay
         if (isPaused) {
@@ -467,7 +474,10 @@ export function startLoop(updateFn, renderFn, ctx) {
         // Run a capped number of physics updates so render hitches do not make
         // projectiles visually pause and then jump forward.
         const updatePlan = calculateFixedUpdatePlan(accumulator);
+        recordDroppedBacklog(updatePlan.droppedTime);
         for (let step = 0; step < updatePlan.steps; step++) {
+            const updateStart = performance.now();
+
             // Update game logic with fixed timestep
             const handlers = getHandlers(currentState);
             if (handlers.update) {
@@ -476,6 +486,7 @@ export function startLoop(updateFn, renderFn, ctx) {
             if (updateFn) {
                 updateFn(FIXED_TIMESTEP);
             }
+            recordGameUpdate(performance.now() - updateStart);
         }
         accumulator = updatePlan.remainingTime;
 
@@ -486,6 +497,7 @@ export function startLoop(updateFn, renderFn, ctx) {
         // Render frame
         // First call global render (clears screen, draws background)
         // Then call state-specific render
+        const renderStart = performance.now();
         if (renderFn) {
             renderFn(ctx);
         }
@@ -498,6 +510,7 @@ export function startLoop(updateFn, renderFn, ctx) {
         if (postRenderCallback) {
             postRenderCallback(ctx);
         }
+        recordMeasure('frameRender', performance.now() - renderStart);
 
         requestAnimationFrame(loop);
     }
