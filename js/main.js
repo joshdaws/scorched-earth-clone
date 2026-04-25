@@ -75,6 +75,9 @@ import * as EngagementUI from './engagement/engagementUI.js';
 import * as DebugOverlays from './debugOverlays.js';
 import { GAMEPLAY_EVENTS, emitGameplayEvent } from './gameplayEvents.js';
 import { resolveProjectileImpact } from './impactResolution.js';
+import { renderGameplayScene } from './gameplayRenderer.js';
+import { renderMenuScene } from './menuRenderer.js';
+import { renderTerrainScene } from './terrainRenderer.js';
 import {
     buildTerrainDerezSamples,
     captureTerrainDerezSnapshot,
@@ -88,7 +91,6 @@ import {
     captureTerrainCellSnapshot,
     getOrCreateTerrainCellGrid,
     getTerrainGridSlopeAngle,
-    getTerrainGridSurfaceYAt,
     rebuildTerrainCellGrid
 } from './terrainCells.js';
 import {
@@ -1829,202 +1831,41 @@ function drawNeonSubtitle(ctx, text, x, y, fontSize, pulseIntensity) {
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  */
 function renderMenu(ctx) {
-    // Update button positions for current screen size
-    updateMenuButtonPositions();
-
-    // Get dynamic screen dimensions
-    const width = Renderer.getWidth();
-    const height = Renderer.getHeight();
-
-    // Update animation time
-    menuAnimationTime += 16;  // Approximate 60fps frame time
-
-    // Calculate pulse intensity for glowing effects (0-1, oscillating)
-    const pulseIntensity = (Math.sin(menuAnimationTime * 0.003) + 1) / 2;
-
-    ctx.save();
-
-    // Update transition state
-    if (menuTransition.active) {
-        const elapsed = performance.now() - menuTransition.startTime;
-        const progress = Math.min(elapsed / menuTransition.duration, 1);
-
-        if (menuTransition.fadeOut) {
-            menuTransition.alpha = 1 - progress;
-        } else {
-            menuTransition.alpha = progress;
-        }
-
-        // Apply fade alpha to entire menu
-        ctx.globalAlpha = menuTransition.alpha;
-
-        // Check if transition is complete
-        if (progress >= 1 && menuTransition.fadeOut && menuTransition.targetState) {
-            menuTransition.active = false;
-            menuTransition.alpha = 1;
-            Game.setState(menuTransition.targetState);
-            ctx.restore();
-            return;
-        }
-    }
-
-    // If Three.js title scene is active, skip the 2D background
-    // and let the 3D animation show through. Otherwise render 2D fallback.
-    if (TitleScene.isActive()) {
-        // Clear entire viewport to transparent so Three.js shows through
-        // (includes letterbox areas, not just game content)
-        Renderer.clearTransparent();
-    } else {
-        // Render 2D synthwave background as fallback
-        renderMenuBackground(ctx);
-    }
-
-    // Subtle vignette overlay for better readability over 3D background
-    // Draw in viewport coordinates to cover entire screen (including letterbox)
-    const viewport = Renderer.getViewportDimensions();
-    const dpr = Renderer.getDevicePixelRatio();
-
-    ctx.save();
-    // Reset to viewport coordinates (no game content transform)
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    const vignetteGradient = ctx.createRadialGradient(
-        viewport.width / 2, viewport.height / 2, 0,
-        viewport.width / 2, viewport.height / 2, Math.max(viewport.width, viewport.height) * 0.7
-    );
-    vignetteGradient.addColorStop(0, 'rgba(10, 10, 26, 0)');
-    vignetteGradient.addColorStop(0.7, 'rgba(10, 10, 26, 0.2)');
-    vignetteGradient.addColorStop(1, 'rgba(10, 10, 26, 0.5)');
-    ctx.fillStyle = vignetteGradient;
-    ctx.fillRect(0, 0, viewport.width, viewport.height);
-
-    ctx.restore();
-
-    // Get layout configuration
-    const layout = currentMenuLayout || calculateMenuLayout(height, width);
-    const isCompact = layout.isCompact;
-    const titleScale = layout.titleScale;
-
-    // Title positioning - split into "SCORCHED" and "EARTH" on separate lines
-    // to match design reference (start-redesign.png) with chrome synthwave effect
-    // Base Y positions (at full scale), then scaled proportionally
-    const baseScorchedY = isCompact ? 100 : 120;
-    const baseEarthY = isCompact ? 190 : 220;
-    const baseSubtitleY = isCompact ? 260 : 300;
-
-    // Scale Y positions proportionally with titleScale to maintain visual balance
-    // The title block should shrink as a unit, not just the font sizes
-    const scorchedY = Math.round(baseScorchedY * titleScale);
-    const earthY = Math.round(baseEarthY * titleScale);
-    const subtitleY = Math.round(baseSubtitleY * titleScale);
-
-    // Font sizes - "SCORCHED" is larger, "EARTH" slightly smaller (using Audiowide font)
-    // Font sizes doubled for greater visual impact
-    const scorchedFontSize = Math.round(120 * titleScale);
-    const earthFontSize = Math.round(100 * titleScale);
-    const subtitleFontSize = Math.round(44 * titleScale);
-
-    // Render "SCORCHED" - chrome synthwave effect with 3D extrusion
-    drawSynthwaveText(ctx, 'SCORCHED', width / 2, scorchedY, scorchedFontSize, pulseIntensity);
-
-    // Render "EARTH" - same chrome synthwave effect
-    drawSynthwaveText(ctx, 'EARTH', width / 2, earthY, earthFontSize, pulseIntensity);
-
-    // Subtitle "SYNTHWAVE EDITION" - neon glow effect
-    drawNeonSubtitle(ctx, 'SYNTHWAVE EDITION', width / 2, subtitleY, subtitleFontSize, pulseIntensity);
-
-    // Get badge counts for buttons
-    const unviewedAchievements = getUnviewedCount();
-    const newTanks = TankCollection.getNewTankCount();
-
-    // Render menu buttons using Button component
-    menuButtons.start.render(ctx, pulseIntensity);
-    menuButtons.highScores.render(ctx, pulseIntensity);
-    menuButtons.achievements.renderWithBadge(ctx, pulseIntensity, unviewedAchievements);
-    menuButtons.collection.renderWithBadge(ctx, pulseIntensity, newTanks);
-    menuButtons.supplyDrop.render(ctx, pulseIntensity);
-    menuButtons.options.render(ctx, pulseIntensity);
-
-    // Render daily challenges button with badge for incomplete challenges
-    const challengeCounts = DailyChallenges.getCompletionCounts();
-    const incompleteChallenges = challengeCounts.total - challengeCounts.completed;
-    menuButtons.dailyChallenges.renderWithBadge(ctx, pulseIntensity, incompleteChallenges);
-
-    // Render daily rewards button with red dot when reward is claimable
-    const rewardClaimable = DailyRewards.canClaim();
-    menuButtons.dailyRewards.renderWithDot(ctx, pulseIntensity, rewardClaimable);
-
-    // Token balance display - bottom right corner
-    const tokenBalance = Tokens.getTokenBalance();
-    const tokenPadding = isCompact ? 15 : 25;
-    const tokenCardWidth = isCompact ? 75 : 90;
-    const tokenCardHeight = isCompact ? 50 : 60;
-
-    const tokenCardX = width - tokenPadding - tokenCardWidth;
-    const tokenCardY = height - tokenPadding - tokenCardHeight;
-
-    drawMenuMetricTile(ctx, {
-        x: tokenCardX,
-        y: tokenCardY,
-        width: tokenCardWidth,
-        height: tokenCardHeight,
-        accent: COLORS.NEON_CYAN,
-        label: 'TOKENS',
-        value: `${tokenBalance}`,
-        icon: 'coin',
-        pulseIntensity
+    const result = renderMenuScene(ctx, {
+        animationTime: menuAnimationTime,
+        menuTransition,
+        currentMenuLayout,
+        updateMenuButtonPositions,
+        width: Renderer.getWidth(),
+        height: Renderer.getHeight(),
+        calculateMenuLayout,
+        titleSceneIsActive: TitleScene.isActive,
+        clearTransparent: Renderer.clearTransparent,
+        getViewportDimensions: Renderer.getViewportDimensions,
+        getDevicePixelRatio: Renderer.getDevicePixelRatio,
+        renderMenuBackground,
+        drawSynthwaveText,
+        drawNeonSubtitle,
+        drawMenuMetricTile,
+        menuButtons,
+        getUnviewedCount,
+        getNewTankCount: TankCollection.getNewTankCount,
+        getDailyChallengeCompletionCounts: DailyChallenges.getCompletionCounts,
+        canClaimDailyReward: DailyRewards.canClaim,
+        getTokenBalance: Tokens.getTokenBalance,
+        getBestRoundCount: HighScores.getBestRoundCount,
+        getTotalStars: Stars.getTotalStars,
+        colors: COLORS,
+        setState: Game.setState,
+        optionsOverlayVisible,
+        renderOptionsOverlay,
+        engagementUpdate: EngagementUI.update,
+        engagementRender: EngagementUI.render,
+        renderCrtEffects,
+        getCrtFullscreenParams
     });
 
-    // Best run display - bottom left corner
-    const bestRound = HighScores.getBestRoundCount();
-    const bestCardPadding = isCompact ? 15 : 25;
-    const bestCardHeight = isCompact ? 40 : 50;
-    const bestCardWidth = isCompact ? 90 : 110;
-    const roundsText = bestRound > 0 ? `${bestRound} rounds` : '--';
-
-    drawMenuMetricTile(ctx, {
-        x: bestCardPadding,
-        y: height - bestCardPadding - bestCardHeight,
-        width: bestCardWidth,
-        height: bestCardHeight,
-        accent: COLORS.NEON_YELLOW,
-        label: 'BEST RUN',
-        value: roundsText,
-        pulseIntensity
-    });
-
-    // Total Stars display - bottom center
-    const totalStars = Stars.getTotalStars();
-    const starsCardWidth = isCompact ? 85 : 100;
-    const starsCardHeight = isCompact ? 50 : 60;
-    const starsCardX = (width - starsCardWidth) / 2;
-    const starsCardY = height - tokenPadding - starsCardHeight;
-
-    drawMenuMetricTile(ctx, {
-        x: starsCardX,
-        y: starsCardY,
-        width: starsCardWidth,
-        height: starsCardHeight,
-        accent: COLORS.NEON_PINK,
-        label: 'STARS',
-        value: `${totalStars}`,
-        icon: 'star',
-        pulseIntensity
-    });
-
-    ctx.restore();
-
-    // Render options overlay on top if visible
-    if (optionsOverlayVisible) {
-        renderOptionsOverlay(ctx);
-    }
-
-    // Render engagement UI (daily rewards popup, challenge panel)
-    EngagementUI.update(0.016); // ~60fps frame time
-    EngagementUI.render(ctx);
-
-    // Render CRT effects as final post-processing overlay (fullscreen)
-    renderCrtEffects(ctx, width, height, getCrtFullscreenParams());
+    menuAnimationTime = result.animationTime;
 }
 
 /**
@@ -3568,88 +3409,10 @@ function updatePlaying(deltaTime) {
     }
 }
 
-// =============================================================================
-// TERRAIN RENDERING
-// =============================================================================
-
-/**
- * Terrain fill color - dark purple per spec
- */
-const TERRAIN_FILL_COLOR = '#1a0a2e';
-
-/**
- * Terrain edge stroke color - neon pink per spec
- */
-const TERRAIN_EDGE_COLOR = '#ff2a6d';
-
-/**
- * Render the terrain as a filled polygon with synthwave styling.
- * Terrain heights are stored as distance from bottom, so we need to flip Y
- * since canvas Y=0 is at the top.
- *
- * Rendering approach (efficient - no per-pixel operations):
- * 1. Build a single path for the terrain polygon
- * 2. Fill with solid dark purple color
- * 3. Draw neon pink edge with glow effect using shadow blur
- *
- * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
- */
 function renderTerrain(ctx) {
-    if (!currentTerrain) return;
-
-    const terrain = currentTerrain;
-    if (renderPixiTerrainLayerToCanvas(ctx, terrain)) {
-        return;
-    }
-
-    const width = terrain.getWidth();
-    const screenHeight = terrain.getScreenHeight();
-
-    // Build terrain path once and reuse for fill and stroke
-    ctx.beginPath();
-
-    // Start at bottom-left corner
-    ctx.moveTo(0, screenHeight);
-
-    // Draw terrain profile
-    // Heights are distance from bottom, so canvas Y = screenHeight - terrainHeight
-    for (let x = 0; x < width; x++) {
-        ctx.lineTo(x, getTerrainGridSurfaceYAt(terrain, x));
-    }
-
-    // Close the path at bottom-right corner
-    ctx.lineTo(width - 1, screenHeight);
-    ctx.closePath();
-
-    // Fill terrain with solid dark purple
-    ctx.fillStyle = TERRAIN_FILL_COLOR;
-    ctx.fill();
-
-    // Draw terrain edge with neon glow effect
-    // Use shadow blur for the glow effect - more performant than gradient
-    ctx.save();
-
-    // Create glow effect using shadow
-    ctx.shadowColor = TERRAIN_EDGE_COLOR;
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
-
-    // Draw neon pink edge stroke
-    ctx.strokeStyle = TERRAIN_EDGE_COLOR;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    for (let x = 0; x < width; x++) {
-        const canvasY = getTerrainGridSurfaceYAt(terrain, x);
-        if (x === 0) {
-            ctx.moveTo(x, canvasY);
-        } else {
-            ctx.lineTo(x, canvasY);
-        }
-    }
-    ctx.stroke();
-
-    ctx.restore();
+    renderTerrainScene(ctx, currentTerrain, {
+        renderPixiTerrainLayerToCanvas
+    });
 }
 
 // =============================================================================
@@ -5153,102 +4916,43 @@ function handleSelectSpecificWeapon(weaponId) {
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  */
 function renderPlaying(ctx) {
-    // Apply screen shake offset if active
-    const shakeOffset = getScreenShakeOffset();
-    if (shakeOffset.x !== 0 || shakeOffset.y !== 0) {
-        ctx.save();
-        ctx.translate(shakeOffset.x, shakeOffset.y);
-    }
-
-    // Render synthwave background (behind everything)
-    renderBackground(ctx, Renderer.getWidth(), Renderer.getHeight());
-
-    // Render terrain (in front of background)
-    renderTerrain(ctx);
-
-    // Render terrain de-res chunks from crater samples before tanks/projectiles
-    renderTerrainDerezEffects(ctx);
-
-    // Render fallout zones (on top of terrain, behind tanks)
-    renderFalloutZones(ctx);
-
-    // Render fire zones from Napalm (on top of terrain, behind tanks)
-    renderFireZones(ctx);
-
-    // Render tanks on terrain
-    renderTanks(ctx);
-
-    // Render shield effects around tanks (on top of tanks)
-    renderTankShields(ctx);
-
-    // Render active projectile and trail (on top of terrain and tanks)
-    renderActiveProjectile(ctx);
-
-    // Sync playerTank's angle/power with playerAim for HUD display
-    // (The tank stores the values, but playerAim is used for real-time input)
-    if (playerTank) {
-        playerTank.angle = playerAim.angle;
-        playerTank.power = playerAim.power;
-    }
-
-    // Determine turn state for HUD
     const phase = Turn.getPhase();
     const isPlayerTurn = Turn.canPlayerAim();
-    const shooter = Turn.getCurrentShooter();
 
-    // Render the complete HUD using the new ui.js module
-    // Pass the phase directly for the enhanced turn indicator
-    HUD.renderHUD(ctx, {
+    renderGameplayScene(ctx, {
+        width: Renderer.getWidth(),
+        height: Renderer.getHeight(),
         playerTank,
         enemyTank,
-        money: Money.getMoney(),
-        isPlayerTurn,
-        phase,
-        shooter,
+        playerAim,
+        currentTerrain,
         currentRound,
-        difficulty: AI.getDifficultyName(AI.getDifficulty())
-    });
-
-    // Render pause button
-    renderPauseButton(ctx);
-    renderLevelEditorReturnButton(ctx);
-
-    // Render touch aiming visuals (drag zone, rubber band, etc.)
-    // This is rendered first so button-based controls appear on top
-    if (isPlayerTurn) {
-        TouchAiming.setEnabled(true);
-        TouchAiming.render(ctx, playerTank, currentTerrain);
-    } else {
-        TouchAiming.setEnabled(false);
-    }
-
-    // Render aiming controls (power bar, angle arc, fire button, trajectory preview)
-    // These are only shown during player's turn
-    // Note: If touch aiming is active, these are still rendered but touch aiming
-    // handles trajectory preview separately
-    AimingControls.renderAimingControls(ctx, {
-        playerTank,
-        angle: playerAim.angle,
-        power: playerAim.power,
+        money: Money.getMoney(),
+        difficultyName: AI.getDifficultyName(AI.getDifficulty()),
+        phase,
         canFire: Turn.canPlayerFire(),
         isPlayerTurn,
-        terrain: currentTerrain
+        shooter: Turn.getCurrentShooter(),
+        crtParams: getCrtFullscreenParams(),
+        getScreenShakeOffset,
+        renderBackground,
+        renderTerrain,
+        renderTerrainDerezEffects,
+        renderFalloutZones,
+        renderFireZones,
+        renderTanks,
+        renderTankShields,
+        renderActiveProjectile,
+        renderHud: HUD.renderHUD,
+        renderPauseButton,
+        renderLevelEditorReturnButton,
+        setTouchAimingEnabled: TouchAiming.setEnabled,
+        renderTouchAiming: TouchAiming.render,
+        renderAimingControls: AimingControls.renderAimingControls,
+        renderScreenFlash,
+        renderDebugOverlays: DebugOverlays.render,
+        renderCrtEffects
     });
-
-    // Restore context if screen shake was applied
-    if (shakeOffset.x !== 0 || shakeOffset.y !== 0) {
-        ctx.restore();
-    }
-
-    // Render screen flash on top of everything (not affected by shake)
-    renderScreenFlash(ctx, Renderer.getWidth(), Renderer.getHeight());
-
-    // Render debug overlays (trajectory, collision boxes, grid, vectors)
-    // These render on top of gameplay but under CRT effects
-    DebugOverlays.render(ctx);
-
-    // Render CRT effects as final post-processing overlay (fullscreen)
-    renderCrtEffects(ctx, Renderer.getWidth(), Renderer.getHeight(), getCrtFullscreenParams());
 }
 
 /**
