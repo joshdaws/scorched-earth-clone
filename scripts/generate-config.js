@@ -5,9 +5,10 @@
  * Used during Vercel deployment to inject the correct Convex URL.
  *
  * Environment variables:
- *   CONVEX_URL - The Convex deployment URL (required for production)
+ *   SERVICE_MODE - "online" or "offline" (defaults to online)
+ *   CONVEX_URL - The Convex deployment URL (required for online mode)
  *
- * If CONVEX_URL is not set, the script will fail with an error.
+ * If CONVEX_URL is not set in online mode, the script will fail with an error.
  */
 
 import fs from 'fs';
@@ -18,8 +19,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const CONVEX_URL = process.env.CONVEX_URL || process.env.VITE_CONVEX_URL;
+const SERVICE_MODE = process.env.SERVICE_MODE || process.env.VITE_SERVICE_MODE || 'online';
+const OFFLINE_SERVICES = SERVICE_MODE === 'offline';
 
-if (!CONVEX_URL) {
+if (!OFFLINE_SERVICES && !CONVEX_URL) {
     console.error('ERROR: CONVEX_URL environment variable is not set.');
     console.error('');
     console.error('For Vercel deployment:');
@@ -39,11 +42,13 @@ const config = `/**
  * DO NOT EDIT - changes will be overwritten.
  */
 window.SCORCHED_EARTH_CONFIG = {
-    CONVEX_URL: '${CONVEX_URL}'
+    SERVICE_MODE: '${SERVICE_MODE}',
+    OFFLINE_SERVICES: ${OFFLINE_SERVICES},
+    CONVEX_URL: '${OFFLINE_SERVICES ? '' : CONVEX_URL}'
 };
 `;
 
 const configPath = path.join(__dirname, '..', 'config.js');
 fs.writeFileSync(configPath, config);
 
-console.log(`Generated config.js with CONVEX_URL: ${CONVEX_URL}`);
+console.log(`Generated config.js with SERVICE_MODE=${SERVICE_MODE}${OFFLINE_SERVICES ? '' : ` CONVEX_URL=${CONVEX_URL}`}`);

@@ -2,6 +2,20 @@
 
 Runtime metrics are exposed through `window.TestAPI` so browser smokes can reset, sample, and budget title/gameplay/impact scenes without adding one-off probes.
 
+## Local Service Mode
+
+Local browser smokes should run with generated `config.js` set to `SERVICE_MODE: 'offline'`, so high scores use local storage and do not contact Convex. To create or restore the smoke-safe config after testing an online deployment config, run:
+
+```bash
+npm run generate-config:offline
+```
+
+Production/online config generation still requires a real Convex URL:
+
+```bash
+CONVEX_URL=https://your-deployment.convex.cloud npm run generate-config
+```
+
 ## Browser Flow
 
 1. Open the target scene.

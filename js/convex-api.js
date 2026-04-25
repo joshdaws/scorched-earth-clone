@@ -6,8 +6,11 @@
  * When Convex is unavailable, all operations fall back to local storage.
  */
 
-// Get Convex URL from runtime config (loaded via config.js before this module)
-const CONVEX_URL = window.SCORCHED_EARTH_CONFIG?.CONVEX_URL || '';
+// Get runtime config from config.js, which loads before this module.
+const RUNTIME_CONFIG = globalThis.window?.SCORCHED_EARTH_CONFIG || {};
+const SERVICE_MODE = RUNTIME_CONFIG.SERVICE_MODE || (RUNTIME_CONFIG.OFFLINE_SERVICES ? 'offline' : 'online');
+const OFFLINE_SERVICES = SERVICE_MODE === 'offline' || RUNTIME_CONFIG.OFFLINE_SERVICES === true;
+const CONVEX_URL = OFFLINE_SERVICES ? '' : (RUNTIME_CONFIG.CONVEX_URL || '');
 
 // LocalStorage keys
 const STORAGE_KEYS = {
@@ -38,6 +41,11 @@ let api = null;
  */
 async function loadConvexModules() {
     if (convexAvailable) return true;
+    if (OFFLINE_SERVICES || !CONVEX_URL) {
+        convexAvailable = false;
+        console.log('[ConvexAPI] Offline service mode enabled - using local-only storage');
+        return false;
+    }
 
     try {
         // Dynamic import - will fail gracefully if module can't be resolved
@@ -120,7 +128,7 @@ function setStoredPlayerName(name) {
  * Check if we're currently online and Convex is available
  */
 function checkOnline() {
-    return isOnline && !connectionError && convexAvailable;
+    return !OFFLINE_SERVICES && isOnline && !connectionError && convexAvailable;
 }
 
 /**
@@ -186,7 +194,7 @@ function calculateBackoffDelay(retryCount) {
  * Uses exponential backoff for failed operations
  */
 async function processOfflineQueue() {
-    if (!convexAvailable) return;
+    if (OFFLINE_SERVICES || !convexAvailable) return;
 
     const queue = getOfflineQueue();
     if (queue.length === 0) return;
@@ -298,6 +306,8 @@ function initClient() {
  * Set up online/offline event listeners
  */
 function setupNetworkListeners() {
+    if (OFFLINE_SERVICES) return;
+
     window.addEventListener('online', () => {
         console.log('[ConvexAPI] Network online');
         isOnline = true;
@@ -645,7 +655,9 @@ export function getConnectionStatus() {
         hasError: !!connectionError,
         errorMessage: connectionError?.message || null,
         queuedActions: getOfflineQueue().length,
-        convexAvailable: convexAvailable
+        convexAvailable: convexAvailable,
+        serviceMode: SERVICE_MODE,
+        offlineServices: OFFLINE_SERVICES
     };
 }
 
@@ -653,6 +665,12 @@ export function getConnectionStatus() {
  * Force retry connection (e.g., when user taps a "retry" button)
  */
 export async function retryConnection() {
+    if (OFFLINE_SERVICES) {
+        connectionError = null;
+        convexAvailable = false;
+        return false;
+    }
+
     connectionError = null;
     isOnline = navigator.onLine;
 
@@ -704,7 +722,9 @@ export async function init() {
         deviceId,
         isOnline: isOnline && convexAvailable,
         hasStoredName: !!getStoredPlayerName(),
-        convexAvailable
+        convexAvailable,
+        serviceMode: SERVICE_MODE,
+        offlineServices: OFFLINE_SERVICES
     };
 }
 
