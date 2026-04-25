@@ -16,6 +16,12 @@ const DEFAULT_FRAGMENT_LIFETIME_MS = 560;
 const SURFACE_GLOW_ROWS = 9;
 const TERRAIN_CHUNK_COLUMNS = 18;
 const DIRTY_PADDING_COLUMNS = 3;
+const DEBRIS_CLUSTER_OFFSETS = [
+    { dx: 0, dy: 0, size: 1 },
+    { dx: -0.28, dy: -0.24, size: 0.62 },
+    { dx: 0.28, dy: 0.22, size: 0.56 },
+    { dx: -0.18, dy: 0.3, size: 0.46 }
+];
 
 let app = null;
 let Pixi = null;
@@ -279,6 +285,46 @@ export function buildTerrainCellDebrisSpec({ x, y, radius, cell, index = 0 }) {
     };
 }
 
+export function getTerrainCellDebrisClusterCount(cell) {
+    const size = Math.max(3, cell?.size ?? getTerrainCellSize());
+    const depth = Math.max(size, cell?.depth ?? size);
+
+    if (size <= 4) return 1;
+    if (depth >= size * 2.5) return 4;
+    if (depth >= size * 1.35) return 3;
+    return 2;
+}
+
+export function buildTerrainCellDebrisSpecs({ x, y, radius, cell, index = 0 }) {
+    const baseSize = Math.max(3, cell?.size ?? getTerrainCellSize());
+    const count = getTerrainCellDebrisClusterCount(cell);
+    const specs = [];
+
+    for (let clusterIndex = 0; clusterIndex < count; clusterIndex++) {
+        const offset = DEBRIS_CLUSTER_OFFSETS[clusterIndex] ?? DEBRIS_CLUSTER_OFFSETS[0];
+        const clusteredCell = {
+            ...cell,
+            x: getCellCoordinate(cell, 'x', baseSize) + offset.dx * baseSize,
+            y: getCellCoordinate(cell, 'y', baseSize) + offset.dy * baseSize,
+            size: Math.max(3, baseSize * offset.size),
+            distance: undefined
+        };
+        const spec = buildTerrainCellDebrisSpec({
+            x,
+            y,
+            radius,
+            cell: clusteredCell,
+            index: index * DEBRIS_CLUSTER_OFFSETS.length + clusterIndex
+        });
+
+        spec.delay += clusterIndex * 5;
+        spec.lifetime = Math.max(360, spec.lifetime - clusterIndex * 26);
+        specs.push(spec);
+    }
+
+    return specs;
+}
+
 function syncParticleChildren() {
     if (!particleContainer) return;
     particleContainer.particleChildren.length = 0;
@@ -514,23 +560,26 @@ export function spawnPixiTerrainDerezEffect({ x, y, radius, cells }) {
 
     for (let index = 0; index < selectedCells.length; index++) {
         const cell = selectedCells[index];
-        const spec = buildTerrainCellDebrisSpec({ x, y, radius, cell, index });
-        const particle = new Pixi.Particle({
-            texture: particleTexture,
-            x: spec.startX,
-            y: spec.startY,
-            anchorX: 0.5,
-            anchorY: 0.5,
-            scaleX: spec.size,
-            scaleY: spec.size,
-            tint: spec.tint,
-            alpha: 0.95
-        });
+        const specs = buildTerrainCellDebrisSpecs({ x, y, radius, cell, index });
 
-        activeFragments.push({
-            particle,
-            ...spec
-        });
+        for (const spec of specs) {
+            const particle = new Pixi.Particle({
+                texture: particleTexture,
+                x: spec.startX,
+                y: spec.startY,
+                anchorX: 0.5,
+                anchorY: 0.5,
+                scaleX: spec.size,
+                scaleY: spec.size,
+                tint: spec.tint,
+                alpha: 0.95
+            });
+
+            activeFragments.push({
+                particle,
+                ...spec
+            });
+        }
     }
 
     while (activeFragments.length > limits.maxFragments) {
@@ -564,15 +613,16 @@ export function updatePixiTerrainLayer(deltaTime) {
         }
 
         const easeOut = 1 - Math.pow(1 - progress, 3);
-        const fade = Math.pow(1 - progress, 1.25);
-        const shimmer = Math.sin(localAge * 0.08 + fragment.phase) * (1 - progress) * 1.4;
-        const scale = fragment.size * (1.35 - progress * 0.55);
+        const fade = Math.pow(1 - progress, 1.18);
+        const flash = clamp(localAge / 80, 0, 1);
+        const shimmer = Math.sin(localAge * 0.09 + fragment.phase) * (1 - progress) * 1.65;
+        const scale = fragment.size * (1.55 - progress * 0.62);
 
         fragment.particle.x = Math.round(fragment.startX + (fragment.targetX - fragment.startX) * easeOut + shimmer);
         fragment.particle.y = Math.round(fragment.startY + (fragment.targetY - fragment.startY) * easeOut - Math.abs(shimmer) * 0.35);
         fragment.particle.scaleX = scale;
         fragment.particle.scaleY = scale;
-        fragment.particle.alpha = clamp(fade, 0, 0.95);
+        fragment.particle.alpha = clamp(fade * flash, 0, 0.95);
         fragment.particle.tint = fragment.tint;
     }
 

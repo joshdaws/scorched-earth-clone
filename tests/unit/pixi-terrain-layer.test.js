@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildTerrainCellDebrisSpec,
+  buildTerrainCellDebrisSpecs,
+  getTerrainCellDebrisClusterCount,
   getPixiTerrainChunkCount,
   getPixiTerrainChunkRangeForImpact,
   getPixiTerrainDebrisLimits,
@@ -50,6 +52,32 @@ describe('pixiTerrainLayer debris helpers', () => {
     expect(spec.lifetime).toBeLessThanOrEqual(680);
     expect(spec.tint).toBeGreaterThanOrEqual(0);
     expect(spec.tint).toBeLessThanOrEqual(0xffffff);
+  });
+
+  it('expands removed cells into anchored chunky debris clusters', () => {
+    const cell = {
+      x: 132,
+      y: 100,
+      topLeftX: 128,
+      topLeftY: 96,
+      size: 8,
+      depth: 24
+    };
+    const specs = buildTerrainCellDebrisSpecs({
+      x: 100,
+      y: 100,
+      radius: 48,
+      index: 0,
+      cell
+    });
+
+    expect(getTerrainCellDebrisClusterCount(cell)).toBe(4);
+    expect(specs).toHaveLength(4);
+    expect(specs[0].startX).toBe(132);
+    expect(specs[0].startY).toBe(100);
+    expect(specs.every(spec => Math.abs(spec.startX - cell.x) <= cell.size)).toBe(true);
+    expect(specs.every(spec => Math.abs(spec.startY - cell.y) <= cell.size)).toBe(true);
+    expect(new Set(specs.map(spec => `${spec.startX},${spec.startY}`)).size).toBeGreaterThan(1);
   });
 
   it('falls back to top-left cell coordinates when a center is not provided', () => {
