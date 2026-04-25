@@ -384,6 +384,38 @@ export function isShowing() {
 }
 
 /**
+ * Get a structured snapshot of shop state for tests and debug tooling.
+ * @returns {Object}
+ */
+export function getDebugState() {
+    const weapons = WeaponRegistry.getAllWeapons().map(weapon => {
+        const lockInfo = Unlocks.getWeaponUnlockInfo(weapon.id);
+        const currentAmmo = playerTankRef ? playerTankRef.getAmmo(weapon.id) : 0;
+        return {
+            id: weapon.id,
+            name: weapon.name,
+            cost: weapon.cost,
+            ammoPerPurchase: weapon.ammo,
+            category: weapon.category,
+            unlocked: !!lockInfo.unlocked,
+            unlockHint: lockInfo.hint,
+            canAfford: Money.canAfford(weapon.cost),
+            currentAmmo
+        };
+    });
+
+    return {
+        visible: isVisible,
+        activeTab,
+        selectedIndex,
+        balance: Money.getMoney(),
+        weapons,
+        feedback: purchaseFeedback ? { ...purchaseFeedback } : null,
+        balanceAnimation: balanceAnimation ? { ...balanceAnimation } : null
+    };
+}
+
+/**
  * Register callback for "Done" button.
  * @param {Function} callback - Function to call when button is clicked
  */

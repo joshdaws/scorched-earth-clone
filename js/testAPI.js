@@ -31,6 +31,8 @@ import * as TankCollection from './tank-collection.js';
 import { DROP_TYPES, processDrop } from './drop-rates.js';
 import * as PitySystem from './pity-system.js';
 import * as SupplyDrop from './supply-drop.js';
+import * as Achievements from './achievements.js';
+import * as AchievementPopup from './achievement-popup.js';
 import {
     getRenderQualitySummary,
     setRenderQuality as setRenderQualityProfile
@@ -1879,6 +1881,116 @@ export function getCollectionQaState() {
     };
 }
 
+// =============================================================================
+// ACHIEVEMENT QA API
+// =============================================================================
+
+/**
+ * Clear achievement state used by browser QA smokes.
+ * @returns {Object}
+ */
+export function resetAchievementQaData() {
+    localStorage.removeItem('scorched_earth_achievements');
+    localStorage.removeItem('scorchedEarth_tokens');
+    Achievements.resetAchievementState();
+    Achievements.clearRoundAchievements();
+    AchievementPopup.clearAll();
+    return getAchievementQaState();
+}
+
+/**
+ * Unlock an achievement through the production achievement system.
+ * @param {string} achievementId
+ * @returns {Object}
+ */
+export function unlockAchievementForQa(achievementId) {
+    const before = getAchievementQaState();
+    const result = Achievements.unlockAchievement(achievementId);
+    return {
+        success: result.unlocked,
+        achievementId,
+        result,
+        before,
+        after: getAchievementQaState()
+    };
+}
+
+/**
+ * Unlock multiple achievements through the production achievement system.
+ * @param {string[]} achievementIds
+ * @returns {Object}
+ */
+export function unlockAchievementsForQa(achievementIds = []) {
+    const before = getAchievementQaState();
+    const results = achievementIds.map(achievementId => ({
+        achievementId,
+        result: Achievements.unlockAchievement(achievementId)
+    }));
+    return {
+        success: results.every(entry => entry.result.unlocked),
+        results,
+        before,
+        after: getAchievementQaState()
+    };
+}
+
+/**
+ * Update an achievement counter through the production achievement system.
+ * @param {Object} options
+ * @returns {Object}
+ */
+export function progressAchievementForQa(options = {}) {
+    const {
+        achievementId = 'sharpshooter',
+        value = 1,
+        increment = true
+    } = options;
+    const result = Achievements.updateAchievementProgress(achievementId, value, increment);
+    return {
+        success: result.updated || result.unlocked,
+        achievementId,
+        result,
+        after: getAchievementQaState()
+    };
+}
+
+/**
+ * Get achievement, popup, and reward state for browser QA.
+ * @returns {Object}
+ */
+export function getAchievementQaState() {
+    const all = Achievements.getAllAchievements();
+    const visible = Achievements.getVisibleAchievements();
+    return {
+        success: true,
+        gameState: getGameState(),
+        stats: Achievements.getAchievementStats(),
+        state: Achievements.getAchievementState(),
+        unlockedIds: Achievements.getUnlockedAchievementIds(),
+        unviewedCount: Achievements.getUnviewedCount(),
+        roundAchievements: Achievements.getRoundAchievements(),
+        visibleAchievements: visible.map(achievement => ({
+            id: achievement.id,
+            name: achievement.name,
+            description: achievement.description,
+            category: achievement.category,
+            tokenReward: achievement.tokenReward,
+            unlocked: Achievements.isAchievementUnlocked(achievement.id),
+            progress: Achievements.getAchievementProgress(achievement.id)
+        })),
+        totalAchievements: all.length,
+        tokens: {
+            balance: Tokens.getTokenBalance(),
+            lifetime: Tokens.getLifetimeStats()
+        },
+        popup: AchievementPopup.getDebugState(),
+        stored: {
+            achievements: readJsonStorage('scorched_earth_achievements', null),
+            tokens: readJsonStorage('scorchedEarth_tokens', null)
+        }
+    };
+}
+
 /**
  * Change audio/settings values through production modules.
  * @param {Object} options
@@ -2003,6 +2115,11 @@ const TestAPI = {
     equipTankForQa,
     buildPityForQa,
     getCollectionQaState,
+    resetAchievementQaData,
+    unlockAchievementForQa,
+    unlockAchievementsForQa,
+    progressAchievementForQa,
+    getAchievementQaState,
     setSettingsAudioForQa,
     getSettingsAudioQaState,
     isInitialized,
