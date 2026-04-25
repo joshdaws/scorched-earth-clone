@@ -48,4 +48,18 @@ describe('sceneIsolation graphics modernization scenes', () => {
       impactRadius: expect.any(Number)
     });
   });
+
+  it('registers an interactive physics playground route', () => {
+    expect(listScenes()).toContain('physics-playground');
+    expect(getScene('physics-playground').setup).toMatchObject({
+      terrain: true,
+      playerTank: true,
+      enemyTank: true,
+      skipMenu: true,
+      physicsPlayground: true,
+      unlimitedAmmo: true,
+      craterRadius: expect.any(Number),
+      startingWeapon: expect.any(String)
+    });
+  });
 });

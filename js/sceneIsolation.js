@@ -5,6 +5,7 @@
  * Enables jumping directly to isolated test scenes via URL parameters:
  * - ?scene=slingshot-test - Aiming UI in isolation
  * - ?scene=physics-sandbox - Fire projectiles and see trajectories
+ * - ?scene=physics-playground - Direct terrain/weapon impact sandbox
  * - ?scene=shop - Shop UI with mock inventory
  * - ?scene=terrain-viewer - Terrain generation testing
  * - ?scene=visual-hud - Deterministic HUD capture scene
@@ -279,6 +280,29 @@ export const SCENES = {
             showTrajectory: true,
             unlimitedAmmo: true,
             showPhysicsData: true
+        }
+    },
+
+    /**
+     * Physics Playground
+     * Mouse-driven terrain/weapon impact testing without progression gates.
+     */
+    'physics-playground': {
+        name: 'Physics Playground',
+        description: 'Direct terrain destruction and weapon impact sandbox',
+        initialState: 'playing',
+        setup: {
+            terrain: true,
+            playerTank: true,
+            enemyTank: true,
+            wind: false,
+            skipMenu: true,
+            physicsPlayground: true,
+            unlimitedAmmo: true,
+            seed: 6601,
+            windValue: 0,
+            startingWeapon: 'basic-shot',
+            craterRadius: 72
         }
     },
 

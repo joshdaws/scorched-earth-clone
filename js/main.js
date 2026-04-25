@@ -240,6 +240,31 @@ let levelModeStats = {
     damageDealt: 0
 };
 
+const PHYSICS_PLAYGROUND = {
+    PANEL_X: 900,
+    PANEL_Y: 132,
+    PANEL_W: 270,
+    PANEL_H: 286,
+    BUTTON_H: 34,
+    GAP: 8,
+    TERRAIN_THROTTLE_MS: 70,
+    MIN_RADIUS: 12,
+    MAX_RADIUS: 220,
+    RADIUS_STEP: 12
+};
+
+const physicsPlaygroundState = {
+    active: false,
+    tool: 'weapon',
+    selectedWeaponId: 'basic-shot',
+    craterRadius: 72,
+    seed: 6601,
+    pointerDown: false,
+    hover: null,
+    lastTerrainEditAt: 0,
+    lastImpact: null
+};
+
 /**
  * True when gameplay was started from the level editor's playtest action.
  * Enables return-to-editor shortcuts and draft slot overrides.
@@ -4918,6 +4943,402 @@ function handleSelectSpecificWeapon(weaponId) {
     return success;
 }
 
+function getPhysicsPlaygroundWeapons() {
+    return WeaponRegistry.getAllWeapons();
+}
+
+function getPhysicsPlaygroundSelectedWeapon() {
+    return WeaponRegistry.getWeapon(physicsPlaygroundState.selectedWeaponId) ||
+        getPhysicsPlaygroundWeapons()[0] ||
+        null;
+}
+
+function grantPhysicsPlaygroundWeapons() {
+    if (!playerTank) return;
+
+    for (const weapon of getPhysicsPlaygroundWeapons()) {
+        playerTank.inventory[weapon.id] = 999;
+    }
+}
+
+function setPhysicsPlaygroundWeapon(weaponId) {
+    const weapon = WeaponRegistry.getWeapon(weaponId);
+    if (!weapon) return false;
+
+    physicsPlaygroundState.selectedWeaponId = weapon.id;
+    if (playerTank) {
+        playerTank.inventory[weapon.id] = 999;
+        playerTank.setWeapon(weapon.id);
+    }
+    return true;
+}
+
+function cyclePhysicsPlaygroundWeapon(direction) {
+    const weapons = getPhysicsPlaygroundWeapons();
+    if (weapons.length === 0) return;
+
+    const currentIndex = Math.max(0, weapons.findIndex(weapon => weapon.id === physicsPlaygroundState.selectedWeaponId));
+    const nextIndex = (currentIndex + direction + weapons.length) % weapons.length;
+    setPhysicsPlaygroundWeapon(weapons[nextIndex].id);
+}
+
+function setPhysicsPlaygroundTool(tool) {
+    if (tool !== 'weapon' && tool !== 'crater') return;
+    physicsPlaygroundState.tool = tool;
+}
+
+function adjustPhysicsPlaygroundRadius(delta) {
+    physicsPlaygroundState.craterRadius = Math.max(
+        PHYSICS_PLAYGROUND.MIN_RADIUS,
+        Math.min(PHYSICS_PLAYGROUND.MAX_RADIUS, physicsPlaygroundState.craterRadius + delta)
+    );
+}
+
+function getPhysicsPlaygroundButtons() {
+    const x = PHYSICS_PLAYGROUND.PANEL_X + 16;
+    const y = PHYSICS_PLAYGROUND.PANEL_Y + 112;
+    const width = PHYSICS_PLAYGROUND.PANEL_W - 32;
+    const halfWidth = (width - PHYSICS_PLAYGROUND.GAP) / 2;
+    const rows = [
+        [
+            { id: 'tool-crater', label: 'CRATER', x, y, width: halfWidth, height: PHYSICS_PLAYGROUND.BUTTON_H },
+            { id: 'tool-weapon', label: 'WEAPON', x: x + halfWidth + PHYSICS_PLAYGROUND.GAP, y, width: halfWidth, height: PHYSICS_PLAYGROUND.BUTTON_H }
+        ],
+        [
+            { id: 'prev-weapon', label: '< WEAPON', x, y: y + 42, width: halfWidth, height: PHYSICS_PLAYGROUND.BUTTON_H },
+            { id: 'next-weapon', label: 'WEAPON >', x: x + halfWidth + PHYSICS_PLAYGROUND.GAP, y: y + 42, width: halfWidth, height: PHYSICS_PLAYGROUND.BUTTON_H }
+        ],
+        [
+            { id: 'radius-down', label: '- RADIUS', x, y: y + 84, width: halfWidth, height: PHYSICS_PLAYGROUND.BUTTON_H },
+            { id: 'radius-up', label: 'RADIUS +', x: x + halfWidth + PHYSICS_PLAYGROUND.GAP, y: y + 84, width: halfWidth, height: PHYSICS_PLAYGROUND.BUTTON_H }
+        ],
+        [
+            { id: 'reset', label: 'RESET', x, y: y + 126, width: halfWidth, height: PHYSICS_PLAYGROUND.BUTTON_H },
+            { id: 'new-seed', label: 'NEW SEED', x: x + halfWidth + PHYSICS_PLAYGROUND.GAP, y: y + 126, width: halfWidth, height: PHYSICS_PLAYGROUND.BUTTON_H }
+        ]
+    ];
+
+    return rows.flat();
+}
+
+function isPointInRect(x, y, rect) {
+    return x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height;
+}
+
+function isInsidePhysicsPlaygroundPanel(x, y) {
+    return physicsPlaygroundState.active && isPointInRect(x, y, {
+        x: PHYSICS_PLAYGROUND.PANEL_X,
+        y: PHYSICS_PLAYGROUND.PANEL_Y,
+        width: PHYSICS_PLAYGROUND.PANEL_W,
+        height: PHYSICS_PLAYGROUND.PANEL_H
+    });
+}
+
+function clearPhysicsPlaygroundTransientState() {
+    activeProjectiles = [];
+    persistentTrails = [];
+    explosionEffect = null;
+    clearParticles();
+    clearTerrainDerezEffects();
+    clearFalloutZones();
+    clearFireZones();
+    clearScreenShake();
+    clearScreenFlash();
+}
+
+function resetPhysicsPlayground({ newSeed = false } = {}) {
+    if (!physicsPlaygroundState.active) return;
+
+    physicsPlaygroundState.seed = newSeed
+        ? Math.floor(Math.random() * 1000000)
+        : physicsPlaygroundState.seed;
+    clearPhysicsPlaygroundTransientState();
+    startNewRunState();
+    Money.init();
+    Money.addMoney(99999);
+
+    currentTerrain = generateTerrain(undefined, undefined, {
+        roughness: 0.5,
+        minHeightPercent: 0.2,
+        maxHeightPercent: 0.7,
+        seed: physicsPlaygroundState.seed
+    });
+
+    const tanks = placeTanksOnTerrain(currentTerrain);
+    playerTank = tanks.player;
+    enemyTank = tanks.enemy;
+    playerTank.health = TANK.START_HEALTH;
+    playerTank.maxHealth = TANK.START_HEALTH;
+    enemyTank.health = TANK.START_HEALTH;
+    enemyTank.maxHealth = TANK.START_HEALTH;
+    grantPhysicsPlaygroundWeapons();
+    setPhysicsPlaygroundWeapon(physicsPlaygroundState.selectedWeaponId);
+    Wind.setWind(0);
+    Turn.init();
+    markPixiTerrainLayerDirty();
+    TestAPI.setPlayerTank(playerTank);
+    TestAPI.setEnemyTank(enemyTank);
+    TestAPI.setTerrain(currentTerrain);
+}
+
+function applyPhysicsPlaygroundImpact(x, y, options = {}) {
+    if (!physicsPlaygroundState.active || !currentTerrain) return false;
+
+    const tool = options.tool || physicsPlaygroundState.tool;
+    physicsPlaygroundState.lastImpact = { x, y, tool, at: performance.now() };
+
+    if (tool === 'crater') {
+        const destroyed = destroyTerrainAt(x, y, physicsPlaygroundState.craterRadius);
+        if (destroyed) {
+            if (playerTank) updateTankTerrainPosition(playerTank, currentTerrain);
+            if (enemyTank) updateTankTerrainPosition(enemyTank, currentTerrain);
+        }
+        return destroyed;
+    }
+
+    const weapon = getPhysicsPlaygroundSelectedWeapon();
+    if (!weapon) return false;
+
+    const tanks = [playerTank, enemyTank].filter(Boolean);
+    const directHit = checkTankCollision(x, y, tanks, { owner: 'player', canHitOwner: true });
+    const fakeProjectile = {
+        owner: 'player',
+        weaponId: weapon.id,
+        getTrail: () => []
+    };
+    const childProjectiles = handleProjectileExplosion(fakeProjectile, { x, y }, directHit?.tank || null);
+    if (childProjectiles?.length) {
+        activeProjectiles.push(...childProjectiles);
+    }
+    return true;
+}
+
+function handlePhysicsPlaygroundButton(buttonId) {
+    switch (buttonId) {
+        case 'tool-crater':
+            setPhysicsPlaygroundTool('crater');
+            return true;
+        case 'tool-weapon':
+            setPhysicsPlaygroundTool('weapon');
+            return true;
+        case 'prev-weapon':
+            cyclePhysicsPlaygroundWeapon(-1);
+            return true;
+        case 'next-weapon':
+            cyclePhysicsPlaygroundWeapon(1);
+            return true;
+        case 'radius-down':
+            adjustPhysicsPlaygroundRadius(-PHYSICS_PLAYGROUND.RADIUS_STEP);
+            return true;
+        case 'radius-up':
+            adjustPhysicsPlaygroundRadius(PHYSICS_PLAYGROUND.RADIUS_STEP);
+            return true;
+        case 'reset':
+            resetPhysicsPlayground();
+            return true;
+        case 'new-seed':
+            resetPhysicsPlayground({ newSeed: true });
+            return true;
+        default:
+            return false;
+    }
+}
+
+function handlePhysicsPlaygroundPointerDown(pos) {
+    if (!physicsPlaygroundState.active || Game.getState() !== GAME_STATES.PLAYING) return false;
+
+    if (isInsidePhysicsPlaygroundPanel(pos.x, pos.y)) {
+        const button = getPhysicsPlaygroundButtons().find(item => isPointInRect(pos.x, pos.y, item));
+        if (button) handlePhysicsPlaygroundButton(button.id);
+        return true;
+    }
+
+    physicsPlaygroundState.pointerDown = true;
+    physicsPlaygroundState.hover = { x: pos.x, y: pos.y };
+    physicsPlaygroundState.lastTerrainEditAt = performance.now();
+    applyPhysicsPlaygroundImpact(pos.x, pos.y);
+    return true;
+}
+
+function handlePhysicsPlaygroundPointerMove(pos) {
+    if (!physicsPlaygroundState.active || Game.getState() !== GAME_STATES.PLAYING) return false;
+
+    physicsPlaygroundState.hover = { x: pos.x, y: pos.y };
+    if (!physicsPlaygroundState.pointerDown || physicsPlaygroundState.tool !== 'crater') {
+        return isInsidePhysicsPlaygroundPanel(pos.x, pos.y);
+    }
+
+    const now = performance.now();
+    if (now - physicsPlaygroundState.lastTerrainEditAt >= PHYSICS_PLAYGROUND.TERRAIN_THROTTLE_MS) {
+        physicsPlaygroundState.lastTerrainEditAt = now;
+        applyPhysicsPlaygroundImpact(pos.x, pos.y, { tool: 'crater' });
+    }
+    return true;
+}
+
+function handlePhysicsPlaygroundPointerUp(pos) {
+    if (!physicsPlaygroundState.active) return false;
+    physicsPlaygroundState.pointerDown = false;
+    physicsPlaygroundState.hover = { x: pos.x, y: pos.y };
+    return Game.getState() === GAME_STATES.PLAYING && isInsidePhysicsPlaygroundPanel(pos.x, pos.y);
+}
+
+function handlePhysicsPlaygroundKey(keyCode, event = null) {
+    if (!physicsPlaygroundState.active) return false;
+
+    if (keyCode === 'Digit1') {
+        setPhysicsPlaygroundTool('crater');
+        return true;
+    }
+    if (keyCode === 'Digit2') {
+        setPhysicsPlaygroundTool('weapon');
+        return true;
+    }
+    if (keyCode === 'BracketLeft' || keyCode === 'Minus') {
+        adjustPhysicsPlaygroundRadius(-PHYSICS_PLAYGROUND.RADIUS_STEP);
+        return true;
+    }
+    if (keyCode === 'BracketRight' || keyCode === 'Equal') {
+        adjustPhysicsPlaygroundRadius(PHYSICS_PLAYGROUND.RADIUS_STEP);
+        return true;
+    }
+    if (keyCode === 'Tab') {
+        event?.preventDefault?.();
+        cyclePhysicsPlaygroundWeapon(event?.shiftKey ? -1 : 1);
+        return true;
+    }
+    if (keyCode === 'KeyR') {
+        resetPhysicsPlayground();
+        return true;
+    }
+    if (keyCode === 'KeyN') {
+        resetPhysicsPlayground({ newSeed: true });
+        return true;
+    }
+
+    return false;
+}
+
+function getPhysicsPlaygroundState() {
+    const weapon = getPhysicsPlaygroundSelectedWeapon();
+    return {
+        active: physicsPlaygroundState.active,
+        tool: physicsPlaygroundState.tool,
+        selectedWeaponId: weapon?.id || null,
+        selectedWeaponName: weapon?.name || null,
+        craterRadius: physicsPlaygroundState.craterRadius,
+        seed: physicsPlaygroundState.seed,
+        hover: physicsPlaygroundState.hover,
+        lastImpact: physicsPlaygroundState.lastImpact
+    };
+}
+
+function exposePhysicsPlaygroundApi() {
+    if (typeof window === 'undefined') return;
+
+    window.__SCORCHED_PHYSICS_PLAYGROUND = {
+        getState: getPhysicsPlaygroundState,
+        setTool: tool => {
+            setPhysicsPlaygroundTool(tool);
+            return getPhysicsPlaygroundState();
+        },
+        setWeapon: weaponId => {
+            setPhysicsPlaygroundWeapon(weaponId);
+            return getPhysicsPlaygroundState();
+        },
+        impact: ({ x, y, tool } = {}) => {
+            const result = applyPhysicsPlaygroundImpact(x, y, { tool });
+            return { success: Boolean(result), state: getPhysicsPlaygroundState() };
+        },
+        reset: options => {
+            resetPhysicsPlayground(options);
+            return getPhysicsPlaygroundState();
+        }
+    };
+}
+
+function deactivatePhysicsPlaygroundScene() {
+    physicsPlaygroundState.active = false;
+    physicsPlaygroundState.pointerDown = false;
+}
+
+function renderPhysicsPlaygroundOverlay(ctx) {
+    if (!physicsPlaygroundState.active || Game.getState() !== GAME_STATES.PLAYING) return;
+
+    const weapon = getPhysicsPlaygroundSelectedWeapon();
+    const panel = {
+        x: PHYSICS_PLAYGROUND.PANEL_X,
+        y: PHYSICS_PLAYGROUND.PANEL_Y,
+        width: PHYSICS_PLAYGROUND.PANEL_W,
+        height: PHYSICS_PLAYGROUND.PANEL_H
+    };
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(5, 8, 24, 0.86)';
+    ctx.strokeStyle = COLORS.NEON_CYAN;
+    ctx.lineWidth = 2;
+    ctx.shadowColor = COLORS.NEON_CYAN;
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    ctx.roundRect(panel.x, panel.y, panel.width, panel.height, 10);
+    ctx.fill();
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.font = `bold 18px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText('PHYSICS PLAYGROUND', panel.x + 16, panel.y + 14);
+
+    ctx.font = `bold 13px ${UI.FONT_FAMILY}`;
+    ctx.fillStyle = COLORS.NEON_CYAN;
+    ctx.fillText(`TOOL ${physicsPlaygroundState.tool.toUpperCase()}`, panel.x + 16, panel.y + 46);
+    ctx.fillStyle = COLORS.NEON_PINK;
+    ctx.fillText(`WEAPON ${weapon?.name || 'None'}`, panel.x + 16, panel.y + 66);
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.fillText(`RADIUS ${physicsPlaygroundState.craterRadius}px`, panel.x + 16, panel.y + 86);
+
+    for (const button of getPhysicsPlaygroundButtons()) {
+        const active = (button.id === 'tool-crater' && physicsPlaygroundState.tool === 'crater') ||
+            (button.id === 'tool-weapon' && physicsPlaygroundState.tool === 'weapon');
+        ctx.fillStyle = active ? 'rgba(40, 220, 255, 0.24)' : 'rgba(255, 255, 255, 0.06)';
+        ctx.strokeStyle = active ? COLORS.NEON_CYAN : 'rgba(111, 231, 255, 0.55)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(button.x, button.y, button.width, button.height, 6);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = active ? COLORS.TEXT_LIGHT : 'rgba(230, 244, 255, 0.9)';
+        ctx.font = `bold 12px ${UI.FONT_FAMILY}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(button.label, button.x + button.width / 2, button.y + button.height / 2 + 1);
+    }
+
+    if (physicsPlaygroundState.hover && !isInsidePhysicsPlaygroundPanel(physicsPlaygroundState.hover.x, physicsPlaygroundState.hover.y)) {
+        const { x, y } = physicsPlaygroundState.hover;
+        const radius = physicsPlaygroundState.tool === 'crater'
+            ? physicsPlaygroundState.craterRadius
+            : (weapon?.blastRadius || physicsPlaygroundState.craterRadius);
+        ctx.strokeStyle = physicsPlaygroundState.tool === 'crater' ? COLORS.NEON_CYAN : COLORS.NEON_PINK;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 8]);
+        ctx.shadowColor = ctx.strokeStyle;
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = ctx.strokeStyle;
+        ctx.fill();
+    }
+
+    ctx.restore();
+}
+
 /**
  * Render the playing screen
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
@@ -4971,6 +5392,10 @@ function handlePlayingPointerDown(pos) {
     const state = Game.getState();
     const pausableStates = [GAME_STATES.PLAYING, GAME_STATES.AIMING, GAME_STATES.FIRING];
     if (!pausableStates.includes(state)) return;
+
+    if (handlePhysicsPlaygroundPointerDown(pos)) {
+        return;
+    }
 
     // Level editor playtest shortcut: return to editor from gameplay states.
     if (isInsideLevelEditorReturnButton(pos.x, pos.y)) {
@@ -5026,6 +5451,10 @@ function handlePlayingPointerDown(pos) {
 function handlePlayingPointerMove(pos) {
     if (Game.getState() !== GAME_STATES.PLAYING) return;
 
+    if (handlePhysicsPlaygroundPointerMove(pos)) {
+        return;
+    }
+
     // Handle weapon bar swipe gesture first
     if (HUD.handleWeaponBarSwipeMove(pos.x, pos.y)) {
         return; // Swipe is active, don't process other moves
@@ -5041,6 +5470,10 @@ function handlePlayingPointerMove(pos) {
  */
 function handlePlayingPointerUp(pos) {
     if (Game.getState() !== GAME_STATES.PLAYING) return;
+
+    if (handlePhysicsPlaygroundPointerUp(pos)) {
+        return;
+    }
 
     // Handle weapon bar swipe end
     const totalWeapons = WeaponRegistry.getWeaponCount();
@@ -5099,6 +5532,10 @@ function setupPlayingState() {
 
     Input.onTouchEnd((x, y) => {
         handlePlayingPointerUp({ x, y });
+    });
+
+    Input.onKeyDown((keyCode, event) => {
+        handlePhysicsPlaygroundKey(keyCode, event);
     });
 
     // Register phase change callback to enable/disable input and apply status effects
@@ -7223,6 +7660,8 @@ async function init() {
  * @param {Object} params - URL parameters
  */
 function handleSceneIsolation(scene, params) {
+    deactivatePhysicsPlaygroundScene();
+
     if (!scene) {
         console.warn('[SceneIsolation] Unknown scene:', params.scene);
         console.log('[SceneIsolation] Available scenes:', SceneIsolation.listScenes().join(', '));
@@ -7254,6 +7693,10 @@ function handleSceneIsolation(scene, params) {
 
         case 'physics-sandbox':
             setupPhysicsSandboxScene(scene, params);
+            break;
+
+        case 'physics-playground':
+            setupPhysicsPlaygroundScene(scene, params);
             break;
 
         case 'shop':
@@ -7427,6 +7870,40 @@ function setupPhysicsSandboxScene(scene, params) {
     console.log('  - TestAPI.fireAndCollect({ angle, power }) - simulate with damage calculation');
     console.log('  - TestAPI.validatePhysics({ angle, power, expectedRange }) - validate physics');
     console.log('  - All weapons available with unlimited ammo');
+}
+
+/**
+ * Setup interactive physics playground scene.
+ * Direct mouse/touch impacts route through the same terrain and weapon systems
+ * used by gameplay, with progression/input gates removed.
+ */
+function setupPhysicsPlaygroundScene(scene, params) {
+    console.log('[SceneIsolation] Setting up physics playground');
+
+    physicsPlaygroundState.active = true;
+    physicsPlaygroundState.tool = 'weapon';
+    physicsPlaygroundState.seed = params.seed ?? scene.setup.seed ?? physicsPlaygroundState.seed;
+    physicsPlaygroundState.craterRadius = params.radius ?? scene.setup.craterRadius ?? physicsPlaygroundState.craterRadius;
+    physicsPlaygroundState.selectedWeaponId = params.weapon || scene.setup.startingWeapon || physicsPlaygroundState.selectedWeaponId;
+    physicsPlaygroundState.pointerDown = false;
+    physicsPlaygroundState.hover = null;
+    physicsPlaygroundState.lastImpact = null;
+
+    Debug.setEnabled(false);
+    Game.setState(GAME_STATES.PLAYING);
+    resetPhysicsPlayground();
+    setPhysicsPlaygroundWeapon(physicsPlaygroundState.selectedWeaponId);
+    Wind.setWind(params.wind ?? scene.setup.windValue ?? 0);
+    Input.disableGameInput();
+    exposePhysicsPlaygroundApi();
+
+    TestAPI.setPlayerTank(playerTank);
+    TestAPI.setEnemyTank(enemyTank);
+    TestAPI.setTerrain(currentTerrain);
+
+    console.log('[SceneIsolation] Physics playground ready');
+    console.log('  - Mouse/touch terrain directly to trigger the active playground tool');
+    console.log('  - window.__SCORCHED_PHYSICS_PLAYGROUND.getState() exposes playground state');
 }
 
 /**
@@ -7882,6 +8359,8 @@ function render(ctx) {
 function postRender(ctx) {
     // Render achievement popup notifications (on top of all game content)
     AchievementPopup.render(ctx);
+
+    renderPhysicsPlaygroundOverlay(ctx);
 
     // Render supply drop animation (covers everything when active)
     if (SupplyDrop.isAnimating()) {

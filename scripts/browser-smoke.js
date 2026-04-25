@@ -48,7 +48,7 @@ function parseArgs(argv) {
 
 function usage() {
     console.log(`Usage:
-  npm run smoke:browser -- [--scenario impact|projectile|idle|visual|controls|terrain|tank-support|high-scores] [--scene physics-sandbox&wind=0] [--quality balanced] [--headed]
+  npm run smoke:browser -- [--scenario impact|projectile|idle|visual|controls|terrain|tank-support|physics-playground|high-scores] [--scene physics-sandbox&wind=0] [--quality balanced] [--headed]
 
 Examples:
   npm run smoke:browser
@@ -58,6 +58,7 @@ Examples:
   npm run smoke:browser -- --scenario controls
   npm run smoke:browser -- --scenario terrain
   npm run smoke:browser -- --scenario tank-support
+  npm run smoke:browser -- --scenario physics-playground --scene physics-playground
   npm run smoke:browser -- --scenario high-scores
 
 If Chromium is missing after a clean checkout, run:
@@ -173,6 +174,11 @@ async function runScenario(page, { scenario, quality }) {
         return;
     }
 
+    if (scenario === 'physics-playground') {
+        await runPhysicsPlaygroundScenario(page, quality);
+        return;
+    }
+
     if (scenario === 'high-scores') {
         await runHighScoresScenario(page, quality);
         return;
@@ -203,6 +209,78 @@ function assertTankSupport(condition, message) {
     if (!condition) {
         throw new Error(`[tank-support] ${message}`);
     }
+}
+
+function assertPlayground(condition, message) {
+    if (!condition) {
+        throw new Error(`[physics-playground] ${message}`);
+    }
+}
+
+async function getSurfacePoint(page, sampleX, offset = 16) {
+    return page.evaluate(({ x, yOffset }) => {
+        const terrain = window.TestAPI.getTerrainAt(x);
+        return {
+            x,
+            y: terrain.canvasY + yOffset,
+            beforeHeight: terrain.height,
+            canvasY: terrain.canvasY
+        };
+    }, { x: sampleX, yOffset: offset });
+}
+
+async function runPhysicsPlaygroundScenario(page, quality) {
+    await page.evaluate(({ selectedQuality }) => {
+        window.TestAPI.setRenderQuality(selectedQuality);
+        window.TestAPI.resetPerformance();
+    }, { selectedQuality: quality });
+
+    await page.waitForFunction(
+        () => window.__SCORCHED_PHYSICS_PLAYGROUND?.getState?.().active === true,
+        null,
+        { timeout: 15000 }
+    );
+
+    const initialState = await page.evaluate(() => window.__SCORCHED_PHYSICS_PLAYGROUND.getState());
+    assertPlayground(initialState.tool === 'weapon', `initial tool should be weapon, got ${initialState.tool}`);
+    assertPlayground(Boolean(initialState.selectedWeaponId), 'playground should expose a selected weapon');
+
+    const weaponImpact = await getSurfacePoint(page, 540, 18);
+    const weaponClient = await designToClient(page, { x: weaponImpact.x, y: weaponImpact.y });
+    await page.mouse.click(weaponClient.x, weaponClient.y);
+    await page.waitForTimeout(900);
+    const afterWeapon = await page.evaluate(x => window.TestAPI.getTerrainAt(x), weaponImpact.x);
+    assertPlayground(
+        afterWeapon.height < weaponImpact.beforeHeight,
+        `weapon impact should lower terrain height at ${weaponImpact.x}, before=${weaponImpact.beforeHeight} after=${afterWeapon.height}`
+    );
+
+    await page.keyboard.press('Tab');
+    await page.waitForTimeout(120);
+    const afterTabState = await page.evaluate(() => window.__SCORCHED_PHYSICS_PLAYGROUND.getState());
+    assertPlayground(
+        afterTabState.selectedWeaponId !== initialState.selectedWeaponId,
+        'Tab should cycle the selected playground weapon'
+    );
+
+    await page.keyboard.press('Digit1');
+    await page.waitForTimeout(120);
+    const craterState = await page.evaluate(() => window.__SCORCHED_PHYSICS_PLAYGROUND.getState());
+    assertPlayground(craterState.tool === 'crater', `Digit1 should switch to crater tool, got ${craterState.tool}`);
+
+    const craterImpact = await getSurfacePoint(page, 650, 20);
+    const dragStart = await designToClient(page, { x: craterImpact.x, y: craterImpact.y });
+    const dragEnd = await designToClient(page, { x: craterImpact.x + 90, y: craterImpact.y + 12 });
+    await page.mouse.move(dragStart.x, dragStart.y);
+    await page.mouse.down();
+    await page.mouse.move(dragEnd.x, dragEnd.y, { steps: 10 });
+    await page.mouse.up();
+    await page.waitForTimeout(1100);
+    const afterCrater = await page.evaluate(x => window.TestAPI.getTerrainAt(x), craterImpact.x + 45);
+    assertPlayground(
+        afterCrater.height < craterImpact.beforeHeight,
+        `crater drag should lower terrain near drag path, before=${craterImpact.beforeHeight} after=${afterCrater.height}`
+    );
 }
 
 async function runTankSupportScenario(page, quality) {
