@@ -11,6 +11,7 @@
  */
 
 import { PHYSICS, TANK } from './constants.js';
+import { getAssetGroupStatus, getLoadedCount, getLoadingStatus } from './assets.js';
 import { queueGameInput, INPUT_EVENTS } from './input.js';
 import * as Wind from './wind.js';
 import * as Turn from './turn.js';
@@ -1427,6 +1428,19 @@ export function checkPerformanceBudget(budgets = {}) {
     };
 }
 
+/**
+ * Get grouped asset loading status for startup/lazy-load smokes.
+ * @returns {Object}
+ */
+export function getAssetStatus() {
+    return {
+        success: true,
+        loadedCount: getLoadedCount(),
+        loading: getLoadingStatus(),
+        groups: getAssetGroupStatus()
+    };
+}
+
 // =============================================================================
 // WINDOW EXPOSURE (for console access)
 // =============================================================================
@@ -1463,6 +1477,7 @@ const TestAPI = {
     getPerformanceMetrics,
     resetPerformance,
     checkPerformanceBudget,
+    getAssetStatus,
     isInitialized,
     // Initialization (typically called by main.js)
     init,

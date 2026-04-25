@@ -21,6 +21,12 @@ const imageCache = new Map();
 /** @type {boolean} Whether all assets have been loaded */
 let loaded = false;
 
+/** @type {Set<string>} Runtime asset groups that have completed loading */
+const loadedGroups = new Set();
+
+/** @type {Map<string, Promise<number>>} In-flight group loading promises */
+const groupLoadPromises = new Map();
+
 /** @type {number} Current loading progress (0-100) */
 let loadingProgress = 0;
 
@@ -29,6 +35,16 @@ let totalAssets = 0;
 
 /** @type {number} Assets loaded so far */
 let loadedAssets = 0;
+
+export const ASSET_GROUPS = {
+    BOOT: 'boot',
+    TITLE: 'title',
+    GAMEPLAY: 'gameplay',
+    COLLECTION: 'collection',
+    SHOP: 'shop',
+    EDITOR: 'editor',
+    SUPPLY_DROP: 'supplyDrop'
+};
 
 // =============================================================================
 // MANIFEST LOADING
@@ -169,7 +185,51 @@ function loadImage(path) {
  * @param {string} prefix - Current path prefix
  * @returns {Array<{key: string, path: string, meta: Object}>} Array of image entries
  */
-function extractImageEntries(obj, prefix = '') {
+function estimateAssetMemoryBytes(meta) {
+    const width = Number(meta?.width);
+    const height = Number(meta?.height);
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+        return 0;
+    }
+    return Math.round(width * height * 4);
+}
+
+function getRuntimeGroupsForAsset(key, meta = {}) {
+    if (Array.isArray(meta.runtimeGroups) && meta.runtimeGroups.length > 0) {
+        return [...new Set(meta.runtimeGroups)];
+    }
+    if (typeof meta.runtimeGroup === 'string') {
+        return [meta.runtimeGroup];
+    }
+
+    if (key.startsWith('supplyDrop.')) return [ASSET_GROUPS.SUPPLY_DROP];
+    if (key.startsWith('tankSkins.')) return [ASSET_GROUPS.COLLECTION, ASSET_GROUPS.SHOP];
+    if (key.startsWith('backgrounds.synthwave')) return [ASSET_GROUPS.TITLE];
+    if (key.startsWith('backgrounds.gameplay')) return [ASSET_GROUPS.GAMEPLAY];
+    if (key.startsWith('weaponIcons.')) return [ASSET_GROUPS.GAMEPLAY, ASSET_GROUPS.SHOP];
+    if (key.startsWith('ui.')) return [ASSET_GROUPS.GAMEPLAY, ASSET_GROUPS.SHOP];
+    if (
+        key.startsWith('tanks.') ||
+        key.startsWith('projectiles.') ||
+        key.startsWith('effects.')
+    ) {
+        return [ASSET_GROUPS.GAMEPLAY];
+    }
+
+    return [ASSET_GROUPS.BOOT];
+}
+
+export function annotateAssetRuntimeMetadata(key, meta) {
+    if (!meta || typeof meta !== 'object') return meta;
+
+    const runtimeGroups = getRuntimeGroupsForAsset(key, meta);
+    meta.runtimeGroup = runtimeGroups[0];
+    meta.runtimeGroups = runtimeGroups;
+    meta.approxMemoryBytes = meta.approxMemoryBytes ?? estimateAssetMemoryBytes(meta);
+    return meta;
+}
+
+export function extractImageEntries(obj, prefix = '') {
     const entries = [];
 
     for (const [key, value] of Object.entries(obj)) {
@@ -183,10 +243,14 @@ function extractImageEntries(obj, prefix = '') {
                 // This is an asset entry with a path
                 // Only include if it's an image (has path ending in image extension)
                 if (/\.(png|jpg|jpeg|gif|webp|svg)$/i.test(value.path)) {
+                    annotateAssetRuntimeMetadata(fullKey, value);
                     entries.push({
                         key: fullKey,
                         path: `assets/${value.path}`,
-                        meta: value
+                        meta: value,
+                        group: value.runtimeGroup,
+                        groups: value.runtimeGroups,
+                        approxMemoryBytes: value.approxMemoryBytes
                     });
                 }
             } else {
@@ -197,6 +261,52 @@ function extractImageEntries(obj, prefix = '') {
     }
 
     return entries;
+}
+
+function getManifestImageEntries() {
+    return manifest ? extractImageEntries(manifest) : [];
+}
+
+function getEntriesForGroup(group) {
+    return getManifestImageEntries().filter(entry => entry.groups.includes(group));
+}
+
+async function loadEntries(entries, onProgress) {
+    totalAssets = entries.length;
+    loadedAssets = 0;
+    loadingProgress = totalAssets === 0 ? 100 : 0;
+    let successCount = 0;
+    let placeholderCount = 0;
+
+    for (const entry of entries) {
+        if (imageCache.has(entry.key)) {
+            successCount++;
+        } else {
+            try {
+                const img = await loadImage(entry.path);
+                imageCache.set(entry.key, img);
+                successCount++;
+                console.log(`  ✓ ${entry.key}`);
+            } catch (error) {
+                // Generate placeholder for failed loads
+                const placeholder = createPlaceholder(entry.key, entry.meta);
+                imageCache.set(entry.key, placeholder);
+                placeholderCount++;
+                console.warn(`  ⚠ ${entry.key} (using placeholder)`);
+            }
+        }
+
+        loadedAssets++;
+        loadingProgress = totalAssets === 0
+            ? 100
+            : Math.round((loadedAssets / totalAssets) * 100);
+
+        if (onProgress) {
+            onProgress(loadedAssets, totalAssets, loadingProgress);
+        }
+    }
+
+    return { successCount, placeholderCount };
 }
 
 /**
@@ -213,47 +323,78 @@ export async function loadAllAssets(onProgress) {
         return 0;
     }
 
-    const entries = extractImageEntries(manifest);
-    totalAssets = entries.length;
-    loadedAssets = 0;
-    loadingProgress = 0;
-    let successCount = 0;
-    let placeholderCount = 0;
+    const entries = getManifestImageEntries();
 
-    if (totalAssets === 0) {
+    if (entries.length === 0) {
         console.log('No assets to load');
         loaded = true;
         loadingProgress = 100;
         return 0;
     }
 
-    console.log(`Loading ${totalAssets} assets...`);
-
-    for (const entry of entries) {
-        try {
-            const img = await loadImage(entry.path);
-            imageCache.set(entry.key, img);
-            successCount++;
-            console.log(`  ✓ ${entry.key}`);
-        } catch (error) {
-            // Generate placeholder for failed loads
-            const placeholder = createPlaceholder(entry.key, entry.meta);
-            imageCache.set(entry.key, placeholder);
-            placeholderCount++;
-            console.warn(`  ⚠ ${entry.key} (using placeholder)`);
-        }
-
-        loadedAssets++;
-        loadingProgress = Math.round((loadedAssets / totalAssets) * 100);
-
-        if (onProgress) {
-            onProgress(loadedAssets, totalAssets, loadingProgress);
-        }
-    }
+    console.log(`Loading ${entries.length} assets...`);
+    const { successCount, placeholderCount } = await loadEntries(entries, onProgress);
 
     loaded = true;
+    for (const group of Object.values(ASSET_GROUPS)) {
+        loadedGroups.add(group);
+    }
     console.log(`Asset loading complete: ${successCount} loaded, ${placeholderCount} placeholders`);
     return successCount;
+}
+
+export async function loadAssetGroup(group, onProgress) {
+    if (!manifest) {
+        console.warn('Manifest not loaded. Call loadManifest() first.');
+        loadedGroups.add(group);
+        return 0;
+    }
+
+    if (loadedGroups.has(group)) {
+        return 0;
+    }
+
+    if (groupLoadPromises.has(group)) {
+        return groupLoadPromises.get(group);
+    }
+
+    const entries = getEntriesForGroup(group);
+    const promise = (async () => {
+        if (entries.length === 0) {
+            loadedGroups.add(group);
+            return 0;
+        }
+
+        const estimatedMemory = entries.reduce((sum, entry) => sum + entry.approxMemoryBytes, 0);
+        console.log(`Loading asset group '${group}' (${entries.length} assets, ${(estimatedMemory / 1024 / 1024).toFixed(2)} MB estimated)...`);
+        const { successCount, placeholderCount } = await loadEntries(entries, onProgress);
+        loadedGroups.add(group);
+        console.log(`Asset group '${group}' complete: ${successCount} loaded, ${placeholderCount} placeholders`);
+        return successCount;
+    })();
+
+    groupLoadPromises.set(group, promise);
+    try {
+        return await promise;
+    } finally {
+        groupLoadPromises.delete(group);
+    }
+}
+
+export async function loadAssetGroups(groups, onProgress) {
+    let loadedCount = 0;
+    for (const group of groups) {
+        loadedCount += await loadAssetGroup(group, onProgress);
+    }
+    return loadedCount;
+}
+
+export function ensureAssetGroupLoaded(group, onProgress) {
+    return loadAssetGroup(group, onProgress);
+}
+
+export function isAssetGroupLoaded(group) {
+    return loadedGroups.has(group);
 }
 
 /**
@@ -400,8 +541,27 @@ export function getLoadingStatus() {
         loaded: loadedAssets,
         total: totalAssets,
         percentage: loadingProgress,
-        complete: loaded
+        complete: loaded,
+        groups: getAssetGroupStatus()
     };
+}
+
+export function getAssetGroupStatus() {
+    const entries = getManifestImageEntries();
+    const status = {};
+
+    for (const group of Object.values(ASSET_GROUPS)) {
+        const groupEntries = entries.filter(entry => entry.groups.includes(group));
+        status[group] = {
+            loaded: loadedGroups.has(group),
+            loading: groupLoadPromises.has(group),
+            assets: groupEntries.length,
+            cached: groupEntries.filter(entry => imageCache.has(entry.key)).length,
+            approxMemoryBytes: groupEntries.reduce((sum, entry) => sum + entry.approxMemoryBytes, 0)
+        };
+    }
+
+    return status;
 }
 
 /**
@@ -409,6 +569,8 @@ export function getLoadingStatus() {
  */
 export function clearCache() {
     imageCache.clear();
+    loadedGroups.clear();
+    groupLoadPromises.clear();
     loaded = false;
     loadingProgress = 0;
     totalAssets = 0;

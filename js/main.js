@@ -1133,6 +1133,46 @@ function updateMenuButtonPositions() {
     menuButtons.dailyRewards.fontSize = layout.isCompact ? 9 : 11;
 }
 
+function ensureAssetsForState(state) {
+    const groups = [];
+
+    if (
+        state === GAME_STATES.PLAYING ||
+        state === GAME_STATES.AIMING ||
+        state === GAME_STATES.FIRING ||
+        state === GAME_STATES.ROUND_TRANSITION ||
+        state === GAME_STATES.LEVEL_COMPLETE
+    ) {
+        groups.push(Assets.ASSET_GROUPS.GAMEPLAY);
+    }
+
+    if (state === GAME_STATES.COLLECTION) {
+        groups.push(Assets.ASSET_GROUPS.COLLECTION);
+    }
+
+    if (state === GAME_STATES.SHOP) {
+        groups.push(Assets.ASSET_GROUPS.SHOP);
+    }
+
+    if (state === GAME_STATES.SUPPLY_DROP) {
+        groups.push(Assets.ASSET_GROUPS.SUPPLY_DROP, Assets.ASSET_GROUPS.COLLECTION);
+    }
+
+    if (state === GAME_STATES.LEVEL_EDITOR || state === GAME_STATES.TANK_EDITOR) {
+        groups.push(Assets.ASSET_GROUPS.EDITOR, Assets.ASSET_GROUPS.COLLECTION);
+    }
+
+    for (const group of [...new Set(groups)]) {
+        void Assets.ensureAssetGroupLoaded(group);
+    }
+}
+
+function registerAssetStateLoading() {
+    Game.onStateChange((newState) => {
+        ensureAssetsForState(newState);
+    });
+}
+
 function getMenuButtonList() {
     return Object.values(menuButtons);
 }
@@ -7147,15 +7187,17 @@ async function init() {
     // Web Audio API requires user gesture to start
     setupAudioInit(canvas);
 
-    // Load assets before starting the game
+    // Load startup assets before starting the game. Gameplay and secondary
+    // screen art lazy-loads as states are entered.
     // Note: loadManifest gracefully handles missing manifest files
     await Assets.loadManifest();
-    await Assets.loadAllAssets((loaded, total, percentage) => {
-        console.log(`Loading assets: ${percentage}% (${loaded}/${total})`);
+    await Assets.loadAssetGroups([Assets.ASSET_GROUPS.BOOT, Assets.ASSET_GROUPS.TITLE], (loaded, total, percentage) => {
+        console.log(`Loading startup assets: ${percentage}% (${loaded}/${total})`);
     });
 
     // Initialize game state
     Game.init();
+    registerAssetStateLoading();
 
     // Initialize debug module
     Debug.init();

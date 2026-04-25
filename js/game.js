@@ -103,6 +103,7 @@ export function calculateFixedUpdatePlan(
  * @type {Object.<string, {onEnter?: Function, onExit?: Function, update?: Function, render?: Function}>}
  */
 const stateHandlers = {};
+const stateChangeListeners = new Set();
 
 /**
  * Register handlers for a specific game state.
@@ -119,6 +120,14 @@ export function registerStateHandlers(state, handlers) {
         return;
     }
     stateHandlers[state] = { ...stateHandlers[state], ...handlers };
+}
+
+export function onStateChange(listener) {
+    if (typeof listener !== 'function') {
+        return () => {};
+    }
+    stateChangeListeners.add(listener);
+    return () => stateChangeListeners.delete(listener);
 }
 
 /**
@@ -357,6 +366,14 @@ export function setState(newState) {
 
     // Update state
     currentState = newState;
+
+    for (const listener of stateChangeListeners) {
+        try {
+            listener(newState, oldState);
+        } catch (error) {
+            console.warn('State change listener failed:', error);
+        }
+    }
 
     // Call onEnter for new state
     const newHandlers = getHandlers(newState);
