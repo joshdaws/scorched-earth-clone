@@ -24,6 +24,7 @@
     "perf:budget": "node scripts/check-performance-budget.js",
     "build:ios": "npm run build && npx cap sync ios",
     "ios:sync": "npm run build && npx cap copy ios",
+    "ios:check": "node scripts/check-ios-readiness.js",
     "open:ios": "npx cap open ios",
     "preview": "vite preview",
     "generate-config": "node scripts/generate-config.js",
