@@ -1453,7 +1453,7 @@ export function setWeaponPoolForRound(roundNumber) {
         console.log(`[AI] Weapon pool set for round ${roundNumber}: [${currentWeaponPool.join(', ')}]`);
     }
 
-    return currentWeaponPool;
+    return [...currentWeaponPool];
 }
 
 /**
