@@ -18,6 +18,26 @@ CONVEX_URL=https://your-deployment.convex.cloud npm run generate-config
 
 ## Browser Flow
 
+For repo-native browser automation, install the Playwright Chromium runtime once after a clean checkout:
+
+```bash
+npm run smoke:browser:install
+```
+
+Then run the default terrain-impact smoke:
+
+```bash
+npm run smoke:browser
+```
+
+The smoke runner starts Vite on a local port, waits for `window.TestAPI` or visual scene readiness, fails on console/page errors, and writes ignored artifacts to `artifacts/browser-smoke/`: a screenshot, metrics JSON, and console JSON. Useful variants:
+
+```bash
+npm run smoke:browser -- --scenario visual --scene visual-impact
+npm run smoke:browser -- --scenario projectile --quality low
+npm run smoke:browser -- --scenario idle --quality balanced
+```
+
 1. Open the target scene.
 2. Wait for `window.TestAPI.isInitialized()` when using gameplay scenes.
 3. Run:

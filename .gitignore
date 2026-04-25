@@ -25,6 +25,9 @@ www/
 # Logs
 *.log
 
+# Local smoke artifacts
+artifacts/browser-smoke/
+
 # Capacitor
 ios/App/Pods/
 ios/App/App/public/
