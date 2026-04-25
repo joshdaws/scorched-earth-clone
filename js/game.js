@@ -33,10 +33,59 @@ const FIXED_TIMESTEP = TIMING.FRAME_DURATION;
 /** @type {number} Maximum accumulated time to prevent spiral of death */
 const MAX_ACCUMULATED_TIME = TIMING.FRAME_DURATION * 5;
 
+/** @type {number} Maximum fixed physics updates before forcing a render */
+const MAX_FIXED_UPDATES_PER_FRAME = 2;
+
 // FPS tracking for debug mode
 let frameCount = 0;
 let lastFpsUpdate = 0;
 let debugMode = false;
+
+/**
+ * Calculate how many fixed updates should run before the next render.
+ *
+ * When rendering hitches, running the entire accumulated backlog makes visible
+ * projectile motion pause and then sprint forward. We allow limited catch-up,
+ * then drop old backlog so the game favors smooth artillery flight over
+ * wall-clock recovery.
+ *
+ * @param {number} accumulatedTime
+ * @param {number} [fixedTimestep]
+ * @param {number} [maxUpdates]
+ * @returns {{steps: number, remainingTime: number, droppedTime: number}}
+ */
+export function calculateFixedUpdatePlan(
+    accumulatedTime,
+    fixedTimestep = FIXED_TIMESTEP,
+    maxUpdates = MAX_FIXED_UPDATES_PER_FRAME
+) {
+    if (accumulatedTime <= 0 || fixedTimestep <= 0 || maxUpdates <= 0) {
+        return {
+            steps: 0,
+            remainingTime: 0,
+            droppedTime: Math.max(0, accumulatedTime)
+        };
+    }
+
+    let steps = 0;
+    let remainingTime = accumulatedTime;
+
+    while (remainingTime >= fixedTimestep && steps < maxUpdates) {
+        steps++;
+        remainingTime -= fixedTimestep;
+    }
+
+    const droppedTime = remainingTime >= fixedTimestep ? remainingTime : 0;
+    if (droppedTime > 0) {
+        remainingTime = 0;
+    }
+
+    return {
+        steps,
+        remainingTime,
+        droppedTime
+    };
+}
 
 // =============================================================================
 // STATE HANDLERS
@@ -415,9 +464,10 @@ export function startLoop(updateFn, renderFn, ctx) {
         // Accumulate time for fixed timestep physics
         accumulator += deltaTime;
 
-        // Run physics updates at fixed intervals
-        // Multiple updates may run per frame if we're behind
-        while (accumulator >= FIXED_TIMESTEP) {
+        // Run a capped number of physics updates so render hitches do not make
+        // projectiles visually pause and then jump forward.
+        const updatePlan = calculateFixedUpdatePlan(accumulator);
+        for (let step = 0; step < updatePlan.steps; step++) {
             // Update game logic with fixed timestep
             const handlers = getHandlers(currentState);
             if (handlers.update) {
@@ -426,9 +476,8 @@ export function startLoop(updateFn, renderFn, ctx) {
             if (updateFn) {
                 updateFn(FIXED_TIMESTEP);
             }
-
-            accumulator -= FIXED_TIMESTEP;
         }
+        accumulator = updatePlan.remainingTime;
 
         // Calculate interpolation alpha for smooth rendering (0-1)
         // Can be passed to render functions for smoother animation
