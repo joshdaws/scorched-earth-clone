@@ -82,6 +82,36 @@
       "width": 64,
       "height": 32
     },
+    "common-forge-circuit-mule": {
+      "path": "images/tanks/generated/tank-common-forge-circuit-mule.png",
+      "width": 64,
+      "height": 32
+    },
+    "common-forge-grid-runner": {
+      "path": "images/tanks/generated/tank-common-forge-grid-runner.png",
+      "width": 64,
+      "height": 32
+    },
+    "common-forge-neon-recruit": {
+      "path": "images/tanks/generated/tank-common-forge-neon-recruit.png",
+      "width": 64,
+      "height": 32
+    },
+    "common-forge-night-patrol": {
+      "path": "images/tanks/generated/tank-common-forge-night-patrol.png",
+      "width": 64,
+      "height": 32
+    },
+    "common-forge-sunrise-scout": {
+      "path": "images/tanks/generated/tank-common-forge-sunrise-scout.png",
+      "width": 64,
+      "height": 32
+    },
+    "common-forge-vector-sentry": {
+      "path": "images/tanks/generated/tank-common-forge-vector-sentry.png",
+      "width": 64,
+      "height": 32
+    },
     "common-midnight": {
       "path": "images/tanks/tank-common-midnight.png",
       "width": 64,
@@ -99,6 +129,31 @@
     },
     "epic-flame-rider": {
       "path": "images/tanks/tank-epic-flame-rider.png",
+      "width": 64,
+      "height": 32
+    },
+    "epic-forge-aurora-juggernaut": {
+      "path": "images/tanks/generated/tank-epic-forge-aurora-juggernaut.png",
+      "width": 64,
+      "height": 32
+    },
+    "epic-forge-chroma-reaper": {
+      "path": "images/tanks/generated/tank-epic-forge-chroma-reaper.png",
+      "width": 64,
+      "height": 32
+    },
+    "epic-forge-hyperion-rail": {
+      "path": "images/tanks/generated/tank-epic-forge-hyperion-rail.png",
+      "width": 64,
+      "height": 32
+    },
+    "epic-forge-neon-samurai": {
+      "path": "images/tanks/generated/tank-epic-forge-neon-samurai.png",
+      "width": 64,
+      "height": 32
+    },
+    "epic-forge-void-hammer": {
+      "path": "images/tanks/generated/tank-epic-forge-void-hammer.png",
       "width": 64,
       "height": 32
     },
@@ -137,6 +192,26 @@
       "width": 64,
       "height": 32
     },
+    "legendary-forge-cosmic-dragon": {
+      "path": "images/tanks/generated/tank-legendary-forge-cosmic-dragon.png",
+      "width": 64,
+      "height": 32
+    },
+    "legendary-forge-moonfall-oracle": {
+      "path": "images/tanks/generated/tank-legendary-forge-moonfall-oracle.png",
+      "width": 64,
+      "height": 32
+    },
+    "legendary-forge-singularity-ace": {
+      "path": "images/tanks/generated/tank-legendary-forge-singularity-ace.png",
+      "width": 64,
+      "height": 32
+    },
+    "legendary-forge-solaris-titan": {
+      "path": "images/tanks/generated/tank-legendary-forge-solaris-titan.png",
+      "width": 64,
+      "height": 32
+    },
     "legendary-golden-god": {
       "path": "images/tanks/tank-legendary-golden-god.png",
       "width": 64,
@@ -159,6 +234,36 @@
     },
     "rare-delorean": {
       "path": "images/tanks/tank-rare-delorean.png",
+      "width": 64,
+      "height": 32
+    },
+    "rare-forge-ion-panther": {
+      "path": "images/tanks/generated/tank-rare-forge-ion-panther.png",
+      "width": 64,
+      "height": 32
+    },
+    "rare-forge-laser-lynx": {
+      "path": "images/tanks/generated/tank-rare-forge-laser-lynx.png",
+      "width": 64,
+      "height": 32
+    },
+    "rare-forge-nebula-bulldog": {
+      "path": "images/tanks/generated/tank-rare-forge-nebula-bulldog.png",
+      "width": 64,
+      "height": 32
+    },
+    "rare-forge-oxide-phantom": {
+      "path": "images/tanks/generated/tank-rare-forge-oxide-phantom.png",
+      "width": 64,
+      "height": 32
+    },
+    "rare-forge-plasma-mantis": {
+      "path": "images/tanks/generated/tank-rare-forge-plasma-mantis.png",
+      "width": 64,
+      "height": 32
+    },
+    "rare-forge-quantum-cobra": {
+      "path": "images/tanks/generated/tank-rare-forge-quantum-cobra.png",
       "width": 64,
       "height": 32
     },
@@ -194,6 +299,36 @@
     },
     "uncommon-digital-camo": {
       "path": "images/tanks/tank-uncommon-digital-camo.png",
+      "width": 64,
+      "height": 32
+    },
+    "uncommon-forge-binary-comet": {
+      "path": "images/tanks/generated/tank-uncommon-forge-binary-comet.png",
+      "width": 64,
+      "height": 32
+    },
+    "uncommon-forge-cobalt-drifter": {
+      "path": "images/tanks/generated/tank-uncommon-forge-cobalt-drifter.png",
+      "width": 64,
+      "height": 32
+    },
+    "uncommon-forge-dataline-prowler": {
+      "path": "images/tanks/generated/tank-uncommon-forge-dataline-prowler.png",
+      "width": 64,
+      "height": 32
+    },
+    "uncommon-forge-glass-cannon": {
+      "path": "images/tanks/generated/tank-uncommon-forge-glass-cannon.png",
+      "width": 64,
+      "height": 32
+    },
+    "uncommon-forge-magenta-wasp": {
+      "path": "images/tanks/generated/tank-uncommon-forge-magenta-wasp.png",
+      "width": 64,
+      "height": 32
+    },
+    "uncommon-forge-sunset-cruiser": {
+      "path": "images/tanks/generated/tank-uncommon-forge-sunset-cruiser.png",
       "width": 64,
       "height": 32
     },
