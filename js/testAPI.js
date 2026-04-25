@@ -23,6 +23,14 @@ import { calculateDamage } from './damage.js';
 import { WeaponRegistry } from './weapons.js';
 import * as HUD from './ui.js?v=20260111d';
 import { generateTerrain as generateTerrainFromModule } from './terrain.js';
+import * as Sound from './sound.js';
+import * as Effects from './effects.js';
+import { Stars } from './stars.js';
+import * as Tokens from './tokens.js';
+import * as TankCollection from './tank-collection.js';
+import { DROP_TYPES, processDrop } from './drop-rates.js';
+import * as PitySystem from './pity-system.js';
+import * as SupplyDrop from './supply-drop.js';
 import {
     getRenderQualitySummary,
     setRenderQuality as setRenderQualityProfile
@@ -1694,6 +1702,252 @@ export function getAssetStatus() {
 }
 
 // =============================================================================
+// PROGRESSION, COLLECTION, AND SETTINGS QA API
+// =============================================================================
+
+/**
+ * Clear level progression data used by browser QA smokes.
+ * @returns {Object}
+ */
+export function resetProgressionQaData() {
+    Stars.resetAll();
+    return getProgressionQaState();
+}
+
+/**
+ * Record deterministic level completion data through the production star system.
+ * @param {Object} options
+ * @returns {Object}
+ */
+export function completeLevelForQa(options = {}) {
+    const {
+        levelId = 'world1-level1',
+        stats = {
+            damageDealt: 120,
+            accuracy: 1,
+            turnsUsed: 1,
+            won: true
+        }
+    } = options;
+
+    const previousStars = Stars.getForLevel(levelId);
+    const result = Stars.recordCompletion(levelId, stats);
+    return {
+        success: true,
+        levelId,
+        previousStars,
+        result,
+        progression: getProgressionQaState()
+    };
+}
+
+/**
+ * Get persisted level progression state for browser QA.
+ * @returns {Object}
+ */
+export function getProgressionQaState() {
+    return {
+        success: true,
+        gameState: getGameState(),
+        totalStars: Stars.getTotalStars(),
+        world1: Stars.getWorldStars(1),
+        worldUnlocks: Stars.getWorldUnlockStatus(),
+        nextLockedWorld: Stars.getNextLockedWorld(),
+        progress: Stars.getProgress(),
+        stored: readJsonStorage('scorched_earth_stars', null)
+    };
+}
+
+/**
+ * Reset collection/drop state used by browser QA smokes.
+ * @returns {Object}
+ */
+export function resetCollectionQaData() {
+    localStorage.removeItem('scorchedEarth_collection');
+    localStorage.removeItem('scorchedEarth_tokens');
+    localStorage.removeItem('scorchedEarth_pityState');
+    TankCollection.init();
+    PitySystem.init();
+    Tokens.init();
+    return getCollectionQaState();
+}
+
+/**
+ * Grant token currency through the production token module.
+ * @param {number} amount
+ * @returns {Object}
+ */
+export function grantTokensForQa(amount = 50) {
+    Tokens.init();
+    Tokens.addTokens(amount, 'browser_qa');
+    return getCollectionQaState();
+}
+
+/**
+ * Process a deterministic browser-QA supply drop and optionally start the overlay animation.
+ * @param {Object} options
+ * @returns {Object}
+ */
+export function openSupplyDropForQa(options = {}) {
+    const { dropType = DROP_TYPES.STANDARD, playAnimation = true, spendTokens = 0 } = options;
+    TankCollection.init();
+    PitySystem.init();
+    Tokens.init();
+
+    const spent = spendTokens > 0 ? Tokens.spendTokens(spendTokens) : true;
+    const drop = processDrop(dropType);
+    if (playAnimation && drop.tank) {
+        SupplyDrop.play(drop.tank);
+    }
+
+    return {
+        success: !!drop.tank && spent,
+        spent,
+        drop,
+        animation: {
+            isAnimating: SupplyDrop.isAnimating(),
+            revealTank: SupplyDrop.getRevealTank()
+        },
+        collection: getCollectionQaState()
+    };
+}
+
+/**
+ * Equip an owned tank for browser QA.
+ * @param {string} tankId
+ * @returns {Object}
+ */
+export function equipTankForQa(tankId) {
+    TankCollection.init();
+    const equipped = TankCollection.setEquippedTank(tankId);
+    return {
+        success: equipped,
+        tankId,
+        collection: getCollectionQaState()
+    };
+}
+
+/**
+ * Build up pity counters using deterministic rarity inputs.
+ * @param {Object} options
+ * @returns {Object}
+ */
+export function buildPityForQa(options = {}) {
+    const { rarity = 'common', count = 1 } = options;
+    PitySystem.init();
+    for (let i = 0; i < count; i++) {
+        PitySystem.onDropResult(rarity);
+    }
+    return getCollectionQaState();
+}
+
+/**
+ * Get collection/drop state for browser QA.
+ * @returns {Object}
+ */
+export function getCollectionQaState() {
+    TankCollection.init();
+    Tokens.init();
+    PitySystem.init();
+    return {
+        success: true,
+        gameState: getGameState(),
+        collection: {
+            ...TankCollection.getState(),
+            progress: TankCollection.getCollectionProgress(),
+            equippedTankId: TankCollection.getEquippedTankId()
+        },
+        tokens: {
+            balance: Tokens.getTokenBalance(),
+            lifetime: Tokens.getLifetimeStats()
+        },
+        pity: {
+            state: PitySystem.getPityState(),
+            bonus: PitySystem.getPityBonus(),
+            progress: PitySystem.getPityProgress(),
+            displayMessage: PitySystem.getPityDisplayMessage()
+        },
+        supplyDrop: {
+            isAnimating: SupplyDrop.isAnimating(),
+            revealTank: SupplyDrop.getRevealTank()
+        },
+        stored: {
+            collection: readJsonStorage('scorchedEarth_collection', null),
+            tokens: readJsonStorage('scorchedEarth_tokens', null),
+            pity: readJsonStorage('scorchedEarth_pityState', null)
+        }
+    };
+}
+
+/**
+ * Change audio/settings values through production modules.
+ * @param {Object} options
+ * @returns {Object}
+ */
+export function setSettingsAudioForQa(options = {}) {
+    if (typeof options.masterVolume === 'number') {
+        Sound.setMasterVolume(options.masterVolume);
+    }
+    if (typeof options.musicVolume === 'number') {
+        Sound.setMusicVolume(options.musicVolume);
+    }
+    if (typeof options.sfxVolume === 'number') {
+        Sound.setSfxVolume(options.sfxVolume);
+    }
+    if (typeof options.muted === 'boolean') {
+        Sound.setMuted(options.muted);
+    }
+    if (typeof options.crtEnabled === 'boolean') {
+        Effects.setCrtEnabled(options.crtEnabled);
+    }
+    if (options.controlMode) {
+        ControlSettings.setControlMode(options.controlMode);
+    }
+    if (options.trajectoryMode) {
+        ControlSettings.setTrajectoryMode(options.trajectoryMode);
+    }
+    if (options.renderQuality) {
+        setRenderQualityProfile(options.renderQuality);
+    }
+    return getSettingsAudioQaState();
+}
+
+/**
+ * Get audio/settings state and persisted values for browser QA.
+ * @returns {Object}
+ */
+export function getSettingsAudioQaState() {
+    return {
+        success: true,
+        gameState: getGameState(),
+        audio: {
+            masterVolume: Sound.getMasterVolume(),
+            musicVolume: Sound.getMusicVolume(),
+            sfxVolume: Sound.getSfxVolume(),
+            muted: Sound.getMuted()
+        },
+        controls: {
+            controlMode: ControlSettings.getControlMode(),
+            trajectoryMode: ControlSettings.getTrajectoryMode()
+        },
+        visual: {
+            crtEnabled: Effects.isCrtEnabled(),
+            renderQuality: getRenderQualitySummary()
+        },
+        stored: {
+            masterVolume: localStorage.getItem('scorched-earth-master-volume'),
+            musicVolume: localStorage.getItem('scorched-earth-music-volume'),
+            sfxVolume: localStorage.getItem('scorched-earth-sfx-volume'),
+            muted: localStorage.getItem('scorched-earth-muted'),
+            crtEnabled: localStorage.getItem('scorched_earth_crt_enabled'),
+            controlMode: localStorage.getItem('scorched_control_mode'),
+            trajectoryMode: localStorage.getItem('scorched_trajectory_mode'),
+            renderQuality: localStorage.getItem('scorched_earth_render_quality')
+        }
+    };
+}
+
+// =============================================================================
 // WINDOW EXPOSURE (for console access)
 // =============================================================================
 
@@ -1740,6 +1994,17 @@ const TestAPI = {
     resetPerformance,
     checkPerformanceBudget,
     getAssetStatus,
+    resetProgressionQaData,
+    completeLevelForQa,
+    getProgressionQaState,
+    resetCollectionQaData,
+    grantTokensForQa,
+    openSupplyDropForQa,
+    equipTankForQa,
+    buildPityForQa,
+    getCollectionQaState,
+    setSettingsAudioForQa,
+    getSettingsAudioQaState,
     isInitialized,
     // Initialization (typically called by main.js)
     init,
