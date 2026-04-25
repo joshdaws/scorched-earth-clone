@@ -55,7 +55,7 @@ describe('render quality profiles', () => {
     expect(getRenderQualityProfile('high').title.bloomEnabled).toBe(true);
     expect(getRenderQualityProfile('low').pixi.derezFilterPass).toBe(false);
     expect(getRenderQualityProfile('balanced').pixi.derezFilterPass).toBe(false);
-    expect(getRenderQualityProfile('high').pixi.derezFilterPass).toBe(true);
+    expect(getRenderQualityProfile('high').pixi.derezFilterPass).toBe(false);
   });
 
   it('persists and cycles quality profiles', () => {

@@ -1401,46 +1401,112 @@ function saveCrtEnabled(enabled) {
 
 let crtEnabled = loadCrtEnabled();
 
-/**
- * Cached scanline pattern for performance
- * @type {CanvasPattern|null}
- */
-let scanlinePattern = null;
-
-/**
- * Canvas dimensions for pattern regeneration
- */
-let patternWidth = 0;
-let patternHeight = 0;
-let patternScanlineOpacity = null;
-let crtGradientCache = {
-    ctx: null,
-    vignetteKey: '',
-    vignette: null,
-    phosphorKey: '',
-    phosphor: null,
-    chromaticKey: '',
-    chromaticRed: null,
-    chromaticBlue: null
-};
-
-function ensureCrtGradientCacheContext(ctx) {
-    if (crtGradientCache.ctx === ctx) return;
-
-    crtGradientCache = {
-        ctx,
-        vignetteKey: '',
-        vignette: null,
-        phosphorKey: '',
-        phosphor: null,
-        chromaticKey: '',
-        chromaticRed: null,
-        chromaticBlue: null
-    };
-}
+let crtOverlayCanvas = null;
+let crtOverlayKey = '';
 
 function getCrtQualitySettings() {
     return getRenderQualityProfile().crt ?? {};
+}
+
+function getStaticCrtOverlay(width, height) {
+    const crtQuality = getCrtQualitySettings();
+    const scanlineOpacity = crtQuality.scanlineOpacity ?? CRT_CONFIG.SCANLINE_OPACITY;
+    const vignetteIntensity = crtQuality.vignetteIntensity ?? CRT_CONFIG.VIGNETTE_INTENSITY;
+    const vignetteRadius = crtQuality.vignetteRadius ?? CRT_CONFIG.VIGNETTE_RADIUS;
+    const chromaticEnabled = crtQuality.chromaticAberrationEnabled ?? CRT_CONFIG.CHROMATIC_ABERRATION_ENABLED;
+    const chromaticAlpha = crtQuality.chromaticAlpha ?? CRT_CONFIG.CHROMATIC_ALPHA;
+    const phosphorEnabled = crtQuality.phosphorGlowEnabled ?? CRT_CONFIG.PHOSPHOR_GLOW_ENABLED;
+    const phosphorIntensity = crtQuality.phosphorGlowIntensity ?? CRT_CONFIG.PHOSPHOR_GLOW_INTENSITY;
+    const key = [
+        width,
+        height,
+        scanlineOpacity,
+        vignetteIntensity,
+        vignetteRadius,
+        chromaticEnabled,
+        chromaticAlpha,
+        phosphorEnabled,
+        phosphorIntensity
+    ].join(':');
+
+    if (crtOverlayCanvas && crtOverlayKey === key) {
+        return crtOverlayCanvas;
+    }
+
+    const overlay = document.createElement('canvas');
+    overlay.width = Math.max(1, Math.ceil(width));
+    overlay.height = Math.max(1, Math.ceil(height));
+    const overlayCtx = overlay.getContext('2d');
+    if (!overlayCtx) return null;
+
+    if (phosphorEnabled) {
+        overlayCtx.save();
+        overlayCtx.globalCompositeOperation = 'lighter';
+        overlayCtx.globalAlpha = phosphorIntensity;
+        const gradient = overlayCtx.createRadialGradient(
+            width / 2, height / 2, 0,
+            width / 2, height / 2, Math.max(width, height) * 0.6
+        );
+        gradient.addColorStop(0, 'rgba(100, 200, 255, 0.05)');
+        gradient.addColorStop(0.5, 'rgba(100, 200, 255, 0.02)');
+        gradient.addColorStop(1, 'rgba(100, 200, 255, 0)');
+        overlayCtx.fillStyle = gradient;
+        overlayCtx.fillRect(0, 0, width, height);
+        overlayCtx.restore();
+    }
+
+    if (chromaticEnabled) {
+        overlayCtx.save();
+        overlayCtx.globalCompositeOperation = 'screen';
+        overlayCtx.globalAlpha = chromaticAlpha;
+        const redGradient = overlayCtx.createLinearGradient(0, 0, width, 0);
+        redGradient.addColorStop(0, 'rgba(255, 0, 0, 0.6)');
+        redGradient.addColorStop(0.15, 'rgba(255, 0, 0, 0)');
+        redGradient.addColorStop(0.85, 'rgba(255, 0, 0, 0)');
+        redGradient.addColorStop(1, 'rgba(255, 0, 0, 0.6)');
+        overlayCtx.fillStyle = redGradient;
+        overlayCtx.fillRect(0, 0, width, height);
+
+        const blueGradient = overlayCtx.createLinearGradient(0, 0, width, 0);
+        blueGradient.addColorStop(0, 'rgba(0, 100, 255, 0.6)');
+        blueGradient.addColorStop(0.15, 'rgba(0, 100, 255, 0)');
+        blueGradient.addColorStop(0.85, 'rgba(0, 100, 255, 0)');
+        blueGradient.addColorStop(1, 'rgba(0, 100, 255, 0.6)');
+        overlayCtx.fillStyle = blueGradient;
+        overlayCtx.fillRect(0, 0, width, height);
+        overlayCtx.restore();
+    }
+
+    if (scanlineOpacity > 0) {
+        overlayCtx.save();
+        overlayCtx.fillStyle = CRT_CONFIG.SCANLINE_COLOR;
+        overlayCtx.globalAlpha = scanlineOpacity;
+        for (let y = 0; y < height; y += CRT_CONFIG.SCANLINE_SPACING) {
+            overlayCtx.fillRect(0, y, width, 1);
+        }
+        overlayCtx.restore();
+    }
+
+    if (vignetteIntensity > 0) {
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const diagonal = Math.sqrt(width * width + height * height);
+        const innerRadius = diagonal * vignetteRadius * 0.5;
+        const outerRadius = diagonal * 0.75;
+        const gradient = overlayCtx.createRadialGradient(
+            centerX, centerY, innerRadius,
+            centerX, centerY, outerRadius
+        );
+        gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        gradient.addColorStop(0.5, `rgba(0, 0, 0, ${vignetteIntensity * 0.3})`);
+        gradient.addColorStop(1, `rgba(0, 0, 0, ${vignetteIntensity})`);
+        overlayCtx.fillStyle = gradient;
+        overlayCtx.fillRect(0, 0, width, height);
+    }
+
+    crtOverlayCanvas = overlay;
+    crtOverlayKey = key;
+    return crtOverlayCanvas;
 }
 
 /**
@@ -1468,160 +1534,6 @@ export function isCrtEnabled() {
 export function toggleCrt() {
     setCrtEnabled(!crtEnabled);
     return crtEnabled;
-}
-
-/**
- * Initialize/regenerate the scanline pattern.
- * Called automatically when rendering if dimensions change.
- * @param {CanvasRenderingContext2D} ctx - Canvas context
- * @param {number} width - Canvas width
- * @param {number} height - Canvas height
- */
-function initScanlinePattern(ctx, width, height) {
-    const crtQuality = getCrtQualitySettings();
-    const scanlineOpacity = crtQuality.scanlineOpacity ?? CRT_CONFIG.SCANLINE_OPACITY;
-
-    // Create a small canvas for the repeating pattern
-    const patternCanvas = document.createElement('canvas');
-    const patternCtx = patternCanvas.getContext('2d');
-
-    // Pattern is 1 pixel wide, SCANLINE_SPACING pixels tall
-    patternCanvas.width = 1;
-    patternCanvas.height = CRT_CONFIG.SCANLINE_SPACING;
-
-    // Clear (transparent)
-    patternCtx.clearRect(0, 0, 1, CRT_CONFIG.SCANLINE_SPACING);
-
-    // Draw single scanline (1 pixel tall)
-    patternCtx.fillStyle = CRT_CONFIG.SCANLINE_COLOR;
-    patternCtx.globalAlpha = scanlineOpacity;
-    patternCtx.fillRect(0, 0, 1, 1);
-
-    // Create repeating pattern
-    scanlinePattern = ctx.createPattern(patternCanvas, 'repeat');
-    patternWidth = width;
-    patternHeight = height;
-    patternScanlineOpacity = scanlineOpacity;
-}
-
-/**
- * Render scanlines overlay.
- * @param {CanvasRenderingContext2D} ctx - Canvas context
- * @param {number} width - Canvas width
- * @param {number} height - Canvas height
- */
-function renderScanlines(ctx, width, height) {
-    const crtQuality = getCrtQualitySettings();
-    const scanlineOpacity = crtQuality.scanlineOpacity ?? CRT_CONFIG.SCANLINE_OPACITY;
-
-    // Regenerate pattern if dimensions changed
-    if (
-        !scanlinePattern ||
-        patternWidth !== width ||
-        patternHeight !== height ||
-        patternScanlineOpacity !== scanlineOpacity
-    ) {
-        initScanlinePattern(ctx, width, height);
-    }
-
-    ctx.save();
-    ctx.fillStyle = scanlinePattern;
-    ctx.fillRect(0, 0, width, height);
-    ctx.restore();
-}
-
-/**
- * Render vignette effect (darker corners).
- * @param {CanvasRenderingContext2D} ctx - Canvas context
- * @param {number} width - Canvas width
- * @param {number} height - Canvas height
- */
-function renderVignette(ctx, width, height) {
-    const crtQuality = getCrtQualitySettings();
-    const vignetteIntensity = crtQuality.vignetteIntensity ?? CRT_CONFIG.VIGNETTE_INTENSITY;
-    const vignetteRadius = crtQuality.vignetteRadius ?? CRT_CONFIG.VIGNETTE_RADIUS;
-    const cacheKey = `${width}x${height}:${vignetteIntensity}:${vignetteRadius}`;
-    ensureCrtGradientCacheContext(ctx);
-
-    ctx.save();
-
-    if (crtGradientCache.ctx !== ctx || crtGradientCache.vignetteKey !== cacheKey) {
-        const centerX = width / 2;
-        const centerY = height / 2;
-        const diagonal = Math.sqrt(width * width + height * height);
-        const innerRadius = diagonal * vignetteRadius * 0.5;
-        const outerRadius = diagonal * 0.75;
-        const gradient = ctx.createRadialGradient(
-            centerX, centerY, innerRadius,
-            centerX, centerY, outerRadius
-        );
-
-        gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-        gradient.addColorStop(0.5, `rgba(0, 0, 0, ${vignetteIntensity * 0.3})`);
-        gradient.addColorStop(1, `rgba(0, 0, 0, ${vignetteIntensity})`);
-
-        crtGradientCache.ctx = ctx;
-        crtGradientCache.vignetteKey = cacheKey;
-        crtGradientCache.vignette = gradient;
-    }
-
-    ctx.fillStyle = crtGradientCache.vignette;
-    ctx.fillRect(0, 0, width, height);
-
-    ctx.restore();
-}
-
-/**
- * Render chromatic aberration effect.
- * This is a subtle RGB color fringing at the edges.
- * Note: This is a lightweight approximation - true chromatic aberration
- * would require reading and shifting pixel data.
- * @param {CanvasRenderingContext2D} ctx - Canvas context
- * @param {number} width - Canvas width
- * @param {number} height - Canvas height
- */
-function renderChromaticAberration(ctx, width, height) {
-    const crtQuality = getCrtQualitySettings();
-    const enabled = crtQuality.chromaticAberrationEnabled ?? CRT_CONFIG.CHROMATIC_ABERRATION_ENABLED;
-    if (!enabled) return;
-
-    const offset = crtQuality.chromaticOffset ?? CRT_CONFIG.CHROMATIC_OFFSET;
-    const alpha = crtQuality.chromaticAlpha ?? CRT_CONFIG.CHROMATIC_ALPHA;
-    ensureCrtGradientCacheContext(ctx);
-
-    ctx.save();
-    ctx.globalCompositeOperation = 'screen';
-    ctx.globalAlpha = alpha;
-    const cacheKey = `${width}x${height}`;
-
-    if (crtGradientCache.ctx !== ctx || crtGradientCache.chromaticKey !== cacheKey) {
-        const redGradient = ctx.createLinearGradient(0, 0, width, 0);
-        redGradient.addColorStop(0, 'rgba(255, 0, 0, 0.6)');
-        redGradient.addColorStop(0.15, 'rgba(255, 0, 0, 0)');
-        redGradient.addColorStop(0.85, 'rgba(255, 0, 0, 0)');
-        redGradient.addColorStop(1, 'rgba(255, 0, 0, 0.6)');
-
-        const blueGradient = ctx.createLinearGradient(0, 0, width, 0);
-        blueGradient.addColorStop(0, 'rgba(0, 100, 255, 0.6)');
-        blueGradient.addColorStop(0.15, 'rgba(0, 100, 255, 0)');
-        blueGradient.addColorStop(0.85, 'rgba(0, 100, 255, 0)');
-        blueGradient.addColorStop(1, 'rgba(0, 100, 255, 0.6)');
-
-        crtGradientCache.ctx = ctx;
-        crtGradientCache.chromaticKey = cacheKey;
-        crtGradientCache.chromaticRed = redGradient;
-        crtGradientCache.chromaticBlue = blueGradient;
-    }
-
-    // Red channel offset (slight right/down shift at edges)
-    ctx.fillStyle = crtGradientCache.chromaticRed;
-    ctx.fillRect(offset, 0, width, height);
-
-    // Blue channel offset (slight left/up shift at edges)
-    ctx.fillStyle = crtGradientCache.chromaticBlue;
-    ctx.fillRect(-offset, 0, width, height);
-
-    ctx.restore();
 }
 
 /**
@@ -1696,7 +1608,7 @@ function updateVhsGlitch(deltaTime) {
  * @param {number} width - Canvas width
  * @param {number} height - Canvas height
  */
-function renderVhsGlitch(ctx, width, height) {
+function renderVhsGlitch(ctx, width, _height) {
     const crtQuality = getCrtQualitySettings();
     const enabled = crtQuality.vhsGlitchEnabled ?? CRT_CONFIG.VHS_GLITCH_ENABLED;
     if (!enabled || !vhsGlitchState.active) return;
@@ -1719,44 +1631,6 @@ function renderVhsGlitch(ctx, width, height) {
     ctx.fillRect(xDisplacement, yOffset - glitchHeight / 2, width, glitchHeight);
     ctx.fillStyle = '#00ffff';
     ctx.fillRect(-xDisplacement, yOffset + glitchHeight / 2, width, glitchHeight);
-
-    ctx.restore();
-}
-
-/**
- * Render phosphor glow effect.
- * Adds a subtle bloom/glow to simulate CRT phosphor persistence.
- * @param {CanvasRenderingContext2D} ctx - Canvas context
- * @param {number} width - Canvas width
- * @param {number} height - Canvas height
- */
-function renderPhosphorGlow(ctx, width, height) {
-    const crtQuality = getCrtQualitySettings();
-    const enabled = crtQuality.phosphorGlowEnabled ?? CRT_CONFIG.PHOSPHOR_GLOW_ENABLED;
-    if (!enabled) return;
-
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = crtQuality.phosphorGlowIntensity ?? CRT_CONFIG.PHOSPHOR_GLOW_INTENSITY;
-    const cacheKey = `${width}x${height}`;
-    ensureCrtGradientCacheContext(ctx);
-
-    if (crtGradientCache.ctx !== ctx || crtGradientCache.phosphorKey !== cacheKey) {
-        const gradient = ctx.createRadialGradient(
-            width / 2, height / 2, 0,
-            width / 2, height / 2, Math.max(width, height) * 0.6
-        );
-        gradient.addColorStop(0, 'rgba(100, 200, 255, 0.05)');
-        gradient.addColorStop(0.5, 'rgba(100, 200, 255, 0.02)');
-        gradient.addColorStop(1, 'rgba(100, 200, 255, 0)');
-
-        crtGradientCache.ctx = ctx;
-        crtGradientCache.phosphorKey = cacheKey;
-        crtGradientCache.phosphor = gradient;
-    }
-
-    ctx.fillStyle = crtGradientCache.phosphor;
-    ctx.fillRect(0, 0, width, height);
 
     ctx.restore();
 }
@@ -1796,24 +1670,14 @@ export function renderCrtEffects(ctx, width, height, fullscreenParams = null) {
         effectHeight = fullscreenParams.viewportHeight;
     }
 
-    // Render effects in order (back to front)
-    // 1. Phosphor glow (subtle bloom)
-    renderPhosphorGlow(ctx, effectWidth, effectHeight);
+    const staticOverlay = getStaticCrtOverlay(effectWidth, effectHeight);
+    if (staticOverlay) {
+        ctx.drawImage(staticOverlay, 0, 0, effectWidth, effectHeight);
+    }
 
-    // 2. Chromatic aberration (RGB color fringing)
-    renderChromaticAberration(ctx, effectWidth, effectHeight);
-
-    // 3. VHS noise/grain
+    // Render dynamic effects after the cached static overlay.
     renderVhsNoise(ctx, effectWidth, effectHeight);
-
-    // 4. VHS tracking glitch
     renderVhsGlitch(ctx, effectWidth, effectHeight);
-
-    // 5. Scanlines (horizontal lines)
-    renderScanlines(ctx, effectWidth, effectHeight);
-
-    // 6. Vignette (darker corners) - on top
-    renderVignette(ctx, effectWidth, effectHeight);
 
     // Restore transform if we modified it
     if (fullscreenParams) {
@@ -1826,18 +1690,6 @@ export function renderCrtEffects(ctx, width, height, fullscreenParams = null) {
  * Call when canvas dimensions change significantly.
  */
 export function clearCrtCache() {
-    scanlinePattern = null;
-    patternWidth = 0;
-    patternHeight = 0;
-    patternScanlineOpacity = null;
-    crtGradientCache = {
-        ctx: null,
-        vignetteKey: '',
-        vignette: null,
-        phosphorKey: '',
-        phosphor: null,
-        chromaticKey: '',
-        chromaticRed: null,
-        chromaticBlue: null
-    };
+    crtOverlayCanvas = null;
+    crtOverlayKey = '';
 }

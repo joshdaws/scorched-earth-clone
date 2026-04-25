@@ -3,7 +3,7 @@
 Date: 2026-04-25
 Bead: `scorched-earth-qtq.4.2.2`
 
-Update: launch performance pass `scorched-earth-3fe.3` moved the optional Pixi de-rez `NoiseFilter` sweep from balanced/high to high-only. Balanced is the iOS default, so mobile keeps Pixi terrain chunks and terrain-cell debris but skips the extra filter pass.
+Update: launch performance follow-up disabled the optional Pixi de-rez `NoiseFilter` sweep across runtime quality profiles. Mobile and desktop still keep Pixi terrain chunks and terrain-cell debris, but skip the extra filter pass until it can be profiled on real devices behind an experimental flag.
 
 ## Scope
 
@@ -32,7 +32,7 @@ Build output from the current release build is 4.88 MB across 106 files. The lar
 
 Keep the Pixi terrain layer, but keep iOS defaulting to `balanced`.
 
-The terrain-specific costs are low enough to keep the architecture: dirty-chunk rebuild p95 stayed under 3 ms, Pixi render p95 stayed under 0.5 ms, and terrain impact p95 stayed under 3 ms. The main risk is not terrain rebuild time; it is high-quality whole-frame spikes, memory pressure, and the optional de-rez filter sweep. High quality should stay a desktop/default-high profile; balanced should remain the iOS default and skip the extra sweep pass.
+The terrain-specific costs are low enough to keep the architecture: dirty-chunk rebuild p95 stayed under 3 ms, Pixi render p95 stayed under 0.5 ms, and terrain impact p95 stayed under 3 ms. The main risk is not terrain rebuild time; it is high-quality whole-frame spikes, memory pressure, and the optional de-rez filter sweep. High quality should stay a desktop/default-high profile; balanced should remain the iOS default.
 
 ## iOS Validation Thresholds
 

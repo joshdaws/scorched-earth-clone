@@ -73,7 +73,7 @@ export const RENDER_QUALITY_PROFILES = {
         maxCanvasDpr: 2,
         crt: {
             chromaticAberrationEnabled: true,
-            vhsNoiseEnabled: true,
+            vhsNoiseEnabled: false,
             vhsGlitchEnabled: true,
             phosphorGlowEnabled: true,
             scanlineOpacity: 0.25,
@@ -90,10 +90,10 @@ export const RENDER_QUALITY_PROFILES = {
         pixi: {
             maxFragments: 520,
             maxSpawnCells: 220,
-            derezFilterPass: true,
-            sweepMaxCells: 96,
-            maxSweeps: 3,
-            scanlineNoise: 0.18
+            derezFilterPass: false,
+            sweepMaxCells: 0,
+            maxSweeps: 0,
+            scanlineNoise: 0
         }
     }
 };

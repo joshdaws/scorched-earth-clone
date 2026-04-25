@@ -75,7 +75,7 @@ npm run perf:budget -- --input metrics.json --scene gameplay
 
 The projectile smoke can also fail when fixed-step catch-up exceeds a threshold by passing `--max-dropped-backlog-ms`. Use that on shot-smoothness work so the screenshot and metrics prove the fired shot did not visibly sprint after a frame hitch.
 
-The Pixi terrain de-rez pass is quality-gated. Low and balanced quality disable the extra `NoiseFilter` sweep; high quality adds a capped Pixi sweep layer over the removed TerrainCellGrid cells. This keeps the iOS-default balanced profile on the cheaper terrain debris path while preserving the more expensive sweep for desktop/high quality. Watch `pixiDerezSweeps`, `pixiFragments`, `pixiTerrainRebuild`, and `pixiTerrainRender` together when tuning this effect for iOS.
+The Pixi terrain de-rez pass is quality-gated. All runtime quality profiles currently disable the extra `NoiseFilter` sweep and use the cheaper terrain-cell debris path. The sweep can be reintroduced later behind a separate experimental flag after real-device profiling. Watch `pixiDerezSweeps`, `pixiFragments`, `pixiTerrainRebuild`, and `pixiTerrainRender` together when tuning this effect for iOS.
 
 Current local Pixi terrain profile results and iOS pass/fail thresholds are recorded in [pixi-terrain-mobile-profile.md](pixi-terrain-mobile-profile.md).
 
