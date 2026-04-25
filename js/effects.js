@@ -1378,7 +1378,28 @@ let vhsGlitchState = {
 /**
  * CRT effects state
  */
-let crtEnabled = true;
+const CRT_ENABLED_STORAGE_KEY = 'scorched_earth_crt_enabled';
+
+function loadCrtEnabled() {
+    try {
+        const stored = localStorage.getItem(CRT_ENABLED_STORAGE_KEY);
+        if (stored === 'true') return true;
+        if (stored === 'false') return false;
+    } catch (error) {
+        console.warn('Failed to load CRT setting:', error);
+    }
+    return true;
+}
+
+function saveCrtEnabled(enabled) {
+    try {
+        localStorage.setItem(CRT_ENABLED_STORAGE_KEY, enabled ? 'true' : 'false');
+    } catch (error) {
+        console.warn('Failed to save CRT setting:', error);
+    }
+}
+
+let crtEnabled = loadCrtEnabled();
 
 /**
  * Cached scanline pattern for performance
@@ -1402,7 +1423,8 @@ function getCrtQualitySettings() {
  * @param {boolean} enabled - Whether CRT effects should be rendered
  */
 export function setCrtEnabled(enabled) {
-    crtEnabled = enabled;
+    crtEnabled = Boolean(enabled);
+    saveCrtEnabled(crtEnabled);
     console.log(`CRT effects ${enabled ? 'enabled' : 'disabled'}`);
 }
 
@@ -1419,8 +1441,7 @@ export function isCrtEnabled() {
  * @returns {boolean} New enabled state
  */
 export function toggleCrt() {
-    crtEnabled = !crtEnabled;
-    console.log(`CRT effects ${crtEnabled ? 'enabled' : 'disabled'}`);
+    setCrtEnabled(!crtEnabled);
     return crtEnabled;
 }
 
