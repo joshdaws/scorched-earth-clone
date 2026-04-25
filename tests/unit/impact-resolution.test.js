@@ -44,6 +44,8 @@ function createBaseServices(weapon) {
     applyExplosionToAllTanks: vi.fn(() => []),
     destroyTerrainAt: vi.fn(),
     updateTankTerrainPosition: vi.fn(),
+    rebuildTerrainCellGrid: vi.fn(),
+    markTerrainDirty: vi.fn(),
     setExplosionEffect: vi.fn(),
     addPersistentTrail: vi.fn(),
     spawnExplosionParticles: vi.fn(),
@@ -208,6 +210,8 @@ describe('resolveProjectileImpact', () => {
 
     expect(currentTerrain.setHeight).toHaveBeenCalled();
     expect(currentTerrain.heights[200]).toBeGreaterThan(100);
+    expect(services.rebuildTerrainCellGrid).toHaveBeenCalledWith(currentTerrain);
+    expect(services.markTerrainDirty).toHaveBeenCalledWith({ x: 200, radius: 50 });
     expect(services.emitGameplayEvent).toHaveBeenCalledWith(
       GAMEPLAY_EVENTS.TERRAIN_CHANGED,
       expect.objectContaining({ source: 'liquid-dirt', radius: 50, terrain: currentTerrain })

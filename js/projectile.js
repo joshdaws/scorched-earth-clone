@@ -9,6 +9,7 @@
 import { PHYSICS, PROJECTILE, DEBUG } from './constants.js';
 import { WeaponRegistry, WEAPON_TYPES } from './weapons.js';
 import { getScreenWidth, getScreenHeight } from './screenSize.js';
+import { getTerrainGridHeightAt, getTerrainGridSurfaceYAt } from './terrainCells.js';
 
 /**
  * Projectile entity for the game.
@@ -675,9 +676,7 @@ export class Projectile {
 
         // Get current terrain height at position
         // Use terrain's screen height for dynamic screen support
-        const screenHeight = terrain.getScreenHeight();
-        const currentTerrainHeight = terrain.getHeight(Math.floor(this.x));
-        const currentSurfaceY = screenHeight - currentTerrainHeight;
+        const currentSurfaceY = getTerrainGridSurfaceYAt(terrain, Math.floor(this.x));
 
         // Calculate slope at current position
         // Look ahead in roll direction to find slope
@@ -689,8 +688,7 @@ export class Projectile {
             return { explode: true, reason: 'wall' };
         }
 
-        const nextTerrainHeight = terrain.getHeight(nextX);
-        const nextSurfaceY = screenHeight - nextTerrainHeight;
+        const nextSurfaceY = getTerrainGridSurfaceYAt(terrain, nextX);
 
         // Calculate slope angle (positive = going downhill, negative = going uphill)
         // In canvas coords: lower Y = higher on screen
@@ -749,8 +747,7 @@ export class Projectile {
         // Snap to terrain surface at new position
         const newX = Math.floor(this.x);
         if (newX >= 0 && newX < terrain.getWidth()) {
-            const newTerrainHeight = terrain.getHeight(newX);
-            this.y = screenHeight - newTerrainHeight;
+            this.y = getTerrainGridSurfaceYAt(terrain, newX);
         }
 
         // Update rotation for visual effect
@@ -868,9 +865,10 @@ export class Projectile {
      *
      * @param {import('./terrain.js').Terrain} terrain - The terrain to dig through
      * @param {import('./tank.js').Tank[]} tanks - Array of tanks to check for collision
+     * @param {{destroyTerrainAt?: (x: number, y: number, radius: number) => boolean}} [services]
      * @returns {{explode: boolean, reason: string, hitTank?: import('./tank.js').Tank}|null} Explosion trigger info or null to continue digging
      */
-    updateDigging(terrain, tanks) {
+    updateDigging(terrain, tanks, services = {}) {
         if (!this.isDigging) return null;
 
         const weapon = WeaponRegistry.getWeapon(this.weaponId);
@@ -893,7 +891,10 @@ export class Projectile {
 
         // Destroy terrain along the tunnel path
         // Use smaller destruction at current position to create smooth tunnel
-        terrain.destroyTerrain(this.x, this.y, tunnelRadius);
+        const destroyTerrain = typeof services.destroyTerrainAt === 'function'
+            ? services.destroyTerrainAt
+            : terrain.destroyTerrain.bind(terrain);
+        destroyTerrain(this.x, this.y, tunnelRadius);
 
         // Check for tank collision while underground
         for (const tank of tanks) {
@@ -916,8 +917,7 @@ export class Projectile {
         // Check if we've emerged from terrain (exited the other side)
         const flooredX = Math.floor(this.x);
         if (flooredX >= 0 && flooredX < terrain.getWidth()) {
-            const terrainHeight = terrain.getHeight(flooredX);
-            const terrainSurfaceY = terrain.getScreenHeight() - terrainHeight;
+            const terrainSurfaceY = terrain.getScreenHeight() - getTerrainGridHeightAt(terrain, flooredX);
 
             // We've emerged if we're above the terrain surface
             // Add a small buffer to prevent immediate re-triggering

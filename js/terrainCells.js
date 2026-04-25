@@ -144,6 +144,25 @@ export function getTerrainGridContactHeight(terrain, centerX, contactWidth = 1, 
     return height;
 }
 
+export function getTerrainGridSurfaceYAt(terrain, x, options = {}) {
+    return getTerrainScreenHeight(terrain) - getTerrainGridHeightAt(terrain, x, options);
+}
+
+export function getTerrainGridSlopeAngle(terrain, x, lookAhead = 5, options = {}) {
+    const width = getTerrainWidth(terrain);
+    if (!terrain || width <= 1) return 0;
+
+    const centerX = clamp(Math.floor(x), 0, width - 1);
+    const sampleDistance = Math.max(1, Math.floor(lookAhead));
+    const prevX = clamp(centerX - sampleDistance, 0, width - 1);
+    const nextX = clamp(centerX + sampleDistance, 0, width - 1);
+    if (prevX === nextX) return 0;
+
+    const prevHeight = getTerrainGridHeightAt(terrain, prevX, options);
+    const nextHeight = getTerrainGridHeightAt(terrain, nextX, options);
+    return Math.atan2(nextHeight - prevHeight, nextX - prevX);
+}
+
 export function checkTerrainGridCollision(terrain, x, y, options = {}) {
     const width = getTerrainWidth(terrain);
     const flooredX = Math.floor(x);

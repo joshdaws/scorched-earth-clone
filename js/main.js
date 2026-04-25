@@ -87,6 +87,8 @@ import {
     buildRemovedTerrainCells,
     captureTerrainCellSnapshot,
     getOrCreateTerrainCellGrid,
+    getTerrainGridSlopeAngle,
+    getTerrainGridSurfaceYAt,
     rebuildTerrainCellGrid
 } from './terrainCells.js';
 import {
@@ -2976,6 +2978,8 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
         services: {
             destroyTerrainAt,
             updateTankTerrainPosition,
+            rebuildTerrainCellGrid,
+            markTerrainDirty: markPixiTerrainLayerDirty,
             setExplosionEffect: effect => {
                 explosionEffect = effect;
             },
@@ -3016,7 +3020,9 @@ function updateProjectile() {
         // Handle digging projectiles
         if (projectile.isDigging) {
             // Update digging physics
-            const digResult = projectile.updateDigging(currentTerrain, tanks);
+            const digResult = projectile.updateDigging(currentTerrain, tanks, {
+                destroyTerrainAt
+            });
 
             if (digResult && digResult.explode) {
                 console.log(`Digger exploded: ${digResult.reason} at (${projectile.x.toFixed(1)}, ${projectile.y.toFixed(1)})`);
@@ -3171,12 +3177,7 @@ function updateProjectile() {
                 // Check if this is a bouncing weapon that should bounce
                 if (projectile.shouldBounce()) {
                     // Calculate terrain slope at collision point for realistic bounce
-                    const lookAhead = 5;
-                    const prevX = Math.max(0, Math.floor(collision.x) - lookAhead);
-                    const nextX = Math.min(currentTerrain.getWidth() - 1, Math.floor(collision.x) + lookAhead);
-                    const prevHeight = currentTerrain.getHeight(prevX);
-                    const nextHeight = currentTerrain.getHeight(nextX);
-                    const slopeAngle = Math.atan2(nextHeight - prevHeight, nextX - prevX);
+                    const slopeAngle = getTerrainGridSlopeAngle(currentTerrain, collision.x, 5);
 
                     console.log(`Bouncer hit terrain at (${collision.x}, ${collision.y.toFixed(1)}) - bouncing! Slope angle: ${(slopeAngle * 180 / Math.PI).toFixed(1)}°`);
                     projectile.bounce(collision.y, slopeAngle);
@@ -3613,9 +3614,7 @@ function renderTerrain(ctx) {
     // Draw terrain profile
     // Heights are distance from bottom, so canvas Y = screenHeight - terrainHeight
     for (let x = 0; x < width; x++) {
-        const terrainHeight = terrain.getHeight(x);
-        const canvasY = screenHeight - terrainHeight;
-        ctx.lineTo(x, canvasY);
+        ctx.lineTo(x, getTerrainGridSurfaceYAt(terrain, x));
     }
 
     // Close the path at bottom-right corner
@@ -3641,8 +3640,7 @@ function renderTerrain(ctx) {
     ctx.lineWidth = 2;
     ctx.beginPath();
     for (let x = 0; x < width; x++) {
-        const terrainHeight = terrain.getHeight(x);
-        const canvasY = screenHeight - terrainHeight;
+        const canvasY = getTerrainGridSurfaceYAt(terrain, x);
         if (x === 0) {
             ctx.moveTo(x, canvasY);
         } else {

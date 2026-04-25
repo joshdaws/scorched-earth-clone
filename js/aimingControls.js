@@ -16,6 +16,7 @@ import { CANVAS, COLORS, UI, PHYSICS, TANK } from './constants.js';
 import { registerSliderZone, queueGameInput, INPUT_EVENTS, isGameInputEnabled } from './input.js';
 import * as Wind from './wind.js';
 import { getScreenWidth, getScreenHeight } from './screenSize.js';
+import { getTerrainGridSurfaceYAt } from './terrainCells.js';
 import {
     fromRight, fromBottom,
     scaled, scaledTouch, isVeryShortScreen, isMobileDevice
@@ -603,8 +604,7 @@ function simulateTrajectory(tank, angle, power, windForce, terrain) {
 
         // Check terrain collision (if terrain is provided)
         if (terrain) {
-            const terrainHeight = terrain.getHeight(Math.floor(x));
-            const terrainY = getScreenHeight() - terrainHeight;
+            const terrainY = getTerrainGridSurfaceYAt(terrain, Math.floor(x));
             if (y >= terrainY) {
                 points.push({ x, y: terrainY });
                 break;

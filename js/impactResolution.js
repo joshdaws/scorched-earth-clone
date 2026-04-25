@@ -25,6 +25,7 @@ import * as LifetimeStats from './lifetime-stats.js';
 import { recordStat } from './runState.js';
 import { screenFlash, screenShakeForBlastRadius, spawnExplosionParticles } from './effects.js';
 import { updateTankTerrainPosition } from './tank.js';
+import { getTerrainGridHeightAt, rebuildTerrainCellGrid } from './terrainCells.js';
 
 const NOOP = () => {};
 
@@ -159,6 +160,8 @@ function applyLiquidDirt({ pos, currentTerrain, playerTank, enemyTank, emit, ser
     if (!currentTerrain) return;
 
     const updateTank = service(services, 'updateTankTerrainPosition', updateTankTerrainPosition);
+    const rebuildGrid = service(services, 'rebuildTerrainCellGrid', rebuildTerrainCellGrid);
+    const markTerrainDirty = service(services, 'markTerrainDirty', NOOP);
     const dirtRadius = 50;
     const dirtHeight = 100;
 
@@ -169,10 +172,13 @@ function applyLiquidDirt({ pos, currentTerrain, playerTank, enemyTank, emit, ser
             const heightMultiplier = 1 - (distFromCenter * distFromCenter);
             const addedHeight = dirtHeight * heightMultiplier;
 
-            const currentHeight = currentTerrain.getHeight(x);
+            const currentHeight = getTerrainGridHeightAt(currentTerrain, x);
             currentTerrain.setHeight(x, currentHeight + addedHeight);
         }
     }
+
+    rebuildGrid(currentTerrain);
+    markTerrainDirty({ x: pos.x, radius: dirtRadius });
 
     if (playerTank) updateTank(playerTank, currentTerrain);
     if (enemyTank) updateTank(enemyTank, currentTerrain);
@@ -192,15 +198,20 @@ function applyIonCannonTerrain({ pos, currentTerrain, playerTank, enemyTank, emi
     if (!currentTerrain) return;
 
     const updateTank = service(services, 'updateTankTerrainPosition', updateTankTerrainPosition);
+    const rebuildGrid = service(services, 'rebuildTerrainCellGrid', rebuildTerrainCellGrid);
+    const markTerrainDirty = service(services, 'markTerrainDirty', NOOP);
     const beamWidth = 10;
 
     for (let dx = -beamWidth; dx <= beamWidth; dx++) {
         const x = Math.floor(pos.x + dx);
         if (x >= 0 && x < currentTerrain.getWidth()) {
-            const currentHeight = currentTerrain.getHeight(x);
+            const currentHeight = getTerrainGridHeightAt(currentTerrain, x);
             currentTerrain.setHeight(x, Math.max(0, currentHeight - 30));
         }
     }
+
+    rebuildGrid(currentTerrain);
+    markTerrainDirty({ x: pos.x, radius: beamWidth });
 
     if (playerTank) updateTank(playerTank, currentTerrain);
     if (enemyTank) updateTank(enemyTank, currentTerrain);

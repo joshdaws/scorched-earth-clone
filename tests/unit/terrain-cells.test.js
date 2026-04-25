@@ -7,6 +7,8 @@ import {
   getTerrainCellSize,
   getTerrainGridContactHeight,
   getTerrainGridHeightAt,
+  getTerrainGridSlopeAngle,
+  getTerrainGridSurfaceYAt,
   rebuildTerrainCellGrid,
   TerrainCellGrid
 } from '../../js/terrainCells.js';
@@ -195,6 +197,22 @@ describe('terrainCells', () => {
 
     expect(getTerrainGridHeightAt(terrain, 36, { cellSize: 8 })).toBe(16);
     expect(getTerrainGridContactHeight(terrain, 36, 24, { cellSize: 8 })).toBe(48);
+    expect(getTerrainGridSurfaceYAt(terrain, 36, { cellSize: 8 })).toBe(48);
+  });
+
+  it('calculates slope from grid heights for bounces and previews', () => {
+    const terrain = createTerrain(new Array(64).fill(16), 64);
+    const grid = getOrCreateTerrainCellGrid(terrain, {
+      cellSize: 8
+    });
+
+    grid.setColumnSolidCount(2, 2);
+    grid.setColumnSolidCount(3, 3);
+    grid.setColumnSolidCount(4, 4);
+
+    const slope = getTerrainGridSlopeAngle(terrain, 28, 8, { cellSize: 8 });
+
+    expect(slope).toBeGreaterThan(0);
   });
 
   it('reuses cached terrain grids until explicitly rebuilt', () => {
