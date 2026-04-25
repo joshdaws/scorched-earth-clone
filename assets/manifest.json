@@ -584,33 +584,33 @@
   "audio": {
     "music": {
       "main-theme": {
-        "path": "audio/music/main-theme.mp3"
+        "path": "audio/music/test-loop.wav"
       },
       "battle": {
-        "path": "audio/music/battle.mp3"
+        "path": "audio/music/test-loop.wav"
       },
       "shop": {
-        "path": "audio/music/shop.mp3"
+        "path": "audio/music/test-loop.wav"
       }
     },
     "sfx": {
       "shot-fire": {
-        "path": "audio/sfx/shot-fire.wav"
+        "path": "audio/sfx/test-beep.wav"
       },
       "explosion-small": {
-        "path": "audio/sfx/explosion-small.wav"
+        "path": "audio/sfx/test-beep.wav"
       },
       "explosion-large": {
-        "path": "audio/sfx/explosion-large.wav"
+        "path": "audio/sfx/test-beep.wav"
       },
       "menu-select": {
-        "path": "audio/sfx/menu-select.wav"
+        "path": "audio/sfx/test-beep.wav"
       },
       "purchase": {
-        "path": "audio/sfx/purchase.wav"
+        "path": "audio/sfx/test-beep.wav"
       },
       "tank-hit": {
-        "path": "audio/sfx/tank-hit.wav"
+        "path": "audio/sfx/test-beep.wav"
       }
     }
   }
