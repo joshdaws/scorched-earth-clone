@@ -686,7 +686,14 @@ async function main() {
 
     try {
         await waitForServer(`http://${args.host}:${args.port}/`, args.timeoutMs);
-        browser = await chromium.launch({ headless: !args.headed });
+        browser = await chromium.launch({
+            headless: !args.headed,
+            args: [
+                '--disable-background-timer-throttling',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-renderer-backgrounding'
+            ]
+        });
         const page = await browser.newPage({
             viewport: { width: 1280, height: 768 },
             hasTouch: args.scenario === 'controls'

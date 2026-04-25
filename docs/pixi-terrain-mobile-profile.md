@@ -3,6 +3,8 @@
 Date: 2026-04-25
 Bead: `scorched-earth-qtq.4.2.2`
 
+Update: launch performance pass `scorched-earth-3fe.3` moved the optional Pixi de-rez `NoiseFilter` sweep from balanced/high to high-only. Balanced is the iOS default, so mobile keeps Pixi terrain chunks and terrain-cell debris but skips the extra filter pass.
+
 ## Scope
 
 This pass profiles the lazy-loaded Pixi terrain layer under the local browser smoke environment and records the iOS WebView decision points. It does not replace a real-device TestFlight run; WebKit GPU scheduling, thermal throttling, and memory pressure still need device validation.
@@ -30,7 +32,7 @@ Build output from the current release build is 4.88 MB across 106 files. The lar
 
 Keep the Pixi terrain layer, but keep iOS defaulting to `balanced`.
 
-The terrain-specific costs are low enough to keep the architecture: dirty-chunk rebuild p95 stayed under 3 ms, Pixi render p95 stayed under 0.5 ms, and terrain impact p95 stayed under 3 ms. The main risk is not terrain rebuild time; it is high-quality whole-frame spikes and memory pressure. High quality produced a 50 ms max frame in local Chromium, so it should stay a desktop/default-high profile rather than an iOS default.
+The terrain-specific costs are low enough to keep the architecture: dirty-chunk rebuild p95 stayed under 3 ms, Pixi render p95 stayed under 0.5 ms, and terrain impact p95 stayed under 3 ms. The main risk is not terrain rebuild time; it is high-quality whole-frame spikes, memory pressure, and the optional de-rez filter sweep. High quality should stay a desktop/default-high profile; balanced should remain the iOS default and skip the extra sweep pass.
 
 ## iOS Validation Thresholds
 
@@ -43,7 +45,7 @@ On physical iPhone/iPad or TestFlight WebView, keep Pixi terrain enabled only if
 - JS heap remains below 450 MB after three rounds with repeated impacts.
 - No WebGL context lost, black terrain frames, or thermal throttling after 3 minutes.
 
-If those fail, force the iOS profile to `low` or disable `derezFilterPass` on balanced before reducing terrain cell density.
+If those fail, force the iOS profile to `low` before reducing terrain cell density.
 
 ## Next Recommendations
 

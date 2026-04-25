@@ -53,6 +53,9 @@ describe('render quality profiles', () => {
     expect(normalizeRenderQualityId('ultra')).toBeNull();
     expect(getRenderQualityProfile('low').maxCanvasDpr).toBe(1);
     expect(getRenderQualityProfile('high').title.bloomEnabled).toBe(true);
+    expect(getRenderQualityProfile('low').pixi.derezFilterPass).toBe(false);
+    expect(getRenderQualityProfile('balanced').pixi.derezFilterPass).toBe(false);
+    expect(getRenderQualityProfile('high').pixi.derezFilterPass).toBe(true);
   });
 
   it('persists and cycles quality profiles', () => {

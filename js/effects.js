@@ -1413,6 +1413,31 @@ let scanlinePattern = null;
 let patternWidth = 0;
 let patternHeight = 0;
 let patternScanlineOpacity = null;
+let crtGradientCache = {
+    ctx: null,
+    vignetteKey: '',
+    vignette: null,
+    phosphorKey: '',
+    phosphor: null,
+    chromaticKey: '',
+    chromaticRed: null,
+    chromaticBlue: null
+};
+
+function ensureCrtGradientCacheContext(ctx) {
+    if (crtGradientCache.ctx === ctx) return;
+
+    crtGradientCache = {
+        ctx,
+        vignetteKey: '',
+        vignette: null,
+        phosphorKey: '',
+        phosphor: null,
+        chromaticKey: '',
+        chromaticRed: null,
+        chromaticBlue: null
+    };
+}
 
 function getCrtQualitySettings() {
     return getRenderQualityProfile().crt ?? {};
@@ -1515,27 +1540,32 @@ function renderVignette(ctx, width, height) {
     const crtQuality = getCrtQualitySettings();
     const vignetteIntensity = crtQuality.vignetteIntensity ?? CRT_CONFIG.VIGNETTE_INTENSITY;
     const vignetteRadius = crtQuality.vignetteRadius ?? CRT_CONFIG.VIGNETTE_RADIUS;
-    const centerX = width / 2;
-    const centerY = height / 2;
-
-    // Calculate radius based on canvas diagonal
-    const diagonal = Math.sqrt(width * width + height * height);
-    const innerRadius = diagonal * vignetteRadius * 0.5;
-    const outerRadius = diagonal * 0.75;
+    const cacheKey = `${width}x${height}:${vignetteIntensity}:${vignetteRadius}`;
+    ensureCrtGradientCacheContext(ctx);
 
     ctx.save();
 
-    // Create radial gradient from center (transparent) to edges (dark)
-    const gradient = ctx.createRadialGradient(
-        centerX, centerY, innerRadius,
-        centerX, centerY, outerRadius
-    );
+    if (crtGradientCache.ctx !== ctx || crtGradientCache.vignetteKey !== cacheKey) {
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const diagonal = Math.sqrt(width * width + height * height);
+        const innerRadius = diagonal * vignetteRadius * 0.5;
+        const outerRadius = diagonal * 0.75;
+        const gradient = ctx.createRadialGradient(
+            centerX, centerY, innerRadius,
+            centerX, centerY, outerRadius
+        );
 
-    gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    gradient.addColorStop(0.5, `rgba(0, 0, 0, ${vignetteIntensity * 0.3})`);
-    gradient.addColorStop(1, `rgba(0, 0, 0, ${vignetteIntensity})`);
+        gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        gradient.addColorStop(0.5, `rgba(0, 0, 0, ${vignetteIntensity * 0.3})`);
+        gradient.addColorStop(1, `rgba(0, 0, 0, ${vignetteIntensity})`);
 
-    ctx.fillStyle = gradient;
+        crtGradientCache.ctx = ctx;
+        crtGradientCache.vignetteKey = cacheKey;
+        crtGradientCache.vignette = gradient;
+    }
+
+    ctx.fillStyle = crtGradientCache.vignette;
     ctx.fillRect(0, 0, width, height);
 
     ctx.restore();
@@ -1557,27 +1587,38 @@ function renderChromaticAberration(ctx, width, height) {
 
     const offset = crtQuality.chromaticOffset ?? CRT_CONFIG.CHROMATIC_OFFSET;
     const alpha = crtQuality.chromaticAlpha ?? CRT_CONFIG.CHROMATIC_ALPHA;
+    ensureCrtGradientCacheContext(ctx);
 
     ctx.save();
     ctx.globalCompositeOperation = 'screen';
     ctx.globalAlpha = alpha;
+    const cacheKey = `${width}x${height}`;
+
+    if (crtGradientCache.ctx !== ctx || crtGradientCache.chromaticKey !== cacheKey) {
+        const redGradient = ctx.createLinearGradient(0, 0, width, 0);
+        redGradient.addColorStop(0, 'rgba(255, 0, 0, 0.6)');
+        redGradient.addColorStop(0.15, 'rgba(255, 0, 0, 0)');
+        redGradient.addColorStop(0.85, 'rgba(255, 0, 0, 0)');
+        redGradient.addColorStop(1, 'rgba(255, 0, 0, 0.6)');
+
+        const blueGradient = ctx.createLinearGradient(0, 0, width, 0);
+        blueGradient.addColorStop(0, 'rgba(0, 100, 255, 0.6)');
+        blueGradient.addColorStop(0.15, 'rgba(0, 100, 255, 0)');
+        blueGradient.addColorStop(0.85, 'rgba(0, 100, 255, 0)');
+        blueGradient.addColorStop(1, 'rgba(0, 100, 255, 0.6)');
+
+        crtGradientCache.ctx = ctx;
+        crtGradientCache.chromaticKey = cacheKey;
+        crtGradientCache.chromaticRed = redGradient;
+        crtGradientCache.chromaticBlue = blueGradient;
+    }
 
     // Red channel offset (slight right/down shift at edges)
-    const redGradient = ctx.createLinearGradient(0, 0, width, 0);
-    redGradient.addColorStop(0, 'rgba(255, 0, 0, 0.6)');
-    redGradient.addColorStop(0.15, 'rgba(255, 0, 0, 0)');
-    redGradient.addColorStop(0.85, 'rgba(255, 0, 0, 0)');
-    redGradient.addColorStop(1, 'rgba(255, 0, 0, 0.6)');
-    ctx.fillStyle = redGradient;
+    ctx.fillStyle = crtGradientCache.chromaticRed;
     ctx.fillRect(offset, 0, width, height);
 
     // Blue channel offset (slight left/up shift at edges)
-    const blueGradient = ctx.createLinearGradient(0, 0, width, 0);
-    blueGradient.addColorStop(0, 'rgba(0, 100, 255, 0.6)');
-    blueGradient.addColorStop(0.15, 'rgba(0, 100, 255, 0)');
-    blueGradient.addColorStop(0.85, 'rgba(0, 100, 255, 0)');
-    blueGradient.addColorStop(1, 'rgba(0, 100, 255, 0.6)');
-    ctx.fillStyle = blueGradient;
+    ctx.fillStyle = crtGradientCache.chromaticBlue;
     ctx.fillRect(-offset, 0, width, height);
 
     ctx.restore();
@@ -1697,18 +1738,24 @@ function renderPhosphorGlow(ctx, width, height) {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     ctx.globalAlpha = crtQuality.phosphorGlowIntensity ?? CRT_CONFIG.PHOSPHOR_GLOW_INTENSITY;
+    const cacheKey = `${width}x${height}`;
+    ensureCrtGradientCacheContext(ctx);
 
-    // Create a subtle overall glow by applying a light overlay
-    // This simulates phosphor bleeding/persistence
-    const gradient = ctx.createRadialGradient(
-        width / 2, height / 2, 0,
-        width / 2, height / 2, Math.max(width, height) * 0.6
-    );
-    gradient.addColorStop(0, 'rgba(100, 200, 255, 0.05)');
-    gradient.addColorStop(0.5, 'rgba(100, 200, 255, 0.02)');
-    gradient.addColorStop(1, 'rgba(100, 200, 255, 0)');
+    if (crtGradientCache.ctx !== ctx || crtGradientCache.phosphorKey !== cacheKey) {
+        const gradient = ctx.createRadialGradient(
+            width / 2, height / 2, 0,
+            width / 2, height / 2, Math.max(width, height) * 0.6
+        );
+        gradient.addColorStop(0, 'rgba(100, 200, 255, 0.05)');
+        gradient.addColorStop(0.5, 'rgba(100, 200, 255, 0.02)');
+        gradient.addColorStop(1, 'rgba(100, 200, 255, 0)');
 
-    ctx.fillStyle = gradient;
+        crtGradientCache.ctx = ctx;
+        crtGradientCache.phosphorKey = cacheKey;
+        crtGradientCache.phosphor = gradient;
+    }
+
+    ctx.fillStyle = crtGradientCache.phosphor;
     ctx.fillRect(0, 0, width, height);
 
     ctx.restore();
@@ -1783,4 +1830,14 @@ export function clearCrtCache() {
     patternWidth = 0;
     patternHeight = 0;
     patternScanlineOpacity = null;
+    crtGradientCache = {
+        ctx: null,
+        vignetteKey: '',
+        vignette: null,
+        phosphorKey: '',
+        phosphor: null,
+        chromaticKey: '',
+        chromaticRed: null,
+        chromaticBlue: null
+    };
 }

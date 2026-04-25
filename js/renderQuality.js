@@ -61,10 +61,10 @@ export const RENDER_QUALITY_PROFILES = {
         pixi: {
             maxFragments: 420,
             maxSpawnCells: 170,
-            derezFilterPass: true,
-            sweepMaxCells: 72,
-            maxSweeps: 2,
-            scanlineNoise: 0.13
+            derezFilterPass: false,
+            sweepMaxCells: 0,
+            maxSweeps: 0,
+            scanlineNoise: 0
         }
     },
     high: {
