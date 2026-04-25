@@ -79,6 +79,17 @@ The Pixi terrain de-rez pass is quality-gated. Low quality disables the filter s
 
 Current local Pixi terrain profile results and iOS pass/fail thresholds are recorded in [pixi-terrain-mobile-profile.md](pixi-terrain-mobile-profile.md).
 
+## Visual Audit Runner
+
+Use the visual audit runner for Phase 3 mobile/desktop screenshot coverage:
+
+```bash
+npm run audit:visual
+npm run audit:visual -- --targets title-menu,gameplay-hud --viewports iphone-14,desktop
+```
+
+The runner captures deterministic canvas screenshots to ignored `artifacts/visual-audit/` folders for five viewport classes: iPhone SE, iPhone 14, iPhone Plus/Max, iPad, and desktop. It covers menu/options, level select, high scores, achievements, collection, supply drop, gameplay HUD, aiming, pause, shop, victory, defeat, round transition, level complete, impact effects, tank pivots, and terrain collapse. Each capture fails on console/page errors, blank canvases, or canvas overflow beyond the viewport.
+
 ## Visual Regression Scenes
 
 Use these deterministic routes for screenshot capture after graphics changes:
