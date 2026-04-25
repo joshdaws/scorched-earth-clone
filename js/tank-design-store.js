@@ -329,19 +329,23 @@ export function clearRuntimeTankDesignOverrides() {
  * Runtime override precedence: exact skin -> player wildcard -> draft.
  *
  * @param {string} skinId
+ * @param {{allowPlayerRuntimeFallback?: boolean}} [options]
  * @returns {object|null}
  */
-export function getActiveTankDesignFromStore(skinId) {
+export function getActiveTankDesignFromStore(skinId, options = {}) {
     initTankDesignStore();
+    const { allowPlayerRuntimeFallback = true } = options;
 
     const exactRuntime = runtimeOverrides.get(skinId);
     if (exactRuntime) {
         return cloneTankDesign(exactRuntime);
     }
 
-    const playerRuntime = runtimeOverrides.get(PLAYER_RUNTIME_OVERRIDE_KEY);
-    if (playerRuntime) {
-        return cloneTankDesign(playerRuntime);
+    if (allowPlayerRuntimeFallback) {
+        const playerRuntime = runtimeOverrides.get(PLAYER_RUNTIME_OVERRIDE_KEY);
+        if (playerRuntime) {
+            return cloneTankDesign(playerRuntime);
+        }
     }
 
     const draft = draftDesigns.get(skinId);

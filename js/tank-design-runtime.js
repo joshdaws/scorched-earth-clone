@@ -381,27 +381,32 @@ export function compileTankDesignToCanvas(inputDesign, timeMs = nowMs()) {
 /**
  * Resolve active design for a skin ID.
  * @param {string} skinId
+ * @param {{allowPlayerRuntimeFallback?: boolean}} [options]
  * @returns {object|null}
  */
-export function getActiveTankDesign(skinId) {
-    return getActiveTankDesignFromStore(skinId);
+export function getActiveTankDesign(skinId, options = {}) {
+    return getActiveTankDesignFromStore(skinId, options);
 }
 
 /**
  * Resolve turret anchor for a skin, with default fallback.
  * @param {string} skinId
+ * @param {{allowPlayerRuntimeFallback?: boolean}} [options]
  * @returns {{anchorX:number, anchorY:number, baseRadius:number}}
  */
-export function getTurretAnchorForSkin(skinId) {
-    const design = getActiveTankDesignFromStore(skinId);
+export function getTurretAnchorForSkin(skinId, options = {}) {
+    const { allowPlayerRuntimeFallback = true } = options;
+    const design = getActiveTankDesignFromStore(skinId, { allowPlayerRuntimeFallback });
     if (!design || !design.turret) {
-        const playerRuntime = getRuntimeTankDesignOverride(PLAYER_RUNTIME_OVERRIDE_KEY);
-        if (playerRuntime?.turret) {
-            return {
-                anchorX: playerRuntime.turret.anchorX,
-                anchorY: playerRuntime.turret.anchorY,
-                baseRadius: playerRuntime.turret.baseRadius || FALLBACK_TURRET_ANCHOR.baseRadius
-            };
+        if (allowPlayerRuntimeFallback) {
+            const playerRuntime = getRuntimeTankDesignOverride(PLAYER_RUNTIME_OVERRIDE_KEY);
+            if (playerRuntime?.turret) {
+                return {
+                    anchorX: playerRuntime.turret.anchorX,
+                    anchorY: playerRuntime.turret.anchorY,
+                    baseRadius: playerRuntime.turret.baseRadius || FALLBACK_TURRET_ANCHOR.baseRadius
+                };
+            }
         }
 
         return { ...FALLBACK_TURRET_ANCHOR };
@@ -418,11 +423,15 @@ export function getTurretAnchorForSkin(skinId) {
  * Compile active design for a skin with lightweight caching.
  * @param {string} skinId
  * @param {number} [timeMs]
+ * @param {{allowPlayerRuntimeFallback?: boolean}} [options]
  * @returns {HTMLCanvasElement|OffscreenCanvas|null}
  */
-export function getCompiledTankCanvasForSkin(skinId, timeMs = nowMs()) {
-    const design = getActiveTankDesignFromStore(skinId);
+export function getCompiledTankCanvasForSkin(skinId, timeMs = nowMs(), options = {}) {
+    const { allowPlayerRuntimeFallback = true } = options;
+    const design = getActiveTankDesignFromStore(skinId, { allowPlayerRuntimeFallback });
     if (!design) {
+        if (!allowPlayerRuntimeFallback) return null;
+
         const playerRuntime = getRuntimeTankDesignOverride(PLAYER_RUNTIME_OVERRIDE_KEY);
         if (!playerRuntime) return null;
 

@@ -57,7 +57,7 @@ import { onAchievementUnlock, clearRoundAchievements, getRoundAchievements, getU
 import * as Tokens from './tokens.js';
 import * as TankCollection from './tank-collection.js';
 import { getTank as getTankSkin } from './tank-skins.js';
-import { getPlayerSpriteKey, getTurretPivot, isRealSprite } from './tank-visuals.js';
+import { getTankSkinId, getTankSpriteKey, getTurretPivot, isRealSprite } from './tank-visuals.js';
 import { getActiveTankDesign, getCompiledTankCanvasForSkin, setRuntimeTankDesign } from './tank-design-runtime.js';
 import { PLAYER_RUNTIME_OVERRIDE_KEY } from './tank-design-store.js';
 import { renderTankEffects } from './tank-effect-renderer.js';
@@ -3584,9 +3584,9 @@ function renderTank(ctx, tank) {
 
     const { team } = tank;
 
-    // Get equipped/playtest skin glow color for player tank
+    // Resolve shared skin/turret profile for player and enemy tanks.
     let glowColor = null;
-    let activePlayerSkinId = null;
+    let activeSkinId = null;
     if (team === 'player') {
         const equippedSkin = tankEditorPlaytestSkinId
             ? getTankSkin(tankEditorPlaytestSkinId)
@@ -3594,17 +3594,23 @@ function renderTank(ctx, tank) {
         if (equippedSkin && equippedSkin.glowColor) {
             glowColor = equippedSkin.glowColor;
         }
-        activePlayerSkinId = equippedSkin?.id || 'standard';
+        activeSkinId = getTankSkinId(tank, { playerSkinId: equippedSkin?.id || 'standard' });
+    } else {
+        activeSkinId = getTankSkinId(tank);
     }
 
     // Try to use sprite asset if available
-    const spriteKey = team === 'player' ? getPlayerSpriteKey() : 'tanks.enemy';
-    const customSprite = team === 'player' && activePlayerSkinId
-        ? getCompiledTankCanvasForSkin(activePlayerSkinId, performance.now())
+    const spriteKey = getTankSpriteKey(tank);
+    const allowPlayerRuntimeFallback = team === 'player';
+    const activeDesign = activeSkinId
+        ? getActiveTankDesign(activeSkinId, { allowPlayerRuntimeFallback })
+        : null;
+    const customSprite = activeSkinId && (team === 'player' || activeDesign)
+        ? getCompiledTankCanvasForSkin(activeSkinId, performance.now(), { allowPlayerRuntimeFallback })
         : null;
     const sprite = customSprite || Assets.get(spriteKey);
     const renderProfile = getTankRenderProfile(tank, glowColor);
-    const splitSprites = !customSprite && shouldUseSplitTankSprites(team, activePlayerSkinId)
+    const splitSprites = !customSprite && shouldUseSplitTankSprites(team, activeSkinId)
         ? getTankPartSprites(team)
         : null;
 
@@ -3619,11 +3625,8 @@ function renderTank(ctx, tank) {
         renderTankPlaceholder(ctx, tank, renderProfile);
     }
 
-    if (team === 'player' && activePlayerSkinId) {
-        const activeDesign = getActiveTankDesign(activePlayerSkinId);
-        if (activeDesign?.effects?.length) {
-            renderTankEffects(ctx, tank, activeDesign.effects, performance.now());
-        }
+    if (activeDesign?.effects?.length) {
+        renderTankEffects(ctx, tank, activeDesign.effects, performance.now());
     }
 }
 
