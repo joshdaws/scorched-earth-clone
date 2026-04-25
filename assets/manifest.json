@@ -375,28 +375,6 @@
         "width": 512,
         "height": 512
       }
-    },
-    "dirt-particle": {
-      "path": "images/effects/dirt-particle.png",
-      "width": 4,
-      "height": 4
-    }
-  },
-  "ui": {
-    "button": {
-      "path": "images/ui/ui-button.png",
-      "width": 120,
-      "height": 40
-    },
-    "power-bar": {
-      "path": "images/ui/ui-power-bar.png",
-      "width": 200,
-      "height": 20
-    },
-    "angle-indicator": {
-      "path": "images/ui/ui-angle-indicator.png",
-      "width": 60,
-      "height": 60
     }
   },
   "weaponIcons": {

@@ -30,6 +30,9 @@ Explosion sprite sheets must:
 - **Consistent frame size**: All frames same dimensions
 - **Animation flow**: Flash → Expansion → Dissipation
 - **Synthwave palette**: Pink/magenta core with cyan edges
+- **Fixed pivot**: Every frame must keep the blast center on the exact same pixel coordinate
+- **Transparent padding**: No glow, sparks, smoke, or bloom may touch the frame edge
+- **Static fallback first**: Keep `explosion-small`, `explosion-medium`, and `explosion-large` as static runtime assets until a candidate atlas passes centering checks and gameplay smoke tests
 
 ### Animation Phases
 
@@ -221,6 +224,8 @@ If generated frames are misaligned:
 1. Use sprite sheet editor to ensure consistent grid
 2. All frames must be same size with no gaps
 3. First frame at x=0, subsequent frames at multiples of frame width
+4. Center the blast core/pivot at the same local coordinate in every frame
+5. Reject sheets where the visual mass drifts, crops, or touches frame bounds
 
 ### Transparency Cleanup
 1. Ensure no white fringing on anti-aliased edges
@@ -232,10 +237,12 @@ If generated frames are misaligned:
 2. Play animation at target frame rate
 3. Check for smooth transitions between frames
 4. Verify loop point if explosion will loop (typically won't)
+5. Overlay frame centers/pivots and confirm they do not move during playback
+6. Test on terrain impacts before adding the atlas to `assets/manifest.json`
 
 ## Integration
 
-After generation, place files in `assets/images/effects/`:
+After generation and verification, place files in `assets/images/effects/`:
 
 ```json
 {
@@ -263,3 +270,8 @@ After generation, place files in `assets/images/effects/`:
 ```
 
 Test in-game rendering and animation playback before finalizing.
+
+Do not keep failed atlas experiments in runtime assets. A previous generated
+`explosion-spritesheet.png` drifted between cells and clipped at the frame
+edges, so it was removed from the runtime asset set. Future atlas work should
+start from a newly generated, centered sheet rather than that file.

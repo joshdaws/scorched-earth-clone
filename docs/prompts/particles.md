@@ -2,6 +2,11 @@
 
 Prompts for generating particle effect sprites for Scorched Earth: Synthwave Edition.
 
+Current terrain debris and de-rez particles are procedural/Pixi-generated from
+TerrainCellGrid cells. Particle PNG prompts are retained as source-only
+reference material; generated particle files should not be added to
+`assets/manifest.json` unless a renderer path actually draws them.
+
 ## Tool Recommendation
 
 **Primary**: NanoBanana Pro (good for tiny sprites)
@@ -32,6 +37,10 @@ Particles must:
 ---
 
 ## Asset 1: Dirt Particle (dirt-particle.png)
+
+Archived runtime decision: the generated `dirt-particle.png` was removed from
+runtime assets because no shipped renderer used it. Prefer the terrain-cell
+particle path unless a future effect explicitly needs bitmap debris.
 
 ### Specifications
 - **Dimensions**: 4x4 pixels
