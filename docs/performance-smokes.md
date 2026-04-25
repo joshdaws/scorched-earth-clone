@@ -48,6 +48,8 @@ npm run perf:budget -- --input metrics.json --scene gameplay
 
 The Pixi terrain de-rez pass is quality-gated. Low quality disables the filter sweep; balanced and high add a capped Pixi `NoiseFilter` sweep layer over the removed TerrainCellGrid cells. Watch `pixiDerezSweeps`, `pixiFragments`, `pixiTerrainRebuild`, and `pixiTerrainRender` together when tuning this effect for iOS.
 
+Current local Pixi terrain profile results and iOS pass/fail thresholds are recorded in [pixi-terrain-mobile-profile.md](pixi-terrain-mobile-profile.md).
+
 ## Visual Regression Scenes
 
 Use these deterministic routes for screenshot capture after graphics changes:
