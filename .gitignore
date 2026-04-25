@@ -27,6 +27,7 @@ www/
 
 # Local smoke artifacts
 artifacts/browser-smoke/
+artifacts/visual-audit/
 
 # Capacitor
 ios/App/Pods/
