@@ -10,7 +10,7 @@
  * This module enables agents to test touch-based controls without touch hardware.
  */
 
-import { PHYSICS, TANK } from './constants.js';
+import { GAME_STATES, PHYSICS, TANK } from './constants.js';
 import { getAssetGroupStatus, getLoadedCount, getLoadingStatus } from './assets.js';
 import { queueGameInput, INPUT_EVENTS, isGameInputEnabled } from './input.js';
 import * as Wind from './wind.js';
@@ -35,7 +35,11 @@ import {
     getPerformanceSnapshot,
     resetPerformanceMetrics
 } from './performanceMetrics.js';
-import { getLoopTimingSnapshot, getState as getGameState } from './game.js';
+import { getLoopTimingSnapshot, getState as getGameState, setState as setGameState } from './game.js';
+import * as RunState from './runState.js';
+import * as HighScores from './highScores.js';
+import * as LifetimeStats from './lifetime-stats.js';
+import * as NameEntry from './nameEntry.js';
 
 // =============================================================================
 // MODULE STATE
@@ -1090,6 +1094,198 @@ export function setControlMode(mode) {
     };
 }
 
+// =============================================================================
+// HIGH SCORE AND STATISTICS QA API
+// =============================================================================
+
+const HIGH_SCORE_QA_STORAGE_KEYS = [
+    'scorched_earth_high_scores',
+    'scorched_earth_lifetime_stats',
+    'scorchedEarth_lifetimeStats',
+    'scorched_earth_local_scores',
+    'scorched_earth_offline_queue',
+    'scorched_earth_player_name'
+];
+
+function readJsonStorage(key, fallback) {
+    try {
+        const value = localStorage.getItem(key);
+        return value ? JSON.parse(value) : fallback;
+    } catch (_error) {
+        return fallback;
+    }
+}
+
+/**
+ * Clear persisted score/stat/name data used by browser QA smokes.
+ * @returns {Object}
+ */
+export function resetHighScoreQaData() {
+    for (const key of HIGH_SCORE_QA_STORAGE_KEYS) {
+        localStorage.removeItem(key);
+    }
+    HighScores.clearAllData();
+    return { success: true };
+}
+
+/**
+ * Show the name-entry modal for browser QA.
+ * @param {Object} options
+ * @returns {Object}
+ */
+export function showNameEntry(options = {}) {
+    NameEntry.show(options);
+    return getNameEntryState();
+}
+
+/**
+ * Get the current name-entry modal state.
+ * @returns {Object}
+ */
+export function getNameEntryState() {
+    return {
+        success: true,
+        isOpen: NameEntry.isOpen(),
+        currentName: NameEntry.getCurrentName(),
+        storedName: localStorage.getItem('scorched_earth_player_name')
+    };
+}
+
+/**
+ * Exercise run-state stat tracking with deterministic values.
+ * @returns {Object}
+ */
+export function exerciseRunStatistics() {
+    RunState.startNewRun();
+    RunState.setRoundNumber(5);
+    RunState.recordStat('damageDealt', 120);
+    RunState.recordStat('damageDealt', 40);
+    RunState.recordStat('damageTaken', 35);
+    RunState.recordStat('shotFired');
+    RunState.recordStat('shotFired');
+    RunState.recordStat('shotFired');
+    RunState.recordStat('shotHit');
+    RunState.recordStat('shotHit');
+    RunState.recordStat('enemyDestroyed');
+    RunState.recordStat('moneyEarned', 750);
+    RunState.recordStat('moneySpent', 200);
+    RunState.recordStat('weaponUsed', 'basic-shot');
+    RunState.recordStat('weaponUsed', 'laser-blast');
+    RunState.recordStat('nukeLaunched');
+    RunState.endRun(false);
+
+    return {
+        success: true,
+        state: RunState.getState(),
+        stats: RunState.getRunStats()
+    };
+}
+
+/**
+ * Save a deterministic local/global high score and update display lifetime stats.
+ * @param {Object} runStats
+ * @returns {Object}
+ */
+export function saveHighScoreForQa(runStats = {}) {
+    const normalized = {
+        roundsSurvived: runStats.roundsSurvived ?? 1,
+        totalDamageDealt: runStats.totalDamageDealt ?? runStats.totalDamage ?? 0,
+        enemiesDestroyed: runStats.enemiesDestroyed ?? 0,
+        shotsFired: runStats.shotsFired ?? 0,
+        shotsHit: runStats.shotsHit ?? 0,
+        moneyEarned: runStats.moneyEarned ?? 0,
+        moneySpent: runStats.moneySpent ?? 0,
+        biggestHit: runStats.biggestHit ?? 0,
+        totalScore: runStats.totalScore ?? ((runStats.roundsSurvived ?? 1) * 1000 + (runStats.totalDamageDealt ?? 0))
+    };
+    const result = HighScores.saveHighScore(normalized);
+    const lifetimeSaved = HighScores.updateLifetimeStats(normalized);
+
+    return {
+        success: true,
+        result,
+        lifetimeSaved,
+        scores: HighScores.getHighScores(),
+        lifetimeStats: HighScores.getFormattedLifetimeStats()
+    };
+}
+
+/**
+ * Record deterministic aggregate lifetime-stat events.
+ * @returns {Object}
+ */
+export function exerciseLifetimeStatistics() {
+    LifetimeStats.recordRunStarted();
+    LifetimeStats.recordDamageDealt(160);
+    LifetimeStats.recordDamageTaken(35);
+    LifetimeStats.recordShot(true);
+    LifetimeStats.recordShot(true);
+    LifetimeStats.recordShot(false);
+    LifetimeStats.recordKill('laser-blast');
+    LifetimeStats.recordKill('laser-blast');
+    LifetimeStats.recordKill('basic-shot');
+    LifetimeStats.recordMoneyEarned(750);
+    LifetimeStats.recordWin({
+        isFlawless: false,
+        roundNumber: 5,
+        damageDealt: 160,
+        shotsFired: 3,
+        shotsHit: 2
+    });
+    LifetimeStats.recordLoss({ roundNumber: 6 });
+
+    return {
+        success: true,
+        stats: LifetimeStats.getStats(),
+        summary: LifetimeStats.getSummary(),
+        accuracy: LifetimeStats.getOverallAccuracy(),
+        favoriteWeapon: LifetimeStats.getFavoriteWeapon(),
+        stored: readJsonStorage('scorchedEarth_lifetimeStats', null)
+    };
+}
+
+/**
+ * Get persisted high-score/stat data and active leaderboard state.
+ * @returns {Object}
+ */
+export function getHighScoreQaState() {
+    return {
+        success: true,
+        gameState: getGameState(),
+        highScores: HighScores.getHighScores(),
+        bestRun: HighScores.getBestRun(),
+        bestRound: HighScores.getBestRoundCount(),
+        qualifiesLowScore: HighScores.isNewHighScore(1),
+        displayLifetimeStats: HighScores.getFormattedLifetimeStats(),
+        aggregateLifetimeStats: LifetimeStats.getStats(),
+        aggregateLifetimeSummary: LifetimeStats.getSummary(),
+        globalLeaderboard: HighScores.getGlobalLeaderboard(),
+        connectionStatus: HighScores.getConnectionStatus(),
+        stored: {
+            playerName: localStorage.getItem('scorched_earth_player_name'),
+            highScores: readJsonStorage('scorched_earth_high_scores', []),
+            displayLifetimeStats: readJsonStorage('scorched_earth_lifetime_stats', null),
+            aggregateLifetimeStats: readJsonStorage('scorchedEarth_lifetimeStats', null),
+            localScores: readJsonStorage('scorched_earth_local_scores', [])
+        }
+    };
+}
+
+/**
+ * Open the high-scores screen from browser QA.
+ * @returns {Object}
+ */
+export function openHighScoresScreen() {
+    if (getGameState() !== GAME_STATES.MENU) {
+        setGameState(GAME_STATES.MENU);
+    }
+    setGameState(GAME_STATES.HIGH_SCORES);
+    return {
+        success: getGameState() === GAME_STATES.HIGH_SCORES,
+        gameState: getGameState()
+    };
+}
+
 /**
  * Check if TestAPI is properly initialized.
  * @returns {boolean} True if initialized with game references
@@ -1530,6 +1726,14 @@ const TestAPI = {
     getState,
     getControlState,
     setControlMode,
+    resetHighScoreQaData,
+    showNameEntry,
+    getNameEntryState,
+    exerciseRunStatistics,
+    saveHighScoreForQa,
+    exerciseLifetimeStatistics,
+    getHighScoreQaState,
+    openHighScoresScreen,
     getRenderQuality,
     setRenderQuality,
     getPerformanceMetrics,

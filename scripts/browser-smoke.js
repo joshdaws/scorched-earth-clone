@@ -48,7 +48,7 @@ function parseArgs(argv) {
 
 function usage() {
     console.log(`Usage:
-  npm run smoke:browser -- [--scenario impact|projectile|idle|visual|controls|terrain] [--scene physics-sandbox&wind=0] [--quality balanced] [--headed]
+  npm run smoke:browser -- [--scenario impact|projectile|idle|visual|controls|terrain|high-scores] [--scene physics-sandbox&wind=0] [--quality balanced] [--headed]
 
 Examples:
   npm run smoke:browser
@@ -57,6 +57,7 @@ Examples:
   npm run smoke:browser -- --scenario projectile --max-dropped-backlog-ms 80
   npm run smoke:browser -- --scenario controls
   npm run smoke:browser -- --scenario terrain
+  npm run smoke:browser -- --scenario high-scores
 
 If Chromium is missing after a clean checkout, run:
   npm run smoke:browser:install
@@ -163,6 +164,11 @@ async function runScenario(page, { scenario, quality }) {
 
     if (scenario === 'terrain') {
         await runTerrainScenario(page, quality);
+        return;
+    }
+
+    if (scenario === 'high-scores') {
+        await runHighScoresScenario(page, quality);
         return;
     }
 
@@ -520,6 +526,128 @@ async function runTerrainScenario(page, quality) {
     assertTerrain(Math.abs(landingTerrain.canvasY - simulation.landingY) <= 10, 'projectile collision point should match terrain surface');
 
     await page.waitForTimeout(500);
+}
+
+function assertHighScores(condition, message) {
+    if (!condition) {
+        throw new Error(`[high-scores] ${message}`);
+    }
+}
+
+function assertDescendingRounds(scores) {
+    for (let index = 1; index < scores.length; index++) {
+        if (scores[index - 1].roundsSurvived < scores[index].roundsSurvived) {
+            return false;
+        }
+    }
+    return true;
+}
+
+async function runHighScoresScenario(page, quality) {
+    await page.evaluate(() => window.TestAPI.resetHighScoreQaData());
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await waitForGameReady(page, 'high-scores');
+
+    await page.evaluate(({ selectedQuality }) => {
+        window.TestAPI.setRenderQuality(selectedQuality);
+        window.TestAPI.resetPerformance();
+    }, { selectedQuality: quality });
+
+    let state = await page.evaluate(() => window.TestAPI.getHighScoreQaState());
+    assertHighScores(state.highScores.length === 0, 'high scores should start empty after reset');
+    assertHighScores(state.stored.playerName === null, 'player name should start empty after reset');
+
+    await page.evaluate(() => window.TestAPI.showNameEntry({ isFirstTime: true }));
+    await page.keyboard.type('QA Pilot');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(500);
+    const nameEntry = await page.evaluate(() => window.TestAPI.getNameEntryState());
+    assertHighScores(!nameEntry.isOpen, 'name entry should close after confirming a valid name');
+    assertHighScores(nameEntry.storedName === 'QA Pilot', `stored player name should be QA Pilot, got ${nameEntry.storedName}`);
+
+    const run = await page.evaluate(() => window.TestAPI.exerciseRunStatistics());
+    assertHighScores(run.success, 'run statistics exercise should succeed');
+    assertHighScores(run.stats.roundsSurvived === 5, `rounds survived should be 5, got ${run.stats.roundsSurvived}`);
+    assertHighScores(run.stats.totalDamageDealt === 160, `damage dealt should be 160, got ${run.stats.totalDamageDealt}`);
+    assertHighScores(run.stats.totalDamageTaken === 35, `damage taken should be 35, got ${run.stats.totalDamageTaken}`);
+    assertHighScores(run.stats.shotsFired === 3, `shots fired should be 3, got ${run.stats.shotsFired}`);
+    assertHighScores(run.stats.shotsHit === 2, `shots hit should be 2, got ${run.stats.shotsHit}`);
+    assertHighScores(run.stats.hitRate === 67, `hit rate should round to 67, got ${run.stats.hitRate}`);
+    assertHighScores(run.stats.moneyEarned === 750, `money earned should be 750, got ${run.stats.moneyEarned}`);
+    assertHighScores(run.stats.moneySpent === 200, `money spent should be 200, got ${run.stats.moneySpent}`);
+    assertHighScores(run.stats.biggestHit === 120, `biggest hit should be 120, got ${run.stats.biggestHit}`);
+    assertHighScores(run.stats.weaponsUsed.includes('basic-shot') && run.stats.weaponsUsed.includes('laser-blast'), 'weapons used should include both deterministic weapons');
+    assertHighScores(run.stats.nukesLaunched === 1, `nukes launched should be 1, got ${run.stats.nukesLaunched}`);
+
+    const saveResults = await page.evaluate(() => {
+        const results = [];
+        for (let index = 1; index <= 12; index++) {
+            results.push(window.TestAPI.saveHighScoreForQa({
+                roundsSurvived: index,
+                totalDamageDealt: index * 100,
+                enemiesDestroyed: index % 3,
+                shotsFired: index + 2,
+                shotsHit: Math.min(index, index + 2),
+                moneyEarned: index * 75,
+                biggestHit: index * 10,
+                totalScore: index * 1000
+            }));
+        }
+        return results;
+    });
+    assertHighScores(saveResults[0].result.saved, 'first qualifying score should save locally');
+    assertHighScores(saveResults[0].result.rank === 1, `first score rank should be 1, got ${saveResults[0].result.rank}`);
+    assertHighScores(saveResults[11].result.saved, 'best score should save locally');
+    assertHighScores(saveResults[11].result.rank === 1, `best score rank should be 1, got ${saveResults[11].result.rank}`);
+    await page.waitForFunction(() => {
+        const raw = localStorage.getItem('scorched_earth_local_scores');
+        return raw && JSON.parse(raw).length >= 12;
+    }, null, { timeout: 5000 });
+
+    state = await page.evaluate(() => window.TestAPI.getHighScoreQaState());
+    assertHighScores(state.highScores.length === 10, `local high scores should retain top 10, got ${state.highScores.length}`);
+    assertHighScores(assertDescendingRounds(state.highScores), 'local high scores should be sorted by rounds descending');
+    assertHighScores(state.bestRound === 12, `best round should be 12, got ${state.bestRound}`);
+    assertHighScores(!state.qualifiesLowScore, 'a 1-round score should not qualify after top 10 is full');
+    assertHighScores(state.highScores[0].roundsSurvived === 12, 'rank #1 should be the 12-round score');
+    assertHighScores(state.highScores[9].roundsSurvived === 3, 'rank #10 should be the 3-round score');
+    assertHighScores(state.displayLifetimeStats.totalRuns === 12, `display lifetime total runs should be 12, got ${state.displayLifetimeStats.totalRuns}`);
+    assertHighScores(state.displayLifetimeStats.totalRoundsPlayed === 78, `display lifetime rounds should be 78, got ${state.displayLifetimeStats.totalRoundsPlayed}`);
+    assertHighScores(state.displayLifetimeStats.lifetimeDamage === 7800, `display lifetime damage should be 7800, got ${state.displayLifetimeStats.lifetimeDamage}`);
+    assertHighScores(state.displayLifetimeStats.bestRound === 12, `display lifetime best round should be 12, got ${state.displayLifetimeStats.bestRound}`);
+    assertHighScores(state.displayLifetimeStats.lifetimeMoneyEarned === 5850, `display lifetime money should be 5850, got ${state.displayLifetimeStats.lifetimeMoneyEarned}`);
+    assertHighScores(state.stored.localScores.length >= 12, 'offline/global leaderboard backup should include submitted scores');
+    assertHighScores(state.stored.localScores.some(score => score.displayName === 'QA Pilot'), 'offline/global scores should include the confirmed player name');
+
+    const aggregateBefore = await page.evaluate(() => window.TestAPI.getHighScoreQaState().aggregateLifetimeStats);
+    const lifetime = await page.evaluate(() => window.TestAPI.exerciseLifetimeStatistics());
+    assertHighScores(lifetime.success, 'aggregate lifetime statistics exercise should succeed');
+    assertHighScores(lifetime.summary.totalRuns === aggregateBefore.totalRuns + 1, `aggregate total runs should increment by 1, got ${aggregateBefore.totalRuns} -> ${lifetime.summary.totalRuns}`);
+    assertHighScores(lifetime.summary.wins === aggregateBefore.totalWins + 1, `aggregate wins should increment by 1, got ${aggregateBefore.totalWins} -> ${lifetime.summary.wins}`);
+    assertHighScores(lifetime.summary.losses === aggregateBefore.totalLosses + 1, `aggregate losses should increment by 1, got ${aggregateBefore.totalLosses} -> ${lifetime.summary.losses}`);
+    assertHighScores(lifetime.summary.damageDealt === aggregateBefore.totalDamageDealt + 160, `aggregate damage dealt should increment by 160, got ${aggregateBefore.totalDamageDealt} -> ${lifetime.summary.damageDealt}`);
+    assertHighScores(lifetime.stats.totalDamageTaken === aggregateBefore.totalDamageTaken + 35, `aggregate damage taken should increment by 35, got ${aggregateBefore.totalDamageTaken} -> ${lifetime.stats.totalDamageTaken}`);
+    assertHighScores(lifetime.accuracy === 67, `aggregate accuracy should round to 67, got ${lifetime.accuracy}`);
+    assertHighScores(lifetime.favoriteWeapon === 'laser-blast', `favorite weapon should be laser-blast, got ${lifetime.favoriteWeapon}`);
+    assertHighScores(lifetime.summary.highestRound === 6, `highest round should be 6, got ${lifetime.summary.highestRound}`);
+    assertHighScores(lifetime.stats.totalMoneyEarned === aggregateBefore.totalMoneyEarned + 750, `aggregate money earned should increment by 750, got ${aggregateBefore.totalMoneyEarned} -> ${lifetime.stats.totalMoneyEarned}`);
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await waitForGameReady(page, 'high-scores');
+    state = await page.evaluate(() => window.TestAPI.getHighScoreQaState());
+    assertHighScores(state.stored.playerName === 'QA Pilot', 'player name should persist after reload');
+    assertHighScores(state.highScores.length === 10, 'top 10 high scores should persist after reload');
+    assertHighScores(state.bestRound === 12, 'best round should persist after reload');
+    assertHighScores(state.displayLifetimeStats.totalRuns === 12, 'display lifetime stats should persist after reload');
+    assertHighScores(state.aggregateLifetimeStats.totalWins === lifetime.stats.totalWins, 'aggregate wins should persist after reload');
+    assertHighScores(state.aggregateLifetimeStats.totalLosses === lifetime.stats.totalLosses, 'aggregate losses should persist after reload');
+    assertHighScores(state.aggregateLifetimeStats.totalDamageDealt === lifetime.stats.totalDamageDealt, 'aggregate damage dealt should persist after reload');
+
+    const opened = await page.evaluate(() => window.TestAPI.openHighScoresScreen());
+    assertHighScores(opened.success && opened.gameState === 'high_scores', `high scores screen should open, got ${opened.gameState}`);
+    const localTab = await designToClient(page, { x: 700, y: 110 });
+    await page.mouse.click(localTab.x, localTab.y);
+    await page.waitForTimeout(800);
 }
 
 function assertSmokeBudgets(metrics, args) {

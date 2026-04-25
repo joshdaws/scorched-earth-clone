@@ -38,6 +38,7 @@ npm run smoke:browser -- --scenario projectile --quality low
 npm run smoke:browser -- --scenario projectile --quality balanced --max-dropped-backlog-ms 80
 npm run smoke:browser -- --scenario controls --quality balanced
 npm run smoke:browser -- --scenario terrain --quality balanced
+npm run smoke:browser -- --scenario high-scores --quality balanced
 npm run smoke:browser -- --scenario idle --quality balanced
 ```
 
@@ -70,6 +71,7 @@ npm run perf:budget -- --input metrics.json --scene gameplay
 - `terrain-impact`: load the physics sandbox, call `TestAPI.destroyTerrain({ x: 620, y: 500, radius: 90 })`, and sample through the de-rez fade.
 - `controls`: load the physics sandbox, assert keyboard angle/power changes, Tab/Shift+Tab weapon cycling, mouse angle arc dragging, touch slingshot aiming, secondary-touch release safety, and release-to-fire.
 - `terrain`: load the physics sandbox, assert seeded generation reproducibility, seed variation, height bounds, tank surface placement, accumulated crater destruction, and projectile-to-terrain collision accuracy.
+- `high-scores`: load the physics sandbox in offline service mode, assert name entry, local high-score ranking/trimming, offline leaderboard backup names, run-stat math, aggregate lifetime stats, reload persistence, and high-scores screen entry.
 
 The projectile smoke can also fail when fixed-step catch-up exceeds a threshold by passing `--max-dropped-backlog-ms`. Use that on shot-smoothness work so the screenshot and metrics prove the fired shot did not visibly sprint after a frame hitch.
 
