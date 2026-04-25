@@ -8,6 +8,7 @@ import {
   getTerrainGridContactHeight,
   getTerrainGridHeightAt,
   getTerrainGridSlopeAngle,
+  getTerrainGridStableContactHeight,
   getTerrainGridSurfaceYAt,
   rebuildTerrainCellGrid,
   TerrainCellGrid
@@ -198,6 +199,56 @@ describe('terrainCells', () => {
     expect(getTerrainGridHeightAt(terrain, 36, { cellSize: 8 })).toBe(16);
     expect(getTerrainGridContactHeight(terrain, 36, 24, { cellSize: 8 })).toBe(48);
     expect(getTerrainGridSurfaceYAt(terrain, 36, { cellSize: 8 })).toBe(48);
+  });
+
+  it('requires a stable footprint instead of letting one pillar support a tank', () => {
+    const terrain = createTerrain(new Array(128).fill(40), 200);
+    const grid = getOrCreateTerrainCellGrid(terrain, {
+      cellSize: 8
+    });
+    const centerX = 64;
+    const minCol = Math.floor((centerX - 32) / 8);
+    const maxCol = Math.floor((centerX + 32) / 8);
+
+    for (let col = minCol; col <= maxCol; col++) {
+      grid.setColumnSolidCount(col, 5);
+    }
+    grid.setColumnSolidCount(minCol + 2, 13);
+    grid.setColumnSolidCount(minCol + 6, 13);
+
+    expect(getTerrainGridContactHeight(terrain, centerX, 64, { cellSize: 8 })).toBe(104);
+    expect(getTerrainGridStableContactHeight(terrain, centerX, 64, { cellSize: 8 })).toBe(40);
+  });
+
+  it('counts empty footprint columns against tank support', () => {
+    const terrain = createTerrain(new Array(128).fill(0), 200);
+    const grid = getOrCreateTerrainCellGrid(terrain, {
+      cellSize: 8
+    });
+    const centerX = 64;
+    const minCol = Math.floor((centerX - 32) / 8);
+
+    grid.setColumnSolidCount(minCol + 1, 13);
+    grid.setColumnSolidCount(minCol + 6, 13);
+
+    expect(getTerrainGridContactHeight(terrain, centerX, 64, { cellSize: 8 })).toBe(104);
+    expect(getTerrainGridStableContactHeight(terrain, centerX, 64, { cellSize: 8 })).toBe(0);
+  });
+
+  it('allows a tank to rest on a broad enough terrain ledge', () => {
+    const terrain = createTerrain(new Array(128).fill(40), 200);
+    const grid = getOrCreateTerrainCellGrid(terrain, {
+      cellSize: 8
+    });
+    const centerX = 64;
+    const minCol = Math.floor((centerX - 32) / 8);
+    const maxCol = Math.floor((centerX + 32) / 8);
+
+    for (let col = minCol; col <= maxCol; col++) {
+      grid.setColumnSolidCount(col, col < minCol + 5 ? 13 : 5);
+    }
+
+    expect(getTerrainGridStableContactHeight(terrain, centerX, 64, { cellSize: 8 })).toBe(104);
   });
 
   it('calculates slope from grid heights for bounces and previews', () => {

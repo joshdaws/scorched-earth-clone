@@ -1,6 +1,7 @@
 const DEFAULT_CELL_SIZE = 8;
 const DEFAULT_MAX_REMOVED_CELLS = 900;
 const DEFAULT_MAX_SLOPE_CELLS = 3;
+const DEFAULT_TANK_SUPPORT_FRACTION = 0.45;
 const terrainGridCache = new WeakMap();
 
 function clamp(value, min, max) {
@@ -142,6 +143,36 @@ export function getTerrainGridContactHeight(terrain, centerX, contactWidth = 1, 
     }
 
     return height;
+}
+
+export function getTerrainGridStableContactHeight(terrain, centerX, contactWidth = 1, options = {}) {
+    const grid = getOrCreateTerrainCellGrid(terrain, options);
+    if (!grid || grid.columns <= 0) {
+        return getTerrainHeight(terrain, centerX);
+    }
+
+    const halfWidth = Math.max(0, contactWidth * 0.5);
+    const minCol = clamp(Math.floor((centerX - halfWidth) / grid.cellSize), 0, grid.columns - 1);
+    const maxCol = clamp(Math.floor((centerX + halfWidth) / grid.cellSize), minCol, grid.columns - 1);
+    const heights = [];
+
+    for (let col = minCol; col <= maxCol; col++) {
+        const height = grid.screenHeight - grid.getSurfaceYForColumn(col);
+        heights.push(height);
+    }
+
+    if (heights.length === 0) return 0;
+
+    const supportFraction = clamp(
+        Number(options.supportFraction ?? DEFAULT_TANK_SUPPORT_FRACTION),
+        0.1,
+        1
+    );
+    const requiredSupportColumns = Math.max(1, Math.ceil((maxCol - minCol + 1) * supportFraction));
+    const supportedIndex = Math.min(heights.length - 1, requiredSupportColumns - 1);
+
+    heights.sort((a, b) => b - a);
+    return heights[supportedIndex];
 }
 
 export function getTerrainGridSurfaceYAt(terrain, x, options = {}) {

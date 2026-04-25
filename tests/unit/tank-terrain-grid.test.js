@@ -46,4 +46,62 @@ describe('tank terrain grid placement', () => {
     expect(tank.startFalling).toHaveBeenCalledWith(160);
     expect(tank.targetY).toBe(160);
   });
+
+  it('starts falling when the tank is only balanced on narrow unsupported pillars', () => {
+    const terrain = createTerrain(new Array(128).fill(40), 200);
+    const grid = getOrCreateTerrainCellGrid(terrain, {
+      cellSize: 8
+    });
+    const tankX = 64;
+    const minCol = Math.floor((tankX - TANK.WIDTH / 2) / grid.cellSize);
+    const maxCol = Math.floor((tankX + TANK.WIDTH / 2) / grid.cellSize);
+
+    for (let col = minCol; col <= maxCol; col++) {
+      grid.setColumnSolidCount(col, 5);
+    }
+    grid.setColumnSolidCount(minCol + 1, 13);
+    grid.setColumnSolidCount(maxCol - 1, 13);
+
+    const tank = {
+      x: tankX,
+      y: 96,
+      isFalling: false,
+      startFalling: vi.fn(function startFalling(targetY) {
+        this.isFalling = true;
+        this.targetY = targetY;
+      })
+    };
+
+    const startedFalling = updateTankTerrainPosition(tank, terrain);
+
+    expect(startedFalling).toBe(true);
+    expect(tank.startFalling).toHaveBeenCalledWith(160);
+  });
+
+  it('keeps a tank seated when enough of the footprint is supported', () => {
+    const terrain = createTerrain(new Array(128).fill(40), 200);
+    const grid = getOrCreateTerrainCellGrid(terrain, {
+      cellSize: 8
+    });
+    const tankX = 64;
+    const minCol = Math.floor((tankX - TANK.WIDTH / 2) / grid.cellSize);
+    const maxCol = Math.floor((tankX + TANK.WIDTH / 2) / grid.cellSize);
+
+    for (let col = minCol; col <= maxCol; col++) {
+      grid.setColumnSolidCount(col, col < minCol + 5 ? 13 : 5);
+    }
+
+    const tank = {
+      x: tankX,
+      y: 96,
+      isFalling: false,
+      startFalling: vi.fn()
+    };
+
+    const startedFalling = updateTankTerrainPosition(tank, terrain);
+
+    expect(startedFalling).toBe(false);
+    expect(tank.startFalling).not.toHaveBeenCalled();
+    expect(tank.y).toBe(96);
+  });
 });

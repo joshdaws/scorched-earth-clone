@@ -39,7 +39,9 @@ import {
 } from './renderQuality.js';
 import { getParticleCount } from './effects.js';
 import { getTerrainDerezEffectCount } from './terrainDerezEffect.js';
-import { getPixiTerrainCacheStats } from './pixiTerrainLayer.js';
+import { getPixiTerrainCacheStats, markPixiTerrainLayerDirty } from './pixiTerrainLayer.js';
+import { getOrCreateTerrainCellGrid, getTerrainGridStableContactHeight } from './terrainCells.js';
+import { updateTankTerrainPosition } from './tank.js';
 import {
     evaluatePerformanceBudget,
     getPerformanceSnapshot,
@@ -995,6 +997,8 @@ export function getTankPositions() {
         result.player = {
             x: player.x,
             y: player.y,
+            isFalling: Boolean(player.isFalling),
+            targetY: player.targetY ?? null,
             terrainHeight: currentTerrain ? currentTerrain.getHeight(Math.floor(player.x)) : null
         };
     }
@@ -1003,11 +1007,76 @@ export function getTankPositions() {
         result.enemy = {
             x: enemy.x,
             y: enemy.y,
+            isFalling: Boolean(enemy.isFalling),
+            targetY: enemy.targetY ?? null,
             terrainHeight: currentTerrain ? currentTerrain.getHeight(Math.floor(enemy.x)) : null
         };
     }
 
     return result;
+}
+
+export function exerciseTankSupportPhysics() {
+    const currentTerrain = module.terrain || terrain;
+    const player = module.playerTank || playerTank;
+
+    if (!currentTerrain || !player) {
+        return { success: false, error: 'Terrain and player tank are required' };
+    }
+
+    const grid = getOrCreateTerrainCellGrid(currentTerrain);
+    if (!grid) {
+        return { success: false, error: 'TerrainCellGrid unavailable' };
+    }
+
+    const tankX = Math.round(currentTerrain.getWidth() * 0.32);
+    const minCol = Math.max(0, Math.floor((tankX - TANK.WIDTH / 2) / grid.cellSize));
+    const maxCol = Math.min(grid.columns - 1, Math.floor((tankX + TANK.WIDTH / 2) / grid.cellSize));
+    const lowCount = Math.max(2, Math.floor(grid.rows * 0.14));
+    const highCount = Math.min(grid.rows - 1, lowCount + 10);
+
+    for (let col = Math.max(0, minCol - 2); col <= Math.min(grid.columns - 1, maxCol + 2); col++) {
+        grid.setColumnSolidCount(col, lowCount);
+    }
+    grid.setColumnSolidCount(Math.min(maxCol, minCol + 1), highCount);
+    grid.setColumnSolidCount(Math.max(minCol, maxCol - 1), highCount);
+    grid.writeHeightsToTerrain(currentTerrain);
+    markPixiTerrainLayerDirty({ x: tankX, radius: TANK.WIDTH * 1.5 });
+
+    player.x = tankX;
+    player.y = currentTerrain.getScreenHeight() - highCount * grid.cellSize;
+    player.isFalling = false;
+    player.fallVelocity = 0;
+    player.targetY = player.y;
+
+    const stableHeight = getTerrainGridStableContactHeight(currentTerrain, tankX, TANK.WIDTH);
+    const targetY = currentTerrain.getScreenHeight() - stableHeight;
+    const before = {
+        x: player.x,
+        y: player.y,
+        stableHeight,
+        targetY
+    };
+    const startedFalling = updateTankTerrainPosition(player, currentTerrain);
+
+    return {
+        success: true,
+        startedFalling,
+        before,
+        after: {
+            x: player.x,
+            y: player.y,
+            isFalling: Boolean(player.isFalling),
+            targetY: player.targetY
+        },
+        footprint: {
+            minCol,
+            maxCol,
+            lowCount,
+            highCount,
+            cellSize: grid.cellSize
+        }
+    };
 }
 
 // =============================================================================
@@ -2079,6 +2148,7 @@ const TestAPI = {
     getDerezFragmentCount,
     setTankPositions,
     getTankPositions,
+    exerciseTankSupportPhysics,
     // Snapshot testing
     snapshot,
     compareSnapshots,

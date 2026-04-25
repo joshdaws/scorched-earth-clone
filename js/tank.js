@@ -12,7 +12,7 @@ import { playExplosionSound } from './sound.js';
 import { getScreenWidth, getScreenHeight } from './screenSize.js';
 import { getUIScale, scaled, scaledTouch, isVeryShortScreen } from './uiPosition.js';
 import { getTurretPivot } from './tank-visuals.js';
-import { getTerrainGridContactHeight, getTerrainGridHeightAt } from './terrainCells.js';
+import { getTerrainGridHeightAt, getTerrainGridStableContactHeight } from './terrainCells.js';
 
 /**
  * Team identifiers for tanks.
@@ -860,7 +860,7 @@ function findBestXInRange(terrain, minX, maxX) {
 
     for (let x = minX; x <= maxX; x += step) {
         const xi = Math.floor(x);
-        const height = getTerrainGridContactHeight(terrain, xi, TANK.WIDTH);
+        const height = getTerrainGridStableContactHeight(terrain, xi, TANK.WIDTH);
 
         // Skip positions in deep valleys
         if (isInDeepValley(terrain, xi)) {
@@ -909,7 +909,7 @@ function terrainHeightToCanvasY(terrain, terrainHeight) {
 function placeTankAtX(tank, terrain, x) {
     tank.x = x;
     // Tank Y is the canvas Y of the bottom of the tank (where it touches ground)
-    const terrainHeight = getTerrainGridContactHeight(terrain, x, TANK.WIDTH);
+    const terrainHeight = getTerrainGridStableContactHeight(terrain, x, TANK.WIDTH);
     tank.y = terrainHeightToCanvasY(terrain, terrainHeight);
 }
 
@@ -965,8 +965,8 @@ export function placeTanksOnTerrain(terrain) {
     const enemyX = findBestXInRange(terrain, effectiveEnemyMinX, effectiveEnemyMaxX);
 
     // Calculate canvas Y positions from terrain heights
-    const playerTerrainHeight = getTerrainGridContactHeight(terrain, playerX, TANK.WIDTH);
-    const enemyTerrainHeight = getTerrainGridContactHeight(terrain, enemyX, TANK.WIDTH);
+    const playerTerrainHeight = getTerrainGridStableContactHeight(terrain, playerX, TANK.WIDTH);
+    const enemyTerrainHeight = getTerrainGridStableContactHeight(terrain, enemyX, TANK.WIDTH);
     const playerY = terrainHeightToCanvasY(terrain, playerTerrainHeight);
     const enemyY = terrainHeightToCanvasY(terrain, enemyTerrainHeight);
 
@@ -998,7 +998,7 @@ export function placeTanksOnTerrain(terrain) {
  * @returns {boolean} True if the tank started falling, false if already on terrain
  */
 export function updateTankTerrainPosition(tank, terrain) {
-    const terrainHeight = getTerrainGridContactHeight(terrain, tank.x, TANK.WIDTH);
+    const terrainHeight = getTerrainGridStableContactHeight(terrain, tank.x, TANK.WIDTH);
     const targetY = terrainHeightToCanvasY(terrain, terrainHeight);
 
     // If tank is already falling, don't restart the fall

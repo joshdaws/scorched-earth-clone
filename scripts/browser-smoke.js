@@ -48,7 +48,7 @@ function parseArgs(argv) {
 
 function usage() {
     console.log(`Usage:
-  npm run smoke:browser -- [--scenario impact|projectile|idle|visual|controls|terrain|high-scores] [--scene physics-sandbox&wind=0] [--quality balanced] [--headed]
+  npm run smoke:browser -- [--scenario impact|projectile|idle|visual|controls|terrain|tank-support|high-scores] [--scene physics-sandbox&wind=0] [--quality balanced] [--headed]
 
 Examples:
   npm run smoke:browser
@@ -57,6 +57,7 @@ Examples:
   npm run smoke:browser -- --scenario projectile --max-dropped-backlog-ms 80
   npm run smoke:browser -- --scenario controls
   npm run smoke:browser -- --scenario terrain
+  npm run smoke:browser -- --scenario tank-support
   npm run smoke:browser -- --scenario high-scores
 
 If Chromium is missing after a clean checkout, run:
@@ -167,6 +168,11 @@ async function runScenario(page, { scenario, quality }) {
         return;
     }
 
+    if (scenario === 'tank-support') {
+        await runTankSupportScenario(page, quality);
+        return;
+    }
+
     if (scenario === 'high-scores') {
         await runHighScoresScenario(page, quality);
         return;
@@ -191,6 +197,43 @@ async function runScenario(page, { scenario, quality }) {
 
 async function getControlState(page) {
     return page.evaluate(() => window.TestAPI.getControlState());
+}
+
+function assertTankSupport(condition, message) {
+    if (!condition) {
+        throw new Error(`[tank-support] ${message}`);
+    }
+}
+
+async function runTankSupportScenario(page, quality) {
+    await page.evaluate(({ selectedQuality }) => {
+        window.TestAPI.setRenderQuality(selectedQuality);
+        window.TestAPI.resetPerformance();
+    }, { selectedQuality: quality });
+
+    const exercise = await page.evaluate(() => window.TestAPI.exerciseTankSupportPhysics());
+    assertTankSupport(exercise.success, exercise.error || 'exerciseTankSupportPhysics failed');
+    assertTankSupport(exercise.startedFalling, 'tank should start falling when supported only by narrow pillars');
+    assertTankSupport(exercise.after.isFalling, 'tank should be in falling state immediately after support check');
+    assertTankSupport(
+        exercise.after.targetY > exercise.before.y + 20,
+        `targetY should be below starting y, got start=${exercise.before.y} target=${exercise.after.targetY}`
+    );
+
+    await page.waitForFunction(
+        expectedY => {
+            const player = window.TestAPI.getTankPositions().player;
+            return player && !player.isFalling && Math.abs(player.y - expectedY) <= 1.5;
+        },
+        exercise.after.targetY,
+        { timeout: 6000 }
+    );
+
+    const finalState = await page.evaluate(() => window.TestAPI.getTankPositions().player);
+    assertTankSupport(
+        finalState.y > exercise.before.y + 20,
+        `tank should settle lower than unsupported starting point, got start=${exercise.before.y} final=${finalState.y}`
+    );
 }
 
 async function designToClient(page, point) {
