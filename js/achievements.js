@@ -627,7 +627,7 @@ export function getAchievement(id) {
  * @returns {Achievement[]} Array of achievements in that category
  */
 export function getAchievementsByCategory(category) {
-    return achievementsByCategory[category] || [];
+    return achievementsByCategory[category] ? [...achievementsByCategory[category]] : [];
 }
 
 /**
@@ -913,7 +913,9 @@ export function saveAchievementState() {
 export function getAchievementState() {
     return {
         unlocked: [...achievementState.unlocked],
-        progress: { ...achievementState.progress },
+        progress: Object.fromEntries(
+            Object.entries(achievementState.progress).map(([id, progress]) => [id, { ...progress }])
+        ),
         unlockDates: { ...achievementState.unlockDates },
         viewed: [...achievementState.viewed]
     };
