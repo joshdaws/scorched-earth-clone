@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { calculateFixedUpdatePlan } from '../../js/game.js';
+import {
+  calculateFixedUpdatePlan,
+  calculateRenderInterpolationAlpha
+} from '../../js/game.js';
 
 describe('game loop fixed update planning', () => {
   it('keeps sub-frame accumulated time for interpolation', () => {
@@ -28,5 +31,12 @@ describe('game loop fixed update planning', () => {
     expect(plan.steps).toBe(2);
     expect(plan.remainingTime).toBe(0);
     expect(plan.droppedTime).toBe(60);
+  });
+
+  it('calculates render interpolation alpha from the remaining fixed time', () => {
+    expect(calculateRenderInterpolationAlpha(8, 16)).toBe(0.5);
+    expect(calculateRenderInterpolationAlpha(-4, 16)).toBe(0);
+    expect(calculateRenderInterpolationAlpha(24, 16)).toBe(1);
+    expect(calculateRenderInterpolationAlpha(8, 0)).toBe(0);
   });
 });

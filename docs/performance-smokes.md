@@ -35,6 +35,7 @@ The smoke runner starts Vite on a local port, waits for `window.TestAPI` or visu
 ```bash
 npm run smoke:browser -- --scenario visual --scene visual-impact
 npm run smoke:browser -- --scenario projectile --quality low
+npm run smoke:browser -- --scenario projectile --quality balanced --max-dropped-backlog-ms 80
 npm run smoke:browser -- --scenario idle --quality balanced
 ```
 
@@ -66,6 +67,8 @@ npm run perf:budget -- --input metrics.json --scene gameplay
 - `projectile-flight`: load the physics sandbox, call `TestAPI.aim({ angle: 42, power: 70 })`, then `TestAPI.fireDirect()`, and sample until the shot resolves.
 - `terrain-impact`: load the physics sandbox, call `TestAPI.destroyTerrain({ x: 620, y: 500, radius: 90 })`, and sample through the de-rez fade.
 
+The projectile smoke can also fail when fixed-step catch-up exceeds a threshold by passing `--max-dropped-backlog-ms`. Use that on shot-smoothness work so the screenshot and metrics prove the fired shot did not visibly sprint after a frame hitch.
+
 The Pixi terrain de-rez pass is quality-gated. Low quality disables the filter sweep; balanced and high add a capped Pixi `NoiseFilter` sweep layer over the removed TerrainCellGrid cells. Watch `pixiDerezSweeps`, `pixiFragments`, `pixiTerrainRebuild`, and `pixiTerrainRender` together when tuning this effect for iOS.
 
 Current local Pixi terrain profile results and iOS pass/fail thresholds are recorded in [pixi-terrain-mobile-profile.md](pixi-terrain-mobile-profile.md).
@@ -91,4 +94,4 @@ The budget script imports `DEFAULT_PERFORMANCE_BUDGETS` from `js/performanceMetr
 npm run perf:budget -- --input metrics.json --scene impact --budget frameP95Ms=28 --budget pixiTerrainRebuildP95Ms=24
 ```
 
-The metrics snapshot includes rolling p95/max frame interval, update durations, dropped fixed-step backlog, terrain impact time, Pixi terrain rebuild/render time, active particle counts, Pixi de-rez fragments, and browser memory when available.
+The metrics snapshot includes rolling p95/max frame interval, update durations, dropped fixed-step backlog, loop interpolation gauges, terrain impact time, Pixi terrain rebuild/render time, active particle counts, Pixi de-rez fragments, and browser memory when available.

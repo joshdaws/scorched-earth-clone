@@ -4143,7 +4143,10 @@ function clearPersistentTrails() {
 function renderProjectile(ctx, projectile) {
     if (!projectile || !projectile.isActive()) return;
 
-    const { x, y } = projectile.getPosition();
+    const interpolationAlpha = Game.getRenderInterpolationAlpha();
+    const { x, y } = typeof projectile.getRenderPosition === 'function'
+        ? projectile.getRenderPosition(interpolationAlpha)
+        : projectile.getPosition();
     const radius = PROJECTILE_VISUAL.DIAMETER / 2;
 
     // Get projectile color - check projectile override first (for Fireworks), then weapon, then default

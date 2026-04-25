@@ -22,7 +22,8 @@ function parseArgs(argv) {
         quality: DEFAULT_QUALITY,
         outDir: DEFAULT_OUT_DIR,
         headed: false,
-        timeoutMs: 20000
+        timeoutMs: 20000,
+        maxDroppedBacklogMs: null
     };
 
     for (let index = 0; index < argv.length; index++) {
@@ -34,12 +35,14 @@ function parseArgs(argv) {
         else if (arg === '--quality' && argv[index + 1]) args.quality = argv[++index];
         else if (arg === '--out-dir' && argv[index + 1]) args.outDir = argv[++index];
         else if (arg === '--timeout-ms' && argv[index + 1]) args.timeoutMs = Number(argv[++index]);
+        else if (arg === '--max-dropped-backlog-ms' && argv[index + 1]) args.maxDroppedBacklogMs = Number(argv[++index]);
         else if (arg === '--headed') args.headed = true;
         else if (arg === '--help' || arg === '-h') args.help = true;
     }
 
     if (!Number.isFinite(args.port)) args.port = DEFAULT_PORT;
     if (!Number.isFinite(args.timeoutMs)) args.timeoutMs = 20000;
+    if (!Number.isFinite(args.maxDroppedBacklogMs)) args.maxDroppedBacklogMs = null;
     return args;
 }
 
@@ -51,6 +54,7 @@ Examples:
   npm run smoke:browser
   npm run smoke:browser -- --scenario visual --scene visual-impact
   npm run smoke:browser -- --scenario projectile --quality low
+  npm run smoke:browser -- --scenario projectile --max-dropped-backlog-ms 80
 
 If Chromium is missing after a clean checkout, run:
   npm run smoke:browser:install
@@ -167,6 +171,23 @@ async function runScenario(page, { scenario, quality }) {
     });
 }
 
+function assertSmokeBudgets(metrics, args) {
+    if (args.maxDroppedBacklogMs === null) {
+        return [];
+    }
+
+    const maxDroppedBacklog = metrics?.droppedBacklog?.maxMs;
+    if (!Number.isFinite(maxDroppedBacklog)) {
+        return ['dropped backlog metrics were not reported'];
+    }
+    if (maxDroppedBacklog > args.maxDroppedBacklogMs) {
+        return [
+            `dropped backlog max ${maxDroppedBacklog.toFixed(2)}ms exceeded ${args.maxDroppedBacklogMs.toFixed(2)}ms`
+        ];
+    }
+    return [];
+}
+
 async function main() {
     const args = parseArgs(process.argv.slice(2));
     if (args.help) {
@@ -222,7 +243,8 @@ async function main() {
             scenario: args.scenario,
             quality: args.quality,
             environment,
-            metrics: metricsResult?.metrics ?? null
+            metrics: metricsResult?.metrics ?? null,
+            loopTiming: metricsResult?.loopTiming ?? null
         });
         await writeJson(`${basePath}.console.json`, {
             console: consoleMessages,
@@ -230,8 +252,12 @@ async function main() {
         });
 
         const consoleErrors = consoleMessages.filter(message => message.type === 'error');
-        if (consoleErrors.length > 0 || pageErrors.length > 0) {
-            console.error(`[browser-smoke] Failed: ${consoleErrors.length} console errors, ${pageErrors.length} page errors`);
+        const budgetFailures = assertSmokeBudgets(metricsResult?.metrics, args);
+        if (consoleErrors.length > 0 || pageErrors.length > 0 || budgetFailures.length > 0) {
+            console.error(`[browser-smoke] Failed: ${consoleErrors.length} console errors, ${pageErrors.length} page errors, ${budgetFailures.length} budget failures`);
+            for (const failure of budgetFailures) {
+                console.error(`[browser-smoke] Budget: ${failure}`);
+            }
             process.exitCode = 1;
         } else {
             console.log(`[browser-smoke] Passed ${args.scenario} at ${url}`);

@@ -56,6 +56,18 @@ export class Projectile {
         this.y = y;
 
         /**
+         * Previous X position for fixed-step render interpolation.
+         * @type {number}
+         */
+        this.previousX = x;
+
+        /**
+         * Previous Y position for fixed-step render interpolation.
+         * @type {number}
+         */
+        this.previousY = y;
+
+        /**
          * Current horizontal velocity (pixels per frame).
          * Positive = moving right, negative = moving left.
          * @type {number}
@@ -376,6 +388,8 @@ export class Projectile {
     update(wind = 0) {
         if (!this.active) return;
 
+        this.capturePreviousPosition();
+
         // Store previous vertical velocity for apex detection
         // Apex occurs when vy transitions from negative (going up) to positive (going down)
         this.prevVy = this.vy;
@@ -493,6 +507,27 @@ export class Projectile {
      */
     getPosition() {
         return { x: this.x, y: this.y };
+    }
+
+    /**
+     * Capture the current physics position before the next fixed update mutates it.
+     */
+    capturePreviousPosition() {
+        this.previousX = this.x;
+        this.previousY = this.y;
+    }
+
+    /**
+     * Get an interpolated render position between the previous and current physics positions.
+     * @param {number} [alpha=1] Fixed-step render interpolation alpha from 0 to 1
+     * @returns {{x: number, y: number}} Interpolated render position
+     */
+    getRenderPosition(alpha = 1) {
+        const t = Number.isFinite(alpha) ? Math.max(0, Math.min(1, alpha)) : 1;
+        return {
+            x: this.previousX + (this.x - this.previousX) * t,
+            y: this.previousY + (this.y - this.previousY) * t
+        };
     }
 
     /**
@@ -631,6 +666,7 @@ export class Projectile {
     startRolling(terrainY) {
         this.isRolling = true;
         this.rollStartTime = performance.now();
+        this.capturePreviousPosition();
 
         // Set roll direction based on horizontal velocity at impact
         // If vx is very small, default to rolling right
@@ -740,6 +776,8 @@ export class Projectile {
         if (absVelocity < minRollSpeed && heightDiff > valleyThreshold) {
             return { explode: true, reason: 'valley' };
         }
+
+        this.capturePreviousPosition();
 
         // Update horizontal position
         this.x += this.rollVelocity;
@@ -876,6 +914,7 @@ export class Projectile {
         const tunnelRadius = weapon?.tunnelRadius || 10;
 
         // Move in digging direction
+        this.capturePreviousPosition();
         const prevX = this.x;
         const prevY = this.y;
 
@@ -1002,6 +1041,7 @@ export class Projectile {
      */
     bounce(terrainSurfaceY, slopeAngle = 0) {
         this.bouncesRemaining--;
+        this.capturePreviousPosition();
 
         // Position above terrain
         this.y = terrainSurfaceY - 2;
@@ -1061,6 +1101,7 @@ export class Projectile {
         this.isDeployed = true;
         this.deployStartTime = performance.now();
         this.deployPosition = { x, y };
+        this.capturePreviousPosition();
         this.x = x;
         this.y = y;
 

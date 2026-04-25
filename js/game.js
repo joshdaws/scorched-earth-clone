@@ -42,6 +42,12 @@ const MAX_ACCUMULATED_TIME = TIMING.FRAME_DURATION * 5;
 /** @type {number} Maximum fixed physics updates before forcing a render */
 const MAX_FIXED_UPDATES_PER_FRAME = 2;
 
+/** @type {{steps: number, remainingTime: number, droppedTime: number}} Last fixed update plan */
+let lastFixedUpdatePlan = { steps: 0, remainingTime: 0, droppedTime: 0 };
+
+/** @type {number} Current fixed-step render interpolation alpha */
+let lastRenderInterpolationAlpha = 0;
+
 // FPS tracking for debug mode
 let frameCount = 0;
 let lastFpsUpdate = 0;
@@ -90,6 +96,42 @@ export function calculateFixedUpdatePlan(
         steps,
         remainingTime,
         droppedTime
+    };
+}
+
+/**
+ * Calculate render interpolation alpha from leftover fixed timestep time.
+ *
+ * @param {number} remainingTime
+ * @param {number} [fixedTimestep]
+ * @returns {number} Clamped alpha from 0 to 1
+ */
+export function calculateRenderInterpolationAlpha(remainingTime, fixedTimestep = FIXED_TIMESTEP) {
+    if (!Number.isFinite(remainingTime) || !Number.isFinite(fixedTimestep) || fixedTimestep <= 0) {
+        return 0;
+    }
+    return Math.max(0, Math.min(1, remainingTime / fixedTimestep));
+}
+
+/**
+ * Get current render interpolation alpha.
+ * @returns {number}
+ */
+export function getRenderInterpolationAlpha() {
+    return lastRenderInterpolationAlpha;
+}
+
+/**
+ * Get lightweight loop timing diagnostics for debug/test hooks.
+ * @returns {{fixedTimestep: number, maxFixedUpdatesPerFrame: number, accumulator: number, interpolationAlpha: number, lastUpdatePlan: {steps: number, remainingTime: number, droppedTime: number}}}
+ */
+export function getLoopTimingSnapshot() {
+    return {
+        fixedTimestep: FIXED_TIMESTEP,
+        maxFixedUpdatesPerFrame: MAX_FIXED_UPDATES_PER_FRAME,
+        accumulator,
+        interpolationAlpha: lastRenderInterpolationAlpha,
+        lastUpdatePlan: { ...lastFixedUpdatePlan }
     };
 }
 
@@ -437,6 +479,8 @@ export function startLoop(updateFn, renderFn, ctx) {
     lastFpsUpdate = performance.now();
     frameCount = 0;
     accumulator = 0;
+    lastFixedUpdatePlan = { steps: 0, remainingTime: 0, droppedTime: 0 };
+    lastRenderInterpolationAlpha = 0;
 
     function loop(currentTime) {
         if (!isRunning) return;
@@ -449,16 +493,16 @@ export function startLoop(updateFn, renderFn, ctx) {
 
             // Still render the current state (pause menu overlay)
             if (renderFn) {
-                renderFn(ctx);
+                renderFn(ctx, lastRenderInterpolationAlpha);
             }
             const handlers = getHandlers(currentState);
             if (handlers.render) {
-                handlers.render(ctx);
+                handlers.render(ctx, lastRenderInterpolationAlpha);
             }
 
             // Call post-render callback for overlays (even when paused)
             if (postRenderCallback) {
-                postRenderCallback(ctx);
+                postRenderCallback(ctx, lastRenderInterpolationAlpha);
             }
 
             requestAnimationFrame(loop);
@@ -506,26 +550,24 @@ export function startLoop(updateFn, renderFn, ctx) {
             recordGameUpdate(performance.now() - updateStart);
         }
         accumulator = updatePlan.remainingTime;
-
-        // Calculate interpolation alpha for smooth rendering (0-1)
-        // Can be passed to render functions for smoother animation
-        // const alpha = accumulator / FIXED_TIMESTEP;
+        lastFixedUpdatePlan = { ...updatePlan };
+        lastRenderInterpolationAlpha = calculateRenderInterpolationAlpha(accumulator);
 
         // Render frame
         // First call global render (clears screen, draws background)
         // Then call state-specific render
         const renderStart = performance.now();
         if (renderFn) {
-            renderFn(ctx);
+            renderFn(ctx, lastRenderInterpolationAlpha);
         }
         const handlers = getHandlers(currentState);
         if (handlers.render) {
-            handlers.render(ctx);
+            handlers.render(ctx, lastRenderInterpolationAlpha);
         }
 
         // Call post-render callback for overlays
         if (postRenderCallback) {
-            postRenderCallback(ctx);
+            postRenderCallback(ctx, lastRenderInterpolationAlpha);
         }
         recordMeasure('frameRender', performance.now() - renderStart);
 
@@ -544,6 +586,8 @@ export function stopLoop() {
     isRunning = false;
     isPaused = false;
     accumulator = 0;
+    lastFixedUpdatePlan = { steps: 0, remainingTime: 0, droppedTime: 0 };
+    lastRenderInterpolationAlpha = 0;
     console.log('Game loop stopped');
 }
 

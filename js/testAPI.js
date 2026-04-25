@@ -31,6 +31,7 @@ import {
     getPerformanceSnapshot,
     resetPerformanceMetrics
 } from './performanceMetrics.js';
+import { getLoopTimingSnapshot } from './game.js';
 
 // =============================================================================
 // MODULE STATE
@@ -1390,6 +1391,7 @@ export function setRenderQuality(id) {
  */
 export function getPerformanceMetrics() {
     const pixiFragments = getDerezFragmentCountRef ? getDerezFragmentCountRef() : 0;
+    const loopTiming = getLoopTimingSnapshot();
 
     return {
         success: true,
@@ -1397,10 +1399,17 @@ export function getPerformanceMetrics() {
             particles: getParticleCount(),
             terrainDerezEffects: getTerrainDerezEffectCount(),
             pixiFragments,
+            'loop.fixedTimestep': loopTiming.fixedTimestep,
+            'loop.maxFixedUpdatesPerFrame': loopTiming.maxFixedUpdatesPerFrame,
+            'loop.accumulator': loopTiming.accumulator,
+            'loop.interpolationAlpha': loopTiming.interpolationAlpha,
+            'loop.lastFixedSteps': loopTiming.lastUpdatePlan.steps,
+            'loop.lastDroppedTime': loopTiming.lastUpdatePlan.droppedTime,
             ...Object.fromEntries(
                 Object.entries(getPixiTerrainCacheStats()).map(([key, value]) => [`pixiTerrain.${key}`, value])
             )
-        })
+        }),
+        loopTiming
     };
 }
 
