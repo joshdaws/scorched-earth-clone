@@ -48,7 +48,7 @@ function parseArgs(argv) {
 
 function usage() {
     console.log(`Usage:
-  npm run smoke:browser -- [--scenario impact|projectile|idle|visual|controls] [--scene physics-sandbox&wind=0] [--quality balanced] [--headed]
+  npm run smoke:browser -- [--scenario impact|projectile|idle|visual|controls|terrain] [--scene physics-sandbox&wind=0] [--quality balanced] [--headed]
 
 Examples:
   npm run smoke:browser
@@ -56,6 +56,7 @@ Examples:
   npm run smoke:browser -- --scenario projectile --quality low
   npm run smoke:browser -- --scenario projectile --max-dropped-backlog-ms 80
   npm run smoke:browser -- --scenario controls
+  npm run smoke:browser -- --scenario terrain
 
 If Chromium is missing after a clean checkout, run:
   npm run smoke:browser:install
@@ -157,6 +158,11 @@ async function runScenario(page, { scenario, quality }) {
 
     if (scenario === 'controls') {
         await runControlsScenario(page, quality);
+        return;
+    }
+
+    if (scenario === 'terrain') {
+        await runTerrainScenario(page, quality);
         return;
     }
 
@@ -407,6 +413,113 @@ async function runControlsScenario(page, quality) {
     await page.waitForTimeout(250);
     controls = await getControlState(page);
     assertControl(!controls.state.canFire, 'releasing the active slingshot drag should fire and disable firing');
+}
+
+function assertTerrain(condition, message) {
+    if (!condition) {
+        throw new Error(`[terrain] ${message}`);
+    }
+}
+
+async function sampleTerrain(page, sampleXs) {
+    return page.evaluate(xs => xs.map(x => window.TestAPI.getTerrainAt(x)), sampleXs);
+}
+
+function heightList(samples) {
+    return samples.map(sample => Math.round(sample.height));
+}
+
+async function runTerrainScenario(page, quality) {
+    await page.evaluate(({ selectedQuality }) => {
+        window.TestAPI.setRenderQuality(selectedQuality);
+        window.TestAPI.resetPerformance();
+    }, { selectedQuality: quality });
+
+    const sampleXs = [0, 80, 160, 300, 450, 600, 750, 900, 1040, 1199];
+
+    const first = await page.evaluate(() => window.TestAPI.generateTerrain({ seed: 24680, roughness: 0.52 }));
+    const firstSamples = await sampleTerrain(page, sampleXs);
+    assertTerrain(first.success, 'seeded terrain generation should succeed');
+    assertTerrain(first.width === 1200, `terrain width should be 1200, got ${first.width}`);
+    assertTerrain(first.minHeight >= 0, `terrain min height should be in bounds, got ${first.minHeight}`);
+    assertTerrain(first.maxHeight <= first.height, `terrain max height should fit screen, got ${first.maxHeight}`);
+    assertTerrain(first.maxHeight - first.minHeight > 24, 'terrain should have visible height variation');
+    assertTerrain(firstSamples.every(sample => sample.success && sample.canvasY >= 0 && sample.canvasY <= first.height), 'sampled terrain should stay within canvas bounds');
+
+    await page.evaluate(() => window.TestAPI.generateTerrain({ seed: 24680, roughness: 0.52 }));
+    const repeatedSamples = await sampleTerrain(page, sampleXs);
+    assertTerrain(
+        JSON.stringify(heightList(firstSamples)) === JSON.stringify(heightList(repeatedSamples)),
+        'same terrain seed should reproduce sampled heights'
+    );
+
+    await page.evaluate(() => window.TestAPI.generateTerrain({ seed: 24681, roughness: 0.52 }));
+    const variedSamples = await sampleTerrain(page, sampleXs);
+    assertTerrain(
+        JSON.stringify(heightList(firstSamples)) !== JSON.stringify(heightList(variedSamples)),
+        'different terrain seed should vary sampled heights'
+    );
+
+    await page.evaluate(() => window.TestAPI.generateTerrain({ seed: 24680, roughness: 0.52 }));
+    await page.evaluate(() => window.TestAPI.setTankPositions({ player: 600, enemy: 900 }));
+    await page.waitForTimeout(150);
+
+    const beforeImpact = await page.evaluate(() => ({
+        center: window.TestAPI.getTerrainAt(600),
+        left: window.TestAPI.getTerrainAt(560),
+        right: window.TestAPI.getTerrainAt(640),
+        outside: window.TestAPI.getTerrainAt(720),
+        tank: window.TestAPI.getTankPositions().player
+    }));
+    assertTerrain(Math.abs(beforeImpact.tank.y - beforeImpact.center.canvasY) < 2, 'tank should sit on terrain after placement');
+
+    const firstDestroy = await page.evaluate(y => window.TestAPI.destroyTerrain({ x: 600, y: y + 22, radius: 64 }), beforeImpact.center.canvasY);
+    await page.waitForTimeout(350);
+    const afterImpact = await page.evaluate(() => ({
+        center: window.TestAPI.getTerrainAt(600),
+        left: window.TestAPI.getTerrainAt(560),
+        right: window.TestAPI.getTerrainAt(640),
+        outside: window.TestAPI.getTerrainAt(720)
+    }));
+    assertTerrain(firstDestroy.success && firstDestroy.destroyed, 'first terrain destruction should carve terrain');
+    assertTerrain(afterImpact.center.height < beforeImpact.center.height, 'blast center terrain height should decrease');
+    assertTerrain(afterImpact.left.height <= beforeImpact.left.height, 'left crater shoulder should not grow');
+    assertTerrain(afterImpact.right.height <= beforeImpact.right.height, 'right crater shoulder should not grow');
+    assertTerrain(afterImpact.outside.height <= beforeImpact.outside.height + 32, 'terrain outside blast should not regenerate upward');
+
+    const secondDestroy = await page.evaluate(y => window.TestAPI.destroyTerrain({ x: 600, y: y + 18, radius: 46 }), afterImpact.center.canvasY);
+    await page.waitForTimeout(250);
+    const afterSecondImpact = await page.evaluate(() => window.TestAPI.getTerrainAt(600));
+    assertTerrain(secondDestroy.success, 'second terrain destruction should return a valid result');
+    assertTerrain(afterSecondImpact.height <= afterImpact.center.height, 'multiple explosions should accumulate or preserve crater depth');
+
+    const simulation = await page.evaluate(() => {
+        const candidates = [
+            { angle: 24, power: 42 },
+            { angle: 32, power: 48 },
+            { angle: 45, power: 50 },
+            { angle: 58, power: 55 },
+            { angle: 72, power: 46 }
+        ];
+        let lastResult = null;
+        for (const candidate of candidates) {
+            lastResult = window.TestAPI.simulateProjectile({
+                ...candidate,
+                wind: 0,
+                maxSteps: 700
+            });
+            if (lastResult.terrainHit) {
+                return lastResult;
+            }
+        }
+        return lastResult;
+    });
+    assertTerrain(simulation.success, 'projectile simulation should succeed');
+    assertTerrain(simulation.terrainHit, 'projectile simulation should hit terrain');
+    const landingTerrain = await page.evaluate(x => window.TestAPI.getTerrainAt(x), simulation.landingX);
+    assertTerrain(Math.abs(landingTerrain.canvasY - simulation.landingY) <= 10, 'projectile collision point should match terrain surface');
+
+    await page.waitForTimeout(500);
 }
 
 function assertSmokeBudgets(metrics, args) {
