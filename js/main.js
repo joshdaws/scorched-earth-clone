@@ -90,6 +90,7 @@ import {
     rebuildTerrainCellGrid
 } from './terrainCells.js';
 import {
+    getPixiTerrainFragmentCount,
     initPixiTerrainLayer,
     markPixiTerrainLayerDirty,
     renderPixiTerrainLayerToCanvas
@@ -7271,6 +7272,8 @@ async function init() {
         getEnemyTank: () => enemyTank,
         getTerrain: () => currentTerrain,
         fireProjectile: fireProjectile,
+        destroyTerrainAt,
+        getDerezFragmentCount: getPixiTerrainFragmentCount,
         playerAim: playerAim
     });
 

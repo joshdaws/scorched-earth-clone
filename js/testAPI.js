@@ -38,6 +38,12 @@ let terrain = null;
 /** @type {Function|null} Reference to fire projectile function from main.js */
 let fireProjectileRef = null;
 
+/** @type {Function|null} Reference to terrain destruction function from main.js */
+let destroyTerrainAtRef = null;
+
+/** @type {Function|null} Reference to active Pixi terrain fragment counter */
+let getDerezFragmentCountRef = null;
+
 /** @type {Object|null} Reference to player aim state from main.js */
 let playerAimRef = null;
 
@@ -57,6 +63,8 @@ let onTerrainChangeCallback = null;
  * @param {() => import('./tank.js').Tank|null} refs.getEnemyTank - Function returning enemy tank
  * @param {() => import('./terrain.js').Terrain|null} refs.getTerrain - Function returning terrain
  * @param {Function} refs.fireProjectile - Function to fire projectile
+ * @param {Function} [refs.destroyTerrainAt] - Function to destroy terrain directly
+ * @param {Function} [refs.getDerezFragmentCount] - Function returning active de-rez fragment count
  * @param {{angle: number, power: number}} refs.playerAim - Reference to player aim state
  */
 export function init(refs) {
@@ -83,6 +91,8 @@ export function init(refs) {
         });
     }
     fireProjectileRef = refs.fireProjectile || null;
+    destroyTerrainAtRef = refs.destroyTerrainAt || null;
+    getDerezFragmentCountRef = refs.getDerezFragmentCount || null;
     playerAimRef = refs.playerAim || null;
 
     console.log('[TestAPI] Initialized');
@@ -834,6 +844,51 @@ export function getTerrainAt(x) {
 }
 
 /**
+ * Destroy terrain directly for deterministic visual/effects tests.
+ *
+ * @param {Object} options
+ * @param {number} options.x
+ * @param {number} options.y
+ * @param {number} options.radius
+ * @returns {{success: boolean, destroyed?: boolean, fragments?: number, error?: string}}
+ */
+export function destroyTerrain(options = {}) {
+    if (!destroyTerrainAtRef) {
+        console.warn('[TestAPI] destroyTerrain: destroyTerrainAt function not set');
+        return { success: false, error: 'Destroy terrain function not initialized' };
+    }
+
+    const { x, y, radius } = options;
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(radius)) {
+        return { success: false, error: 'x, y, and radius are required numbers' };
+    }
+
+    const destroyed = destroyTerrainAtRef(x, y, radius);
+    const fragments = getDerezFragmentCountRef ? getDerezFragmentCountRef() : undefined;
+    return {
+        success: true,
+        destroyed,
+        fragments
+    };
+}
+
+/**
+ * Get active Pixi terrain de-rez fragment count.
+ *
+ * @returns {{success: boolean, fragments?: number, error?: string}}
+ */
+export function getDerezFragmentCount() {
+    if (!getDerezFragmentCountRef) {
+        return { success: false, error: 'De-rez fragment counter not initialized' };
+    }
+
+    return {
+        success: true,
+        fragments: getDerezFragmentCountRef()
+    };
+}
+
+/**
  * Set tank positions on the terrain.
  * Tanks are automatically positioned at the correct Y coordinate based on terrain height.
  *
@@ -1300,6 +1355,8 @@ const TestAPI = {
     // Terrain and tank manipulation
     generateTerrain,
     getTerrainAt,
+    destroyTerrain,
+    getDerezFragmentCount,
     setTankPositions,
     getTankPositions,
     // Snapshot testing

@@ -8,10 +8,9 @@ const BODY_ALT_COLOR = 0x0b1435;
 const CYAN = 0x05d9e8;
 const PINK = 0xff2a6d;
 const PURPLE = 0xb967ff;
-const YELLOW = 0xf8ff4a;
-const MAX_FRAGMENTS = 1400;
-const MAX_SPAWN_CELLS = 520;
-const DEFAULT_FRAGMENT_LIFETIME_MS = 1250;
+const MAX_FRAGMENTS = 520;
+const MAX_SPAWN_CELLS = 220;
+const DEFAULT_FRAGMENT_LIFETIME_MS = 560;
 const SURFACE_GLOW_ROWS = 9;
 
 let app = null;
@@ -111,6 +110,93 @@ function getGridColor(depthRows) {
 function getGridAlpha(depthRows) {
     const surfaceGlow = Math.max(0, 1 - depthRows / SURFACE_GLOW_ROWS);
     return clamp(0.1 + surfaceGlow * 0.38, 0.08, 0.5);
+}
+
+function getCellCoordinate(cell, axis, size) {
+    const centerValue = cell?.[axis];
+    if (Number.isFinite(centerValue)) return centerValue;
+
+    const topLeftValue = axis === 'x' ? cell?.topLeftX : cell?.topLeftY;
+    if (Number.isFinite(topLeftValue)) return topLeftValue + size * 0.5;
+    return 0;
+}
+
+function getCellDepthRows(cell, size) {
+    if (Number.isFinite(cell?.depth)) {
+        return Math.max(0, Math.floor(cell.depth / size));
+    }
+    if (Number.isFinite(cell?.surfaceY) && Number.isFinite(cell?.topLeftY)) {
+        return Math.max(0, Math.floor((cell.topLeftY - cell.surfaceY) / size));
+    }
+    return 0;
+}
+
+function getCellDebrisTint(cell, size) {
+    const x = getCellCoordinate(cell, 'x', size);
+    const y = getCellCoordinate(cell, 'y', size);
+    const col = Number.isFinite(cell?.col) ? cell.col : Math.floor(x / size);
+    const row = Number.isFinite(cell?.row) ? cell.row : Math.floor(y / size);
+    const depthRows = getCellDepthRows(cell, size);
+    const bodyColor = getBodyColor(depthRows, col, row);
+    const gridColor = getGridColor(depthRows);
+    const glowMix = depthRows <= 2 ? 1 : 0.82;
+    return mixColor(bodyColor, gridColor, glowMix);
+}
+
+export function getPixiTerrainDebrisLimits() {
+    return {
+        maxFragments: MAX_FRAGMENTS,
+        maxSpawnCells: MAX_SPAWN_CELLS
+    };
+}
+
+export function selectTerrainDebrisCells(cells, maxCells = MAX_SPAWN_CELLS) {
+    if (!Array.isArray(cells) || cells.length === 0) return [];
+
+    const limit = Math.max(1, Math.floor(maxCells));
+    const stride = Math.max(1, Math.ceil(cells.length / limit));
+    return cells.filter((_, index) => index % stride === 0).slice(0, limit);
+}
+
+export function buildTerrainCellDebrisSpec({ x, y, radius, cell, index = 0 }) {
+    const size = Math.max(3, cell?.size ?? getTerrainCellSize());
+    const startX = Math.round(getCellCoordinate(cell, 'x', size));
+    const startY = Math.round(getCellCoordinate(cell, 'y', size));
+    const seed = startX * 0.91 + startY * 1.37 + radius * 0.53 + index * 6.13;
+    const distance = cell?.distance ?? Math.hypot(startX - x, startY - y);
+    const distanceFactor = clamp(distance / Math.max(1, radius), 0, 1);
+    const angleJitter = (hash01(seed) - 0.5) * 0.38;
+    const fallbackAngle = hash01(seed + 8.9) * Math.PI * 2;
+    const blastAngle = distance > 0.1 ? Math.atan2(startY - y, startX - x) : fallbackAngle;
+    const angle = blastAngle + angleJitter;
+    const displacement = clamp(
+        radius * (0.28 + (1 - distanceFactor) * 0.42) + hash01(seed + 2.4) * 7,
+        size * 1.5,
+        radius * 0.85
+    );
+    const lift = Math.max(0, (1 - distanceFactor) * radius * 0.12);
+
+    return {
+        startX,
+        startY,
+        targetX: Math.round(startX + Math.cos(angle) * displacement),
+        targetY: Math.round(startY + Math.sin(angle) * displacement - lift),
+        size,
+        tint: getCellDebrisTint(cell, size),
+        age: 0,
+        delay: distanceFactor * 12 + hash01(seed + 4.1) * 8,
+        lifetime: DEFAULT_FRAGMENT_LIFETIME_MS + hash01(seed + 5.8) * 120,
+        phase: hash01(seed + 7.2) * Math.PI * 2
+    };
+}
+
+function syncParticleChildren() {
+    if (!particleContainer) return;
+    particleContainer.particleChildren.length = 0;
+    for (const fragment of activeFragments) {
+        particleContainer.particleChildren.push(fragment.particle);
+    }
+    particleContainer.update();
 }
 
 function rebuildTerrainGraphics(terrain) {
@@ -254,59 +340,34 @@ export function markPixiTerrainLayerDirty() {
 export function spawnPixiTerrainDerezEffect({ x, y, radius, cells }) {
     if (!ensureReady() || !Array.isArray(cells) || cells.length === 0) return false;
 
-    const stride = Math.max(1, Math.ceil(cells.length / MAX_SPAWN_CELLS));
-    const selectedCells = cells.filter((_, index) => index % stride === 0);
-    const newParticles = [];
+    const selectedCells = selectTerrainDebrisCells(cells);
 
     for (let index = 0; index < selectedCells.length; index++) {
         const cell = selectedCells[index];
-        const seed = cell.x * 0.91 + cell.y * 1.37 + radius * 0.53 + index * 6.13;
-        const angle = Math.atan2(cell.y - y, cell.x - x) + (hash01(seed) - 0.5) * 1.25;
-        const speed = 6 + hash01(seed + 1.7) * 16;
-        const lift = -10 - hash01(seed + 2.4) * 18;
-        const distanceFactor = clamp((cell.distance ?? Math.hypot(cell.x - x, cell.y - y)) / Math.max(1, radius), 0, 1);
-        const size = Math.max(3, cell.size ?? getTerrainCellSize());
-        const tint = [PINK, CYAN, PURPLE, YELLOW][index % 4];
+        const spec = buildTerrainCellDebrisSpec({ x, y, radius, cell, index });
         const particle = new Pixi.Particle({
             texture: particleTexture,
-            x: Math.round(cell.x),
-            y: Math.round(cell.y),
+            x: spec.startX,
+            y: spec.startY,
             anchorX: 0.5,
             anchorY: 0.5,
-            scaleX: size,
-            scaleY: size,
-            tint,
+            scaleX: spec.size,
+            scaleY: spec.size,
+            tint: spec.tint,
             alpha: 0.95
         });
 
         activeFragments.push({
             particle,
-            startX: cell.x,
-            startY: cell.y,
-            age: 0,
-            delay: distanceFactor * 90 + hash01(seed + 4.1) * 55,
-            lifetime: DEFAULT_FRAGMENT_LIFETIME_MS + hash01(seed + 5.8) * 360,
-            vx: Math.cos(angle) * speed,
-            vy: Math.sin(angle) * speed + lift,
-            gravity: 34 + hash01(seed + 7.2) * 34,
-            size,
-            tint
+            ...spec
         });
-        newParticles.push(particle);
     }
-
-    particleContainer.particleChildren.push(...newParticles);
-    particleContainer.update();
 
     while (activeFragments.length > MAX_FRAGMENTS) {
-        const removed = activeFragments.shift();
-        const particleIndex = particleContainer.particleChildren.indexOf(removed.particle);
-        if (particleIndex >= 0) {
-            particleContainer.particleChildren.splice(particleIndex, 1);
-        }
+        activeFragments.shift();
     }
 
-    particleContainer.update();
+    syncParticleChildren();
     return true;
 }
 
@@ -326,30 +387,26 @@ export function updatePixiTerrainLayer(deltaTime) {
 
         const progress = localAge / fragment.lifetime;
         if (progress >= 1) {
-            const particleIndex = particleContainer.particleChildren.indexOf(fragment.particle);
-            if (particleIndex >= 0) {
-                particleContainer.particleChildren.splice(particleIndex, 1);
-            }
             activeFragments.splice(index, 1);
             removedAny = true;
             continue;
         }
 
-        const seconds = localAge / 1000;
-        const flicker = 0.82 + Math.sin(localAge * 0.045 + fragment.startX) * 0.14;
-        const fade = Math.pow(1 - progress, 0.95);
-        const expansion = 1.15 + progress * 0.65;
+        const easeOut = 1 - Math.pow(1 - progress, 3);
+        const fade = Math.pow(1 - progress, 1.25);
+        const shimmer = Math.sin(localAge * 0.08 + fragment.phase) * (1 - progress) * 1.4;
+        const scale = fragment.size * (1.35 - progress * 0.55);
 
-        fragment.particle.x = Math.round(fragment.startX + fragment.vx * seconds);
-        fragment.particle.y = Math.round(fragment.startY + fragment.vy * seconds + 0.5 * fragment.gravity * seconds * seconds);
-        fragment.particle.scaleX = fragment.size * expansion;
-        fragment.particle.scaleY = fragment.size * expansion;
-        fragment.particle.alpha = clamp(fade * flicker, 0, 0.98);
-        fragment.particle.tint = progress > 0.68 ? CYAN : fragment.tint;
+        fragment.particle.x = Math.round(fragment.startX + (fragment.targetX - fragment.startX) * easeOut + shimmer);
+        fragment.particle.y = Math.round(fragment.startY + (fragment.targetY - fragment.startY) * easeOut - Math.abs(shimmer) * 0.35);
+        fragment.particle.scaleX = scale;
+        fragment.particle.scaleY = scale;
+        fragment.particle.alpha = clamp(fade, 0, 0.95);
+        fragment.particle.tint = fragment.tint;
     }
 
     if (removedAny) {
-        particleContainer.update();
+        syncParticleChildren();
     }
 }
 
