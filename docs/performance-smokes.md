@@ -46,6 +46,19 @@ npm run perf:budget -- --input metrics.json --scene gameplay
 - `projectile-flight`: load the physics sandbox, call `TestAPI.aim({ angle: 42, power: 70 })`, then `TestAPI.fireDirect()`, and sample until the shot resolves.
 - `terrain-impact`: load the physics sandbox, call `TestAPI.destroyTerrain({ x: 620, y: 500, radius: 90 })`, and sample through the de-rez fade.
 
+## Visual Regression Scenes
+
+Use these deterministic routes for screenshot capture after graphics changes:
+
+- `/?scene=visual-hud`: HUD, weapon dock, tanks, aiming controls, and terrain.
+- `/?scene=visual-impact`: pre-carved crater with active terrain de-rez fragments.
+- `/?scene=visual-tank-pivots`: player/enemy tank body and turret pivot alignment.
+- `/?scene=visual-terrain-collapse`: side-impact crater and settled terrain columns.
+
+Impact scenes expose `window.__SCORCHED_VISUAL_SCENE.ready` and `window.__SCORCHED_VISUAL_SCENE.trigger()`. For de-rez captures, call `trigger()` immediately before screenshot capture to refresh the deterministic crater/debris moment.
+
+For iOS aspect captures, reuse `visual-hud` with the target viewport, for example `390x844`, `430x932`, and `1024x1366`.
+
 ## Default Budgets
 
 The budget script imports `DEFAULT_PERFORMANCE_BUDGETS` from `js/performanceMetrics.js`. Budgets can be overridden per run:

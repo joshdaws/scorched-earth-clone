@@ -91,6 +91,7 @@ import {
     captureTerrainCellSnapshot,
     getOrCreateTerrainCellGrid,
     getTerrainGridSlopeAngle,
+    getTerrainGridSurfaceYAt,
     rebuildTerrainCellGrid
 } from './terrainCells.js';
 import {
@@ -7257,6 +7258,13 @@ function handleSceneIsolation(scene, params) {
             setupTerrainViewerScene(scene, params);
             break;
 
+        case 'visual-hud':
+        case 'visual-impact':
+        case 'visual-tank-pivots':
+        case 'visual-terrain-collapse':
+            setupVisualRegressionScene(scene, params);
+            break;
+
         case 'ai-debug':
             setupAIDebugScene(scene, params);
             break;
@@ -7478,6 +7486,100 @@ function setupTerrainViewerScene(scene, params) {
     console.log(`  - Seed: ${seed}`);
     console.log('  - Reload with ?scene=terrain-viewer&seed=<number> to regenerate');
     console.log('  - getTerrain().getHeight(x) to query terrain height');
+}
+
+/**
+ * Setup deterministic graphics modernization scenes for browser visual captures.
+ */
+function setupVisualRegressionScene(scene, params) {
+    const setup = scene.setup;
+    console.log(`[SceneIsolation] Setting up visual regression scene: ${setup.visualType}`);
+
+    startNewRunState();
+    Money.init();
+
+    currentRound = params.round ?? setup.round ?? 1;
+    Money.addMoney((params.money ?? setup.money ?? GAME.STARTING_MONEY) - GAME.STARTING_MONEY);
+
+    currentTerrain = generateTerrain(undefined, undefined, {
+        roughness: 0.42,
+        minHeightPercent: 0.22,
+        maxHeightPercent: 0.68,
+        seed: params.seed ?? setup.seed
+    });
+
+    const tanks = placeTanksOnTerrain(currentTerrain);
+    playerTank = tanks.player;
+    enemyTank = tanks.enemy;
+
+    const windValue = params.wind ?? setup.windValue ?? 0;
+    Wind.setWind(windValue);
+
+    const allWeapons = WeaponRegistry.getAllWeapons();
+    for (const weapon of allWeapons) {
+        playerTank.inventory[weapon.id] = 99;
+    }
+    playerTank.setWeapon(params.weapon || 'basic-shot');
+
+    Turn.init();
+    Debug.setEnabled(false);
+    Input.enableGameInput();
+
+    Game.setState(GAME_STATES.PLAYING);
+
+    currentRound = params.round ?? setup.round ?? currentRound;
+    if (setup.playerHealth) {
+        playerTank.health = setup.playerHealth;
+        playerTank.maxHealth = TANK.START_HEALTH;
+    }
+    if (setup.enemyHealth) {
+        enemyTank.health = setup.enemyHealth;
+        enemyTank.maxHealth = setup.enemyHealth;
+    }
+
+    playerAim.angle = setup.playerAngle ?? 43;
+    playerAim.power = 66;
+    playerTank.angle = playerAim.angle;
+    playerTank.power = playerAim.power;
+    enemyTank.angle = setup.enemyAngle ?? 137;
+    enemyTank.power = 62;
+    Wind.setWind(windValue);
+
+    TestAPI.setPlayerTank(playerTank);
+    TestAPI.setEnemyTank(enemyTank);
+    TestAPI.setTerrain(currentTerrain);
+
+    if (typeof window !== 'undefined') {
+        window.__SCORCHED_VISUAL_SCENE = {
+            name: setup.visualType,
+            ready: setup.visualType !== 'impact' && setup.visualType !== 'terrain-collapse',
+            trigger: null,
+            lastTriggeredAt: null
+        };
+    }
+
+    if (setup.visualType === 'impact' || setup.visualType === 'terrain-collapse') {
+        const triggerVisualImpact = () => {
+            const impactX = setup.impactX ?? Renderer.getWidth() / 2;
+            const impactY = getTerrainGridSurfaceYAt(currentTerrain, impactX);
+            destroyTerrainAt(impactX, impactY, setup.impactRadius ?? 72);
+            if (typeof window !== 'undefined' && window.__SCORCHED_VISUAL_SCENE) {
+                window.__SCORCHED_VISUAL_SCENE.ready = true;
+                window.__SCORCHED_VISUAL_SCENE.lastTriggeredAt = performance.now();
+            }
+        };
+
+        if (typeof window !== 'undefined' && window.__SCORCHED_VISUAL_SCENE) {
+            window.__SCORCHED_VISUAL_SCENE.trigger = triggerVisualImpact;
+        }
+
+        setTimeout(triggerVisualImpact, 150);
+    }
+
+    console.log('[SceneIsolation] Visual regression scene ready');
+    console.log(`  - Scene: ${setup.visualType}`);
+    console.log(`  - Seed: ${params.seed ?? setup.seed}`);
+    console.log(`  - Wind: ${windValue}`);
 }
 
 /**
