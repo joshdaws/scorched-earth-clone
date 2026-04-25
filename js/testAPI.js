@@ -18,6 +18,10 @@ import { getScreenWidth, getScreenHeight } from './screenSize.js';
 import { calculateDamage } from './damage.js';
 import { WeaponRegistry } from './weapons.js';
 import { generateTerrain as generateTerrainFromModule } from './terrain.js';
+import {
+    getRenderQualitySummary,
+    setRenderQuality as setRenderQualityProfile
+} from './renderQuality.js';
 
 // =============================================================================
 // MODULE STATE
@@ -1339,6 +1343,38 @@ export function getSnapshot(name) {
     };
 }
 
+/**
+ * Get the current render quality profile summary.
+ * @returns {Object}
+ */
+export function getRenderQuality() {
+    return {
+        success: true,
+        quality: getRenderQualitySummary()
+    };
+}
+
+/**
+ * Set the render quality profile for testing or debug tuning.
+ * @param {string} id - low, balanced, or high
+ * @returns {Object}
+ */
+export function setRenderQuality(id) {
+    try {
+        const profile = setRenderQualityProfile(id);
+        return {
+            success: true,
+            quality: getRenderQualitySummary(),
+            label: profile.label
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+}
+
 // =============================================================================
 // WINDOW EXPOSURE (for console access)
 // =============================================================================
@@ -1370,6 +1406,8 @@ const TestAPI = {
     getWind,
     getWindForce,
     getState,
+    getRenderQuality,
+    setRenderQuality,
     isInitialized,
     // Initialization (typically called by main.js)
     init,

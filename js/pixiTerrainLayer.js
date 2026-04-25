@@ -2,6 +2,7 @@ import {
     getOrCreateTerrainCellGrid,
     getTerrainCellSize
 } from './terrainCells.js';
+import { getRenderQualityProfile } from './renderQuality.js';
 
 const BODY_COLOR = 0x140527;
 const BODY_ALT_COLOR = 0x0b1435;
@@ -144,9 +145,10 @@ function getCellDebrisTint(cell, size) {
 }
 
 export function getPixiTerrainDebrisLimits() {
+    const pixiQuality = getRenderQualityProfile().pixi ?? {};
     return {
-        maxFragments: MAX_FRAGMENTS,
-        maxSpawnCells: MAX_SPAWN_CELLS
+        maxFragments: pixiQuality.maxFragments ?? MAX_FRAGMENTS,
+        maxSpawnCells: pixiQuality.maxSpawnCells ?? MAX_SPAWN_CELLS
     };
 }
 
@@ -340,7 +342,8 @@ export function markPixiTerrainLayerDirty() {
 export function spawnPixiTerrainDerezEffect({ x, y, radius, cells }) {
     if (!ensureReady() || !Array.isArray(cells) || cells.length === 0) return false;
 
-    const selectedCells = selectTerrainDebrisCells(cells);
+    const limits = getPixiTerrainDebrisLimits();
+    const selectedCells = selectTerrainDebrisCells(cells, limits.maxSpawnCells);
 
     for (let index = 0; index < selectedCells.length; index++) {
         const cell = selectedCells[index];
@@ -363,7 +366,7 @@ export function spawnPixiTerrainDerezEffect({ x, y, radius, cells }) {
         });
     }
 
-    while (activeFragments.length > MAX_FRAGMENTS) {
+    while (activeFragments.length > limits.maxFragments) {
         activeFragments.shift();
     }
 

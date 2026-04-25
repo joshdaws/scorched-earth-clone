@@ -9,6 +9,7 @@
 import { CANVAS, COLORS, PHYSICS } from './constants.js';
 import { WeaponRegistry, WEAPON_TYPES } from './weapons.js';
 import { get as getAsset } from './assets.js';
+import { getRenderQualityProfile } from './renderQuality.js';
 
 // =============================================================================
 // PARTICLE CONFIGURATION
@@ -1390,6 +1391,11 @@ let scanlinePattern = null;
  */
 let patternWidth = 0;
 let patternHeight = 0;
+let patternScanlineOpacity = null;
+
+function getCrtQualitySettings() {
+    return getRenderQualityProfile().crt ?? {};
+}
 
 /**
  * Enable or disable CRT effects.
@@ -1426,6 +1432,9 @@ export function toggleCrt() {
  * @param {number} height - Canvas height
  */
 function initScanlinePattern(ctx, width, height) {
+    const crtQuality = getCrtQualitySettings();
+    const scanlineOpacity = crtQuality.scanlineOpacity ?? CRT_CONFIG.SCANLINE_OPACITY;
+
     // Create a small canvas for the repeating pattern
     const patternCanvas = document.createElement('canvas');
     const patternCtx = patternCanvas.getContext('2d');
@@ -1439,13 +1448,14 @@ function initScanlinePattern(ctx, width, height) {
 
     // Draw single scanline (1 pixel tall)
     patternCtx.fillStyle = CRT_CONFIG.SCANLINE_COLOR;
-    patternCtx.globalAlpha = CRT_CONFIG.SCANLINE_OPACITY;
+    patternCtx.globalAlpha = scanlineOpacity;
     patternCtx.fillRect(0, 0, 1, 1);
 
     // Create repeating pattern
     scanlinePattern = ctx.createPattern(patternCanvas, 'repeat');
     patternWidth = width;
     patternHeight = height;
+    patternScanlineOpacity = scanlineOpacity;
 }
 
 /**
@@ -1455,8 +1465,16 @@ function initScanlinePattern(ctx, width, height) {
  * @param {number} height - Canvas height
  */
 function renderScanlines(ctx, width, height) {
+    const crtQuality = getCrtQualitySettings();
+    const scanlineOpacity = crtQuality.scanlineOpacity ?? CRT_CONFIG.SCANLINE_OPACITY;
+
     // Regenerate pattern if dimensions changed
-    if (!scanlinePattern || patternWidth !== width || patternHeight !== height) {
+    if (
+        !scanlinePattern ||
+        patternWidth !== width ||
+        patternHeight !== height ||
+        patternScanlineOpacity !== scanlineOpacity
+    ) {
         initScanlinePattern(ctx, width, height);
     }
 
@@ -1473,12 +1491,15 @@ function renderScanlines(ctx, width, height) {
  * @param {number} height - Canvas height
  */
 function renderVignette(ctx, width, height) {
+    const crtQuality = getCrtQualitySettings();
+    const vignetteIntensity = crtQuality.vignetteIntensity ?? CRT_CONFIG.VIGNETTE_INTENSITY;
+    const vignetteRadius = crtQuality.vignetteRadius ?? CRT_CONFIG.VIGNETTE_RADIUS;
     const centerX = width / 2;
     const centerY = height / 2;
 
     // Calculate radius based on canvas diagonal
     const diagonal = Math.sqrt(width * width + height * height);
-    const innerRadius = diagonal * CRT_CONFIG.VIGNETTE_RADIUS * 0.5;
+    const innerRadius = diagonal * vignetteRadius * 0.5;
     const outerRadius = diagonal * 0.75;
 
     ctx.save();
@@ -1490,8 +1511,8 @@ function renderVignette(ctx, width, height) {
     );
 
     gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    gradient.addColorStop(0.5, `rgba(0, 0, 0, ${CRT_CONFIG.VIGNETTE_INTENSITY * 0.3})`);
-    gradient.addColorStop(1, `rgba(0, 0, 0, ${CRT_CONFIG.VIGNETTE_INTENSITY})`);
+    gradient.addColorStop(0.5, `rgba(0, 0, 0, ${vignetteIntensity * 0.3})`);
+    gradient.addColorStop(1, `rgba(0, 0, 0, ${vignetteIntensity})`);
 
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
@@ -1509,10 +1530,12 @@ function renderVignette(ctx, width, height) {
  * @param {number} height - Canvas height
  */
 function renderChromaticAberration(ctx, width, height) {
-    if (!CRT_CONFIG.CHROMATIC_ABERRATION_ENABLED) return;
+    const crtQuality = getCrtQualitySettings();
+    const enabled = crtQuality.chromaticAberrationEnabled ?? CRT_CONFIG.CHROMATIC_ABERRATION_ENABLED;
+    if (!enabled) return;
 
-    const offset = CRT_CONFIG.CHROMATIC_OFFSET;
-    const alpha = CRT_CONFIG.CHROMATIC_ALPHA;
+    const offset = crtQuality.chromaticOffset ?? CRT_CONFIG.CHROMATIC_OFFSET;
+    const alpha = crtQuality.chromaticAlpha ?? CRT_CONFIG.CHROMATIC_ALPHA;
 
     ctx.save();
     ctx.globalCompositeOperation = 'screen';
@@ -1547,10 +1570,12 @@ function renderChromaticAberration(ctx, width, height) {
  * @param {number} height - Canvas height
  */
 function renderVhsNoise(ctx, width, height) {
-    if (!CRT_CONFIG.VHS_NOISE_ENABLED) return;
+    const crtQuality = getCrtQualitySettings();
+    const enabled = crtQuality.vhsNoiseEnabled ?? CRT_CONFIG.VHS_NOISE_ENABLED;
+    if (!enabled) return;
 
-    const scale = CRT_CONFIG.VHS_NOISE_SCALE;
-    const intensity = CRT_CONFIG.VHS_NOISE_INTENSITY;
+    const scale = crtQuality.vhsNoiseScale ?? CRT_CONFIG.VHS_NOISE_SCALE;
+    const intensity = crtQuality.vhsNoiseIntensity ?? CRT_CONFIG.VHS_NOISE_INTENSITY;
 
     ctx.save();
     ctx.globalAlpha = intensity;
@@ -1579,7 +1604,9 @@ function renderVhsNoise(ctx, width, height) {
  * @param {number} deltaTime - Time since last frame in ms
  */
 function updateVhsGlitch(deltaTime) {
-    if (!CRT_CONFIG.VHS_GLITCH_ENABLED) return;
+    const crtQuality = getCrtQualitySettings();
+    const enabled = crtQuality.vhsGlitchEnabled ?? CRT_CONFIG.VHS_GLITCH_ENABLED;
+    if (!enabled) return;
 
     if (vhsGlitchState.active) {
         vhsGlitchState.elapsed += deltaTime;
@@ -1588,11 +1615,11 @@ function updateVhsGlitch(deltaTime) {
         }
     } else {
         // Random chance to start a new glitch
-        if (Math.random() < CRT_CONFIG.VHS_GLITCH_CHANCE) {
+        if (Math.random() < (crtQuality.vhsGlitchChance ?? CRT_CONFIG.VHS_GLITCH_CHANCE)) {
             vhsGlitchState = {
                 active: true,
                 yOffset: Math.random() * 600, // Random vertical position
-                xDisplacement: (Math.random() - 0.5) * 2 * CRT_CONFIG.VHS_GLITCH_MAX_OFFSET,
+                xDisplacement: (Math.random() - 0.5) * 2 * (crtQuality.vhsGlitchMaxOffset ?? CRT_CONFIG.VHS_GLITCH_MAX_OFFSET),
                 duration: 50 + Math.random() * 100, // 50-150ms glitch duration
                 elapsed: 0
             };
@@ -1608,10 +1635,12 @@ function updateVhsGlitch(deltaTime) {
  * @param {number} height - Canvas height
  */
 function renderVhsGlitch(ctx, width, height) {
-    if (!CRT_CONFIG.VHS_GLITCH_ENABLED || !vhsGlitchState.active) return;
+    const crtQuality = getCrtQualitySettings();
+    const enabled = crtQuality.vhsGlitchEnabled ?? CRT_CONFIG.VHS_GLITCH_ENABLED;
+    if (!enabled || !vhsGlitchState.active) return;
 
     const { yOffset, xDisplacement } = vhsGlitchState;
-    const glitchHeight = CRT_CONFIG.VHS_GLITCH_HEIGHT;
+    const glitchHeight = crtQuality.vhsGlitchHeight ?? CRT_CONFIG.VHS_GLITCH_HEIGHT;
 
     ctx.save();
 
@@ -1640,11 +1669,13 @@ function renderVhsGlitch(ctx, width, height) {
  * @param {number} height - Canvas height
  */
 function renderPhosphorGlow(ctx, width, height) {
-    if (!CRT_CONFIG.PHOSPHOR_GLOW_ENABLED) return;
+    const crtQuality = getCrtQualitySettings();
+    const enabled = crtQuality.phosphorGlowEnabled ?? CRT_CONFIG.PHOSPHOR_GLOW_ENABLED;
+    if (!enabled) return;
 
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = CRT_CONFIG.PHOSPHOR_GLOW_INTENSITY;
+    ctx.globalAlpha = crtQuality.phosphorGlowIntensity ?? CRT_CONFIG.PHOSPHOR_GLOW_INTENSITY;
 
     // Create a subtle overall glow by applying a light overlay
     // This simulates phosphor bleeding/persistence
@@ -1730,4 +1761,5 @@ export function clearCrtCache() {
     scanlinePattern = null;
     patternWidth = 0;
     patternHeight = 0;
+    patternScanlineOpacity = null;
 }
