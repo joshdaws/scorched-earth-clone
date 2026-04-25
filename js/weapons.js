@@ -894,7 +894,7 @@ export const WeaponRegistry = {
      * @returns {Weapon[]} Array of weapons in that category
      */
     getWeaponsByCategory(category) {
-        return ALL_WEAPONS[category] || [];
+        return ALL_WEAPONS[category] ? [...ALL_WEAPONS[category]] : [];
     },
 
     /**
