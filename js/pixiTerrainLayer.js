@@ -12,7 +12,10 @@ const PINK = 0xff2a6d;
 const PURPLE = 0xb967ff;
 const MAX_FRAGMENTS = 520;
 const MAX_SPAWN_CELLS = 220;
+const MAX_SWEEP_CELLS = 96;
+const MAX_ACTIVE_SWEEPS = 3;
 const DEFAULT_FRAGMENT_LIFETIME_MS = 560;
+const DEFAULT_SWEEP_LIFETIME_MS = 420;
 const SURFACE_GLOW_ROWS = 9;
 const TERRAIN_CHUNK_COLUMNS = 18;
 const DIRTY_PADDING_COLUMNS = 3;
@@ -29,8 +32,10 @@ let initPromise = null;
 let ready = false;
 let terrainRoot = null;
 let terrainChunkRoot = null;
+let derezSweepRoot = null;
 let particleContainer = null;
 let particleTexture = null;
+let derezSweepNoiseFilter = null;
 let lastTerrain = null;
 let lastWidth = 0;
 let lastHeight = 0;
@@ -40,6 +45,7 @@ const dirtyTerrainChunks = new Set();
 let lastGridColumns = 0;
 let lastGridCellSize = 0;
 let activeFragments = [];
+let activeSweeps = [];
 
 function hasBrowserCanvas() {
     return typeof document !== 'undefined' && typeof document.createElement === 'function';
@@ -253,6 +259,67 @@ export function selectTerrainDebrisCells(cells, maxCells = MAX_SPAWN_CELLS) {
     return cells.filter((_, index) => index % stride === 0).slice(0, limit);
 }
 
+export function getPixiTerrainDerezPassConfig(profile = getRenderQualityProfile()) {
+    const pixiQuality = profile?.pixi ?? {};
+    return {
+        enabled: Boolean(pixiQuality.derezFilterPass),
+        sweepMaxCells: Math.max(0, Math.floor(pixiQuality.sweepMaxCells ?? MAX_SWEEP_CELLS)),
+        maxSweeps: Math.max(0, Math.floor(pixiQuality.maxSweeps ?? MAX_ACTIVE_SWEEPS)),
+        scanlineNoise: clamp(pixiQuality.scanlineNoise ?? 0.14, 0, 0.5),
+        lifetime: DEFAULT_SWEEP_LIFETIME_MS
+    };
+}
+
+export function selectTerrainDerezSweepCells(cells, maxCells = MAX_SWEEP_CELLS) {
+    if (!Array.isArray(cells) || cells.length === 0) return [];
+
+    const limit = Math.max(0, Math.floor(maxCells));
+    if (limit <= 0) return [];
+    if (cells.length <= limit) return [...cells];
+
+    const sorted = [...cells].sort((a, b) => {
+        const aDistance = Number.isFinite(a?.distance) ? a.distance : 0;
+        const bDistance = Number.isFinite(b?.distance) ? b.distance : 0;
+        return aDistance - bDistance;
+    });
+    const stride = Math.max(1, Math.ceil(sorted.length / limit));
+
+    return sorted.filter((_, index) => index % stride === 0).slice(0, limit);
+}
+
+export function buildTerrainDerezSweepSpec({ x, y, radius, cells }, config = getPixiTerrainDerezPassConfig()) {
+    if (!config.enabled || !Array.isArray(cells) || cells.length === 0) return null;
+
+    const selectedCells = selectTerrainDerezSweepCells(cells, config.sweepMaxCells);
+    if (selectedCells.length === 0) return null;
+
+    return {
+        x,
+        y,
+        radius,
+        age: 0,
+        lifetime: config.lifetime,
+        cells: selectedCells.map((cell, index) => {
+            const size = Math.max(3, cell?.size ?? getTerrainCellSize());
+            const distance = Number.isFinite(cell?.distance)
+                ? cell.distance
+                : Math.hypot(getCellCoordinate(cell, 'x', size) - x, getCellCoordinate(cell, 'y', size) - y);
+            const distanceFactor = clamp(distance / Math.max(1, radius), 0, 1);
+            const seed = index * 5.33 + getCellCoordinate(cell, 'x', size) * 0.07 + getCellCoordinate(cell, 'y', size) * 0.11;
+
+            return {
+                x: Number.isFinite(cell?.topLeftX) ? cell.topLeftX : getCellCoordinate(cell, 'x', size) - size * 0.5,
+                y: Number.isFinite(cell?.topLeftY) ? cell.topLeftY : getCellCoordinate(cell, 'y', size) - size * 0.5,
+                size,
+                tint: getCellDebrisTint(cell, size),
+                distanceFactor,
+                delay: distanceFactor * 72 + hash01(seed) * 28,
+                phase: hash01(seed + 9.7) * Math.PI * 2
+            };
+        })
+    };
+}
+
 export function buildTerrainCellDebrisSpec({ x, y, radius, cell, index = 0 }) {
     const size = Math.max(3, cell?.size ?? getTerrainCellSize());
     const startX = Math.round(getCellCoordinate(cell, 'x', size));
@@ -332,6 +399,96 @@ function syncParticleChildren() {
         particleContainer.particleChildren.push(fragment.particle);
     }
     particleContainer.update();
+}
+
+function clearDerezSweepFilters() {
+    if (derezSweepRoot) {
+        derezSweepRoot.filters = null;
+    }
+}
+
+function updateDerezSweepFilter(hasActiveSweeps) {
+    if (!derezSweepRoot || !Pixi) return;
+
+    const config = getPixiTerrainDerezPassConfig();
+    if (!config.enabled || !hasActiveSweeps || typeof Pixi.NoiseFilter !== 'function') {
+        clearDerezSweepFilters();
+        return;
+    }
+
+    try {
+        if (!derezSweepNoiseFilter) {
+            derezSweepNoiseFilter = new Pixi.NoiseFilter({
+                noise: config.scanlineNoise,
+                seed: 0.5,
+                resolution: 0.75
+            });
+        }
+        derezSweepNoiseFilter.noise = config.scanlineNoise;
+        derezSweepNoiseFilter.seed = (performance.now() * 0.001) % 1;
+        derezSweepRoot.filters = [derezSweepNoiseFilter];
+    } catch (_error) {
+        clearDerezSweepFilters();
+    }
+}
+
+function drawDerezSweepGraphics() {
+    if (!derezSweepRoot) return;
+
+    derezSweepRoot.clear();
+    if (activeSweeps.length === 0) {
+        updateDerezSweepFilter(false);
+        return;
+    }
+
+    for (const sweep of activeSweeps) {
+        const progress = clamp(sweep.age / sweep.lifetime, 0, 1);
+        const sweepAlpha = Math.pow(1 - progress, 1.45);
+        const waveCenter = progress;
+        const waveWidth = 0.28;
+
+        for (const cell of sweep.cells) {
+            const localAge = sweep.age - cell.delay;
+            if (localAge < 0) continue;
+
+            const waveDistance = Math.abs(cell.distanceFactor - waveCenter);
+            const waveBoost = clamp(1 - waveDistance / waveWidth, 0, 1);
+            const flicker = 0.78 + hash01(cell.phase + Math.floor(sweep.age / 24)) * 0.22;
+            const alpha = clamp((0.18 + waveBoost * 0.56) * sweepAlpha * flicker, 0, 0.78);
+            const lineAlpha = clamp(alpha * (1.35 + waveBoost * 0.6), 0, 0.92);
+            const size = Math.max(2, cell.size);
+
+            addCellRect(derezSweepRoot, cell.x, cell.y, size, cell.tint, alpha * 0.42);
+            addLineRect(derezSweepRoot, cell.x, cell.y, size, 1, PINK, lineAlpha);
+            addLineRect(derezSweepRoot, cell.x, cell.y + size - 1, size, 1, CYAN, lineAlpha * 0.54);
+            addLineRect(derezSweepRoot, cell.x, cell.y, 1, size, PURPLE, lineAlpha * 0.42);
+
+            if (waveBoost > 0.55 && size >= 6) {
+                addLineRect(
+                    derezSweepRoot,
+                    cell.x,
+                    cell.y + Math.floor(size * 0.5),
+                    size,
+                    1,
+                    0xffffff,
+                    lineAlpha * 0.35
+                );
+            }
+        }
+
+        const scanlineY = sweep.y - sweep.radius + progress * sweep.radius * 2;
+        addLineRect(
+            derezSweepRoot,
+            sweep.x - sweep.radius,
+            scanlineY,
+            sweep.radius * 2,
+            2,
+            CYAN,
+            sweepAlpha * 0.28
+        );
+    }
+
+    updateDerezSweepFilter(true);
 }
 
 function drawTerrainCell(graphics, { topLeftX, topLeftY, size, row, col, surfaceY }) {
@@ -484,6 +641,7 @@ export async function initPixiTerrainLayer({ width, height }) {
             particleTexture = makeParticleTexture();
             terrainRoot = new Pixi.Container();
             terrainChunkRoot = new Pixi.Container();
+            derezSweepRoot = new Pixi.Graphics();
             particleContainer = new Pixi.ParticleContainer({
                 texture: particleTexture,
                 boundsArea: new Pixi.Rectangle(0, 0, width, height),
@@ -498,6 +656,7 @@ export async function initPixiTerrainLayer({ width, height }) {
             });
 
             terrainRoot.addChild(terrainChunkRoot);
+            terrainRoot.addChild(derezSweepRoot);
             terrainRoot.addChild(particleContainer);
             app.stage.addChild(terrainRoot);
 
@@ -557,6 +716,15 @@ export function spawnPixiTerrainDerezEffect({ x, y, radius, cells }) {
 
     const limits = getPixiTerrainDebrisLimits();
     const selectedCells = selectTerrainDebrisCells(cells, limits.maxSpawnCells);
+    const derezPassConfig = getPixiTerrainDerezPassConfig();
+    const sweepSpec = buildTerrainDerezSweepSpec({ x, y, radius, cells }, derezPassConfig);
+
+    if (sweepSpec) {
+        activeSweeps.push(sweepSpec);
+        while (activeSweeps.length > derezPassConfig.maxSweeps) {
+            activeSweeps.shift();
+        }
+    }
 
     for (let index = 0; index < selectedCells.length; index++) {
         const cell = selectedCells[index];
@@ -588,11 +756,12 @@ export function spawnPixiTerrainDerezEffect({ x, y, radius, cells }) {
 
     syncParticleChildren();
     setPerformanceGauge('pixiFragments', activeFragments.length);
+    setPerformanceGauge('pixiDerezSweeps', activeSweeps.length);
     return true;
 }
 
 export function updatePixiTerrainLayer(deltaTime) {
-    if (!ensureReady() || activeFragments.length === 0) return;
+    if (!ensureReady()) return;
 
     let removedAny = false;
     for (let index = activeFragments.length - 1; index >= 0; index--) {
@@ -629,7 +798,19 @@ export function updatePixiTerrainLayer(deltaTime) {
     if (removedAny) {
         syncParticleChildren();
     }
+    if (activeSweeps.length > 0) {
+        for (let index = activeSweeps.length - 1; index >= 0; index--) {
+            activeSweeps[index].age += deltaTime;
+            if (activeSweeps[index].age >= activeSweeps[index].lifetime) {
+                activeSweeps.splice(index, 1);
+            }
+        }
+        drawDerezSweepGraphics();
+    } else {
+        drawDerezSweepGraphics();
+    }
     setPerformanceGauge('pixiFragments', activeFragments.length);
+    setPerformanceGauge('pixiDerezSweeps', activeSweeps.length);
 }
 
 /**
@@ -660,13 +841,19 @@ export function renderPixiTerrainLayerToCanvas(ctx, terrain) {
 
 export function clearPixiTerrainLayer() {
     activeFragments = [];
+    activeSweeps = [];
     if (particleContainer) {
         particleContainer.particleChildren.length = 0;
         particleContainer.update();
     }
+    if (derezSweepRoot) {
+        derezSweepRoot.clear();
+        clearDerezSweepFilters();
+    }
     terrainDirty = true;
     markAllTerrainChunksDirty();
     setPerformanceGauge('pixiFragments', 0);
+    setPerformanceGauge('pixiDerezSweeps', 0);
 }
 
 export function getPixiTerrainFragmentCount() {
@@ -679,6 +866,8 @@ export function getPixiTerrainCacheStats() {
         dirtyChunks: dirtyTerrainChunks.size,
         chunkColumns: TERRAIN_CHUNK_COLUMNS,
         columns: lastGridColumns,
-        cellSize: lastGridCellSize
+        cellSize: lastGridCellSize,
+        activeSweeps: activeSweeps.length,
+        filterPassEnabled: getPixiTerrainDerezPassConfig().enabled
     };
 }

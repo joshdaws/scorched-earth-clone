@@ -46,6 +46,8 @@ npm run perf:budget -- --input metrics.json --scene gameplay
 - `projectile-flight`: load the physics sandbox, call `TestAPI.aim({ angle: 42, power: 70 })`, then `TestAPI.fireDirect()`, and sample until the shot resolves.
 - `terrain-impact`: load the physics sandbox, call `TestAPI.destroyTerrain({ x: 620, y: 500, radius: 90 })`, and sample through the de-rez fade.
 
+The Pixi terrain de-rez pass is quality-gated. Low quality disables the filter sweep; balanced and high add a capped Pixi `NoiseFilter` sweep layer over the removed TerrainCellGrid cells. Watch `pixiDerezSweeps`, `pixiFragments`, `pixiTerrainRebuild`, and `pixiTerrainRender` together when tuning this effect for iOS.
+
 ## Visual Regression Scenes
 
 Use these deterministic routes for screenshot capture after graphics changes:

@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   buildTerrainCellDebrisSpec,
   buildTerrainCellDebrisSpecs,
+  buildTerrainDerezSweepSpec,
   getTerrainCellDebrisClusterCount,
   getPixiTerrainChunkCount,
   getPixiTerrainChunkRangeForImpact,
+  getPixiTerrainDerezPassConfig,
   getPixiTerrainDebrisLimits,
+  selectTerrainDerezSweepCells,
   selectTerrainDebrisCells
 } from '../../js/pixiTerrainLayer.js';
 
@@ -114,5 +117,60 @@ describe('pixiTerrainLayer debris helpers', () => {
       startChunk: 3,
       endChunk: 5
     });
+  });
+
+  it('selects nearest removed cells for the de-rez sweep budget', () => {
+    const cells = Array.from({ length: 20 }, (_, index) => ({
+      x: index * 8,
+      y: 100,
+      size: 8,
+      distance: 20 - index
+    }));
+
+    const selected = selectTerrainDerezSweepCells(cells, 5);
+
+    expect(selected).toHaveLength(5);
+    expect(selected[0].distance).toBe(1);
+    expect(selected.every(cell => cell.size === 8)).toBe(true);
+  });
+
+  it('builds a bounded Pixi filter sweep spec from removed terrain cells', () => {
+    const config = getPixiTerrainDerezPassConfig({
+      pixi: {
+        derezFilterPass: true,
+        sweepMaxCells: 3,
+        maxSweeps: 1,
+        scanlineNoise: 0.2
+      }
+    });
+    const spec = buildTerrainDerezSweepSpec({
+      x: 100,
+      y: 120,
+      radius: 48,
+      cells: [
+        { topLeftX: 80, topLeftY: 112, size: 8, distance: 4 },
+        { topLeftX: 88, topLeftY: 112, size: 8, distance: 8 },
+        { topLeftX: 96, topLeftY: 112, size: 8, distance: 12 },
+        { topLeftX: 104, topLeftY: 112, size: 8, distance: 16 }
+      ]
+    }, config);
+
+    expect(config.enabled).toBe(true);
+    expect(config.scanlineNoise).toBe(0.2);
+    expect(spec.cells).toHaveLength(2);
+    expect(spec.lifetime).toBeGreaterThan(0);
+    expect(spec.cells[0].x).toBe(80);
+    expect(spec.cells[0].delay).toBeGreaterThanOrEqual(0);
+  });
+
+  it('does not build a sweep spec when the filter pass is disabled', () => {
+    const spec = buildTerrainDerezSweepSpec({
+      x: 100,
+      y: 120,
+      radius: 48,
+      cells: [{ topLeftX: 80, topLeftY: 112, size: 8, distance: 4 }]
+    }, { enabled: false, sweepMaxCells: 8, lifetime: 420 });
+
+    expect(spec).toBeNull();
   });
 });

@@ -27,7 +27,11 @@ export const RENDER_QUALITY_PROFILES = {
         },
         pixi: {
             maxFragments: 280,
-            maxSpawnCells: 120
+            maxSpawnCells: 120,
+            derezFilterPass: false,
+            sweepMaxCells: 0,
+            maxSweeps: 0,
+            scanlineNoise: 0
         }
     },
     balanced: {
@@ -56,7 +60,11 @@ export const RENDER_QUALITY_PROFILES = {
         },
         pixi: {
             maxFragments: 420,
-            maxSpawnCells: 170
+            maxSpawnCells: 170,
+            derezFilterPass: true,
+            sweepMaxCells: 72,
+            maxSweeps: 2,
+            scanlineNoise: 0.13
         }
     },
     high: {
@@ -81,7 +89,11 @@ export const RENDER_QUALITY_PROFILES = {
         },
         pixi: {
             maxFragments: 520,
-            maxSpawnCells: 220
+            maxSpawnCells: 220,
+            derezFilterPass: true,
+            sweepMaxCells: 96,
+            maxSweeps: 3,
+            scanlineNoise: 0.18
         }
     }
 };
