@@ -2,8 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   buildRemovedTerrainCells,
   captureTerrainCellSnapshot,
+  checkTerrainGridCollision,
   getOrCreateTerrainCellGrid,
   getTerrainCellSize,
+  getTerrainGridContactHeight,
+  getTerrainGridHeightAt,
   rebuildTerrainCellGrid,
   TerrainCellGrid
 } from '../../js/terrainCells.js';
@@ -152,6 +155,46 @@ describe('terrainCells', () => {
     expect(removed.length).toBeGreaterThan(0);
     expect(settled.modified).toBe(true);
     expect(terrain.getHeight(28)).toBeLessThan(beforeHeight);
+  });
+
+  it('queries collision from the persistent grid instead of stale height projection', () => {
+    const terrain = createTerrain(new Array(64).fill(48), 64);
+    const grid = TerrainCellGrid.fromTerrain(terrain, {
+      cellSize: 8
+    });
+
+    grid.setCell(3, 4, false);
+    grid.recalculateColumnTops();
+
+    const cachedGrid = getOrCreateTerrainCellGrid(terrain, {
+      cellSize: 8
+    });
+    cachedGrid.cells.set(grid.cells);
+    cachedGrid.recalculateColumnTops();
+
+    expect(checkTerrainGridCollision(terrain, 28, 36, { cellSize: 8 })).toMatchObject({
+      hit: false,
+      x: 28,
+      y: 36
+    });
+    expect(checkTerrainGridCollision(terrain, 28, 20, { cellSize: 8 })).toMatchObject({
+      hit: true,
+      x: 28,
+      y: 16
+    });
+  });
+
+  it('uses grid contact height for tank-width terrain reads', () => {
+    const terrain = createTerrain(new Array(64).fill(32), 64);
+    const grid = getOrCreateTerrainCellGrid(terrain, {
+      cellSize: 8
+    });
+
+    grid.setColumnSolidCount(3, 6);
+    grid.setColumnSolidCount(4, 2);
+
+    expect(getTerrainGridHeightAt(terrain, 36, { cellSize: 8 })).toBe(16);
+    expect(getTerrainGridContactHeight(terrain, 36, 24, { cellSize: 8 })).toBe(48);
   });
 
   it('reuses cached terrain grids until explicitly rebuilt', () => {

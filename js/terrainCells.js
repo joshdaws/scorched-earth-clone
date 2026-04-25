@@ -117,6 +117,66 @@ export function getTerrainCellSize() {
     return DEFAULT_CELL_SIZE;
 }
 
+export function getTerrainGridHeightAt(terrain, x, options = {}) {
+    const grid = getOrCreateTerrainCellGrid(terrain, options);
+    if (!grid || grid.columns <= 0) {
+        return getTerrainHeight(terrain, x);
+    }
+
+    return grid.getHeightAt(x);
+}
+
+export function getTerrainGridContactHeight(terrain, centerX, contactWidth = 1, options = {}) {
+    const grid = getOrCreateTerrainCellGrid(terrain, options);
+    if (!grid || grid.columns <= 0) {
+        return getTerrainHeight(terrain, centerX);
+    }
+
+    const halfWidth = Math.max(0, contactWidth * 0.5);
+    const minCol = clamp(Math.floor((centerX - halfWidth) / grid.cellSize), 0, grid.columns - 1);
+    const maxCol = clamp(Math.floor((centerX + halfWidth) / grid.cellSize), minCol, grid.columns - 1);
+    let height = 0;
+
+    for (let col = minCol; col <= maxCol; col++) {
+        height = Math.max(height, grid.screenHeight - grid.getSurfaceYForColumn(col));
+    }
+
+    return height;
+}
+
+export function checkTerrainGridCollision(terrain, x, y, options = {}) {
+    const width = getTerrainWidth(terrain);
+    const flooredX = Math.floor(x);
+    if (!terrain || flooredX < 0 || flooredX >= width) return null;
+
+    const grid = getOrCreateTerrainCellGrid(terrain, options);
+    if (!grid || grid.columns <= 0) {
+        const terrainHeight = getTerrainHeight(terrain, flooredX);
+        const surfaceY = getTerrainScreenHeight(terrain) - terrainHeight;
+        return y >= surfaceY
+            ? { hit: true, x: flooredX, y: surfaceY }
+            : { hit: false, x: flooredX, y };
+    }
+
+    const col = clamp(Math.floor(x / grid.cellSize), 0, grid.columns - 1);
+    const row = Math.floor(y / grid.cellSize);
+    const surfaceY = grid.getSurfaceYForColumn(col);
+
+    if (row >= 0 && row < grid.rows) {
+        return grid.isSolid(col, row)
+            ? {
+                hit: true,
+                x: flooredX,
+                y: Math.max(surfaceY, row * grid.cellSize)
+            }
+            : { hit: false, x: flooredX, y };
+    }
+
+    return y >= surfaceY
+        ? { hit: true, x: flooredX, y: surfaceY }
+        : { hit: false, x: flooredX, y };
+}
+
 export class TerrainCellGrid {
     /**
      * @param {{width: number, screenHeight: number, cellSize?: number}} options
