@@ -24,6 +24,7 @@ import {
 } from './renderQuality.js';
 import { getParticleCount } from './effects.js';
 import { getTerrainDerezEffectCount } from './terrainDerezEffect.js';
+import { getPixiTerrainCacheStats } from './pixiTerrainLayer.js';
 import {
     evaluatePerformanceBudget,
     getPerformanceSnapshot,
@@ -1394,7 +1395,10 @@ export function getPerformanceMetrics() {
         metrics: getPerformanceSnapshot({
             particles: getParticleCount(),
             terrainDerezEffects: getTerrainDerezEffectCount(),
-            pixiFragments
+            pixiFragments,
+            ...Object.fromEntries(
+                Object.entries(getPixiTerrainCacheStats()).map(([key, value]) => [`pixiTerrain.${key}`, value])
+            )
         })
     };
 }

@@ -4914,7 +4914,7 @@ export function destroyTerrainAt(x, y, radius) {
         if (fallingResult.modified) {
             console.log('Terrain cell settling applied');
         }
-        markPixiTerrainLayerDirty();
+        markPixiTerrainLayerDirty({ x, radius: radius * 3 });
 
         emitGameplayEvent(GAMEPLAY_EVENTS.TERRAIN_CHANGED, {
             source: 'explosion',

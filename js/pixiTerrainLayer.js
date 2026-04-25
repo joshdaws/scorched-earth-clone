@@ -14,19 +14,25 @@ const MAX_FRAGMENTS = 520;
 const MAX_SPAWN_CELLS = 220;
 const DEFAULT_FRAGMENT_LIFETIME_MS = 560;
 const SURFACE_GLOW_ROWS = 9;
+const TERRAIN_CHUNK_COLUMNS = 18;
+const DIRTY_PADDING_COLUMNS = 3;
 
 let app = null;
 let Pixi = null;
 let initPromise = null;
 let ready = false;
 let terrainRoot = null;
-let terrainGraphics = null;
+let terrainChunkRoot = null;
 let particleContainer = null;
 let particleTexture = null;
 let lastTerrain = null;
 let lastWidth = 0;
 let lastHeight = 0;
 let terrainDirty = true;
+let terrainChunkRecords = [];
+const dirtyTerrainChunks = new Set();
+let lastGridColumns = 0;
+let lastGridCellSize = 0;
 let activeFragments = [];
 
 function hasBrowserCanvas() {
@@ -71,6 +77,7 @@ function resizeLayer(width, height) {
     lastWidth = width;
     lastHeight = height;
     terrainDirty = true;
+    markAllTerrainChunksDirty();
 }
 
 function addCellRect(graphics, x, y, size, color, alpha) {
@@ -79,6 +86,35 @@ function addCellRect(graphics, x, y, size, color, alpha) {
 
 function addLineRect(graphics, x, y, width, height, color, alpha) {
     graphics.rect(x, y, Math.max(1, width), Math.max(1, height)).fill({ color, alpha });
+}
+
+export function getPixiTerrainChunkCount(totalColumns, chunkColumns = TERRAIN_CHUNK_COLUMNS) {
+    const columns = Math.max(0, Math.floor(totalColumns));
+    const size = Math.max(1, Math.floor(chunkColumns));
+    return Math.ceil(columns / size);
+}
+
+export function getPixiTerrainChunkRangeForImpact({
+    x,
+    radius,
+    cellSize,
+    totalColumns,
+    chunkColumns = TERRAIN_CHUNK_COLUMNS,
+    paddingColumns = DIRTY_PADDING_COLUMNS
+}) {
+    const columns = Math.max(0, Math.floor(totalColumns));
+    if (columns <= 0) return { startChunk: 0, endChunk: -1 };
+
+    const size = Math.max(1, Math.floor(cellSize));
+    const chunkSize = Math.max(1, Math.floor(chunkColumns));
+    const padding = Math.max(0, Math.floor(paddingColumns));
+    const startCol = clamp(Math.floor((x - radius) / size) - padding, 0, columns - 1);
+    const endCol = clamp(Math.floor((x + radius) / size) + padding, startCol, columns - 1);
+
+    return {
+        startChunk: Math.floor(startCol / chunkSize),
+        endChunk: Math.floor(endCol / chunkSize)
+    };
 }
 
 function mixColor(a, b, amount) {
@@ -145,6 +181,56 @@ function getCellDebrisTint(cell, size) {
     return mixColor(bodyColor, gridColor, glowMix);
 }
 
+function markAllTerrainChunksDirty() {
+    dirtyTerrainChunks.clear();
+    for (let index = 0; index < terrainChunkRecords.length; index++) {
+        dirtyTerrainChunks.add(index);
+    }
+}
+
+function markTerrainChunkRangeDirty(startChunk, endChunk) {
+    if (endChunk < startChunk) return;
+    if (terrainChunkRecords.length === 0) return;
+    const maxChunk = terrainChunkRecords.length - 1;
+    const min = clamp(startChunk, 0, maxChunk);
+    const max = clamp(endChunk, min, maxChunk);
+    for (let chunkIndex = min; chunkIndex <= max; chunkIndex++) {
+        dirtyTerrainChunks.add(chunkIndex);
+    }
+}
+
+function setChunkTextureCache(graphics, enabled) {
+    if (!graphics || typeof graphics.cacheAsTexture !== 'function') return;
+    try {
+        graphics.cacheAsTexture(enabled ? { resolution: 1 } : false);
+    } catch (_error) {
+        // Pixi cacheAsTexture is an optimization only; rendering remains correct without it.
+    }
+}
+
+function destroyTerrainChunkRecord(record) {
+    if (!record) return;
+    setChunkTextureCache(record.graphics, false);
+    record.graphics.destroy();
+}
+
+function ensureTerrainChunks(chunkCount) {
+    if (!terrainChunkRoot || !Pixi) return;
+
+    while (terrainChunkRecords.length < chunkCount) {
+        const graphics = new Pixi.Graphics();
+        terrainChunkRoot.addChild(graphics);
+        terrainChunkRecords.push({ graphics, dirty: true });
+        dirtyTerrainChunks.add(terrainChunkRecords.length - 1);
+    }
+
+    while (terrainChunkRecords.length > chunkCount) {
+        const record = terrainChunkRecords.pop();
+        terrainChunkRoot.removeChild(record.graphics);
+        destroyTerrainChunkRecord(record);
+    }
+}
+
 export function getPixiTerrainDebrisLimits() {
     const pixiQuality = getRenderQualityProfile().pixi ?? {};
     return {
@@ -202,63 +288,120 @@ function syncParticleChildren() {
     particleContainer.update();
 }
 
-function rebuildTerrainGraphics(terrain) {
-    if (!ready || !terrainGraphics || !terrain) return;
-    const rebuildStart = performance.now();
+function drawTerrainCell(graphics, { topLeftX, topLeftY, size, row, col, surfaceY }) {
+    const isEdge = topLeftY <= surfaceY;
+    const depthRows = Math.max(0, Math.floor((topLeftY - surfaceY) / size));
+    const baseColor = getBodyColor(depthRows, col, row);
+    const gridColor = getGridColor(depthRows);
+    const gridAlpha = getGridAlpha(depthRows);
 
-    const width = getTerrainWidth(terrain);
-    const screenHeight = getTerrainScreenHeight(terrain);
-    const grid = getOrCreateTerrainCellGrid(terrain);
-    const cellSize = grid?.cellSize ?? getTerrainCellSize();
-    terrainGraphics.clear();
+    addCellRect(graphics, topLeftX, topLeftY, size, baseColor, 1);
+    addLineRect(graphics, topLeftX, topLeftY, size, 1, gridColor, gridAlpha);
+    addLineRect(graphics, topLeftX, topLeftY, 1, size, gridColor, gridAlpha * 0.55);
 
-    const renderCell = ({ topLeftX, topLeftY, size, row, col, surfaceY }) => {
-        const isEdge = topLeftY <= surfaceY;
-        const depthRows = Math.max(0, Math.floor((topLeftY - surfaceY) / size));
-        const baseColor = getBodyColor(depthRows, col, row);
-        const gridColor = getGridColor(depthRows);
-        const gridAlpha = getGridAlpha(depthRows);
+    if (isEdge) {
+        addLineRect(graphics, topLeftX, topLeftY, size, 2, PINK, 0.94);
+        addLineRect(graphics, topLeftX, topLeftY + 2, size, 1, CYAN, 0.5);
+        addLineRect(graphics, topLeftX, topLeftY - 1, size, 1, PURPLE, 0.42);
+    }
+}
 
-        addCellRect(terrainGraphics, topLeftX, topLeftY, size, baseColor, 1);
-        addLineRect(terrainGraphics, topLeftX, topLeftY, size, 1, gridColor, gridAlpha);
-        addLineRect(terrainGraphics, topLeftX, topLeftY, 1, size, gridColor, gridAlpha * 0.55);
+function rebuildTerrainChunk(terrain, grid, chunkIndex, cellSize) {
+    const record = terrainChunkRecords[chunkIndex];
+    if (!record) return;
 
-        if (isEdge) {
-            addLineRect(terrainGraphics, topLeftX, topLeftY, size, 2, PINK, 0.94);
-            addLineRect(terrainGraphics, topLeftX, topLeftY + 2, size, 1, CYAN, 0.5);
-            addLineRect(terrainGraphics, topLeftX, topLeftY - 1, size, 1, PURPLE, 0.42);
-        }
-    };
+    const graphics = record.graphics;
+    const startCol = chunkIndex * TERRAIN_CHUNK_COLUMNS;
+    const endCol = Math.min(
+        (grid?.columns ?? Math.ceil(getTerrainWidth(terrain) / cellSize)) - 1,
+        startCol + TERRAIN_CHUNK_COLUMNS - 1
+    );
+
+    setChunkTextureCache(graphics, false);
+    graphics.clear();
 
     if (grid) {
-        grid.forEachOccupiedCell(renderCell);
+        for (let col = startCol; col <= endCol; col++) {
+            const surfaceY = grid.getSurfaceYForColumn(col);
+            for (let row = 0; row < grid.rows; row++) {
+                if (!grid.isSolid(col, row)) continue;
+                const topLeftX = col * grid.cellSize;
+                const topLeftY = row * grid.cellSize;
+                drawTerrainCell(graphics, {
+                    topLeftX,
+                    topLeftY,
+                    size: grid.cellSize,
+                    row,
+                    col,
+                    surfaceY
+                });
+            }
+        }
     } else {
-        for (let x = 0; x < width; x += cellSize) {
+        const width = getTerrainWidth(terrain);
+        const screenHeight = getTerrainScreenHeight(terrain);
+        const startX = startCol * cellSize;
+        const endX = Math.min(width - 1, (endCol + 1) * cellSize - 1);
+
+        for (let x = startX; x <= endX; x += cellSize) {
             const sampleX = Math.min(width - 1, x + cellSize * 0.5);
             const terrainHeight = terrain.getHeight(sampleX);
             const surfaceY = screenHeight - terrainHeight;
             const topY = clamp(Math.floor(surfaceY / cellSize) * cellSize, 0, screenHeight);
+            const col = Math.floor(x / cellSize);
 
             for (let y = topY; y < screenHeight; y += cellSize) {
-                renderCell({
+                drawTerrainCell(graphics, {
                     topLeftX: x,
                     topLeftY: y,
                     size: cellSize,
                     row: Math.floor(y / cellSize),
-                    col: Math.floor(x / cellSize),
+                    col,
                     surfaceY: topY
                 });
             }
         }
     }
 
+    setChunkTextureCache(graphics, true);
+    record.dirty = false;
+}
+
+function rebuildDirtyTerrainChunks(terrain) {
+    if (!ready || !terrainChunkRoot || !terrain) return;
+    const rebuildStart = performance.now();
+
+    const width = getTerrainWidth(terrain);
+    const grid = getOrCreateTerrainCellGrid(terrain);
+    const cellSize = grid?.cellSize ?? getTerrainCellSize();
+    const columns = grid?.columns ?? Math.ceil(width / cellSize);
+    const chunkCount = getPixiTerrainChunkCount(columns);
+    const terrainChanged = lastTerrain !== terrain ||
+        lastGridColumns !== columns ||
+        lastGridCellSize !== cellSize;
+
+    ensureTerrainChunks(chunkCount);
+    if (terrainDirty || terrainChanged) {
+        markAllTerrainChunksDirty();
+    }
+
+    const rebuiltChunks = dirtyTerrainChunks.size;
+    for (const chunkIndex of dirtyTerrainChunks) {
+        rebuildTerrainChunk(terrain, grid, chunkIndex, cellSize);
+    }
+
+    dirtyTerrainChunks.clear();
     terrainDirty = false;
     lastTerrain = terrain;
+    lastGridColumns = columns;
+    lastGridCellSize = cellSize;
     recordMeasure('pixiTerrainRebuild', performance.now() - rebuildStart);
+    setPerformanceGauge('pixiTerrainChunks', terrainChunkRecords.length);
+    setPerformanceGauge('pixiTerrainDirtyChunks', rebuiltChunks);
 }
 
 function ensureReady() {
-    return ready && app && terrainRoot && terrainGraphics && particleContainer;
+    return ready && app && terrainRoot && terrainChunkRoot && particleContainer;
 }
 
 /**
@@ -294,7 +437,7 @@ export async function initPixiTerrainLayer({ width, height }) {
 
             particleTexture = makeParticleTexture();
             terrainRoot = new Pixi.Container();
-            terrainGraphics = new Pixi.Graphics();
+            terrainChunkRoot = new Pixi.Container();
             particleContainer = new Pixi.ParticleContainer({
                 texture: particleTexture,
                 boundsArea: new Pixi.Rectangle(0, 0, width, height),
@@ -308,13 +451,15 @@ export async function initPixiTerrainLayer({ width, height }) {
                 }
             });
 
-            terrainRoot.addChild(terrainGraphics);
+            terrainRoot.addChild(terrainChunkRoot);
             terrainRoot.addChild(particleContainer);
             app.stage.addChild(terrainRoot);
 
             lastWidth = width;
             lastHeight = height;
             terrainDirty = true;
+            terrainChunkRecords = [];
+            dirtyTerrainChunks.clear();
             ready = true;
             return true;
         } catch (error) {
@@ -332,8 +477,27 @@ export function isPixiTerrainLayerReady() {
     return Boolean(ensureReady());
 }
 
-export function markPixiTerrainLayerDirty() {
+export function markPixiTerrainLayerDirty(region = null) {
+    if (
+        region &&
+        Number.isFinite(region.x) &&
+        Number.isFinite(region.radius) &&
+        lastGridColumns > 0 &&
+        lastGridCellSize > 0 &&
+        terrainChunkRecords.length > 0
+    ) {
+        const range = getPixiTerrainChunkRangeForImpact({
+            x: region.x,
+            radius: region.radius,
+            cellSize: lastGridCellSize,
+            totalColumns: lastGridColumns
+        });
+        markTerrainChunkRangeDirty(range.startChunk, range.endChunk);
+        return;
+    }
+
     terrainDirty = true;
+    markAllTerrainChunksDirty();
 }
 
 /**
@@ -432,8 +596,8 @@ export function renderPixiTerrainLayerToCanvas(ctx, terrain) {
     const height = getTerrainScreenHeight(terrain);
     resizeLayer(width, height);
 
-    if (terrainDirty || lastTerrain !== terrain) {
-        rebuildTerrainGraphics(terrain);
+    if (terrainDirty || dirtyTerrainChunks.size > 0 || lastTerrain !== terrain) {
+        rebuildDirtyTerrainChunks(terrain);
     }
 
     const renderStart = performance.now();
@@ -451,9 +615,20 @@ export function clearPixiTerrainLayer() {
         particleContainer.update();
     }
     terrainDirty = true;
+    markAllTerrainChunksDirty();
     setPerformanceGauge('pixiFragments', 0);
 }
 
 export function getPixiTerrainFragmentCount() {
     return activeFragments.length;
+}
+
+export function getPixiTerrainCacheStats() {
+    return {
+        chunks: terrainChunkRecords.length,
+        dirtyChunks: dirtyTerrainChunks.size,
+        chunkColumns: TERRAIN_CHUNK_COLUMNS,
+        columns: lastGridColumns,
+        cellSize: lastGridCellSize
+    };
 }

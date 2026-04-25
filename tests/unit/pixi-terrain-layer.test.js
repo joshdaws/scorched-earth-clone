@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildTerrainCellDebrisSpec,
+  getPixiTerrainChunkCount,
+  getPixiTerrainChunkRangeForImpact,
   getPixiTerrainDebrisLimits,
   selectTerrainDebrisCells
 } from '../../js/pixiTerrainLayer.js';
@@ -66,5 +68,23 @@ describe('pixiTerrainLayer debris helpers', () => {
     expect(spec.startX).toBe(124);
     expect(spec.startY).toBe(140);
     expect(spec.size).toBe(8);
+  });
+
+  it('maps localized terrain impacts to chunk ranges with settling padding', () => {
+    expect(getPixiTerrainChunkCount(150, 18)).toBe(9);
+
+    const range = getPixiTerrainChunkRangeForImpact({
+      x: 620,
+      radius: 120,
+      cellSize: 8,
+      totalColumns: 150,
+      chunkColumns: 18,
+      paddingColumns: 3
+    });
+
+    expect(range).toEqual({
+      startChunk: 3,
+      endChunk: 5
+    });
   });
 });
