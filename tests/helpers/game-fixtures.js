@@ -15,6 +15,7 @@ export function createMockTank(overrides = {}) {
     y: 300,
     health: TANK.START_HEALTH,
     maxHealth: TANK.MAX_HEALTH,
+    shield: 0,
     team: 'player',
     angle: 45,
     power: 50,
@@ -33,6 +34,7 @@ export function createMockTank(overrides = {}) {
       height: tank.height
     }),
     isDestroyed: () => tank.health <= 0,
+    hasShield: () => tank.shield > 0,
     takeDamage: vi.fn((amount) => {
       const actualDamage = Math.min(amount, tank.health);
       tank.health -= actualDamage;

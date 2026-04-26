@@ -2,6 +2,11 @@
 
 Prompts for generating UI elements for Scorched Earth: Synthwave Edition HUD.
 
+Current runtime UI is canvas-native. These prompts are retained as source-only
+reference material; generated button, power-bar, and angle-indicator PNGs should
+not be added to `assets/manifest.json` unless the renderer is explicitly wired
+to draw them and a gameplay/menu smoke confirms they improve the shipped UI.
+
 ## Tool Recommendation
 
 **Primary**: Leonardo.ai (excellent transparency control, clean edges)
@@ -262,7 +267,7 @@ Disabled:  Pink border, 50% opacity, no glow
 
 ## Integration
 
-After generation, place files in `assets/images/ui/`:
+After generation and renderer integration, place files in `assets/images/ui/`:
 
 ```json
 {
@@ -287,6 +292,9 @@ After generation, place files in `assets/images/ui/`:
 }
 ```
 
-Note: Button may benefit from 9-slice scaling for different sizes.
+Note: Button may benefit from 9-slice scaling for different sizes. Do not keep
+unused UI bitmap experiments in runtime assets; the previous generated
+`ui-button.png`, `ui-power-bar.png`, and `ui-angle-indicator.png` files were
+removed because the game uses the more polished canvas-native HUD controls.
 
 Test in-game HUD rendering with actual content before finalizing.

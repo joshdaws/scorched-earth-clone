@@ -14,8 +14,7 @@ import * as Turn from './turn.js';
 import { COLORS, DEBUG, CANVAS, UI, GAME_STATES, TURN_PHASES, PHYSICS, TANK, PROJECTILE, GAME } from './constants.js';
 import { generateTerrain } from './terrain.js';
 import { createPlayerTank, createEnemyTank, placeTanksOnTerrain, updateTankTerrainPosition, calculateFallDamage, areAnyTanksFalling } from './tank.js';
-import { Projectile, createProjectileFromTank, checkTankCollision, createSplitProjectiles, createChainReactionProjectiles, shouldChainReact } from './projectile.js';
-import { applyExplosionDamage, applyExplosionToAllTanks, DAMAGE } from './damage.js';
+import { Projectile, createProjectileFromTank, checkTankCollision, createSplitProjectiles } from './projectile.js';
 import * as Wind from './wind.js';
 import { WeaponRegistry, WEAPON_TYPES } from './weapons.js';
 import * as AI from './ai.js';
@@ -24,7 +23,7 @@ import * as AimingControls from './aimingControls.js?v=20260111a';
 import * as VictoryDefeat from './victoryDefeat.js';
 import * as Money from './money.js';
 import * as Shop from './shop.js';
-import { spawnExplosionParticles, updateParticles, renderParticles, clearParticles, getParticleCount, screenShakeForBlastRadius, getScreenShakeOffset, clearScreenShake, screenFlash, renderScreenFlash, clearScreenFlash, initBackground, updateBackground, renderBackground, clearBackground, renderCrtEffects, setCrtEnabled, isCrtEnabled, toggleCrt } from './effects.js';
+import { updateParticles, renderParticles, clearParticles, getParticleCount, screenShakeForBlastRadius, getScreenShakeOffset, clearScreenShake, renderScreenFlash, clearScreenFlash, initBackground, updateBackground, renderBackground, clearBackground, renderCrtEffects, setCrtEnabled, isCrtEnabled, toggleCrt } from './effects.js';
 import * as Music from './music.js';
 import * as VolumeControls from './volumeControls.js';
 import * as PauseMenu from './pauseMenu.js';
@@ -58,7 +57,7 @@ import { onAchievementUnlock, clearRoundAchievements, getRoundAchievements, getU
 import * as Tokens from './tokens.js';
 import * as TankCollection from './tank-collection.js';
 import { getTank as getTankSkin } from './tank-skins.js';
-import { getPlayerSpriteKey, getTurretPivot, isRealSprite } from './tank-visuals.js';
+import { getTankSkinId, getTankSpriteKey, getTurretPivot, isRealSprite } from './tank-visuals.js';
 import { getActiveTankDesign, getCompiledTankCanvasForSkin, setRuntimeTankDesign } from './tank-design-runtime.js';
 import { PLAYER_RUNTIME_OVERRIDE_KEY } from './tank-design-store.js';
 import { renderTankEffects } from './tank-effect-renderer.js';
@@ -74,6 +73,34 @@ import * as DailyRewards from './engagement/dailyRewards.js';
 import * as DailyChallenges from './engagement/dailyChallenges.js';
 import * as EngagementUI from './engagement/engagementUI.js';
 import * as DebugOverlays from './debugOverlays.js';
+import { GAMEPLAY_EVENTS, emitGameplayEvent } from './gameplayEvents.js';
+import { resolveProjectileImpact } from './impactResolution.js';
+import { renderGameplayScene } from './gameplayRenderer.js';
+import { renderMenuScene } from './menuRenderer.js';
+import { renderTerrainScene } from './terrainRenderer.js';
+import {
+    buildTerrainDerezSamples,
+    captureTerrainDerezSnapshot,
+    clearTerrainDerezEffects,
+    registerTerrainDerezEventHandlers,
+    renderTerrainDerezEffects,
+    updateTerrainDerezEffects
+} from './terrainDerezEffect.js';
+import {
+    buildRemovedTerrainCells,
+    captureTerrainCellSnapshot,
+    getOrCreateTerrainCellGrid,
+    getTerrainGridSlopeAngle,
+    getTerrainGridSurfaceYAt,
+    rebuildTerrainCellGrid
+} from './terrainCells.js';
+import {
+    getPixiTerrainFragmentCount,
+    initPixiTerrainLayer,
+    markPixiTerrainLayerDirty,
+    renderPixiTerrainLayerToCanvas
+} from './pixiTerrainLayer.js';
+import { recordMeasure, setPerformanceGauge } from './performanceMetrics.js';
 
 // =============================================================================
 // TERRAIN STATE
@@ -100,6 +127,11 @@ let playerTank = null;
  * @type {import('./tank.js').Tank|null}
  */
 let enemyTank = null;
+
+const TANK_TURRET_SPRITE = {
+    PIVOT_X: 6,
+    PIVOT_Y: 6
+};
 
 /**
  * Current round number (1-based)
@@ -206,6 +238,31 @@ let levelModeStats = {
     shotsHit: 0,
     turnsUsed: 0,
     damageDealt: 0
+};
+
+const PHYSICS_PLAYGROUND = {
+    PANEL_X: 900,
+    PANEL_Y: 132,
+    PANEL_W: 270,
+    PANEL_H: 286,
+    BUTTON_H: 34,
+    GAP: 8,
+    TERRAIN_THROTTLE_MS: 70,
+    MIN_RADIUS: 12,
+    MAX_RADIUS: 220,
+    RADIUS_STEP: 12
+};
+
+const physicsPlaygroundState = {
+    active: false,
+    tool: 'weapon',
+    selectedWeaponId: 'basic-shot',
+    craterRadius: 72,
+    seed: 6601,
+    pointerDown: false,
+    hover: null,
+    lastTerrainEditAt: 0,
+    lastImpact: null
 };
 
 /**
@@ -1106,6 +1163,64 @@ function updateMenuButtonPositions() {
     menuButtons.dailyRewards.fontSize = layout.isCompact ? 9 : 11;
 }
 
+function ensureAssetsForState(state) {
+    const groups = [];
+
+    if (
+        state === GAME_STATES.PLAYING ||
+        state === GAME_STATES.AIMING ||
+        state === GAME_STATES.FIRING ||
+        state === GAME_STATES.ROUND_TRANSITION ||
+        state === GAME_STATES.LEVEL_COMPLETE
+    ) {
+        groups.push(Assets.ASSET_GROUPS.GAMEPLAY);
+    }
+
+    if (state === GAME_STATES.COLLECTION) {
+        groups.push(Assets.ASSET_GROUPS.COLLECTION);
+    }
+
+    if (state === GAME_STATES.SHOP) {
+        groups.push(Assets.ASSET_GROUPS.SHOP);
+    }
+
+    if (state === GAME_STATES.SUPPLY_DROP) {
+        groups.push(Assets.ASSET_GROUPS.SUPPLY_DROP, Assets.ASSET_GROUPS.COLLECTION);
+    }
+
+    if (state === GAME_STATES.LEVEL_EDITOR || state === GAME_STATES.TANK_EDITOR) {
+        groups.push(Assets.ASSET_GROUPS.EDITOR, Assets.ASSET_GROUPS.COLLECTION);
+    }
+
+    for (const group of [...new Set(groups)]) {
+        void Assets.ensureAssetGroupLoaded(group);
+    }
+}
+
+function registerAssetStateLoading() {
+    Game.onStateChange((newState) => {
+        ensureAssetsForState(newState);
+    });
+}
+
+function getMenuButtonList() {
+    return Object.values(menuButtons);
+}
+
+function clearMenuButtonInteractionState() {
+    for (const button of getMenuButtonList()) {
+        button.setHovered(false);
+        button.setPressed(false);
+    }
+}
+
+function updateMenuButtonHover(x, y) {
+    updateMenuButtonPositions();
+    for (const button of getMenuButtonList()) {
+        button.handlePointerMove(x, y);
+    }
+}
+
 // =============================================================================
 // OPTIONS OVERLAY STATE
 // =============================================================================
@@ -1172,18 +1287,22 @@ function handleMenuClick(pos) {
 
     // Ensure button positions are current for the screen size
     updateMenuButtonPositions();
+    clearMenuButtonInteractionState();
 
     if (menuButtons.start.containsPoint(pos.x, pos.y)) {
+        menuButtons.start.setPressed(true);
         // Play click sound
         Sound.playClickSound();
         // Start fade-out transition, then go to MODE_SELECT state
         startMenuTransition(GAME_STATES.MODE_SELECT);
     } else if (menuButtons.highScores.containsPoint(pos.x, pos.y)) {
+        menuButtons.highScores.setPressed(true);
         // Play click sound
         Sound.playClickSound();
         // Go to HIGH_SCORES state
         Game.setState(GAME_STATES.HIGH_SCORES);
     } else if (menuButtons.achievements.containsPoint(pos.x, pos.y)) {
+        menuButtons.achievements.setPressed(true);
         // Play click sound
         Sound.playClickSound();
         // Mark achievements as viewed when opening the screen
@@ -1191,6 +1310,7 @@ function handleMenuClick(pos) {
         // Go to ACHIEVEMENTS state
         Game.setState(GAME_STATES.ACHIEVEMENTS);
     } else if (menuButtons.collection.containsPoint(pos.x, pos.y)) {
+        menuButtons.collection.setPressed(true);
         // Play click sound
         Sound.playClickSound();
         // Mark new tanks as viewed when opening collection
@@ -1198,22 +1318,26 @@ function handleMenuClick(pos) {
         // Go to COLLECTION state
         Game.setState(GAME_STATES.COLLECTION);
     } else if (menuButtons.supplyDrop.containsPoint(pos.x, pos.y)) {
+        menuButtons.supplyDrop.setPressed(true);
         // Play click sound
         Sound.playClickSound();
         // Go to SUPPLY_DROP state
         Game.setState(GAME_STATES.SUPPLY_DROP);
     } else if (menuButtons.options.containsPoint(pos.x, pos.y) && !menuButtons.options.disabled) {
+        menuButtons.options.setPressed(true);
         // Play click sound
         Sound.playClickSound();
         // Show options overlay with volume controls
         optionsOverlayVisible = true;
         console.log('Options overlay opened');
     } else if (menuButtons.dailyChallenges.containsPoint(pos.x, pos.y)) {
+        menuButtons.dailyChallenges.setPressed(true);
         // Play click sound
         Sound.playClickSound();
         // Show daily challenges panel
         EngagementUI.showChallengePanel();
     } else if (menuButtons.dailyRewards.containsPoint(pos.x, pos.y)) {
+        menuButtons.dailyRewards.setPressed(true);
         // Play click sound
         Sound.playClickSound();
         // Show daily rewards popup
@@ -1484,6 +1608,144 @@ function renderMenuButton(ctx, button, pulseIntensity, badgeCount = 0) {
 }
 
 /**
+ * Draw a compact metric tile for menu resources and progress.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {Object} config - Tile configuration
+ * @param {number} config.x - Left X
+ * @param {number} config.y - Top Y
+ * @param {number} config.width - Tile width
+ * @param {number} config.height - Tile height
+ * @param {string} config.accent - Accent/glow color
+ * @param {string} config.label - Small uppercase label
+ * @param {string} config.value - Primary value
+ * @param {'coin'|'star'|'none'} [config.icon='none'] - Optional icon
+ * @param {number} [config.pulseIntensity=0] - Pulse intensity
+ */
+function drawMenuMetricTile(ctx, config) {
+    const {
+        x,
+        y,
+        width,
+        height,
+        accent,
+        label,
+        value,
+        icon = 'none',
+        pulseIntensity = 0
+    } = config;
+    const radius = 8;
+    const glow = 6 + pulseIntensity * 5;
+    const iconSize = Math.min(20, height * 0.34);
+    const hasIcon = icon !== 'none';
+    const valueX = hasIcon ? x + width * 0.42 : x + 10;
+    const valueY = y + height * 0.58;
+
+    ctx.save();
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.48)';
+    ctx.beginPath();
+    ctx.roundRect(x + 4, y + 5, width - 8, height, radius);
+    ctx.fill();
+
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = glow;
+    ctx.fillStyle = `${accent}26`;
+    ctx.beginPath();
+    ctx.roundRect(x - 2, y - 2, width + 4, height + 4, radius + 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    const bg = ctx.createLinearGradient(0, y, 0, y + height);
+    bg.addColorStop(0, `${accent}35`);
+    bg.addColorStop(0.24, 'rgba(31, 25, 52, 0.94)');
+    bg.addColorStop(1, 'rgba(5, 6, 18, 0.96)');
+    ctx.fillStyle = bg;
+    ctx.beginPath();
+    ctx.roundRect(x, y, width, height, radius);
+    ctx.fill();
+
+    const sheen = ctx.createLinearGradient(x, y, x + width, y + height);
+    sheen.addColorStop(0, 'rgba(255, 255, 255, 0.24)');
+    sheen.addColorStop(0.36, 'rgba(255, 255, 255, 0.04)');
+    sheen.addColorStop(1, 'rgba(255, 255, 255, 0.02)');
+    ctx.fillStyle = sheen;
+    ctx.beginPath();
+    ctx.roundRect(x + 3, y + 3, width - 6, Math.max(5, height * 0.38), radius - 2);
+    ctx.fill();
+
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 2;
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = glow;
+    ctx.beginPath();
+    ctx.roundRect(x, y, width, height, radius);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(x + 3, y + 3, width - 6, height - 6, radius - 3);
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.58)';
+    ctx.font = `bold 10px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(label, x + width / 2, y + 7);
+
+    if (hasIcon) {
+        const iconX = x + width * 0.27;
+        const iconY = valueY - 1;
+        ctx.save();
+        ctx.fillStyle = icon === 'star' ? COLORS.NEON_YELLOW : '#F59E0B';
+        ctx.shadowColor = ctx.fillStyle;
+        ctx.shadowBlur = 7;
+        ctx.beginPath();
+        if (icon === 'star') {
+            drawStarPath(ctx, iconX, iconY, iconSize * 0.55, iconSize * 0.24);
+        } else {
+            ctx.arc(iconX, iconY, iconSize * 0.48, 0, Math.PI * 2);
+        }
+        ctx.fill();
+        ctx.restore();
+    }
+
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.font = `bold ${Math.max(14, Math.round(height * 0.28))}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = hasIcon ? 'left' : 'left';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = 3;
+    ctx.fillText(value, valueX, valueY);
+
+    ctx.restore();
+}
+
+/**
+ * Build a star path.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} cx - Center X
+ * @param {number} cy - Center Y
+ * @param {number} outerRadius - Outer radius
+ * @param {number} innerRadius - Inner radius
+ */
+function drawStarPath(ctx, cx, cy, outerRadius, innerRadius) {
+    let angle = -Math.PI / 2;
+    const step = Math.PI / 5;
+
+    for (let i = 0; i < 10; i++) {
+        const radius = i % 2 === 0 ? outerRadius : innerRadius;
+        const x = cx + Math.cos(angle) * radius;
+        const y = cy + Math.sin(angle) * radius;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+        angle += step;
+    }
+    ctx.closePath();
+}
+
+/**
  * Configuration for synthwave title text effect.
  * Based on docs/examples/synthwave-title-text.html
  */
@@ -1595,296 +1857,41 @@ function drawNeonSubtitle(ctx, text, x, y, fontSize, pulseIntensity) {
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  */
 function renderMenu(ctx) {
-    // Update button positions for current screen size
-    updateMenuButtonPositions();
+    const result = renderMenuScene(ctx, {
+        animationTime: menuAnimationTime,
+        menuTransition,
+        currentMenuLayout,
+        updateMenuButtonPositions,
+        width: Renderer.getWidth(),
+        height: Renderer.getHeight(),
+        calculateMenuLayout,
+        titleSceneIsActive: TitleScene.isActive,
+        clearTransparent: Renderer.clearTransparent,
+        getViewportDimensions: Renderer.getViewportDimensions,
+        getDevicePixelRatio: Renderer.getDevicePixelRatio,
+        renderMenuBackground,
+        drawSynthwaveText,
+        drawNeonSubtitle,
+        drawMenuMetricTile,
+        menuButtons,
+        getUnviewedCount,
+        getNewTankCount: TankCollection.getNewTankCount,
+        getDailyChallengeCompletionCounts: DailyChallenges.getCompletionCounts,
+        canClaimDailyReward: DailyRewards.canClaim,
+        getTokenBalance: Tokens.getTokenBalance,
+        getBestRoundCount: HighScores.getBestRoundCount,
+        getTotalStars: Stars.getTotalStars,
+        colors: COLORS,
+        setState: Game.setState,
+        optionsOverlayVisible,
+        renderOptionsOverlay,
+        engagementUpdate: EngagementUI.update,
+        engagementRender: EngagementUI.render,
+        renderCrtEffects,
+        getCrtFullscreenParams
+    });
 
-    // Get dynamic screen dimensions
-    const width = Renderer.getWidth();
-    const height = Renderer.getHeight();
-
-    // Update animation time
-    menuAnimationTime += 16;  // Approximate 60fps frame time
-
-    // Calculate pulse intensity for glowing effects (0-1, oscillating)
-    const pulseIntensity = (Math.sin(menuAnimationTime * 0.003) + 1) / 2;
-
-    ctx.save();
-
-    // Update transition state
-    if (menuTransition.active) {
-        const elapsed = performance.now() - menuTransition.startTime;
-        const progress = Math.min(elapsed / menuTransition.duration, 1);
-
-        if (menuTransition.fadeOut) {
-            menuTransition.alpha = 1 - progress;
-        } else {
-            menuTransition.alpha = progress;
-        }
-
-        // Apply fade alpha to entire menu
-        ctx.globalAlpha = menuTransition.alpha;
-
-        // Check if transition is complete
-        if (progress >= 1 && menuTransition.fadeOut && menuTransition.targetState) {
-            menuTransition.active = false;
-            menuTransition.alpha = 1;
-            Game.setState(menuTransition.targetState);
-            ctx.restore();
-            return;
-        }
-    }
-
-    // If Three.js title scene is active, skip the 2D background
-    // and let the 3D animation show through. Otherwise render 2D fallback.
-    if (TitleScene.isActive()) {
-        // Clear entire viewport to transparent so Three.js shows through
-        // (includes letterbox areas, not just game content)
-        Renderer.clearTransparent();
-    } else {
-        // Render 2D synthwave background as fallback
-        renderMenuBackground(ctx);
-    }
-
-    // Subtle vignette overlay for better readability over 3D background
-    // Draw in viewport coordinates to cover entire screen (including letterbox)
-    const viewport = Renderer.getViewportDimensions();
-    const dpr = Renderer.getDevicePixelRatio();
-
-    ctx.save();
-    // Reset to viewport coordinates (no game content transform)
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    const vignetteGradient = ctx.createRadialGradient(
-        viewport.width / 2, viewport.height / 2, 0,
-        viewport.width / 2, viewport.height / 2, Math.max(viewport.width, viewport.height) * 0.7
-    );
-    vignetteGradient.addColorStop(0, 'rgba(10, 10, 26, 0)');
-    vignetteGradient.addColorStop(0.7, 'rgba(10, 10, 26, 0.2)');
-    vignetteGradient.addColorStop(1, 'rgba(10, 10, 26, 0.5)');
-    ctx.fillStyle = vignetteGradient;
-    ctx.fillRect(0, 0, viewport.width, viewport.height);
-
-    ctx.restore();
-
-    // Get layout configuration
-    const layout = currentMenuLayout || calculateMenuLayout(height, width);
-    const isCompact = layout.isCompact;
-    const titleScale = layout.titleScale;
-
-    // Title positioning - split into "SCORCHED" and "EARTH" on separate lines
-    // to match design reference (start-redesign.png) with chrome synthwave effect
-    // Base Y positions (at full scale), then scaled proportionally
-    const baseScorchedY = isCompact ? 100 : 120;
-    const baseEarthY = isCompact ? 190 : 220;
-    const baseSubtitleY = isCompact ? 260 : 300;
-
-    // Scale Y positions proportionally with titleScale to maintain visual balance
-    // The title block should shrink as a unit, not just the font sizes
-    const scorchedY = Math.round(baseScorchedY * titleScale);
-    const earthY = Math.round(baseEarthY * titleScale);
-    const subtitleY = Math.round(baseSubtitleY * titleScale);
-
-    // Font sizes - "SCORCHED" is larger, "EARTH" slightly smaller (using Audiowide font)
-    // Font sizes doubled for greater visual impact
-    const scorchedFontSize = Math.round(120 * titleScale);
-    const earthFontSize = Math.round(100 * titleScale);
-    const subtitleFontSize = Math.round(44 * titleScale);
-
-    // Render "SCORCHED" - chrome synthwave effect with 3D extrusion
-    drawSynthwaveText(ctx, 'SCORCHED', width / 2, scorchedY, scorchedFontSize, pulseIntensity);
-
-    // Render "EARTH" - same chrome synthwave effect
-    drawSynthwaveText(ctx, 'EARTH', width / 2, earthY, earthFontSize, pulseIntensity);
-
-    // Subtitle "SYNTHWAVE EDITION" - neon glow effect
-    drawNeonSubtitle(ctx, 'SYNTHWAVE EDITION', width / 2, subtitleY, subtitleFontSize, pulseIntensity);
-
-    // Get badge counts for buttons
-    const unviewedAchievements = getUnviewedCount();
-    const newTanks = TankCollection.getNewTankCount();
-
-    // Render menu buttons using Button component
-    menuButtons.start.render(ctx, pulseIntensity);
-    menuButtons.highScores.render(ctx, pulseIntensity);
-    menuButtons.achievements.renderWithBadge(ctx, pulseIntensity, unviewedAchievements);
-    menuButtons.collection.renderWithBadge(ctx, pulseIntensity, newTanks);
-    menuButtons.supplyDrop.render(ctx, pulseIntensity);
-    menuButtons.options.render(ctx, pulseIntensity);
-
-    // Render daily challenges button with badge for incomplete challenges
-    const challengeCounts = DailyChallenges.getCompletionCounts();
-    const incompleteChallenges = challengeCounts.total - challengeCounts.completed;
-    menuButtons.dailyChallenges.renderWithBadge(ctx, pulseIntensity, incompleteChallenges);
-
-    // Render daily rewards button with red dot when reward is claimable
-    const rewardClaimable = DailyRewards.canClaim();
-    menuButtons.dailyRewards.renderWithDot(ctx, pulseIntensity, rewardClaimable);
-
-    // Token balance display - bottom right corner with neon box (mirroring Best Run box on left)
-    const tokenBalance = Tokens.getTokenBalance();
-    const tokenPadding = isCompact ? 15 : 25;
-    const tokenFontSize = isCompact ? UI.FONT_SIZE_SMALL : UI.FONT_SIZE_MEDIUM;
-    const tokenCardWidth = isCompact ? 75 : 90;
-    const tokenCardHeight = isCompact ? 50 : 60;
-
-    // Position: bottom right corner (mirroring Best Run's bottom left position)
-    const tokenCardX = width - tokenPadding - tokenCardWidth;
-    const tokenCardY = height - tokenPadding - tokenCardHeight;
-
-    ctx.save();
-
-    // Card background with neon border (like Best Run box)
-    ctx.fillStyle = 'rgba(10, 10, 26, 0.85)';
-    ctx.beginPath();
-    ctx.roundRect(tokenCardX, tokenCardY, tokenCardWidth, tokenCardHeight, 8);
-    ctx.fill();
-
-    // Neon border with cyan glow effect
-    ctx.strokeStyle = COLORS.NEON_CYAN;
-    ctx.lineWidth = 2;
-    ctx.shadowColor = COLORS.NEON_CYAN;
-    ctx.shadowBlur = 8;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-
-    // Coin icon (circle with glow) - positioned on left side of card
-    const coinRadius = isCompact ? 8 : 10;
-    const coinX = tokenCardX + 18;
-    const coinY = tokenCardY + tokenCardHeight / 2 - 2;
-
-    ctx.fillStyle = '#F59E0B';
-    ctx.shadowColor = '#F59E0B';
-    ctx.shadowBlur = 6;
-    ctx.beginPath();
-    ctx.arc(coinX, coinY, coinRadius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-
-    // Token count - large number next to coin
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `bold ${tokenFontSize + 2}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`${tokenBalance}`, coinX + coinRadius + 8, coinY);
-
-    // "TOKENS" label - below the coin/number row
-    ctx.fillStyle = '#888899';
-    ctx.font = `${isCompact ? 9 : 11}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText('TOKENS', tokenCardX + tokenCardWidth / 2, tokenCardY + tokenCardHeight - 6);
-    ctx.restore();
-
-    // Best run display - bottom left corner as a styled card
-    const bestRound = HighScores.getBestRoundCount();
-    const bestRunFontSize = isCompact ? UI.FONT_SIZE_SMALL - 2 : UI.FONT_SIZE_SMALL;
-    const bestCardPadding = isCompact ? 15 : 25;
-    const bestCardHeight = isCompact ? 40 : 50;
-    const bestCardWidth = isCompact ? 90 : 110;
-
-    ctx.save();
-    // Card background
-    ctx.fillStyle = 'rgba(10, 10, 26, 0.85)';
-    ctx.beginPath();
-    ctx.roundRect(bestCardPadding, height - bestCardPadding - bestCardHeight, bestCardWidth, bestCardHeight, 8);
-    ctx.fill();
-
-    // Neon border with glow effect
-    ctx.strokeStyle = COLORS.NEON_YELLOW;
-    ctx.lineWidth = 2;
-    ctx.shadowColor = COLORS.NEON_YELLOW;
-    ctx.shadowBlur = 8;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-
-    // Best Run label
-    ctx.fillStyle = '#888899';
-    ctx.font = `${bestRunFontSize}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText('Best Run:', bestCardPadding + 10, height - bestCardPadding - bestCardHeight + 8);
-
-    // Best Run value
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `bold ${bestRunFontSize + 4}px ${UI.FONT_FAMILY}`;
-    ctx.textBaseline = 'bottom';
-    const roundsText = bestRound > 0 ? `${bestRound} rounds` : '--';
-    ctx.fillText(roundsText, bestCardPadding + 10, height - bestCardPadding - 6);
-    ctx.restore();
-
-    // Total Stars display - bottom center as a styled card
-    const totalStars = Stars.getTotalStars();
-    const starsCardWidth = isCompact ? 85 : 100;
-    const starsCardHeight = isCompact ? 50 : 60;
-    const starsCardX = (width - starsCardWidth) / 2;
-    const starsCardY = height - tokenPadding - starsCardHeight;
-    const starsFontSize = isCompact ? UI.FONT_SIZE_SMALL : UI.FONT_SIZE_MEDIUM;
-
-    ctx.save();
-    // Card background
-    ctx.fillStyle = 'rgba(10, 10, 26, 0.85)';
-    ctx.beginPath();
-    ctx.roundRect(starsCardX, starsCardY, starsCardWidth, starsCardHeight, 8);
-    ctx.fill();
-
-    // Neon border with pink glow effect (matching level mode color)
-    ctx.strokeStyle = COLORS.NEON_PINK;
-    ctx.lineWidth = 2;
-    ctx.shadowColor = COLORS.NEON_PINK;
-    ctx.shadowBlur = 8;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-
-    // Star icon - positioned on left side of card
-    const starIconX = starsCardX + 18;
-    const starIconY = starsCardY + starsCardHeight / 2 - 2;
-    const starRadius = isCompact ? 8 : 10;
-
-    // Draw 5-pointed star
-    ctx.fillStyle = COLORS.NEON_YELLOW;
-    ctx.shadowColor = COLORS.NEON_YELLOW;
-    ctx.shadowBlur = 6;
-    ctx.beginPath();
-    for (let i = 0; i < 5; i++) {
-        const angle = (i * 4 * Math.PI / 5) - Math.PI / 2;
-        const r = i === 0 ? starRadius : starRadius;
-        const x = starIconX + Math.cos(angle) * r;
-        const y = starIconY + Math.sin(angle) * r;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-    }
-    ctx.closePath();
-    ctx.fill();
-    ctx.shadowBlur = 0;
-
-    // Star count - large number next to star icon
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `bold ${starsFontSize + 2}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`${totalStars}`, starIconX + starRadius + 8, starIconY);
-
-    // "STARS" label - below the star/number row
-    ctx.fillStyle = '#888899';
-    ctx.font = `${isCompact ? 9 : 11}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText('STARS', starsCardX + starsCardWidth / 2, starsCardY + starsCardHeight - 6);
-    ctx.restore();
-
-    ctx.restore();
-
-    // Render options overlay on top if visible
-    if (optionsOverlayVisible) {
-        renderOptionsOverlay(ctx);
-    }
-
-    // Render engagement UI (daily rewards popup, challenge panel)
-    EngagementUI.update(0.016); // ~60fps frame time
-    EngagementUI.render(ctx);
-
-    // Render CRT effects as final post-processing overlay (fullscreen)
-    renderCrtEffects(ctx, width, height, getCrtFullscreenParams());
+    menuAnimationTime = result.animationTime;
 }
 
 /**
@@ -1960,6 +1967,7 @@ function setupMenuState() {
                 optionsOverlayVisible = false;
                 VolumeControls.reset();
             }
+            clearMenuButtonInteractionState();
             // Keep TitleScene running for mode select and difficulty select (seamless visual transition)
             // Stop it only when going to other states
             if (toState !== GAME_STATES.MODE_SELECT && toState !== GAME_STATES.DIFFICULTY_SELECT) {
@@ -2027,6 +2035,9 @@ function setupMenuState() {
         }
         if (Game.getState() === GAME_STATES.MENU && optionsOverlayVisible) {
             VolumeControls.handlePointerMove(x, y);
+        }
+        if (Game.getState() === GAME_STATES.MENU && !EngagementUI.isActive() && !optionsOverlayVisible && !NameEntry.isOpen()) {
+            updateMenuButtonHover(x, y);
         }
     });
 
@@ -2821,459 +2832,32 @@ function fireProjectile(tank) {
  * @returns {import('./projectile.js').Projectile[]} Chain reaction projectiles to spawn, or empty array
  */
 function handleProjectileExplosion(projectile, pos, directHitTank) {
-    const weaponId = projectile.weaponId;
-    const weapon = WeaponRegistry.getWeapon(weaponId);
-    const blastRadius = weapon ? weapon.blastRadius : 30;
-    const isNuclear = weapon && weapon.type === WEAPON_TYPES.NUCLEAR;
-
-    const explosion = {
-        x: pos.x,
-        y: pos.y,
-        blastRadius: blastRadius
-    };
-
-    // Track who fired this projectile for money awards
-    const isPlayerShot = projectile.owner === 'player';
-
-    // Track if player shot hit enemy for shotHit stat
-    let playerHitEnemy = false;
-    let wasDirectHit = false; // For precision achievement detection
-
-    if (directHitTank) {
-        // Store health before damage for achievement detection (Overkill)
-        const healthBeforeDamage = directHitTank.health;
-
-        // Apply explosion damage to the directly hit tank
-        const damageResult = applyExplosionDamage(explosion, directHitTank, weapon);
-
-        // Award money and record stats if player hit the enemy tank
-        if (isPlayerShot && directHitTank.team === 'enemy' && damageResult.actualDamage > 0) {
-            const hitReward = Money.awardHitReward(damageResult.actualDamage);
-            ProgressionAchievements.onMoneyEarned(hitReward);
-            LifetimeStats.recordMoneyEarned(hitReward);
-            recordStat('damageDealt', damageResult.actualDamage);
-            playerHitEnemy = true;
-            wasDirectHit = damageResult.isDirectHit;
-
-            // Level mode: track damage dealt
-            if (isLevelMode) {
-                levelModeStats.damageDealt += damageResult.actualDamage;
-            }
-
-            // Lifetime stats: record damage dealt
-            LifetimeStats.recordDamageDealt(damageResult.actualDamage);
-
-            // Combat achievement detection: damage dealt to enemy
-            CombatAchievements.onDamageDealt(damageResult, directHitTank, healthBeforeDamage);
-
-            // Weapon achievement: track damage dealt by weapon (for kill credit)
-            WeaponAchievements.onDamageDealtToEnemy(weaponId, damageResult.actualDamage, directHitTank.health);
+    return resolveProjectileImpact({
+        projectile,
+        pos,
+        directHitTank,
+        playerTank,
+        enemyTank,
+        currentTerrain,
+        isLevelMode,
+        levelModeStats,
+        tracerTrailDuration: TRACER_TRAIL_DURATION,
+        services: {
+            destroyTerrainAt,
+            updateTankTerrainPosition,
+            rebuildTerrainCellGrid,
+            markTerrainDirty: markPixiTerrainLayerDirty,
+            setExplosionEffect: effect => {
+                explosionEffect = effect;
+            },
+            addPersistentTrail: trail => {
+                persistentTrails.push(trail);
+            },
+            createFalloutZone,
+            createFireZone,
+            createGravityWell
         }
-
-        // Track damage taken by player
-        if (directHitTank.team === 'player' && damageResult.actualDamage > 0) {
-            recordStat('damageTaken', damageResult.actualDamage);
-
-            // Lifetime stats: record damage taken
-            LifetimeStats.recordDamageTaken(damageResult.actualDamage);
-
-            // Performance tracking: player took damage (affects flawless status and heavy damage penalty)
-            PerformanceTracking.onDamageTaken(damageResult.actualDamage, TANK.START_HEALTH);
-
-            // Combat achievement detection: player took damage
-            CombatAchievements.onPlayerDamageTaken(damageResult.actualDamage, directHitTank.health);
-
-            // Hidden achievement detection: check for self-inflicted damage
-            HiddenAchievements.onPlayerSelfDamage(isPlayerShot, directHitTank.health, damageResult.actualDamage);
-        }
-
-        // Also check for splash damage to other tanks
-        const allTanks = [playerTank, enemyTank].filter(t => t !== null && t !== directHitTank);
-
-        // Store health before splash damage for achievement detection
-        const splashHealthBefore = {};
-        for (const tank of allTanks) {
-            splashHealthBefore[tank.team] = tank.health;
-        }
-
-        const splashResults = applyExplosionToAllTanks(explosion, allTanks, weapon);
-
-        // Award money and record stats for splash damage
-        if (isPlayerShot) {
-            for (const result of splashResults) {
-                if (result.tank.team === 'enemy' && result.actualDamage > 0) {
-                    const splashReward = Money.awardHitReward(result.actualDamage);
-                    ProgressionAchievements.onMoneyEarned(splashReward);
-                    LifetimeStats.recordMoneyEarned(splashReward);
-                    recordStat('damageDealt', result.actualDamage);
-                    playerHitEnemy = true;
-
-                    // Level mode: track splash damage dealt
-                    if (isLevelMode) {
-                        levelModeStats.damageDealt += result.actualDamage;
-                    }
-
-                    // Lifetime stats: record splash damage dealt
-                    LifetimeStats.recordDamageDealt(result.actualDamage);
-
-                    // Combat achievement detection: splash damage dealt to enemy
-                    CombatAchievements.onDamageDealt(result, result.tank, splashHealthBefore[result.tank.team]);
-
-                    // Weapon achievement: track splash damage dealt by weapon (for kill credit)
-                    WeaponAchievements.onDamageDealtToEnemy(weaponId, result.actualDamage, result.tank.health);
-                }
-            }
-        }
-
-        // Track splash damage taken by player
-        for (const result of splashResults) {
-            if (result.tank.team === 'player' && result.actualDamage > 0) {
-                recordStat('damageTaken', result.actualDamage);
-
-                // Lifetime stats: record splash damage taken
-                LifetimeStats.recordDamageTaken(result.actualDamage);
-
-                // Combat achievement detection: player took splash damage
-                CombatAchievements.onPlayerDamageTaken(result.actualDamage, result.tank.health);
-
-                // Hidden achievement detection: check for self-inflicted splash damage
-                HiddenAchievements.onPlayerSelfDamage(isPlayerShot, result.tank.health, result.actualDamage);
-            }
-        }
-
-        console.log(`Tank hit! ${directHitTank.team} took ${damageResult.actualDamage} damage${damageResult.isDirectHit ? ' (DIRECT HIT!)' : ''}, health: ${directHitTank.health}`);
-    } else {
-        // Apply splash damage to all tanks near the explosion
-        const allTanks = [playerTank, enemyTank].filter(t => t !== null);
-
-        // Store health before damage for achievement detection
-        const healthBefore = {};
-        for (const tank of allTanks) {
-            healthBefore[tank.team] = tank.health;
-        }
-
-        const damageResults = applyExplosionToAllTanks(explosion, allTanks, weapon);
-
-        // Award money and record stats for any damage on enemy if player shot
-        if (isPlayerShot) {
-            for (const result of damageResults) {
-                if (result.tank.team === 'enemy' && result.actualDamage > 0) {
-                    const terrainHitReward = Money.awardHitReward(result.actualDamage);
-                    ProgressionAchievements.onMoneyEarned(terrainHitReward);
-                    LifetimeStats.recordMoneyEarned(terrainHitReward);
-                    recordStat('damageDealt', result.actualDamage);
-                    playerHitEnemy = true;
-
-                    // Level mode: track terrain splash damage dealt
-                    if (isLevelMode) {
-                        levelModeStats.damageDealt += result.actualDamage;
-                    }
-
-                    // Lifetime stats: record terrain splash damage dealt
-                    LifetimeStats.recordDamageDealt(result.actualDamage);
-
-                    // Combat achievement detection: damage dealt to enemy
-                    CombatAchievements.onDamageDealt(result, result.tank, healthBefore[result.tank.team]);
-
-                    // Weapon achievement: track damage dealt by weapon (for kill credit)
-                    WeaponAchievements.onDamageDealtToEnemy(weaponId, result.actualDamage, result.tank.health);
-                }
-            }
-        }
-
-        // Track damage taken by player
-        for (const result of damageResults) {
-            if (result.tank.team === 'player' && result.actualDamage > 0) {
-                recordStat('damageTaken', result.actualDamage);
-
-                // Lifetime stats: record terrain splash damage taken
-                LifetimeStats.recordDamageTaken(result.actualDamage);
-
-                // Performance tracking: player took splash damage
-                PerformanceTracking.onDamageTaken(result.actualDamage, TANK.START_HEALTH);
-
-                // Combat achievement detection: player took damage
-                CombatAchievements.onPlayerDamageTaken(result.actualDamage, result.tank.health);
-
-                // Hidden achievement detection: check for self-inflicted damage
-                HiddenAchievements.onPlayerSelfDamage(isPlayerShot, result.tank.health, result.actualDamage);
-            }
-            console.log(`Splash damage: ${result.tank.team} tank took ${result.actualDamage} damage, health: ${result.tank.health}`);
-        }
-    }
-
-    // Record shotHit if player shot hit the enemy (only once per projectile)
-    if (isPlayerShot && playerHitEnemy) {
-        recordStat('shotHit');
-
-        // Level mode: track hits for accuracy calculation
-        if (isLevelMode) {
-            levelModeStats.shotsHit++;
-        }
-
-        // Lifetime stats: record shot that hit
-        LifetimeStats.recordShot(true);
-
-        // Performance tracking: player hit enemy
-        PerformanceTracking.updateAccuracy(true);
-
-        // Precision achievement detection: player hit enemy
-        PrecisionAchievements.onPlayerHitEnemy({
-            isDirectHit: wasDirectHit,
-            playerTank: playerTank,
-            enemyTank: enemyTank
-        });
-
-        // Hidden achievement detection: player hit enemy (resets consecutive misses)
-        HiddenAchievements.onPlayerHitEnemy();
-    } else if (isPlayerShot) {
-        // Lifetime stats: record shot that missed
-        LifetimeStats.recordShot(false);
-
-        // Performance tracking: player missed
-        PerformanceTracking.updateAccuracy(false);
-
-        // Precision achievement detection: player missed
-        PrecisionAchievements.onPlayerMissed();
-
-        // Hidden achievement detection: player missed (tracks consecutive misses)
-        HiddenAchievements.onPlayerMissed();
-    }
-
-    // Trigger explosion visual effect for all weapons (before terrain destruction)
-    // Nuclear weapons get longer duration and special mushroom cloud
-    const explosionDuration = isNuclear ? 800 : 400;
-    explosionEffect = {
-        active: true,
-        x: pos.x,
-        y: pos.y,
-        radius: blastRadius,
-        startTime: performance.now(),
-        duration: explosionDuration,
-        isNuclear: isNuclear,
-        hasMushroomCloud: weapon?.mushroomCloud || false
-    };
-
-    // Save trail for Tracer weapons (showsTrajectory flag)
-    // Trail persists for TRACER_TRAIL_DURATION after explosion so player can learn trajectory
-    if (weapon?.showsTrajectory && projectile) {
-        const trail = projectile.getTrail();
-        if (trail && trail.length > 0) {
-            // Deep copy the trail positions (they'll be cleared from the projectile soon)
-            const trailCopy = trail.map(p => ({ x: p.x, y: p.y }));
-            // Add the final impact position to the trail
-            trailCopy.push({ x: pos.x, y: pos.y });
-            persistentTrails.push({
-                trail: trailCopy,
-                startTime: performance.now(),
-                duration: TRACER_TRAIL_DURATION,
-                color: weapon.trailColor || '#ffffff'
-            });
-            console.log(`Tracer trail saved with ${trailCopy.length} points`);
-        }
-    }
-
-    // Spawn explosion particles
-    spawnExplosionParticles(pos.x, pos.y, blastRadius, isNuclear);
-
-    // Screen shake for ALL weapons (intensity/duration based on blast radius)
-    // Smaller weapons get subtle shakes, larger weapons get dramatic shakes
-    screenShakeForBlastRadius(blastRadius);
-
-    // Haptic feedback for explosions (mobile devices)
-    Haptics.hapticExplosion(blastRadius);
-
-    // Destroy terrain (unless weapon has noTerrainDamage flag - e.g., Neutron Bomb, EMP)
-    if (currentTerrain && !weapon?.noTerrainDamage) {
-        destroyTerrainAt(pos.x, pos.y, blastRadius);
-
-        // Update tank positions to match new terrain height
-        if (playerTank && currentTerrain) {
-            updateTankTerrainPosition(playerTank, currentTerrain);
-        }
-        if (enemyTank && currentTerrain) {
-            updateTankTerrainPosition(enemyTank, currentTerrain);
-        }
-    } else if (weapon?.noTerrainDamage) {
-        console.log(`${weapon.name} - no terrain damage (noTerrainDamage flag)`);
-    }
-
-    // Nuclear weapon special effects (flash only - shake handled above for all weapons)
-    if (isNuclear) {
-        console.log(`Nuclear explosion at (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}) - ${weapon.name}`);
-
-        // Screen flash effect (white flash) - triggers for nuclear weapons only
-        if (weapon.screenFlash) {
-            screenFlash('white', 300);
-        }
-
-        // EMP effect - disables advanced weapons for 2 turns
-        if (weapon.emp) {
-            const allTanks = [playerTank, enemyTank].filter(t => t !== null);
-            for (const tank of allTanks) {
-                // Check if tank is within blast radius
-                const dx = tank.x - pos.x;
-                const dy = tank.y - pos.y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-
-                if (distance <= blastRadius) {
-                    tank.applyEmp(2); // Disable weapons for 2 turns
-                }
-            }
-        }
-
-        // Tactical Nuke fallout - create a fallout zone that persists
-        if (weapon.burning && weaponId === 'tactical-nuke') {
-            createFalloutZone(pos.x, pos.y, blastRadius * 0.6, 2); // 60% of blast radius, 2 turns
-        }
-
-        // Play nuclear explosion sound
-        Sound.playNuclearExplosionSound(blastRadius);
-    } else {
-        // Standard explosion sound for non-nuclear weapons
-        Sound.playExplosionSound(blastRadius);
-    }
-
-    // ==========================================================================
-    // SPECIAL WEAPON EFFECTS
-    // ==========================================================================
-
-    const isSpecial = weapon && weapon.type === WEAPON_TYPES.SPECIAL;
-
-    if (isSpecial) {
-        // Napalm - Create burning fire zone
-        if (weapon.burning && weaponId === 'napalm') {
-            createFireZone(pos.x, pos.y, blastRadius);
-            console.log(`Napalm fire zone created at (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)})`);
-        }
-
-        // Liquid Dirt - Add terrain at impact point to bury enemy
-        if (weapon.buriesTank && weaponId === 'liquid-dirt') {
-            const dirtRadius = 50; // Width of dirt pile
-            const dirtHeight = 100; // Height of dirt added
-
-            // Add terrain in a mound shape at impact point
-            for (let dx = -dirtRadius; dx <= dirtRadius; dx++) {
-                const x = Math.floor(pos.x + dx);
-                if (x >= 0 && x < currentTerrain.getWidth()) {
-                    // Create a mound shape: higher in the center, lower at edges
-                    const distFromCenter = Math.abs(dx) / dirtRadius;
-                    const heightMultiplier = 1 - (distFromCenter * distFromCenter); // Parabolic falloff
-                    const addedHeight = dirtHeight * heightMultiplier;
-
-                    const currentHeight = currentTerrain.getHeight(x);
-                    const newHeight = currentHeight + addedHeight;
-                    currentTerrain.setHeight(x, newHeight);
-                }
-            }
-
-            // Update tank positions after terrain change
-            if (playerTank && currentTerrain) {
-                updateTankTerrainPosition(playerTank, currentTerrain);
-            }
-            if (enemyTank && currentTerrain) {
-                updateTankTerrainPosition(enemyTank, currentTerrain);
-            }
-
-            console.log(`Liquid Dirt added ${dirtHeight}px terrain at (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)})`);
-        }
-
-        // Teleporter - Move the firing tank to the impact point
-        if (weapon.teleport && weaponId === 'teleporter') {
-            // Find the tank that fired this projectile
-            const firingTank = projectile.owner === 'player' ? playerTank : enemyTank;
-
-            if (firingTank && !firingTank.isDestroyed()) {
-                // Teleport to impact X position, but snap to terrain height
-                const teleportX = Math.max(32, Math.min(currentTerrain.getWidth() - 32, pos.x));
-                firingTank.x = teleportX;
-
-                // Update Y to match terrain at new position
-                updateTankTerrainPosition(firingTank, currentTerrain);
-
-                console.log(`${firingTank.team} tank teleported to (${teleportX.toFixed(1)}, ${firingTank.y.toFixed(1)})`);
-
-                // Visual effect for teleportation
-                screenFlash('#9900ff', 200); // Purple flash for teleport
-            }
-        }
-
-        // Wind Bomb - Change wind direction and strength
-        if (weapon.windEffect && weaponId === 'wind-bomb') {
-            // Generate a new random wind value
-            const currentWind = Wind.getWind();
-            const newWind = (Math.random() * 20) - 10; // Range -10 to +10
-            Wind.setWind(newWind);
-
-            console.log(`Wind Bomb changed wind from ${currentWind.toFixed(1)} to ${newWind.toFixed(1)}`);
-
-            // Visual feedback
-            screenFlash('#87ceeb', 150); // Light blue flash for wind change
-        }
-
-        // Gravity Well - Pull nearby tanks toward impact point
-        if (weapon.gravityWell && weaponId === 'gravity-well') {
-            createGravityWell(pos.x, pos.y);
-
-            // Visual effect for gravity well
-            screenFlash('#330066', 300); // Dark purple flash
-        }
-
-        // Lightning Strike - Vertical strike from sky (already handled by vertical flag in projectile)
-        if (weapon.vertical && weaponId === 'lightning-strike') {
-            // The lightning strike visual effect
-            screenFlash('#00ffff', 100); // Bright cyan flash
-
-            console.log(`Lightning Strike at (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)})`);
-        }
-
-        // Ion Cannon - Continuous beam from orbit (vertical + beam)
-        if (weapon.vertical && weapon.beam && weaponId === 'ion-cannon') {
-            // Ion Cannon has longer sustained flash effect
-            screenFlash('#ff00ff', 400); // Magenta flash for Ion Cannon
-
-            // Additional terrain damage in a line from top of screen to impact
-            const beamWidth = 10;
-            for (let dx = -beamWidth; dx <= beamWidth; dx++) {
-                const x = Math.floor(pos.x + dx);
-                if (x >= 0 && x < currentTerrain.getWidth()) {
-                    const currentHeight = currentTerrain.getHeight(x);
-                    // Reduce terrain height by 30 pixels in the beam path
-                    currentTerrain.setHeight(x, Math.max(0, currentHeight - 30));
-                }
-            }
-
-            // Update tank positions after terrain destruction
-            if (playerTank && currentTerrain) {
-                updateTankTerrainPosition(playerTank, currentTerrain);
-            }
-            if (enemyTank && currentTerrain) {
-                updateTankTerrainPosition(enemyTank, currentTerrain);
-            }
-
-            console.log(`Ion Cannon beam at (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)})`);
-        }
-    }
-
-    // Shield Buster - Extra damage is handled in damage calculation (shieldBuster flag)
-    // Note: Shield system not yet implemented, but the weapon flag is ready
-
-    // Play hit or miss sound based on whether a tank was hit
-    if (directHitTank) {
-        // Tank was directly hit - play metallic hit sound
-        Sound.playHitSound();
-    } else {
-        // Terrain hit only - play dull thud miss sound
-        Sound.playMissSound();
-    }
-
-    // Check for chain reaction - spawn child projectiles from explosion
-    if (shouldChainReact(projectile)) {
-        const chainChildren = createChainReactionProjectiles(projectile, pos);
-        return chainChildren;
-    }
-
-    return [];
+    });
 }
 
 /**
@@ -3303,7 +2887,9 @@ function updateProjectile() {
         // Handle digging projectiles
         if (projectile.isDigging) {
             // Update digging physics
-            const digResult = projectile.updateDigging(currentTerrain, tanks);
+            const digResult = projectile.updateDigging(currentTerrain, tanks, {
+                destroyTerrainAt
+            });
 
             if (digResult && digResult.explode) {
                 console.log(`Digger exploded: ${digResult.reason} at (${projectile.x.toFixed(1)}, ${projectile.y.toFixed(1)})`);
@@ -3458,12 +3044,7 @@ function updateProjectile() {
                 // Check if this is a bouncing weapon that should bounce
                 if (projectile.shouldBounce()) {
                     // Calculate terrain slope at collision point for realistic bounce
-                    const lookAhead = 5;
-                    const prevX = Math.max(0, Math.floor(collision.x) - lookAhead);
-                    const nextX = Math.min(currentTerrain.getWidth() - 1, Math.floor(collision.x) + lookAhead);
-                    const prevHeight = currentTerrain.getHeight(prevX);
-                    const nextHeight = currentTerrain.getHeight(nextX);
-                    const slopeAngle = Math.atan2(nextHeight - prevHeight, nextX - prevX);
+                    const slopeAngle = getTerrainGridSlopeAngle(currentTerrain, collision.x, 5);
 
                     console.log(`Bouncer hit terrain at (${collision.x}, ${collision.y.toFixed(1)}) - bouncing! Slope angle: ${(slopeAngle * 180 / Math.PI).toFixed(1)}°`);
                     projectile.bounce(collision.y, slopeAngle);
@@ -3854,87 +3435,10 @@ function updatePlaying(deltaTime) {
     }
 }
 
-// =============================================================================
-// TERRAIN RENDERING
-// =============================================================================
-
-/**
- * Terrain fill color - dark purple per spec
- */
-const TERRAIN_FILL_COLOR = '#1a0a2e';
-
-/**
- * Terrain edge stroke color - neon pink per spec
- */
-const TERRAIN_EDGE_COLOR = '#ff2a6d';
-
-/**
- * Render the terrain as a filled polygon with synthwave styling.
- * Terrain heights are stored as distance from bottom, so we need to flip Y
- * since canvas Y=0 is at the top.
- *
- * Rendering approach (efficient - no per-pixel operations):
- * 1. Build a single path for the terrain polygon
- * 2. Fill with solid dark purple color
- * 3. Draw neon pink edge with glow effect using shadow blur
- *
- * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
- */
 function renderTerrain(ctx) {
-    if (!currentTerrain) return;
-
-    const terrain = currentTerrain;
-    const width = terrain.getWidth();
-    const screenHeight = terrain.getScreenHeight();
-
-    // Build terrain path once and reuse for fill and stroke
-    ctx.beginPath();
-
-    // Start at bottom-left corner
-    ctx.moveTo(0, screenHeight);
-
-    // Draw terrain profile
-    // Heights are distance from bottom, so canvas Y = screenHeight - terrainHeight
-    for (let x = 0; x < width; x++) {
-        const terrainHeight = terrain.getHeight(x);
-        const canvasY = screenHeight - terrainHeight;
-        ctx.lineTo(x, canvasY);
-    }
-
-    // Close the path at bottom-right corner
-    ctx.lineTo(width - 1, screenHeight);
-    ctx.closePath();
-
-    // Fill terrain with solid dark purple
-    ctx.fillStyle = TERRAIN_FILL_COLOR;
-    ctx.fill();
-
-    // Draw terrain edge with neon glow effect
-    // Use shadow blur for the glow effect - more performant than gradient
-    ctx.save();
-
-    // Create glow effect using shadow
-    ctx.shadowColor = TERRAIN_EDGE_COLOR;
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
-
-    // Draw neon pink edge stroke
-    ctx.strokeStyle = TERRAIN_EDGE_COLOR;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    for (let x = 0; x < width; x++) {
-        const terrainHeight = terrain.getHeight(x);
-        const canvasY = screenHeight - terrainHeight;
-        if (x === 0) {
-            ctx.moveTo(x, canvasY);
-        } else {
-            ctx.lineTo(x, canvasY);
-        }
-    }
-    ctx.stroke();
-
-    ctx.restore();
+    renderTerrainScene(ctx, currentTerrain, {
+        renderPixiTerrainLayerToCanvas
+    });
 }
 
 // =============================================================================
@@ -4088,16 +3592,11 @@ function renderFireZones(ctx) {
 
 /**
  * Render a single tank.
- * First attempts to render sprite assets if available.
+ * First attempts to render split body/turret assets or sprite assets if available.
  * Falls back to geometric placeholder (64x24 body with rotating turret).
  *
  * For player tanks, uses the equipped skin's glow color.
  * For enemy tanks, uses the default pink color.
- *
- * Placeholder consists of:
- * - A rectangular body (dark fill with neon outline, 64x24)
- * - A circular turret base
- * - A turret barrel pointing at the current angle
  *
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  * @param {import('./tank.js').Tank} tank - The tank to render
@@ -4110,9 +3609,9 @@ function renderTank(ctx, tank) {
 
     const { team } = tank;
 
-    // Get equipped/playtest skin glow color for player tank
+    // Resolve shared skin/turret profile for player and enemy tanks.
     let glowColor = null;
-    let activePlayerSkinId = null;
+    let activeSkinId = null;
     if (team === 'player') {
         const equippedSkin = tankEditorPlaytestSkinId
             ? getTankSkin(tankEditorPlaytestSkinId)
@@ -4120,34 +3619,114 @@ function renderTank(ctx, tank) {
         if (equippedSkin && equippedSkin.glowColor) {
             glowColor = equippedSkin.glowColor;
         }
-        activePlayerSkinId = equippedSkin?.id || 'standard';
+        activeSkinId = getTankSkinId(tank, { playerSkinId: equippedSkin?.id || 'standard' });
+    } else {
+        activeSkinId = getTankSkinId(tank);
     }
 
     // Try to use sprite asset if available
-    const spriteKey = team === 'player' ? getPlayerSpriteKey() : 'tanks.enemy';
-    const customSprite = team === 'player' && activePlayerSkinId
-        ? getCompiledTankCanvasForSkin(activePlayerSkinId, performance.now())
+    const spriteKey = getTankSpriteKey(tank);
+    const allowPlayerRuntimeFallback = team === 'player';
+    const activeDesign = activeSkinId
+        ? getActiveTankDesign(activeSkinId, { allowPlayerRuntimeFallback })
+        : null;
+    const customSprite = activeSkinId && (team === 'player' || activeDesign)
+        ? getCompiledTankCanvasForSkin(activeSkinId, performance.now(), { allowPlayerRuntimeFallback })
         : null;
     const sprite = customSprite || Assets.get(spriteKey);
     const renderProfile = getTankRenderProfile(tank, glowColor);
+    const splitSprites = !customSprite && shouldUseSplitTankSprites(team, activeSkinId)
+        ? getTankPartSprites(team)
+        : null;
 
     // If sprite is loaded and is a real image (not a placeholder), render it
     // Note: Placeholder images have diagonal lines and are generated by assets.js
-    // For now, we always use geometric rendering since sprites aren't ready yet
-    // When sprites are available, this will automatically use them
-    if (customSprite || isRealSprite(sprite)) {
+    if (splitSprites) {
+        renderTankParts(ctx, tank, splitSprites.body, splitSprites.turret, renderProfile);
+    } else if (customSprite || isRealSprite(sprite)) {
         renderTankSprite(ctx, tank, sprite, renderProfile);
     } else {
         // Fall back to geometric placeholder rendering
         renderTankPlaceholder(ctx, tank, renderProfile);
     }
 
-    if (team === 'player' && activePlayerSkinId) {
-        const activeDesign = getActiveTankDesign(activePlayerSkinId);
-        if (activeDesign?.effects?.length) {
-            renderTankEffects(ctx, tank, activeDesign.effects, performance.now());
-        }
+    if (activeDesign?.effects?.length) {
+        renderTankEffects(ctx, tank, activeDesign.effects, performance.now());
     }
+}
+
+/**
+ * Default player and enemy tanks use generated split sprites so the turret can
+ * rotate from an authored pivot without drawing a procedural overlay.
+ *
+ * @param {string} team
+ * @param {string|null} activePlayerSkinId
+ * @returns {boolean}
+ */
+function shouldUseSplitTankSprites(team, activePlayerSkinId) {
+    return team === 'enemy' || (team === 'player' && activePlayerSkinId === 'standard');
+}
+
+/**
+ * Resolve split tank body/turret assets.
+ * @param {string} team
+ * @returns {{body: HTMLImageElement, turret: HTMLImageElement}|null}
+ */
+function getTankPartSprites(team) {
+    const body = Assets.get(team === 'player' ? 'tanks.playerBody' : 'tanks.enemyBody');
+    const turret = Assets.get(team === 'player' ? 'tanks.playerTurret' : 'tanks.enemyTurret');
+
+    if (!isRealSprite(body) || !isRealSprite(turret)) {
+        return null;
+    }
+
+    return { body, turret };
+}
+
+/**
+ * Render tank using separate generated body and turret sprites.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {import('./tank.js').Tank} tank - The tank to render
+ * @param {HTMLImageElement} bodySprite - Static tank body sprite
+ * @param {HTMLImageElement} turretSprite - Right-facing turret sprite
+ * @param {Object} renderProfile - Turret/body render settings
+ */
+function renderTankParts(ctx, tank, bodySprite, turretSprite, renderProfile) {
+    const { x, y, team, angle } = tank;
+    const { outlineColor, barrelLength } = renderProfile;
+
+    ctx.save();
+
+    const bodyX = x - bodySprite.width / 2;
+    const bodyY = y - bodySprite.height;
+    const prevSmoothing = ctx.imageSmoothingEnabled;
+
+    ctx.imageSmoothingEnabled = false;
+    ctx.shadowColor = outlineColor;
+    ctx.shadowBlur = team === 'player' ? 7 : 10;
+    ctx.drawImage(bodySprite, bodyX, bodyY);
+
+    const pivot = getTurretPivot(tank);
+    const radians = (angle * Math.PI) / 180;
+
+    ctx.save();
+    ctx.shadowBlur = team === 'player' ? 10 : 8;
+    ctx.translate(pivot.x, pivot.y);
+    ctx.rotate(-radians);
+    ctx.drawImage(turretSprite, -TANK_TURRET_SPRITE.PIVOT_X, -TANK_TURRET_SPRITE.PIVOT_Y);
+    ctx.restore();
+
+    ctx.imageSmoothingEnabled = prevSmoothing;
+    ctx.shadowBlur = team === 'player' ? 8 : 5;
+
+    const muzzleX = pivot.x + Math.cos(radians) * barrelLength;
+    const muzzleY = pivot.y - Math.sin(radians) * barrelLength;
+    ctx.beginPath();
+    ctx.arc(muzzleX, muzzleY, team === 'player' ? 2.5 : 2, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+
+    ctx.restore();
 }
 
 /**
@@ -4429,6 +4008,17 @@ const PROJECTILE_VISUAL = {
     GLOW_BLUR: 12
 };
 
+const PROJECTILE_ASSET_KEYS = {
+    'basic-shot': 'projectiles.basic',
+    mirv: 'projectiles.mirv',
+    roller: 'projectiles.roller',
+    'heavy-roller': 'projectiles.roller',
+    digger: 'projectiles.digger',
+    'heavy-digger': 'projectiles.digger',
+    nuke: 'projectiles.nuke',
+    'mini-nuke': 'projectiles.miniNuke'
+};
+
 /**
  * Convert a hex color string to RGB values.
  * @param {string} hex - Hex color (e.g., '#ff00ff')
@@ -4441,6 +4031,19 @@ function hexToRgb(hex) {
         g: parseInt(result[2], 16),
         b: parseInt(result[3], 16)
     } : { r: 249, g: 240, b: 2 }; // Default to yellow if parsing fails
+}
+
+/**
+ * Resolve generated projectile sprite for supported weapons.
+ * @param {string} weaponId - Weapon id
+ * @returns {HTMLImageElement|null}
+ */
+function getProjectileSprite(weaponId) {
+    const key = PROJECTILE_ASSET_KEYS[weaponId];
+    if (!key) return null;
+
+    const sprite = Assets.get(key);
+    return isRealSprite(sprite) ? sprite : null;
 }
 
 /**
@@ -4568,13 +4171,22 @@ function clearPersistentTrails() {
 function renderProjectile(ctx, projectile) {
     if (!projectile || !projectile.isActive()) return;
 
-    const { x, y } = projectile.getPosition();
+    const interpolationAlpha = Game.getRenderInterpolationAlpha();
+    const { x, y } = typeof projectile.getRenderPosition === 'function'
+        ? projectile.getRenderPosition(interpolationAlpha)
+        : projectile.getPosition();
     const radius = PROJECTILE_VISUAL.DIAMETER / 2;
 
     // Get projectile color - check projectile override first (for Fireworks), then weapon, then default
     const weapon = WeaponRegistry.getWeapon(projectile.weaponId);
     const projectileColor = projectile.projectileColor || weapon?.projectileColor || PROJECTILE_VISUAL.COLOR;
     const rgb = hexToRgb(projectileColor);
+    const sprite = getProjectileSprite(projectile.weaponId);
+
+    if (sprite) {
+        renderProjectileAsset(ctx, projectile, sprite, x, y, projectileColor);
+        return;
+    }
 
     ctx.save();
 
@@ -4791,6 +4403,36 @@ function renderProjectile(ctx, projectile) {
 }
 
 /**
+ * Render a generated projectile sprite with the same glow language as procedural shots.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {import('./projectile.js').Projectile} projectile - Active projectile
+ * @param {HTMLImageElement} sprite - Loaded projectile sprite
+ * @param {number} x - Projectile x
+ * @param {number} y - Projectile y
+ * @param {string} projectileColor - Glow color
+ */
+function renderProjectileAsset(ctx, projectile, sprite, x, y, projectileColor) {
+    const { vx, vy } = projectile.getVelocity();
+    let rotation = Math.atan2(vy, vx);
+
+    if (projectile.isRolling) {
+        rotation = projectile.getRollRotation();
+    }
+
+    const displayWidth = Math.max(sprite.width, PROJECTILE_VISUAL.DIAMETER);
+    const displayHeight = Math.max(sprite.height, PROJECTILE_VISUAL.DIAMETER);
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rotation);
+    ctx.shadowColor = projectileColor;
+    ctx.shadowBlur = PROJECTILE_VISUAL.GLOW_BLUR;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(sprite, -displayWidth / 2, -displayHeight / 2, displayWidth, displayHeight);
+    ctx.restore();
+}
+
+/**
  * Render the MIRV split effect (expanding flash/ring).
  * Creates a visual feedback when MIRV splits into multiple warheads.
  *
@@ -4958,7 +4600,49 @@ function renderExplosionEffect(ctx) {
         ctx.stroke();
     }
 
+    renderGeneratedExplosionOverlay(ctx, x, y, radius, progress, isNuclear);
+
     ctx.restore();
+}
+
+/**
+ * Overlay generated GPT Image 2 explosion art on the procedural blast.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {number} x - Explosion center x
+ * @param {number} y - Explosion center y
+ * @param {number} radius - Blast radius
+ * @param {number} progress - Animation progress from 0 to 1
+ * @param {boolean} isNuclear - Whether this is a nuclear explosion
+ */
+function renderGeneratedExplosionOverlay(ctx, x, y, radius, progress, isNuclear) {
+    const assetKey = getExplosionAssetKey(radius, isNuclear);
+    const sprite = Assets.get(assetKey);
+
+    if (!isRealSprite(sprite)) return;
+
+    const scaleProgress = isNuclear
+        ? 0.72 + progress * 0.38
+        : 0.62 + progress * 0.48;
+    const drawSize = radius * (isNuclear ? 3.4 : 2.65) * scaleProgress;
+    const alpha = Math.max(0, isNuclear ? 0.82 - progress * 0.28 : 0.74 - progress * 0.42);
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.globalCompositeOperation = 'screen';
+    ctx.drawImage(sprite, x - drawSize / 2, y - drawSize / 2, drawSize, drawSize);
+    ctx.restore();
+}
+
+/**
+ * Choose the generated explosion asset by weapon scale.
+ * @param {number} radius - Blast radius
+ * @param {boolean} isNuclear - Whether this is a nuclear explosion
+ * @returns {string} Asset key
+ */
+function getExplosionAssetKey(radius, isNuclear) {
+    if (isNuclear || radius >= 80) return 'effects.explosion-large';
+    if (radius >= 45) return 'effects.explosion-medium';
+    return 'effects.explosion-small';
 }
 
 // renderScreenFlash() is now imported from effects.js
@@ -5010,21 +4694,76 @@ function renderActiveProjectile(ctx) {
  * @returns {boolean} True if terrain was destroyed, false otherwise
  */
 export function destroyTerrainAt(x, y, radius) {
+    const terrainImpactStart = performance.now();
+    let impactRemovedCellCount = 0;
+
     if (!currentTerrain) {
         console.warn('Cannot destroy terrain: no terrain loaded');
+        recordMeasure('terrainImpact', performance.now() - terrainImpactStart);
+        setPerformanceGauge('terrainImpactDestroyed', 0);
+        setPerformanceGauge('terrainImpactRemovedCells', 0);
         return false;
     }
 
-    const wasDestroyed = currentTerrain.destroyTerrain(x, y, radius);
+    const derezSnapshot = captureTerrainDerezSnapshot(currentTerrain, x, radius);
+    const cellSnapshot = captureTerrainCellSnapshot(currentTerrain, x, radius);
+    const terrainGrid = getOrCreateTerrainCellGrid(currentTerrain);
+    let removedCells = terrainGrid?.destroyCircle(x, y, radius) ?? [];
+    let fallingResult = { modified: false, fallingColumns: [] };
+    let wasDestroyed = removedCells.length > 0;
+    impactRemovedCellCount = removedCells.length;
 
-    // Apply falling dirt physics after terrain destruction
     if (wasDestroyed) {
-        const fallingResult = currentTerrain.applyFallingDirt(x, radius);
-        if (fallingResult.modified) {
-            console.log('Falling dirt physics applied');
+        const settlingRadius = radius * 3;
+        fallingResult = terrainGrid.settleUnsupported({
+            minCol: Math.floor((x - settlingRadius) / terrainGrid.cellSize),
+            maxCol: Math.floor((x + settlingRadius) / terrainGrid.cellSize)
+        });
+        terrainGrid.writeHeightsToTerrain(currentTerrain);
+    } else {
+        wasDestroyed = currentTerrain.destroyTerrain(x, y, radius);
+        removedCells = wasDestroyed
+            ? buildRemovedTerrainCells(cellSnapshot, currentTerrain)
+            : [];
+        impactRemovedCellCount = removedCells.length;
+        if (wasDestroyed) {
+            const fallbackGrid = rebuildTerrainCellGrid(currentTerrain);
+            if (fallbackGrid) {
+                const settlingRadius = radius * 3;
+                fallingResult = fallbackGrid.settleUnsupported({
+                    minCol: Math.floor((x - settlingRadius) / fallbackGrid.cellSize),
+                    maxCol: Math.floor((x + settlingRadius) / fallbackGrid.cellSize)
+                });
+                fallbackGrid.writeHeightsToTerrain(currentTerrain);
+            }
         }
     }
 
+    const destructionSamples = wasDestroyed
+        ? buildTerrainDerezSamples(derezSnapshot, currentTerrain)
+        : [];
+
+    if (wasDestroyed) {
+        if (fallingResult.modified) {
+            console.log('Terrain cell settling applied');
+        }
+        markPixiTerrainLayerDirty({ x, radius: radius * 3 });
+
+        emitGameplayEvent(GAMEPLAY_EVENTS.TERRAIN_CHANGED, {
+            source: 'explosion',
+            x,
+            y,
+            radius,
+            destructionSamples,
+            removedCells,
+            fallingDirt: fallingResult,
+            terrain: currentTerrain
+        });
+    }
+
+    recordMeasure('terrainImpact', performance.now() - terrainImpactStart);
+    setPerformanceGauge('terrainImpactDestroyed', wasDestroyed ? 1 : 0);
+    setPerformanceGauge('terrainImpactRemovedCells', impactRemovedCellCount);
     return wasDestroyed;
 }
 
@@ -5204,104 +4943,444 @@ function handleSelectSpecificWeapon(weaponId) {
     return success;
 }
 
+function getPhysicsPlaygroundWeapons() {
+    return WeaponRegistry.getAllWeapons();
+}
+
+function getPhysicsPlaygroundSelectedWeapon() {
+    return WeaponRegistry.getWeapon(physicsPlaygroundState.selectedWeaponId) ||
+        getPhysicsPlaygroundWeapons()[0] ||
+        null;
+}
+
+function grantPhysicsPlaygroundWeapons() {
+    if (!playerTank) return;
+
+    for (const weapon of getPhysicsPlaygroundWeapons()) {
+        playerTank.inventory[weapon.id] = 999;
+    }
+}
+
+function setPhysicsPlaygroundWeapon(weaponId) {
+    const weapon = WeaponRegistry.getWeapon(weaponId);
+    if (!weapon) return false;
+
+    physicsPlaygroundState.selectedWeaponId = weapon.id;
+    if (playerTank) {
+        playerTank.inventory[weapon.id] = 999;
+        playerTank.setWeapon(weapon.id);
+    }
+    return true;
+}
+
+function cyclePhysicsPlaygroundWeapon(direction) {
+    const weapons = getPhysicsPlaygroundWeapons();
+    if (weapons.length === 0) return;
+
+    const currentIndex = Math.max(0, weapons.findIndex(weapon => weapon.id === physicsPlaygroundState.selectedWeaponId));
+    const nextIndex = (currentIndex + direction + weapons.length) % weapons.length;
+    setPhysicsPlaygroundWeapon(weapons[nextIndex].id);
+}
+
+function setPhysicsPlaygroundTool(tool) {
+    if (tool !== 'weapon' && tool !== 'crater') return;
+    physicsPlaygroundState.tool = tool;
+}
+
+function adjustPhysicsPlaygroundRadius(delta) {
+    physicsPlaygroundState.craterRadius = Math.max(
+        PHYSICS_PLAYGROUND.MIN_RADIUS,
+        Math.min(PHYSICS_PLAYGROUND.MAX_RADIUS, physicsPlaygroundState.craterRadius + delta)
+    );
+}
+
+function getPhysicsPlaygroundButtons() {
+    const x = PHYSICS_PLAYGROUND.PANEL_X + 16;
+    const y = PHYSICS_PLAYGROUND.PANEL_Y + 112;
+    const width = PHYSICS_PLAYGROUND.PANEL_W - 32;
+    const halfWidth = (width - PHYSICS_PLAYGROUND.GAP) / 2;
+    const rows = [
+        [
+            { id: 'tool-crater', label: 'CRATER', x, y, width: halfWidth, height: PHYSICS_PLAYGROUND.BUTTON_H },
+            { id: 'tool-weapon', label: 'WEAPON', x: x + halfWidth + PHYSICS_PLAYGROUND.GAP, y, width: halfWidth, height: PHYSICS_PLAYGROUND.BUTTON_H }
+        ],
+        [
+            { id: 'prev-weapon', label: '< WEAPON', x, y: y + 42, width: halfWidth, height: PHYSICS_PLAYGROUND.BUTTON_H },
+            { id: 'next-weapon', label: 'WEAPON >', x: x + halfWidth + PHYSICS_PLAYGROUND.GAP, y: y + 42, width: halfWidth, height: PHYSICS_PLAYGROUND.BUTTON_H }
+        ],
+        [
+            { id: 'radius-down', label: '- RADIUS', x, y: y + 84, width: halfWidth, height: PHYSICS_PLAYGROUND.BUTTON_H },
+            { id: 'radius-up', label: 'RADIUS +', x: x + halfWidth + PHYSICS_PLAYGROUND.GAP, y: y + 84, width: halfWidth, height: PHYSICS_PLAYGROUND.BUTTON_H }
+        ],
+        [
+            { id: 'reset', label: 'RESET', x, y: y + 126, width: halfWidth, height: PHYSICS_PLAYGROUND.BUTTON_H },
+            { id: 'new-seed', label: 'NEW SEED', x: x + halfWidth + PHYSICS_PLAYGROUND.GAP, y: y + 126, width: halfWidth, height: PHYSICS_PLAYGROUND.BUTTON_H }
+        ]
+    ];
+
+    return rows.flat();
+}
+
+function isPointInRect(x, y, rect) {
+    return x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height;
+}
+
+function isInsidePhysicsPlaygroundPanel(x, y) {
+    return physicsPlaygroundState.active && isPointInRect(x, y, {
+        x: PHYSICS_PLAYGROUND.PANEL_X,
+        y: PHYSICS_PLAYGROUND.PANEL_Y,
+        width: PHYSICS_PLAYGROUND.PANEL_W,
+        height: PHYSICS_PLAYGROUND.PANEL_H
+    });
+}
+
+function clearPhysicsPlaygroundTransientState() {
+    activeProjectiles = [];
+    persistentTrails = [];
+    explosionEffect = null;
+    clearParticles();
+    clearTerrainDerezEffects();
+    clearFalloutZones();
+    clearFireZones();
+    clearScreenShake();
+    clearScreenFlash();
+}
+
+function resetPhysicsPlayground({ newSeed = false } = {}) {
+    if (!physicsPlaygroundState.active) return;
+
+    physicsPlaygroundState.seed = newSeed
+        ? Math.floor(Math.random() * 1000000)
+        : physicsPlaygroundState.seed;
+    clearPhysicsPlaygroundTransientState();
+    startNewRunState();
+    Money.init();
+    Money.addMoney(99999);
+
+    currentTerrain = generateTerrain(undefined, undefined, {
+        roughness: 0.5,
+        minHeightPercent: 0.2,
+        maxHeightPercent: 0.7,
+        seed: physicsPlaygroundState.seed
+    });
+
+    const tanks = placeTanksOnTerrain(currentTerrain);
+    playerTank = tanks.player;
+    enemyTank = tanks.enemy;
+    playerTank.health = TANK.START_HEALTH;
+    playerTank.maxHealth = TANK.START_HEALTH;
+    enemyTank.health = TANK.START_HEALTH;
+    enemyTank.maxHealth = TANK.START_HEALTH;
+    grantPhysicsPlaygroundWeapons();
+    setPhysicsPlaygroundWeapon(physicsPlaygroundState.selectedWeaponId);
+    Wind.setWind(0);
+    Turn.init();
+    markPixiTerrainLayerDirty();
+    TestAPI.setPlayerTank(playerTank);
+    TestAPI.setEnemyTank(enemyTank);
+    TestAPI.setTerrain(currentTerrain);
+}
+
+function applyPhysicsPlaygroundImpact(x, y, options = {}) {
+    if (!physicsPlaygroundState.active || !currentTerrain) return false;
+
+    const tool = options.tool || physicsPlaygroundState.tool;
+    physicsPlaygroundState.lastImpact = { x, y, tool, at: performance.now() };
+
+    if (tool === 'crater') {
+        const destroyed = destroyTerrainAt(x, y, physicsPlaygroundState.craterRadius);
+        if (destroyed) {
+            if (playerTank) updateTankTerrainPosition(playerTank, currentTerrain);
+            if (enemyTank) updateTankTerrainPosition(enemyTank, currentTerrain);
+        }
+        return destroyed;
+    }
+
+    const weapon = getPhysicsPlaygroundSelectedWeapon();
+    if (!weapon) return false;
+
+    const tanks = [playerTank, enemyTank].filter(Boolean);
+    const directHit = checkTankCollision(x, y, tanks, { owner: 'player', canHitOwner: true });
+    const fakeProjectile = {
+        owner: 'player',
+        weaponId: weapon.id,
+        getTrail: () => []
+    };
+    const childProjectiles = handleProjectileExplosion(fakeProjectile, { x, y }, directHit?.tank || null);
+    if (childProjectiles?.length) {
+        activeProjectiles.push(...childProjectiles);
+    }
+    return true;
+}
+
+function handlePhysicsPlaygroundButton(buttonId) {
+    switch (buttonId) {
+        case 'tool-crater':
+            setPhysicsPlaygroundTool('crater');
+            return true;
+        case 'tool-weapon':
+            setPhysicsPlaygroundTool('weapon');
+            return true;
+        case 'prev-weapon':
+            cyclePhysicsPlaygroundWeapon(-1);
+            return true;
+        case 'next-weapon':
+            cyclePhysicsPlaygroundWeapon(1);
+            return true;
+        case 'radius-down':
+            adjustPhysicsPlaygroundRadius(-PHYSICS_PLAYGROUND.RADIUS_STEP);
+            return true;
+        case 'radius-up':
+            adjustPhysicsPlaygroundRadius(PHYSICS_PLAYGROUND.RADIUS_STEP);
+            return true;
+        case 'reset':
+            resetPhysicsPlayground();
+            return true;
+        case 'new-seed':
+            resetPhysicsPlayground({ newSeed: true });
+            return true;
+        default:
+            return false;
+    }
+}
+
+function handlePhysicsPlaygroundPointerDown(pos) {
+    if (!physicsPlaygroundState.active || Game.getState() !== GAME_STATES.PLAYING) return false;
+
+    if (isInsidePhysicsPlaygroundPanel(pos.x, pos.y)) {
+        const button = getPhysicsPlaygroundButtons().find(item => isPointInRect(pos.x, pos.y, item));
+        if (button) handlePhysicsPlaygroundButton(button.id);
+        return true;
+    }
+
+    physicsPlaygroundState.pointerDown = true;
+    physicsPlaygroundState.hover = { x: pos.x, y: pos.y };
+    physicsPlaygroundState.lastTerrainEditAt = performance.now();
+    applyPhysicsPlaygroundImpact(pos.x, pos.y);
+    return true;
+}
+
+function handlePhysicsPlaygroundPointerMove(pos) {
+    if (!physicsPlaygroundState.active || Game.getState() !== GAME_STATES.PLAYING) return false;
+
+    physicsPlaygroundState.hover = { x: pos.x, y: pos.y };
+    if (!physicsPlaygroundState.pointerDown || physicsPlaygroundState.tool !== 'crater') {
+        return isInsidePhysicsPlaygroundPanel(pos.x, pos.y);
+    }
+
+    const now = performance.now();
+    if (now - physicsPlaygroundState.lastTerrainEditAt >= PHYSICS_PLAYGROUND.TERRAIN_THROTTLE_MS) {
+        physicsPlaygroundState.lastTerrainEditAt = now;
+        applyPhysicsPlaygroundImpact(pos.x, pos.y, { tool: 'crater' });
+    }
+    return true;
+}
+
+function handlePhysicsPlaygroundPointerUp(pos) {
+    if (!physicsPlaygroundState.active) return false;
+    physicsPlaygroundState.pointerDown = false;
+    physicsPlaygroundState.hover = { x: pos.x, y: pos.y };
+    return Game.getState() === GAME_STATES.PLAYING && isInsidePhysicsPlaygroundPanel(pos.x, pos.y);
+}
+
+function handlePhysicsPlaygroundKey(keyCode, event = null) {
+    if (!physicsPlaygroundState.active) return false;
+
+    if (keyCode === 'Digit1') {
+        setPhysicsPlaygroundTool('crater');
+        return true;
+    }
+    if (keyCode === 'Digit2') {
+        setPhysicsPlaygroundTool('weapon');
+        return true;
+    }
+    if (keyCode === 'BracketLeft' || keyCode === 'Minus') {
+        adjustPhysicsPlaygroundRadius(-PHYSICS_PLAYGROUND.RADIUS_STEP);
+        return true;
+    }
+    if (keyCode === 'BracketRight' || keyCode === 'Equal') {
+        adjustPhysicsPlaygroundRadius(PHYSICS_PLAYGROUND.RADIUS_STEP);
+        return true;
+    }
+    if (keyCode === 'Tab') {
+        event?.preventDefault?.();
+        cyclePhysicsPlaygroundWeapon(event?.shiftKey ? -1 : 1);
+        return true;
+    }
+    if (keyCode === 'KeyR') {
+        resetPhysicsPlayground();
+        return true;
+    }
+    if (keyCode === 'KeyN') {
+        resetPhysicsPlayground({ newSeed: true });
+        return true;
+    }
+
+    return false;
+}
+
+function getPhysicsPlaygroundState() {
+    const weapon = getPhysicsPlaygroundSelectedWeapon();
+    return {
+        active: physicsPlaygroundState.active,
+        tool: physicsPlaygroundState.tool,
+        selectedWeaponId: weapon?.id || null,
+        selectedWeaponName: weapon?.name || null,
+        craterRadius: physicsPlaygroundState.craterRadius,
+        seed: physicsPlaygroundState.seed,
+        hover: physicsPlaygroundState.hover,
+        lastImpact: physicsPlaygroundState.lastImpact
+    };
+}
+
+function exposePhysicsPlaygroundApi() {
+    if (typeof window === 'undefined') return;
+
+    window.__SCORCHED_PHYSICS_PLAYGROUND = {
+        getState: getPhysicsPlaygroundState,
+        setTool: tool => {
+            setPhysicsPlaygroundTool(tool);
+            return getPhysicsPlaygroundState();
+        },
+        setWeapon: weaponId => {
+            setPhysicsPlaygroundWeapon(weaponId);
+            return getPhysicsPlaygroundState();
+        },
+        impact: ({ x, y, tool } = {}) => {
+            const result = applyPhysicsPlaygroundImpact(x, y, { tool });
+            return { success: Boolean(result), state: getPhysicsPlaygroundState() };
+        },
+        reset: options => {
+            resetPhysicsPlayground(options);
+            return getPhysicsPlaygroundState();
+        }
+    };
+}
+
+function deactivatePhysicsPlaygroundScene() {
+    physicsPlaygroundState.active = false;
+    physicsPlaygroundState.pointerDown = false;
+}
+
+function renderPhysicsPlaygroundOverlay(ctx) {
+    if (!physicsPlaygroundState.active || Game.getState() !== GAME_STATES.PLAYING) return;
+
+    const weapon = getPhysicsPlaygroundSelectedWeapon();
+    const panel = {
+        x: PHYSICS_PLAYGROUND.PANEL_X,
+        y: PHYSICS_PLAYGROUND.PANEL_Y,
+        width: PHYSICS_PLAYGROUND.PANEL_W,
+        height: PHYSICS_PLAYGROUND.PANEL_H
+    };
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(5, 8, 24, 0.86)';
+    ctx.strokeStyle = COLORS.NEON_CYAN;
+    ctx.lineWidth = 2;
+    ctx.shadowColor = COLORS.NEON_CYAN;
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    ctx.roundRect(panel.x, panel.y, panel.width, panel.height, 10);
+    ctx.fill();
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.font = `bold 18px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText('PHYSICS PLAYGROUND', panel.x + 16, panel.y + 14);
+
+    ctx.font = `bold 13px ${UI.FONT_FAMILY}`;
+    ctx.fillStyle = COLORS.NEON_CYAN;
+    ctx.fillText(`TOOL ${physicsPlaygroundState.tool.toUpperCase()}`, panel.x + 16, panel.y + 46);
+    ctx.fillStyle = COLORS.NEON_PINK;
+    ctx.fillText(`WEAPON ${weapon?.name || 'None'}`, panel.x + 16, panel.y + 66);
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.fillText(`RADIUS ${physicsPlaygroundState.craterRadius}px`, panel.x + 16, panel.y + 86);
+
+    for (const button of getPhysicsPlaygroundButtons()) {
+        const active = (button.id === 'tool-crater' && physicsPlaygroundState.tool === 'crater') ||
+            (button.id === 'tool-weapon' && physicsPlaygroundState.tool === 'weapon');
+        ctx.fillStyle = active ? 'rgba(40, 220, 255, 0.24)' : 'rgba(255, 255, 255, 0.06)';
+        ctx.strokeStyle = active ? COLORS.NEON_CYAN : 'rgba(111, 231, 255, 0.55)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(button.x, button.y, button.width, button.height, 6);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = active ? COLORS.TEXT_LIGHT : 'rgba(230, 244, 255, 0.9)';
+        ctx.font = `bold 12px ${UI.FONT_FAMILY}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(button.label, button.x + button.width / 2, button.y + button.height / 2 + 1);
+    }
+
+    if (physicsPlaygroundState.hover && !isInsidePhysicsPlaygroundPanel(physicsPlaygroundState.hover.x, physicsPlaygroundState.hover.y)) {
+        const { x, y } = physicsPlaygroundState.hover;
+        const radius = physicsPlaygroundState.tool === 'crater'
+            ? physicsPlaygroundState.craterRadius
+            : (weapon?.blastRadius || physicsPlaygroundState.craterRadius);
+        ctx.strokeStyle = physicsPlaygroundState.tool === 'crater' ? COLORS.NEON_CYAN : COLORS.NEON_PINK;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 8]);
+        ctx.shadowColor = ctx.strokeStyle;
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = ctx.strokeStyle;
+        ctx.fill();
+    }
+
+    ctx.restore();
+}
+
 /**
  * Render the playing screen
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  */
 function renderPlaying(ctx) {
-    // Apply screen shake offset if active
-    const shakeOffset = getScreenShakeOffset();
-    if (shakeOffset.x !== 0 || shakeOffset.y !== 0) {
-        ctx.save();
-        ctx.translate(shakeOffset.x, shakeOffset.y);
-    }
-
-    // Render synthwave background (behind everything)
-    renderBackground(ctx, Renderer.getWidth(), Renderer.getHeight());
-
-    // Render terrain (in front of background)
-    renderTerrain(ctx);
-
-    // Render fallout zones (on top of terrain, behind tanks)
-    renderFalloutZones(ctx);
-
-    // Render fire zones from Napalm (on top of terrain, behind tanks)
-    renderFireZones(ctx);
-
-    // Render tanks on terrain
-    renderTanks(ctx);
-
-    // Render shield effects around tanks (on top of tanks)
-    renderTankShields(ctx);
-
-    // Render active projectile and trail (on top of terrain and tanks)
-    renderActiveProjectile(ctx);
-
-    // Sync playerTank's angle/power with playerAim for HUD display
-    // (The tank stores the values, but playerAim is used for real-time input)
-    if (playerTank) {
-        playerTank.angle = playerAim.angle;
-        playerTank.power = playerAim.power;
-    }
-
-    // Determine turn state for HUD
     const phase = Turn.getPhase();
     const isPlayerTurn = Turn.canPlayerAim();
-    const shooter = Turn.getCurrentShooter();
 
-    // Render the complete HUD using the new ui.js module
-    // Pass the phase directly for the enhanced turn indicator
-    HUD.renderHUD(ctx, {
+    renderGameplayScene(ctx, {
+        width: Renderer.getWidth(),
+        height: Renderer.getHeight(),
         playerTank,
         enemyTank,
-        money: Money.getMoney(),
-        isPlayerTurn,
-        phase,
-        shooter,
+        playerAim,
+        currentTerrain,
         currentRound,
-        difficulty: AI.getDifficultyName(AI.getDifficulty())
-    });
-
-    // Render pause button
-    renderPauseButton(ctx);
-    renderLevelEditorReturnButton(ctx);
-
-    // Render touch aiming visuals (drag zone, rubber band, etc.)
-    // This is rendered first so button-based controls appear on top
-    if (isPlayerTurn) {
-        TouchAiming.setEnabled(true);
-        TouchAiming.render(ctx, playerTank, currentTerrain);
-    } else {
-        TouchAiming.setEnabled(false);
-    }
-
-    // Render aiming controls (power bar, angle arc, fire button, trajectory preview)
-    // These are only shown during player's turn
-    // Note: If touch aiming is active, these are still rendered but touch aiming
-    // handles trajectory preview separately
-    AimingControls.renderAimingControls(ctx, {
-        playerTank,
-        angle: playerAim.angle,
-        power: playerAim.power,
+        money: Money.getMoney(),
+        difficultyName: AI.getDifficultyName(AI.getDifficulty()),
+        phase,
         canFire: Turn.canPlayerFire(),
         isPlayerTurn,
-        terrain: currentTerrain
+        shooter: Turn.getCurrentShooter(),
+        crtParams: getCrtFullscreenParams(),
+        getScreenShakeOffset,
+        renderBackground,
+        renderTerrain,
+        renderTerrainDerezEffects,
+        renderFalloutZones,
+        renderFireZones,
+        renderTanks,
+        renderTankShields,
+        renderActiveProjectile,
+        renderHud: HUD.renderHUD,
+        renderPauseButton,
+        renderLevelEditorReturnButton,
+        setTouchAimingEnabled: TouchAiming.setEnabled,
+        renderTouchAiming: TouchAiming.render,
+        renderAimingControls: AimingControls.renderAimingControls,
+        renderScreenFlash,
+        renderDebugOverlays: DebugOverlays.render,
+        renderCrtEffects
     });
-
-    // Restore context if screen shake was applied
-    if (shakeOffset.x !== 0 || shakeOffset.y !== 0) {
-        ctx.restore();
-    }
-
-    // Render screen flash on top of everything (not affected by shake)
-    renderScreenFlash(ctx, Renderer.getWidth(), Renderer.getHeight());
-
-    // Render debug overlays (trajectory, collision boxes, grid, vectors)
-    // These render on top of gameplay but under CRT effects
-    DebugOverlays.render(ctx);
-
-    // Render CRT effects as final post-processing overlay (fullscreen)
-    renderCrtEffects(ctx, Renderer.getWidth(), Renderer.getHeight(), getCrtFullscreenParams());
 }
 
 /**
@@ -5313,6 +5392,10 @@ function handlePlayingPointerDown(pos) {
     const state = Game.getState();
     const pausableStates = [GAME_STATES.PLAYING, GAME_STATES.AIMING, GAME_STATES.FIRING];
     if (!pausableStates.includes(state)) return;
+
+    if (handlePhysicsPlaygroundPointerDown(pos)) {
+        return;
+    }
 
     // Level editor playtest shortcut: return to editor from gameplay states.
     if (isInsideLevelEditorReturnButton(pos.x, pos.y)) {
@@ -5368,6 +5451,10 @@ function handlePlayingPointerDown(pos) {
 function handlePlayingPointerMove(pos) {
     if (Game.getState() !== GAME_STATES.PLAYING) return;
 
+    if (handlePhysicsPlaygroundPointerMove(pos)) {
+        return;
+    }
+
     // Handle weapon bar swipe gesture first
     if (HUD.handleWeaponBarSwipeMove(pos.x, pos.y)) {
         return; // Swipe is active, don't process other moves
@@ -5383,6 +5470,10 @@ function handlePlayingPointerMove(pos) {
  */
 function handlePlayingPointerUp(pos) {
     if (Game.getState() !== GAME_STATES.PLAYING) return;
+
+    if (handlePhysicsPlaygroundPointerUp(pos)) {
+        return;
+    }
 
     // Handle weapon bar swipe end
     const totalWeapons = WeaponRegistry.getWeaponCount();
@@ -5441,6 +5532,10 @@ function setupPlayingState() {
 
     Input.onTouchEnd((x, y) => {
         handlePlayingPointerUp({ x, y });
+    });
+
+    Input.onKeyDown((keyCode, event) => {
+        handlePhysicsPlaygroundKey(keyCode, event);
     });
 
     // Register phase change callback to enable/disable input and apply status effects
@@ -5732,6 +5827,7 @@ function setupPlayingState() {
             clearPersistentTrails();
             clearFalloutZones();
             clearFireZones();
+            clearTerrainDerezEffects();
             explosionEffect = null;
             // Clear explosion particles
             clearParticles();
@@ -6954,6 +7050,7 @@ function quitToMenu() {
     clearBackground();
     clearPersistentTrails();
     clearFalloutZones();
+    clearTerrainDerezEffects();
     explosionEffect = null;
 
     // Reset round counter for new game
@@ -7182,6 +7279,30 @@ function setupAudioInit(canvas) {
     document.addEventListener('keydown', initAudio);
 }
 
+async function loadTitleFontWithTimeout(timeoutMs = 1200) {
+    if (!document.fonts?.load) {
+        return false;
+    }
+
+    let timeoutId = null;
+    const timeout = new Promise((resolve) => {
+        timeoutId = setTimeout(() => resolve(false), timeoutMs);
+    });
+
+    try {
+        const loaded = await Promise.race([
+            document.fonts.load(`120px ${UI.TITLE_FONT_FAMILY}`).then(() => true),
+            timeout
+        ]);
+
+        return loaded;
+    } finally {
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+        }
+    }
+}
+
 /**
  * Initialize all game modules
  */
@@ -7212,15 +7333,17 @@ async function init() {
     // Web Audio API requires user gesture to start
     setupAudioInit(canvas);
 
-    // Load assets before starting the game
+    // Load startup assets before starting the game. Gameplay and secondary
+    // screen art lazy-loads as states are entered.
     // Note: loadManifest gracefully handles missing manifest files
     await Assets.loadManifest();
-    await Assets.loadAllAssets((loaded, total, percentage) => {
-        console.log(`Loading assets: ${percentage}% (${loaded}/${total})`);
+    await Assets.loadAssetGroups([Assets.ASSET_GROUPS.BOOT, Assets.ASSET_GROUPS.TITLE], (loaded, total, percentage) => {
+        console.log(`Loading startup assets: ${percentage}% (${loaded}/${total})`);
     });
 
     // Initialize game state
     Game.init();
+    registerAssetStateLoading();
 
     // Initialize debug module
     Debug.init();
@@ -7228,14 +7351,25 @@ async function init() {
     // Preload Audiowide font to prevent flash of unstyled text (FOUT) on title screen
     // Use document.fonts.load() to explicitly load the font before rendering
     try {
-        await document.fonts.load(`120px ${UI.TITLE_FONT_FAMILY}`);
-        console.log('Audiowide font loaded successfully');
+        const fontLoaded = await loadTitleFontWithTimeout();
+        if (fontLoaded) {
+            console.log('Audiowide font loaded successfully');
+        } else {
+            console.warn('Audiowide font load timed out, continuing with fallback font');
+        }
     } catch (err) {
         console.warn('Font preloading failed, title may flash:', err);
     }
 
     // Initialize synthwave background (static layer behind gameplay)
     initBackground(Renderer.getWidth(), Renderer.getHeight());
+
+    // Initialize the GPU-backed terrain visuals. Gameplay keeps the Canvas 2D
+    // renderer; Pixi is composited into the terrain pass when available.
+    await initPixiTerrainLayer({
+        width: Renderer.getWidth(),
+        height: Renderer.getHeight()
+    });
 
     // Initialize Three.js title scene (animated 3D background for menu)
     TitleScene.init();
@@ -7338,12 +7472,15 @@ async function init() {
         getEnemyTank: () => enemyTank,
         getTerrain: () => currentTerrain,
         fireProjectile: fireProjectile,
+        destroyTerrainAt,
+        getDerezFragmentCount: getPixiTerrainFragmentCount,
         playerAim: playerAim
     });
 
     // Set up terrain change callback for TestAPI.generateTerrain()
     TestAPI.setOnTerrainChange((newTerrain) => {
         currentTerrain = newTerrain;
+        markPixiTerrainLayerDirty();
         console.log('[Main] Terrain updated via TestAPI');
     });
 
@@ -7423,6 +7560,9 @@ async function init() {
     // Initialize name entry module
     NameEntry.init();
     loadOnboardingState();
+
+    // Route terrain destruction events into anchored visual effects.
+    registerTerrainDerezEventHandlers();
 
     // Set up VolumeControls callback for Change Name button
     VolumeControls.setChangeNameCallback(() => {
@@ -7520,6 +7660,8 @@ async function init() {
  * @param {Object} params - URL parameters
  */
 function handleSceneIsolation(scene, params) {
+    deactivatePhysicsPlaygroundScene();
+
     if (!scene) {
         console.warn('[SceneIsolation] Unknown scene:', params.scene);
         console.log('[SceneIsolation] Available scenes:', SceneIsolation.listScenes().join(', '));
@@ -7553,12 +7695,23 @@ function handleSceneIsolation(scene, params) {
             setupPhysicsSandboxScene(scene, params);
             break;
 
+        case 'physics-playground':
+            setupPhysicsPlaygroundScene(scene, params);
+            break;
+
         case 'shop':
             setupShopTestScene(scene, params);
             break;
 
         case 'terrain-viewer':
             setupTerrainViewerScene(scene, params);
+            break;
+
+        case 'visual-hud':
+        case 'visual-impact':
+        case 'visual-tank-pivots':
+        case 'visual-terrain-collapse':
+            setupVisualRegressionScene(scene, params);
             break;
 
         case 'ai-debug':
@@ -7630,6 +7783,17 @@ function setupSlingshotTestScene(scene, params) {
     // Go to playing state
     Game.setState(GAME_STATES.PLAYING);
 
+    // Reapply deterministic scene hooks after PLAYING creates round entities.
+    if (params.wind !== null) {
+        Wind.setWind(params.wind);
+    } else {
+        Wind.setWind(0);
+    }
+    TestAPI.setPlayerTank(playerTank);
+    TestAPI.setEnemyTank(enemyTank);
+    TestAPI.setTerrain(currentTerrain);
+    Input.enableGameInput();
+
     console.log('[SceneIsolation] Slingshot test ready - use TestAPI.aim() and TestAPI.fire() to test');
 }
 
@@ -7660,12 +7824,6 @@ function setupPhysicsSandboxScene(scene, params) {
     playerTank = tanks.player;
     enemyTank = tanks.enemy;
 
-    // Give player all weapons with high ammo
-    const allWeapons = WeaponRegistry.getAllWeapons();
-    for (const weapon of allWeapons) {
-        playerTank.inventory[weapon.id] = 999;
-    }
-
     // Set wind (use URL param or enable normal wind)
     if (params.wind !== null) {
         Wind.setWind(params.wind);
@@ -7691,11 +7849,61 @@ function setupPhysicsSandboxScene(scene, params) {
     // Go to playing state
     Game.setState(GAME_STATES.PLAYING);
 
+    // PLAYING onEnter creates the actual round entities, so test-only state has
+    // to be applied after entering the state.
+    const allWeapons = WeaponRegistry.getAllWeapons();
+    for (const weapon of allWeapons) {
+        playerTank.inventory[weapon.id] = 999;
+    }
+
+    if (params.wind !== null) {
+        Wind.setWind(params.wind);
+    }
+
+    TestAPI.setPlayerTank(playerTank);
+    TestAPI.setEnemyTank(enemyTank);
+    TestAPI.setTerrain(currentTerrain);
+    Input.enableGameInput();
+
     console.log('[SceneIsolation] Physics sandbox ready');
     console.log('  - TestAPI.simulateProjectile({ angle, power }) - simulate without firing');
     console.log('  - TestAPI.fireAndCollect({ angle, power }) - simulate with damage calculation');
     console.log('  - TestAPI.validatePhysics({ angle, power, expectedRange }) - validate physics');
     console.log('  - All weapons available with unlimited ammo');
+}
+
+/**
+ * Setup interactive physics playground scene.
+ * Direct mouse/touch impacts route through the same terrain and weapon systems
+ * used by gameplay, with progression/input gates removed.
+ */
+function setupPhysicsPlaygroundScene(scene, params) {
+    console.log('[SceneIsolation] Setting up physics playground');
+
+    physicsPlaygroundState.active = true;
+    physicsPlaygroundState.tool = 'weapon';
+    physicsPlaygroundState.seed = params.seed ?? scene.setup.seed ?? physicsPlaygroundState.seed;
+    physicsPlaygroundState.craterRadius = params.radius ?? scene.setup.craterRadius ?? physicsPlaygroundState.craterRadius;
+    physicsPlaygroundState.selectedWeaponId = params.weapon || scene.setup.startingWeapon || physicsPlaygroundState.selectedWeaponId;
+    physicsPlaygroundState.pointerDown = false;
+    physicsPlaygroundState.hover = null;
+    physicsPlaygroundState.lastImpact = null;
+
+    Debug.setEnabled(false);
+    Game.setState(GAME_STATES.PLAYING);
+    resetPhysicsPlayground();
+    setPhysicsPlaygroundWeapon(physicsPlaygroundState.selectedWeaponId);
+    Wind.setWind(params.wind ?? scene.setup.windValue ?? 0);
+    Input.disableGameInput();
+    exposePhysicsPlaygroundApi();
+
+    TestAPI.setPlayerTank(playerTank);
+    TestAPI.setEnemyTank(enemyTank);
+    TestAPI.setTerrain(currentTerrain);
+
+    console.log('[SceneIsolation] Physics playground ready');
+    console.log('  - Mouse/touch terrain directly to trigger the active playground tool');
+    console.log('  - window.__SCORCHED_PHYSICS_PLAYGROUND.getState() exposes playground state');
 }
 
 /**
@@ -7782,6 +7990,100 @@ function setupTerrainViewerScene(scene, params) {
     console.log(`  - Seed: ${seed}`);
     console.log('  - Reload with ?scene=terrain-viewer&seed=<number> to regenerate');
     console.log('  - getTerrain().getHeight(x) to query terrain height');
+}
+
+/**
+ * Setup deterministic graphics modernization scenes for browser visual captures.
+ */
+function setupVisualRegressionScene(scene, params) {
+    const setup = scene.setup;
+    console.log(`[SceneIsolation] Setting up visual regression scene: ${setup.visualType}`);
+
+    startNewRunState();
+    Money.init();
+
+    currentRound = params.round ?? setup.round ?? 1;
+    Money.addMoney((params.money ?? setup.money ?? GAME.STARTING_MONEY) - GAME.STARTING_MONEY);
+
+    currentTerrain = generateTerrain(undefined, undefined, {
+        roughness: 0.42,
+        minHeightPercent: 0.22,
+        maxHeightPercent: 0.68,
+        seed: params.seed ?? setup.seed
+    });
+
+    const tanks = placeTanksOnTerrain(currentTerrain);
+    playerTank = tanks.player;
+    enemyTank = tanks.enemy;
+
+    const windValue = params.wind ?? setup.windValue ?? 0;
+    Wind.setWind(windValue);
+
+    const allWeapons = WeaponRegistry.getAllWeapons();
+    for (const weapon of allWeapons) {
+        playerTank.inventory[weapon.id] = 99;
+    }
+    playerTank.setWeapon(params.weapon || 'basic-shot');
+
+    Turn.init();
+    Debug.setEnabled(false);
+    Input.enableGameInput();
+
+    Game.setState(GAME_STATES.PLAYING);
+
+    currentRound = params.round ?? setup.round ?? currentRound;
+    if (setup.playerHealth) {
+        playerTank.health = setup.playerHealth;
+        playerTank.maxHealth = TANK.START_HEALTH;
+    }
+    if (setup.enemyHealth) {
+        enemyTank.health = setup.enemyHealth;
+        enemyTank.maxHealth = setup.enemyHealth;
+    }
+
+    playerAim.angle = setup.playerAngle ?? 43;
+    playerAim.power = 66;
+    playerTank.angle = playerAim.angle;
+    playerTank.power = playerAim.power;
+    enemyTank.angle = setup.enemyAngle ?? 137;
+    enemyTank.power = 62;
+    Wind.setWind(windValue);
+
+    TestAPI.setPlayerTank(playerTank);
+    TestAPI.setEnemyTank(enemyTank);
+    TestAPI.setTerrain(currentTerrain);
+
+    if (typeof window !== 'undefined') {
+        window.__SCORCHED_VISUAL_SCENE = {
+            name: setup.visualType,
+            ready: setup.visualType !== 'impact' && setup.visualType !== 'terrain-collapse',
+            trigger: null,
+            lastTriggeredAt: null
+        };
+    }
+
+    if (setup.visualType === 'impact' || setup.visualType === 'terrain-collapse') {
+        const triggerVisualImpact = () => {
+            const impactX = setup.impactX ?? Renderer.getWidth() / 2;
+            const impactY = getTerrainGridSurfaceYAt(currentTerrain, impactX);
+            destroyTerrainAt(impactX, impactY, setup.impactRadius ?? 72);
+            if (typeof window !== 'undefined' && window.__SCORCHED_VISUAL_SCENE) {
+                window.__SCORCHED_VISUAL_SCENE.ready = true;
+                window.__SCORCHED_VISUAL_SCENE.lastTriggeredAt = performance.now();
+            }
+        };
+
+        if (typeof window !== 'undefined' && window.__SCORCHED_VISUAL_SCENE) {
+            window.__SCORCHED_VISUAL_SCENE.trigger = triggerVisualImpact;
+        }
+
+        setTimeout(triggerVisualImpact, 150);
+    }
+
+    console.log('[SceneIsolation] Visual regression scene ready');
+    console.log(`  - Scene: ${setup.visualType}`);
+    console.log(`  - Seed: ${params.seed ?? setup.seed}`);
+    console.log(`  - Wind: ${windValue}`);
 }
 
 /**
@@ -7985,6 +8287,9 @@ function update(deltaTime) {
     // Update particle system
     updateParticles(deltaTime);
 
+    // Update anchored terrain de-res pixel effects
+    updateTerrainDerezEffects(deltaTime);
+
     // Update persistent trails (Tracer weapon feature - fades over time)
     updatePersistentTrails();
 
@@ -8054,6 +8359,8 @@ function render(ctx) {
 function postRender(ctx) {
     // Render achievement popup notifications (on top of all game content)
     AchievementPopup.render(ctx);
+
+    renderPhysicsPlaygroundOverlay(ctx);
 
     // Render supply drop animation (covers everything when active)
     if (SupplyDrop.isAnimating()) {

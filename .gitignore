@@ -25,6 +25,13 @@ www/
 # Logs
 *.log
 
+# Local smoke artifacts
+artifacts/browser-smoke/
+artifacts/visual-audit/
+coverage/
+playwright-report/
+test-results/
+
 # Capacitor
 ios/App/Pods/
 ios/App/App/public/
@@ -39,9 +46,6 @@ xcuserdata/
 
 # Runtime config (generated from env vars during deployment)
 config.js
-
-# Convex
-convex/_generated/
 
 # Unity (artifacts from native branch that may appear on main)
 Library/

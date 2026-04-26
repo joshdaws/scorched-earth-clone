@@ -1,14 +1,17 @@
 import { defineConfig } from 'vite';
 import path from 'path';
 
+const buildSourcemap = process.env.BUILD_SOURCEMAP === 'true';
+
 export default defineConfig({
   // Build output directory (for Capacitor)
   build: {
     outDir: 'www',
     // Don't empty outDir (we might have other files there)
     emptyOutDir: true,
-    // Generate sourcemaps for debugging
-    sourcemap: true,
+    // Release builds omit sourcemaps to keep iOS bundles small. Use
+    // `npm run build:debug` when source maps are needed for local debugging.
+    sourcemap: buildSourcemap,
     // Handle Convex dynamic imports - don't try to bundle them
     rollupOptions: {
       external: [

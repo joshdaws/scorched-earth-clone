@@ -52,6 +52,37 @@ const BUTTON_DEFAULTS = {
     textGlowPulseRange: 2
 };
 
+/**
+ * Convert common canvas color strings to an rgba string with a supplied alpha.
+ * @param {string} color - Hex/rgb/rgba color string
+ * @param {number} alpha - Alpha value from 0 to 1
+ * @returns {string} rgba color string
+ */
+function withAlpha(color, alpha) {
+    if (typeof color !== 'string') return `rgba(255, 255, 255, ${alpha})`;
+
+    const hexMatch = color.trim().match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+    if (hexMatch) {
+        let hex = hexMatch[1];
+        if (hex.length === 3) {
+            hex = hex.split('').map((char) => char + char).join('');
+        }
+        const intValue = Number.parseInt(hex, 16);
+        const r = (intValue >> 16) & 255;
+        const g = (intValue >> 8) & 255;
+        const b = intValue & 255;
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
+    const rgbMatch = color.match(/rgba?\(([^)]+)\)/i);
+    if (rgbMatch) {
+        const channels = rgbMatch[1].split(',').slice(0, 3).map((part) => part.trim());
+        return `rgba(${channels.join(', ')}, ${alpha})`;
+    }
+
+    return color;
+}
+
 // =============================================================================
 // BUTTON CLASS
 // =============================================================================
@@ -394,54 +425,139 @@ export class Button {
             glowIntensity = Math.min(1, pulseIntensity * BUTTON_DEFAULTS.hoverGlowBoost + 0.3);
         }
 
-        // Button background with rounded corners
-        ctx.fillStyle = bgColor;
+        const isPrimary = this.width >= 300;
+        const pressedOffset = this._pressed && !this.disabled ? Math.max(1, Math.round(this.height * 0.04)) : 0;
+        const radius = Math.min(this.borderRadius, this.height * 0.24);
+        const bodyY = btnY + pressedOffset;
+        const bodyHeight = this.height - pressedOffset;
+        const innerPad = Math.max(4, Math.round(this.height * 0.11));
+
+        if (!this.disabled) {
+            ctx.shadowColor = glowColor;
+            ctx.shadowBlur = (isPrimary ? 32 : 22) + glowIntensity * (isPrimary ? 22 : 16);
+            ctx.fillStyle = withAlpha(glowColor, isPrimary ? 0.26 : 0.18);
+            ctx.globalAlpha = 0.95;
+            ctx.beginPath();
+            ctx.roundRect(btnX - 6, bodyY - 4, this.width + 12, bodyHeight + 8, radius + 6);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+            ctx.shadowBlur = 0;
+        }
+
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
         ctx.beginPath();
-        ctx.roundRect(btnX, btnY, this.width, this.height, this.borderRadius);
+        ctx.roundRect(btnX + 4, btnY + this.height * 0.12, this.width - 8, this.height, radius);
         ctx.fill();
 
-        // Neon border effect with outer glow
+        const bodyGradient = ctx.createLinearGradient(0, bodyY, 0, bodyY + bodyHeight);
+        if (this.disabled) {
+            bodyGradient.addColorStop(0, BUTTON_DEFAULTS.disabledBgColor);
+            bodyGradient.addColorStop(1, 'rgba(10, 10, 20, 0.75)');
+        } else {
+            bodyGradient.addColorStop(0, withAlpha(glowColor, isPrimary ? 0.55 : 0.34));
+            bodyGradient.addColorStop(0.45, bgColor);
+            bodyGradient.addColorStop(1, 'rgba(5, 6, 18, 0.96)');
+        }
+
+        ctx.fillStyle = bodyGradient;
+        ctx.beginPath();
+        ctx.roundRect(btnX, bodyY, this.width, bodyHeight, radius);
+        ctx.fill();
+
         if (!this.disabled) {
-            // Outer glow layer - softer, wider glow
+            ctx.fillStyle = withAlpha(glowColor, isPrimary ? 0.2 : 0.13);
+            ctx.beginPath();
+            ctx.roundRect(
+                btnX + innerPad,
+                bodyY + innerPad,
+                this.width - innerPad * 2,
+                bodyHeight - innerPad * 1.8,
+                Math.max(2, radius - innerPad)
+            );
+            ctx.fill();
+
+            const sheenGradient = ctx.createLinearGradient(btnX, bodyY, btnX + this.width, bodyY + bodyHeight);
+            sheenGradient.addColorStop(0, 'rgba(255, 255, 255, 0.34)');
+            sheenGradient.addColorStop(0.28, 'rgba(255, 255, 255, 0.04)');
+            sheenGradient.addColorStop(0.62, 'rgba(255, 255, 255, 0.15)');
+            sheenGradient.addColorStop(1, 'rgba(255, 255, 255, 0.02)');
+            ctx.fillStyle = sheenGradient;
+            ctx.beginPath();
+            ctx.roundRect(btnX + 3, bodyY + 3, this.width - 6, Math.max(4, bodyHeight * 0.42), Math.max(2, radius - 3));
+            ctx.fill();
+
+            const accentY = bodyY + bodyHeight - Math.max(7, Math.round(bodyHeight * 0.18));
+            const accentWidth = this.width * (isPrimary ? 0.72 : 0.5);
+            const accentGradient = ctx.createLinearGradient(this.x - accentWidth / 2, 0, this.x + accentWidth / 2, 0);
+            accentGradient.addColorStop(0, withAlpha(glowColor, 0));
+            accentGradient.addColorStop(0.5, withAlpha(glowColor, 0.82));
+            accentGradient.addColorStop(1, withAlpha(glowColor, 0));
+            ctx.fillStyle = accentGradient;
+            ctx.shadowColor = glowColor;
+            ctx.shadowBlur = 8 + glowIntensity * 8;
+            ctx.beginPath();
+            ctx.roundRect(this.x - accentWidth / 2, accentY, accentWidth, 3, 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.roundRect(btnX + 2, bodyY + 2, this.width - 4, bodyHeight - 4, Math.max(2, radius - 2));
+            ctx.clip();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.055)';
+            ctx.lineWidth = 1;
+            for (let y = bodyY + 7; y < bodyY + bodyHeight; y += 6) {
+                ctx.beginPath();
+                ctx.moveTo(btnX + 8, y);
+                ctx.lineTo(btnX + this.width - 8, y);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        if (!this.disabled) {
             ctx.shadowColor = glowColor;
             ctx.shadowBlur = BUTTON_DEFAULTS.glowBlur + glowIntensity * BUTTON_DEFAULTS.glowPulseRange;
             ctx.shadowOffsetX = 0;
             ctx.shadowOffsetY = 0;
             ctx.strokeStyle = borderColor;
-            ctx.lineWidth = this.borderWidth;
+            ctx.lineWidth = this.borderWidth + (isPrimary ? 1 : 0);
             ctx.beginPath();
-            ctx.roundRect(btnX, btnY, this.width, this.height, this.borderRadius);
+            ctx.roundRect(btnX, bodyY, this.width, bodyHeight, radius);
             ctx.stroke();
 
-            // Inner border - crisp line without shadow
             ctx.shadowBlur = 0;
-            ctx.strokeStyle = borderColor;
-            ctx.lineWidth = this.borderWidth;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+            ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.roundRect(btnX, btnY, this.width, this.height, this.borderRadius);
+            ctx.roundRect(btnX + 3, bodyY + 3, this.width - 6, bodyHeight - 6, Math.max(2, radius - 3));
+            ctx.stroke();
+
+            ctx.strokeStyle = borderColor;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(btnX + radius, bodyY + 1.5);
+            ctx.lineTo(btnX + this.width - radius, bodyY + 1.5);
             ctx.stroke();
         } else {
-            // Disabled button border
             ctx.strokeStyle = BUTTON_DEFAULTS.disabledBorderColor;
             ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.roundRect(btnX, btnY, this.width, this.height, this.borderRadius);
+            ctx.roundRect(btnX, bodyY, this.width, bodyHeight, radius);
             ctx.stroke();
         }
 
-        // Reset shadow for text
         ctx.shadowBlur = 0;
 
-        // Button text with subtle glow
         if (!this.disabled) {
             ctx.shadowColor = glowColor;
-            ctx.shadowBlur = BUTTON_DEFAULTS.textGlowBlur + glowIntensity * BUTTON_DEFAULTS.textGlowPulseRange;
+            ctx.shadowBlur = (isPrimary ? 7 : BUTTON_DEFAULTS.textGlowBlur) + glowIntensity * BUTTON_DEFAULTS.textGlowPulseRange;
         }
         ctx.fillStyle = textColor;
         ctx.font = `bold ${this.fontSize}px ${this.fontFamily}`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(this.text, this.x, this.y);
+        ctx.fillText(this.text, this.x, this.y + pressedOffset);
 
         ctx.restore();
     }

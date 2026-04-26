@@ -361,6 +361,204 @@ let previousColor = '';
 // =============================================================================
 
 /**
+ * Apply alpha to common canvas color strings.
+ * @param {string} color - Hex/rgb/rgba color
+ * @param {number} alpha - Alpha value
+ * @returns {string} rgba color
+ */
+function withAlpha(color, alpha) {
+    if (typeof color !== 'string') return `rgba(255, 255, 255, ${alpha})`;
+
+    const hexMatch = color.trim().match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+    if (hexMatch) {
+        let hex = hexMatch[1];
+        if (hex.length === 3) {
+            hex = hex.split('').map((char) => char + char).join('');
+        }
+        const value = Number.parseInt(hex, 16);
+        return `rgba(${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255}, ${alpha})`;
+    }
+
+    const rgbMatch = color.match(/rgba?\(([^)]+)\)/i);
+    if (rgbMatch) {
+        const channels = rgbMatch[1].split(',').slice(0, 3).map((part) => part.trim());
+        return `rgba(${channels.join(', ')}, ${alpha})`;
+    }
+
+    return color;
+}
+
+/**
+ * Draw shared HUD chrome with depth, gradient fill, and neon rail.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} x - Left X
+ * @param {number} y - Top Y
+ * @param {number} width - Width
+ * @param {number} height - Height
+ * @param {string} accent - Accent color
+ * @param {Object} [options] - Render options
+ * @param {number} [options.radius=8] - Corner radius
+ * @param {boolean} [options.pressed=false] - Pressed state
+ */
+function drawChromePanel(ctx, x, y, width, height, accent, options = {}) {
+    const radius = options.radius ?? 8;
+    const pressed = options.pressed ?? false;
+    const offsetY = pressed ? Math.max(1, Math.round(height * 0.04)) : 0;
+    const drawY = y + offsetY;
+    const drawHeight = height - offsetY;
+
+    ctx.save();
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.48)';
+    ctx.beginPath();
+    ctx.roundRect(x + 4, y + height * 0.1, width - 8, height, radius);
+    ctx.fill();
+
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = pressed ? 14 : 8;
+    ctx.fillStyle = withAlpha(accent, pressed ? 0.22 : 0.13);
+    ctx.beginPath();
+    ctx.roundRect(x - 2, drawY - 2, width + 4, drawHeight + 4, radius + 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    const gradient = ctx.createLinearGradient(0, drawY, 0, drawY + drawHeight);
+    gradient.addColorStop(0, withAlpha(accent, pressed ? 0.34 : 0.24));
+    gradient.addColorStop(0.32, 'rgba(24, 21, 43, 0.94)');
+    gradient.addColorStop(1, 'rgba(4, 5, 15, 0.96)');
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.roundRect(x, drawY, width, drawHeight, radius);
+    ctx.fill();
+
+    const sheen = ctx.createLinearGradient(x, drawY, x + width, drawY + drawHeight);
+    sheen.addColorStop(0, 'rgba(255, 255, 255, 0.22)');
+    sheen.addColorStop(0.28, 'rgba(255, 255, 255, 0.04)');
+    sheen.addColorStop(0.7, 'rgba(255, 255, 255, 0.11)');
+    sheen.addColorStop(1, 'rgba(255, 255, 255, 0.02)');
+    ctx.fillStyle = sheen;
+    ctx.beginPath();
+    ctx.roundRect(x + 3, drawY + 3, width - 6, Math.max(5, drawHeight * 0.38), Math.max(2, radius - 3));
+    ctx.fill();
+
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = pressed ? 3 : 2;
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = pressed ? 12 : 7;
+    ctx.beginPath();
+    ctx.roundRect(x, drawY, width, drawHeight, radius);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.16)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(x + 3, drawY + 3, width - 6, drawHeight - 6, Math.max(2, radius - 3));
+    ctx.stroke();
+
+    ctx.restore();
+}
+
+/**
+ * Build an angled cockpit panel path.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} x - Left X
+ * @param {number} y - Top Y
+ * @param {number} width - Width
+ * @param {number} height - Height
+ * @param {number} cut - Corner cut size
+ */
+function buildChamferPath(ctx, x, y, width, height, cut) {
+    ctx.moveTo(x + cut, y);
+    ctx.lineTo(x + width - cut, y);
+    ctx.lineTo(x + width, y + cut);
+    ctx.lineTo(x + width, y + height - cut);
+    ctx.lineTo(x + width - cut, y + height);
+    ctx.lineTo(x + cut, y + height);
+    ctx.lineTo(x, y + height - cut);
+    ctx.lineTo(x, y + cut);
+    ctx.closePath();
+}
+
+/**
+ * Draw a sharper top-HUD instrument panel.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} x - Left X
+ * @param {number} y - Top Y
+ * @param {number} width - Width
+ * @param {number} height - Height
+ * @param {string} accent - Accent color
+ */
+function drawInstrumentPanel(ctx, x, y, width, height, accent) {
+    const cut = Math.min(18, height * 0.22);
+
+    ctx.save();
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.52)';
+    ctx.beginPath();
+    buildChamferPath(ctx, x + 5, y + 7, width - 10, height, cut);
+    ctx.fill();
+
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = withAlpha(accent, 0.16);
+    ctx.beginPath();
+    buildChamferPath(ctx, x - 2, y - 2, width + 4, height + 4, cut + 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    const bg = ctx.createLinearGradient(0, y, 0, y + height);
+    bg.addColorStop(0, withAlpha(accent, 0.34));
+    bg.addColorStop(0.18, 'rgba(42, 38, 68, 0.92)');
+    bg.addColorStop(0.48, 'rgba(9, 10, 27, 0.95)');
+    bg.addColorStop(1, 'rgba(3, 4, 13, 0.98)');
+    ctx.fillStyle = bg;
+    ctx.beginPath();
+    buildChamferPath(ctx, x, y, width, height, cut);
+    ctx.fill();
+
+    const topSheen = ctx.createLinearGradient(x, y, x + width, y + height * 0.45);
+    topSheen.addColorStop(0, 'rgba(255, 255, 255, 0.22)');
+    topSheen.addColorStop(0.28, 'rgba(255, 255, 255, 0.04)');
+    topSheen.addColorStop(0.78, 'rgba(255, 255, 255, 0.12)');
+    topSheen.addColorStop(1, 'rgba(255, 255, 255, 0.02)');
+    ctx.fillStyle = topSheen;
+    ctx.beginPath();
+    buildChamferPath(ctx, x + 4, y + 4, width - 8, Math.max(10, height * 0.34), Math.max(4, cut - 4));
+    ctx.fill();
+
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 2;
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = 9;
+    ctx.beginPath();
+    buildChamferPath(ctx, x, y, width, height, cut);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    buildChamferPath(ctx, x + 4, y + 4, width - 8, height - 8, Math.max(4, cut - 4));
+    ctx.stroke();
+
+    const railWidth = width * 0.62;
+    const railX = x + (width - railWidth) / 2;
+    const rail = ctx.createLinearGradient(railX, 0, railX + railWidth, 0);
+    rail.addColorStop(0, withAlpha(accent, 0));
+    rail.addColorStop(0.5, withAlpha(accent, 0.82));
+    rail.addColorStop(1, withAlpha(accent, 0));
+    ctx.fillStyle = rail;
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.roundRect(railX, y + height - 7, railWidth, 3, 2);
+    ctx.fill();
+
+    ctx.restore();
+}
+
+/**
  * Draw a rounded rectangle panel with synthwave styling.
  * Supports pressed state for touch feedback.
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
@@ -374,30 +572,7 @@ let previousColor = '';
  */
 function drawPanel(ctx, x, y, width, height, borderColor, rightAligned = false, isPressed = false) {
     const drawX = rightAligned ? x - width : x;
-
-    ctx.save();
-
-    // Dark translucent background - brighter when pressed
-    ctx.fillStyle = isPressed ? 'rgba(30, 30, 60, 0.95)' : 'rgba(10, 10, 26, 0.85)';
-    ctx.beginPath();
-    ctx.roundRect(drawX, y, width, height, 8);
-    ctx.fill();
-
-    // Inner highlight when pressed
-    if (isPressed) {
-        ctx.fillStyle = `${borderColor}15`;  // 8% opacity highlight
-        ctx.fill();
-    }
-
-    // Glowing border - stronger when pressed
-    ctx.strokeStyle = borderColor;
-    ctx.lineWidth = isPressed ? 3 : 2;
-    ctx.shadowColor = borderColor;
-    ctx.shadowBlur = isPressed ? 10 : 4;
-    ctx.stroke();
-
-    ctx.restore();
-
+    drawChromePanel(ctx, drawX, y, width, height, borderColor, { pressed: isPressed });
     return drawX;
 }
 
@@ -413,30 +588,7 @@ function drawGameStatePanel(ctx, contentHeight = 0) {
     const height = Math.max(panel.MIN_HEIGHT, panel.MIN_HEIGHT + contentHeight);
     const drawX = panel.X - panel.WIDTH / 2;  // Center horizontally
 
-    ctx.save();
-
-    // Dark translucent background
-    ctx.fillStyle = 'rgba(10, 10, 26, 0.85)';
-    ctx.beginPath();
-    ctx.roundRect(drawX, panel.Y, panel.WIDTH, height, panel.BORDER_RADIUS);
-    ctx.fill();
-
-    // Cyan glowing border (synthwave aesthetic)
-    ctx.strokeStyle = COLORS.NEON_CYAN;
-    ctx.lineWidth = 2;
-    ctx.shadowColor = COLORS.NEON_CYAN;
-    ctx.shadowBlur = 8;
-    ctx.stroke();
-
-    // Subtle inner glow effect
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = `${COLORS.NEON_CYAN}40`;  // 25% opacity
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.roundRect(drawX + 2, panel.Y + 2, panel.WIDTH - 4, height - 4, panel.BORDER_RADIUS - 2);
-    ctx.stroke();
-
-    ctx.restore();
+    drawInstrumentPanel(ctx, drawX, panel.Y, panel.WIDTH, height, COLORS.NEON_CYAN);
 
     // Return bounds for content placement
     return {
@@ -588,16 +740,26 @@ function renderWindBarInPanel(ctx, bounds, roundY) {
     // WIND BAR BACKGROUND
     // ==========================================================================
 
-    // Draw bar background with rounded corners
-    ctx.fillStyle = 'rgba(20, 20, 40, 0.8)';
+    // Draw recessed wind rail
+    const railGradient = ctx.createLinearGradient(0, barY, 0, barY + barHeight);
+    railGradient.addColorStop(0, 'rgba(255, 255, 255, 0.08)');
+    railGradient.addColorStop(0.3, 'rgba(13, 12, 28, 0.9)');
+    railGradient.addColorStop(1, 'rgba(4, 5, 15, 0.95)');
+    ctx.fillStyle = railGradient;
     ctx.beginPath();
     ctx.roundRect(barX, barY, barWidth, barHeight, 4);
     ctx.fill();
 
-    // Draw bar border
-    ctx.strokeStyle = 'rgba(100, 100, 140, 0.6)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
     ctx.lineWidth = 1;
     ctx.stroke();
+
+    const centerLine = ctx.createLinearGradient(barX, 0, barX + barWidth, 0);
+    centerLine.addColorStop(0, 'rgba(5, 217, 232, 0)');
+    centerLine.addColorStop(0.5, 'rgba(255, 255, 255, 0.28)');
+    centerLine.addColorStop(1, 'rgba(255, 42, 109, 0)');
+    ctx.fillStyle = centerLine;
+    ctx.fillRect(barX + 6, barY + barHeight / 2 - 0.5, barWidth - 12, 1);
 
     // ==========================================================================
     // WIND DIRECTION ARROW INSIDE BAR
@@ -775,30 +937,7 @@ export function renderPlayerInfoPanel(ctx, playerTank, money, isPlayerTurn = tru
     const totalHeight = panel.PADDING * 2 + healthSection + panel.SECTION_GAP +
                         currencySection + panel.SECTION_GAP + aimingSection;
 
-    ctx.save();
-
-    // Draw panel background
-    ctx.fillStyle = 'rgba(10, 10, 26, 0.85)';
-    ctx.beginPath();
-    ctx.roundRect(panel.X, panel.Y, panel.WIDTH, totalHeight, panel.BORDER_RADIUS);
-    ctx.fill();
-
-    // Glowing border - cyan for player
-    ctx.strokeStyle = COLORS.NEON_CYAN;
-    ctx.lineWidth = 2;
-    ctx.shadowColor = COLORS.NEON_CYAN;
-    ctx.shadowBlur = 6;
-    ctx.stroke();
-
-    // Subtle inner glow
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = `${COLORS.NEON_CYAN}30`;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.roundRect(panel.X + 2, panel.Y + 2, panel.WIDTH - 4, totalHeight - 4, panel.BORDER_RADIUS - 2);
-    ctx.stroke();
-
-    ctx.restore();
+    drawInstrumentPanel(ctx, panel.X, panel.Y, panel.WIDTH, totalHeight, COLORS.NEON_CYAN);
 
     // =========================================================================
     // SECTION 1: HEALTH BAR
@@ -807,13 +946,14 @@ export function renderPlayerInfoPanel(ctx, playerTank, money, isPlayerTurn = tru
     const contentX = panel.X + panel.PADDING;
     const contentWidth = panel.WIDTH - panel.PADDING * 2;
 
-    const playerPercent = playerTank ? (playerTank.health / TANK.MAX_HEALTH) * 100 : 100;
+    const playerMaxHealth = playerTank?.maxHealth || TANK.MAX_HEALTH;
+    const playerPercent = playerTank ? (playerTank.health / playerMaxHealth) * 100 : 100;
 
     ctx.save();
 
     // Health label and percentage
     ctx.fillStyle = COLORS.TEXT_LIGHT;
-    ctx.font = `bold ${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+    ctx.font = `bold ${UI.FONT_SIZE_SMALL + 1}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillText('PLAYER', contentX, currentY);
@@ -833,7 +973,10 @@ export function renderPlayerInfoPanel(ctx, playerTank, money, isPlayerTurn = tru
     ctx.save();
 
     // Bar background
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    const healthBg = ctx.createLinearGradient(0, currentY, 0, currentY + healthBarHeight);
+    healthBg.addColorStop(0, 'rgba(255, 255, 255, 0.08)');
+    healthBg.addColorStop(1, 'rgba(0, 0, 0, 0.62)');
+    ctx.fillStyle = healthBg;
     ctx.beginPath();
     ctx.roundRect(contentX, currentY, barWidth, healthBarHeight, 3);
     ctx.fill();
@@ -849,12 +992,16 @@ export function renderPlayerInfoPanel(ctx, playerTank, money, isPlayerTurn = tru
     if (fillWidth > 0) {
         const gradient = ctx.createLinearGradient(contentX, currentY, contentX + fillWidth, currentY);
         gradient.addColorStop(0, COLORS.NEON_CYAN);
+        gradient.addColorStop(0.65, '#8ff7ff');
         gradient.addColorStop(1, adjustColorBrightness(COLORS.NEON_CYAN, -40));
 
         ctx.fillStyle = gradient;
         ctx.beginPath();
         ctx.roundRect(contentX + 1, currentY + 1, Math.max(0, fillWidth - 2), healthBarHeight - 2, 2);
         ctx.fill();
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+        ctx.fillRect(contentX + 3, currentY + 2, Math.max(0, fillWidth - 6), 1);
     }
 
     ctx.restore();
@@ -887,21 +1034,42 @@ export function renderPlayerInfoPanel(ctx, playerTank, money, isPlayerTurn = tru
     const moneyText = `$${moneyValue.toLocaleString()}`;
 
     // Draw money text right-aligned with dollar sign glow effect
+    const cashX = contentX;
+    const cashY = currentY - 2;
+    const cashW = contentWidth;
+    const cashH = 24;
+    const cashBg = ctx.createLinearGradient(0, cashY, 0, cashY + cashH);
+    cashBg.addColorStop(0, 'rgba(245, 213, 71, 0.18)');
+    cashBg.addColorStop(1, 'rgba(7, 7, 18, 0.78)');
+    ctx.fillStyle = cashBg;
+    ctx.beginPath();
+    ctx.roundRect(cashX, cashY, cashW, cashH, 6);
+    ctx.fill();
+    ctx.strokeStyle = withAlpha(COLORS.NEON_YELLOW, 0.42);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = withAlpha(COLORS.NEON_YELLOW, 0.78);
+    ctx.font = `bold ${UI.FONT_SIZE_SMALL - 1}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('CASH', cashX + 8, cashY + cashH / 2);
+
     ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'right';
-    ctx.textBaseline = 'top';
+    ctx.textBaseline = 'middle';
 
     // First pass: draw with glow on dollar sign color
     ctx.fillStyle = COLORS.NEON_YELLOW;
     ctx.shadowColor = COLORS.NEON_YELLOW;
     ctx.shadowBlur = 4;
-    ctx.fillText(moneyText, panel.X + panel.WIDTH - panel.PADDING, currentY);
+    ctx.fillText(moneyText, panel.X + panel.WIDTH - panel.PADDING - 6, cashY + cashH / 2);
 
     // Second pass: overdraw just the number portion in white (no $ sign)
     ctx.shadowBlur = 0;
     ctx.fillStyle = COLORS.TEXT_LIGHT;
     const numberOnly = moneyValue.toLocaleString();
-    ctx.fillText(numberOnly, panel.X + panel.WIDTH - panel.PADDING, currentY);
+    ctx.fillText(numberOnly, panel.X + panel.WIDTH - panel.PADDING - 6, cashY + cashH / 2);
 
     ctx.restore();
 
@@ -933,26 +1101,68 @@ export function renderPlayerInfoPanel(ctx, playerTank, money, isPlayerTurn = tru
 
     ctx.save();
 
-    // Labels
-    ctx.fillStyle = COLORS.TEXT_MUTED;
-    ctx.font = `bold ${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    ctx.fillText('ANGLE', angleX + halfWidth / 2, currentY);
-    ctx.fillText('POWER', powerX + halfWidth / 2, currentY);
-
-    currentY += 14;
-
-    // Values
     const angle = playerTank ? Math.round(playerTank.angle) : 45;
     const power = playerTank ? Math.round(playerTank.power) : 50;
 
-    ctx.font = `bold ${UI.FONT_SIZE_LARGE}px ${UI.FONT_FAMILY}`;
-    ctx.fillStyle = isPlayerTurn ? COLORS.NEON_CYAN : COLORS.TEXT_MUTED;
-    ctx.fillText(`${angle}°`, angleX + halfWidth / 2, currentY);
+    renderMiniStat(ctx, angleX, currentY, halfWidth, 40, 'ANGLE', `${angle}°`, COLORS.NEON_CYAN, angle / 180, isPlayerTurn);
+    renderMiniStat(ctx, powerX, currentY, halfWidth, 40, 'POWER', `${power}%`, COLORS.NEON_PINK, power / 100, isPlayerTurn);
 
-    ctx.fillStyle = isPlayerTurn ? COLORS.NEON_PINK : COLORS.TEXT_MUTED;
-    ctx.fillText(`${power}%`, powerX + halfWidth / 2, currentY);
+    ctx.restore();
+}
+
+/**
+ * Render a compact labeled stat with a small rail.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} x - Left X
+ * @param {number} y - Top Y
+ * @param {number} width - Width
+ * @param {number} height - Height
+ * @param {string} label - Label
+ * @param {string} value - Value
+ * @param {string} accent - Accent color
+ * @param {number} fraction - Fill fraction
+ * @param {boolean} active - Whether active
+ */
+function renderMiniStat(ctx, x, y, width, height, label, value, accent, fraction, active) {
+    const alphaAccent = active ? accent : COLORS.TEXT_MUTED;
+
+    ctx.save();
+    ctx.fillStyle = active ? withAlpha(accent, 0.08) : 'rgba(255, 255, 255, 0.025)';
+    ctx.beginPath();
+    ctx.roundRect(x, y, width, height, 5);
+    ctx.fill();
+
+    ctx.fillStyle = COLORS.TEXT_MUTED;
+    ctx.font = `bold ${Math.max(8, UI.FONT_SIZE_SMALL - 3)}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(label, x + width / 2, y + 4);
+
+    ctx.fillStyle = alphaAccent;
+    if (active) {
+        ctx.shadowColor = accent;
+        ctx.shadowBlur = 4;
+    }
+    ctx.font = `bold ${Math.max(15, Math.round(height * 0.42))}px ${UI.FONT_FAMILY}`;
+    ctx.textBaseline = 'middle';
+    ctx.fillText(value, x + width / 2, y + 23);
+    ctx.shadowBlur = 0;
+
+    const railX = x + 8;
+    const railY = y + height - 7;
+    const railWidth = width - 16;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+    ctx.beginPath();
+    ctx.roundRect(railX, railY, railWidth, 3, 2);
+    ctx.fill();
+    if (active) {
+        ctx.fillStyle = accent;
+        ctx.shadowColor = accent;
+        ctx.shadowBlur = 4;
+        ctx.beginPath();
+        ctx.roundRect(railX, railY, Math.max(3, railWidth * Math.max(0, Math.min(1, fraction))), 3, 2);
+        ctx.fill();
+    }
 
     ctx.restore();
 }
@@ -974,7 +1184,11 @@ function drawHealthBar(ctx, x, y, width, height, percent, color, label) {
     ctx.save();
 
     // Background (empty bar)
-    ctx.fillStyle = 'rgba(10, 10, 26, 0.85)';
+    const bg = ctx.createLinearGradient(0, y, 0, y + height);
+    bg.addColorStop(0, withAlpha(color, 0.22));
+    bg.addColorStop(0.35, 'rgba(13, 12, 28, 0.94)');
+    bg.addColorStop(1, 'rgba(2, 3, 10, 0.96)');
+    ctx.fillStyle = bg;
     ctx.beginPath();
     ctx.roundRect(x, y, width, height, HUD.HEALTH_BAR.BORDER_RADIUS);
     ctx.fill();
@@ -990,26 +1204,32 @@ function drawHealthBar(ctx, x, y, width, height, percent, color, label) {
     if (fillWidth > 0) {
         const gradient = ctx.createLinearGradient(x, y, x + fillWidth, y);
         gradient.addColorStop(0, color);
-        gradient.addColorStop(1, adjustColorBrightness(color, -30));
+        gradient.addColorStop(0.62, withAlpha('#ffffff', 0.75));
+        gradient.addColorStop(1, adjustColorBrightness(color, -35));
 
         ctx.fillStyle = gradient;
         ctx.beginPath();
         ctx.roundRect(x + 2, y + 2, Math.max(0, fillWidth - 4), height - 4, 2);
         ctx.fill();
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.34)';
+        ctx.fillRect(x + 5, y + 3, Math.max(0, fillWidth - 10), 1);
     }
 
-    // Label text
-    ctx.fillStyle = COLORS.TEXT_LIGHT;
-    ctx.font = `bold ${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.shadowColor = 'transparent';
-    ctx.fillText(label, x, y - 6);
+    if (label) {
+        // Label text
+        ctx.fillStyle = COLORS.TEXT_LIGHT;
+        ctx.font = `bold ${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = 'transparent';
+        ctx.fillText(label, x, y - 6);
 
-    // Health percentage
-    ctx.textAlign = 'right';
-    ctx.fillStyle = percent > 30 ? COLORS.TEXT_LIGHT : COLORS.NEON_PINK;
-    ctx.fillText(`${Math.round(percent)}%`, x + width, y - 6);
+        // Health percentage
+        ctx.textAlign = 'right';
+        ctx.fillStyle = percent > 30 ? COLORS.TEXT_LIGHT : COLORS.NEON_PINK;
+        ctx.fillText(`${Math.round(percent)}%`, x + width, y - 6);
+    }
 
     ctx.restore();
 }
@@ -1093,24 +1313,39 @@ export function renderEnemyHealthBar(ctx, enemyTank) {
     if (!ctx || !enemyTank) return;
 
     const layout = getHUD();
+    const playerPanel = HUD.PLAYER_INFO_PANEL;
     const barWidth = layout.HEALTH_BAR.WIDTH;
     const barHeight = layout.HEALTH_BAR.HEIGHT;
     const padding = layout.HEALTH_BAR.PADDING;
-    const y = layout.HEALTH_BAR.Y;
 
     // Use tank's maxHealth for proper scaling with roguelike health progression
     const maxHealth = enemyTank.maxHealth || TANK.MAX_HEALTH;
     const enemyPercent = (enemyTank.health / maxHealth) * 100;
-    drawHealthBar(
-        ctx,
-        fromRight(padding + barWidth),
-        y + 10,
-        barWidth,
-        barHeight,
-        enemyPercent,
-        COLORS.PLAYER_2,
-        'ENEMY'
-    );
+    const panelWidth = barWidth + 52;
+    const panelHeight = 46;
+    const panelX = fromRight(padding + panelWidth);
+    const panelY = playerPanel.Y;
+    const contentX = panelX + 16;
+    const contentY = panelY + 12;
+
+    drawInstrumentPanel(ctx, panelX, panelY, panelWidth, panelHeight, COLORS.PLAYER_2);
+
+    ctx.save();
+
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.font = `bold ${UI.FONT_SIZE_SMALL + 1}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = COLORS.PLAYER_2;
+    ctx.shadowBlur = 4;
+    ctx.fillText('ENEMY', contentX, contentY);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = enemyPercent > 30 ? COLORS.TEXT_LIGHT : COLORS.NEON_YELLOW;
+    ctx.fillText(`${Math.round(enemyPercent)}%`, panelX + panelWidth - 16, contentY);
+    ctx.restore();
+
+    drawHealthBar(ctx, contentX, panelY + 25, panelWidth - 32, barHeight, enemyPercent, COLORS.PLAYER_2, '');
 }
 
 // =============================================================================
@@ -1163,33 +1398,20 @@ export function renderWeaponBar(ctx, playerTank) {
     const drawX = bar.X;
     const drawY = bar.Y - bar.HEIGHT / 2;
 
+    drawChromePanel(ctx, drawX, drawY, bar.WIDTH, bar.HEIGHT, COLORS.NEON_CYAN, {
+        radius: bar.BORDER_RADIUS
+    });
+
     ctx.save();
-
-    // ==========================================================================
-    // MAIN CONTAINER BACKGROUND
-    // ==========================================================================
-
-    // Dark translucent background
-    ctx.fillStyle = 'rgba(10, 10, 26, 0.85)';
+    const railY = drawY + bar.HEIGHT - Math.max(7, bar.HEIGHT * 0.15);
+    const railGradient = ctx.createLinearGradient(drawX + 16, 0, drawX + bar.WIDTH - 16, 0);
+    railGradient.addColorStop(0, 'rgba(5, 217, 232, 0)');
+    railGradient.addColorStop(0.5, 'rgba(5, 217, 232, 0.55)');
+    railGradient.addColorStop(1, 'rgba(5, 217, 232, 0)');
+    ctx.fillStyle = railGradient;
     ctx.beginPath();
-    ctx.roundRect(drawX, drawY, bar.WIDTH, bar.HEIGHT, bar.BORDER_RADIUS);
+    ctx.roundRect(drawX + 16, railY, bar.WIDTH - 32, 3, 2);
     ctx.fill();
-
-    // Cyan glowing border (synthwave aesthetic)
-    ctx.strokeStyle = COLORS.NEON_CYAN;
-    ctx.lineWidth = 2;
-    ctx.shadowColor = COLORS.NEON_CYAN;
-    ctx.shadowBlur = 8;
-    ctx.stroke();
-
-    // Subtle inner glow effect
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = `${COLORS.NEON_CYAN}40`;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.roundRect(drawX + 2, drawY + 2, bar.WIDTH - 4, bar.HEIGHT - 4, bar.BORDER_RADIUS - 2);
-    ctx.stroke();
-
     ctx.restore();
 
     // ==========================================================================
@@ -1287,7 +1509,10 @@ function renderWeaponBarArrow(ctx, x, y, width, height, direction, enabled, pres
     const pressOffset = pressed && enabled ? 2 : 0;
 
     // Arrow button background
-    ctx.fillStyle = pressed && enabled ? 'rgba(5, 217, 232, 0.2)' : 'rgba(30, 30, 60, 0.6)';
+    const bg = ctx.createLinearGradient(0, y, 0, y + height);
+    bg.addColorStop(0, enabled ? withAlpha(color, pressed ? 0.32 : 0.22) : 'rgba(60, 60, 80, 0.2)');
+    bg.addColorStop(1, 'rgba(5, 6, 18, 0.92)');
+    ctx.fillStyle = bg;
     ctx.beginPath();
     ctx.roundRect(x, y + pressOffset, width, height - pressOffset * 2, 6);
     ctx.fill();
@@ -1467,18 +1692,35 @@ function renderWeaponSlot(ctx, x, y, size, isSelected, weapon, ammo, isEmpDisabl
     }
 
     // Slot background - dimmer if disabled or no ammo
+    let bgTop;
+    let bgBottom;
     if (isEmpDisabled && hasAmmo) {
-        ctx.fillStyle = 'rgba(40, 20, 20, 0.7)'; // Reddish tint for EMP
+        bgTop = 'rgba(120, 42, 28, 0.35)';
+        bgBottom = 'rgba(24, 12, 15, 0.86)';
     } else if (!hasAmmo) {
-        ctx.fillStyle = 'rgba(15, 15, 25, 0.6)';
+        bgTop = 'rgba(55, 55, 75, 0.2)';
+        bgBottom = 'rgba(8, 8, 16, 0.84)';
     } else if (isSelected) {
-        ctx.fillStyle = 'rgba(5, 217, 232, 0.15)';
+        bgTop = withAlpha(COLORS.NEON_CYAN, 0.42);
+        bgBottom = 'rgba(5, 16, 28, 0.95)';
     } else {
-        ctx.fillStyle = 'rgba(20, 20, 40, 0.8)';
+        bgTop = 'rgba(80, 80, 120, 0.22)';
+        bgBottom = 'rgba(10, 10, 24, 0.9)';
     }
+    const slotBg = ctx.createLinearGradient(0, y, 0, y + size);
+    slotBg.addColorStop(0, bgTop);
+    slotBg.addColorStop(1, bgBottom);
+    ctx.fillStyle = slotBg;
     ctx.beginPath();
     ctx.roundRect(x, y, size, size, 6);
     ctx.fill();
+
+    if (!isDisabled) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.16)';
+        ctx.beginPath();
+        ctx.roundRect(x + 3, y + 3, size - 6, Math.max(4, size * 0.32), 4);
+        ctx.fill();
+    }
 
     // Slot border with glow for selected
     ctx.strokeStyle = borderColor;
@@ -1526,6 +1768,10 @@ function renderWeaponSlot(ctx, x, y, size, isSelected, weapon, ammo, isEmpDisabl
         ctx.fillStyle = iconColor;
         ctx.strokeStyle = iconColor;
         ctx.lineWidth = 2;
+        if (hasAmmo) {
+            ctx.shadowColor = iconColor;
+            ctx.shadowBlur = isSelected ? 9 : 4;
+        }
 
         // Draw weapon icon
         ctx.beginPath();
@@ -1537,6 +1783,7 @@ function renderWeaponSlot(ctx, x, y, size, isSelected, weapon, ammo, isEmpDisabl
             ctx.arc(iconX, iconY, iconSize * 0.5, 0, Math.PI * 2);
         }
         ctx.fill();
+        ctx.shadowBlur = 0;
 
         // For nuke, add center dot
         if (weapon.id === 'nuke' || weapon.id === 'mini-nuke') {
@@ -1747,6 +1994,14 @@ export function getWeaponSlotAtPosition(x, y) {
         }
     }
     return null;
+}
+
+/**
+ * Get cached weapon slot hit boxes from the last weapon bar render.
+ * @returns {Array<{x: number, y: number, size: number, weaponId: string}>}
+ */
+export function getWeaponSlotPositions() {
+    return weaponSlotPositions.map(slot => ({ ...slot }));
 }
 
 /**

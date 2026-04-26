@@ -5,10 +5,60 @@
       "width": 64,
       "height": 32
     },
+    "playerBody": {
+      "path": "images/tanks/tank-player-body.png",
+      "width": 64,
+      "height": 32
+    },
+    "playerTurret": {
+      "path": "images/tanks/tank-player-turret.png",
+      "width": 28,
+      "height": 12,
+      "scalePolicy": "pixel-perfect",
+      "pivot": {
+        "x": 6,
+        "y": 6
+      },
+      "anchors": {
+        "embeddedBase": {
+          "x": 6,
+          "y": 6
+        },
+        "muzzle": {
+          "x": 26,
+          "y": 6
+        }
+      }
+    },
     "enemy": {
       "path": "images/tanks/tank-enemy.png",
       "width": 64,
       "height": 32
+    },
+    "enemyBody": {
+      "path": "images/tanks/tank-enemy-body.png",
+      "width": 64,
+      "height": 32
+    },
+    "enemyTurret": {
+      "path": "images/tanks/tank-enemy-turret.png",
+      "width": 28,
+      "height": 12,
+      "scalePolicy": "pixel-perfect",
+      "pivot": {
+        "x": 6,
+        "y": 6
+      },
+      "anchors": {
+        "embeddedBase": {
+          "x": 6,
+          "y": 6
+        },
+        "muzzle": {
+          "x": 26,
+          "y": 6
+        }
+      }
     }
   },
   "tankSkins": {
@@ -32,6 +82,36 @@
       "width": 64,
       "height": 32
     },
+    "common-forge-circuit-mule": {
+      "path": "images/tanks/generated/tank-common-forge-circuit-mule.png",
+      "width": 64,
+      "height": 32
+    },
+    "common-forge-grid-runner": {
+      "path": "images/tanks/generated/tank-common-forge-grid-runner.png",
+      "width": 64,
+      "height": 32
+    },
+    "common-forge-neon-recruit": {
+      "path": "images/tanks/generated/tank-common-forge-neon-recruit.png",
+      "width": 64,
+      "height": 32
+    },
+    "common-forge-night-patrol": {
+      "path": "images/tanks/generated/tank-common-forge-night-patrol.png",
+      "width": 64,
+      "height": 32
+    },
+    "common-forge-sunrise-scout": {
+      "path": "images/tanks/generated/tank-common-forge-sunrise-scout.png",
+      "width": 64,
+      "height": 32
+    },
+    "common-forge-vector-sentry": {
+      "path": "images/tanks/generated/tank-common-forge-vector-sentry.png",
+      "width": 64,
+      "height": 32
+    },
     "common-midnight": {
       "path": "images/tanks/tank-common-midnight.png",
       "width": 64,
@@ -49,6 +129,31 @@
     },
     "epic-flame-rider": {
       "path": "images/tanks/tank-epic-flame-rider.png",
+      "width": 64,
+      "height": 32
+    },
+    "epic-forge-aurora-juggernaut": {
+      "path": "images/tanks/generated/tank-epic-forge-aurora-juggernaut.png",
+      "width": 64,
+      "height": 32
+    },
+    "epic-forge-chroma-reaper": {
+      "path": "images/tanks/generated/tank-epic-forge-chroma-reaper.png",
+      "width": 64,
+      "height": 32
+    },
+    "epic-forge-hyperion-rail": {
+      "path": "images/tanks/generated/tank-epic-forge-hyperion-rail.png",
+      "width": 64,
+      "height": 32
+    },
+    "epic-forge-neon-samurai": {
+      "path": "images/tanks/generated/tank-epic-forge-neon-samurai.png",
+      "width": 64,
+      "height": 32
+    },
+    "epic-forge-void-hammer": {
+      "path": "images/tanks/generated/tank-epic-forge-void-hammer.png",
       "width": 64,
       "height": 32
     },
@@ -87,6 +192,26 @@
       "width": 64,
       "height": 32
     },
+    "legendary-forge-cosmic-dragon": {
+      "path": "images/tanks/generated/tank-legendary-forge-cosmic-dragon.png",
+      "width": 64,
+      "height": 32
+    },
+    "legendary-forge-moonfall-oracle": {
+      "path": "images/tanks/generated/tank-legendary-forge-moonfall-oracle.png",
+      "width": 64,
+      "height": 32
+    },
+    "legendary-forge-singularity-ace": {
+      "path": "images/tanks/generated/tank-legendary-forge-singularity-ace.png",
+      "width": 64,
+      "height": 32
+    },
+    "legendary-forge-solaris-titan": {
+      "path": "images/tanks/generated/tank-legendary-forge-solaris-titan.png",
+      "width": 64,
+      "height": 32
+    },
     "legendary-golden-god": {
       "path": "images/tanks/tank-legendary-golden-god.png",
       "width": 64,
@@ -109,6 +234,36 @@
     },
     "rare-delorean": {
       "path": "images/tanks/tank-rare-delorean.png",
+      "width": 64,
+      "height": 32
+    },
+    "rare-forge-ion-panther": {
+      "path": "images/tanks/generated/tank-rare-forge-ion-panther.png",
+      "width": 64,
+      "height": 32
+    },
+    "rare-forge-laser-lynx": {
+      "path": "images/tanks/generated/tank-rare-forge-laser-lynx.png",
+      "width": 64,
+      "height": 32
+    },
+    "rare-forge-nebula-bulldog": {
+      "path": "images/tanks/generated/tank-rare-forge-nebula-bulldog.png",
+      "width": 64,
+      "height": 32
+    },
+    "rare-forge-oxide-phantom": {
+      "path": "images/tanks/generated/tank-rare-forge-oxide-phantom.png",
+      "width": 64,
+      "height": 32
+    },
+    "rare-forge-plasma-mantis": {
+      "path": "images/tanks/generated/tank-rare-forge-plasma-mantis.png",
+      "width": 64,
+      "height": 32
+    },
+    "rare-forge-quantum-cobra": {
+      "path": "images/tanks/generated/tank-rare-forge-quantum-cobra.png",
       "width": 64,
       "height": 32
     },
@@ -144,6 +299,36 @@
     },
     "uncommon-digital-camo": {
       "path": "images/tanks/tank-uncommon-digital-camo.png",
+      "width": 64,
+      "height": 32
+    },
+    "uncommon-forge-binary-comet": {
+      "path": "images/tanks/generated/tank-uncommon-forge-binary-comet.png",
+      "width": 64,
+      "height": 32
+    },
+    "uncommon-forge-cobalt-drifter": {
+      "path": "images/tanks/generated/tank-uncommon-forge-cobalt-drifter.png",
+      "width": 64,
+      "height": 32
+    },
+    "uncommon-forge-dataline-prowler": {
+      "path": "images/tanks/generated/tank-uncommon-forge-dataline-prowler.png",
+      "width": 64,
+      "height": 32
+    },
+    "uncommon-forge-glass-cannon": {
+      "path": "images/tanks/generated/tank-uncommon-forge-glass-cannon.png",
+      "width": 64,
+      "height": 32
+    },
+    "uncommon-forge-magenta-wasp": {
+      "path": "images/tanks/generated/tank-uncommon-forge-magenta-wasp.png",
+      "width": 64,
+      "height": 32
+    },
+    "uncommon-forge-sunset-cruiser": {
+      "path": "images/tanks/generated/tank-uncommon-forge-sunset-cruiser.png",
       "width": 64,
       "height": 32
     },
@@ -280,43 +465,51 @@
   "effects": {
     "explosion-small": {
       "path": "images/effects/explosion-small.png",
-      "width": 32,
-      "height": 32,
-      "frames": 8
+      "width": 128,
+      "height": 128,
+      "scalePolicy": "smooth",
+      "anchor": {
+        "x": 64,
+        "y": 64
+      },
+      "safeBounds": {
+        "x": 0,
+        "y": 0,
+        "width": 128,
+        "height": 128
+      }
     },
     "explosion-medium": {
       "path": "images/effects/explosion-medium.png",
-      "width": 64,
-      "height": 64,
-      "frames": 10
+      "width": 256,
+      "height": 256,
+      "scalePolicy": "smooth",
+      "anchor": {
+        "x": 128,
+        "y": 128
+      },
+      "safeBounds": {
+        "x": 0,
+        "y": 0,
+        "width": 256,
+        "height": 256
+      }
     },
     "explosion-large": {
       "path": "images/effects/explosion-large.png",
-      "width": 128,
-      "height": 128,
-      "frames": 12
-    },
-    "dirt-particle": {
-      "path": "images/effects/dirt-particle.png",
-      "width": 4,
-      "height": 4
-    }
-  },
-  "ui": {
-    "button": {
-      "path": "images/ui/ui-button.png",
-      "width": 120,
-      "height": 40
-    },
-    "power-bar": {
-      "path": "images/ui/ui-power-bar.png",
-      "width": 200,
-      "height": 20
-    },
-    "angle-indicator": {
-      "path": "images/ui/ui-angle-indicator.png",
-      "width": 60,
-      "height": 60
+      "width": 512,
+      "height": 512,
+      "scalePolicy": "smooth",
+      "anchor": {
+        "x": 256,
+        "y": 256
+      },
+      "safeBounds": {
+        "x": 0,
+        "y": 0,
+        "width": 512,
+        "height": 512
+      }
     }
   },
   "weaponIcons": {
@@ -382,52 +575,42 @@
       "width": 2048,
       "height": 1365
     },
-    "sky": {
-      "path": "images/backgrounds/bg-sky.png",
-      "width": 1920,
-      "height": 1080
-    },
-    "mountains": {
-      "path": "images/backgrounds/bg-mountains.png",
-      "width": 1920,
-      "height": 400
-    },
-    "grid": {
-      "path": "images/backgrounds/bg-grid.png",
-      "width": 1920,
-      "height": 1080
+    "gameplay": {
+      "path": "images/backgrounds/bg-gameplay.png",
+      "width": 1536,
+      "height": 1024
     }
   },
   "audio": {
     "music": {
       "main-theme": {
-        "path": "audio/music/main-theme.mp3"
+        "path": "audio/music/test-loop.wav"
       },
       "battle": {
-        "path": "audio/music/battle.mp3"
+        "path": "audio/music/test-loop.wav"
       },
       "shop": {
-        "path": "audio/music/shop.mp3"
+        "path": "audio/music/test-loop.wav"
       }
     },
     "sfx": {
       "shot-fire": {
-        "path": "audio/sfx/shot-fire.wav"
+        "path": "audio/sfx/test-beep.wav"
       },
       "explosion-small": {
-        "path": "audio/sfx/explosion-small.wav"
+        "path": "audio/sfx/test-beep.wav"
       },
       "explosion-large": {
-        "path": "audio/sfx/explosion-large.wav"
+        "path": "audio/sfx/test-beep.wav"
       },
       "menu-select": {
-        "path": "audio/sfx/menu-select.wav"
+        "path": "audio/sfx/test-beep.wav"
       },
       "purchase": {
-        "path": "audio/sfx/purchase.wav"
+        "path": "audio/sfx/test-beep.wav"
       },
       "tank-hit": {
-        "path": "audio/sfx/tank-hit.wav"
+        "path": "audio/sfx/test-beep.wav"
       }
     }
   }

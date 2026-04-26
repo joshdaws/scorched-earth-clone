@@ -89,7 +89,7 @@ export const TANK = {
  * Core gameplay settings.
  */
 export const GAME = {
-    STARTING_MONEY: 1000,
+    STARTING_MONEY: 1500,
     ROUNDS_PER_MATCH: 10,
     DAMAGE_MULTIPLIER: 1.0
 };

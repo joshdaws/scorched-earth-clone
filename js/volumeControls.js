@@ -11,6 +11,7 @@ import * as Renderer from './renderer.js';
 import * as Sound from './sound.js';
 import { isCrtEnabled, toggleCrt } from './effects.js';
 import * as ControlSettings from './controls/controlSettings.js';
+import { cycleRenderQuality, getRenderQualityProfile } from './renderQuality.js';
 
 // =============================================================================
 // LAYOUT CONFIGURATION
@@ -23,7 +24,7 @@ import * as ControlSettings from './controls/controlSettings.js';
  */
 const VOLUME_PANEL = {
     WIDTH: 340,
-    HEIGHT: 520,               // Increased to fit control settings
+    HEIGHT: 580,               // Increased to fit control and quality settings
     PADDING: 24,
     SLIDER_HEIGHT: 12,         // Thicker track for easier tapping
     SLIDER_WIDTH: 260,
@@ -125,10 +126,10 @@ function getSliders(panelX, panelY) {
 function getMuteButton(panelX, panelY) {
     const totalWidth = VOLUME_PANEL.BUTTON_WIDTH * 2 + VOLUME_PANEL.BUTTON_SPACING;
     const startX = panelX + (VOLUME_PANEL.WIDTH - totalWidth) / 2;
-    // Position below trajectory toggle (290 + 40 height + 12 spacing = 342)
+    // Position below quality toggle.
     return {
         x: startX,
-        y: panelY + 342,
+        y: panelY + 392,
         width: VOLUME_PANEL.BUTTON_WIDTH,
         height: VOLUME_PANEL.BUTTON_HEIGHT
     };
@@ -143,10 +144,10 @@ function getMuteButton(panelX, panelY) {
 function getCrtButton(panelX, panelY) {
     const totalWidth = VOLUME_PANEL.BUTTON_WIDTH * 2 + VOLUME_PANEL.BUTTON_SPACING;
     const startX = panelX + (VOLUME_PANEL.WIDTH - totalWidth) / 2;
-    // Same row as mute button (Y=342)
+    // Same row as mute button.
     return {
         x: startX + VOLUME_PANEL.BUTTON_WIDTH + VOLUME_PANEL.BUTTON_SPACING,
-        y: panelY + 342,
+        y: panelY + 392,
         width: VOLUME_PANEL.BUTTON_WIDTH,
         height: VOLUME_PANEL.BUTTON_HEIGHT
     };
@@ -190,17 +191,34 @@ function getTrajectoryButton(panelX, panelY) {
 }
 
 /**
+ * Get Render Quality toggle button bounds.
+ * @param {number} panelX - Panel X position
+ * @param {number} panelY - Panel Y position
+ * @returns {{x: number, y: number, width: number, height: number, labelWidth: number}}
+ */
+function getQualityButton(panelX, panelY) {
+    const buttonY = panelY + 240 + (VOLUME_PANEL.TOGGLE_HEIGHT + VOLUME_PANEL.TOGGLE_SPACING) * 2;
+    return {
+        x: panelX + VOLUME_PANEL.PADDING,
+        y: buttonY,
+        width: VOLUME_PANEL.WIDTH - VOLUME_PANEL.PADDING * 2,
+        height: VOLUME_PANEL.TOGGLE_HEIGHT,
+        labelWidth: 130
+    };
+}
+
+/**
  * Get Change Name button bounds.
  * @param {number} panelX - Panel X position
  * @param {number} panelY - Panel Y position
  * @returns {{x: number, y: number, width: number, height: number}}
  */
 function getChangeNameButton(panelX, panelY) {
-    // Centered, full width-ish button below mute/CRT row (342 + 48 height + 12 spacing = 402)
+    // Centered, full width-ish button below mute/CRT row.
     const buttonWidth = VOLUME_PANEL.WIDTH - VOLUME_PANEL.PADDING * 2;
     return {
         x: panelX + VOLUME_PANEL.PADDING,
-        y: panelY + 402,
+        y: panelY + 452,
         width: buttonWidth,
         height: VOLUME_PANEL.BUTTON_HEIGHT
     };
@@ -288,6 +306,9 @@ export function render(ctx, centerX = Renderer.getWidth() / 2, centerY = Rendere
 
     // Render Trajectory Preview toggle
     renderTrajectoryButton(ctx, getTrajectoryButton(panelX, panelY));
+
+    // Render Quality toggle
+    renderQualityButton(ctx, getQualityButton(panelX, panelY));
 
     // Render Change Name button
     renderChangeNameButton(ctx, getChangeNameButton(panelX, panelY));
@@ -513,6 +534,47 @@ function renderTrajectoryButton(ctx, button) {
 }
 
 /**
+ * Render the Render Quality toggle button.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {Object} button - Button bounds with labelWidth
+ */
+function renderQualityButton(ctx, button) {
+    const profile = getRenderQualityProfile();
+
+    ctx.save();
+
+    ctx.fillStyle = 'rgba(185, 103, 255, 0.1)';
+    ctx.beginPath();
+    ctx.roundRect(button.x, button.y, button.width, button.height, 6);
+    ctx.fill();
+
+    ctx.strokeStyle = COLORS.NEON_PURPLE;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('QUALITY', button.x + 12, button.y + button.height / 2);
+
+    const valueX = button.x + button.labelWidth;
+    const valueWidth = button.width - button.labelWidth;
+
+    ctx.fillStyle = 'rgba(185, 103, 255, 0.2)';
+    ctx.beginPath();
+    ctx.roundRect(valueX, button.y + 4, valueWidth - 4, button.height - 8, 4);
+    ctx.fill();
+
+    ctx.fillStyle = COLORS.NEON_PURPLE;
+    ctx.font = `bold ${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.fillText(profile.label, valueX + valueWidth / 2, button.y + button.height / 2);
+
+    ctx.restore();
+}
+
+/**
  * Render the Change Name button.
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  * @param {Object} button - Button bounds
@@ -640,6 +702,14 @@ export function handlePointerDown(x, y) {
     const trajectoryBtn = getTrajectoryButton(panelPosition.x, panelPosition.y);
     if (isInsideButton(x, y, trajectoryBtn)) {
         ControlSettings.cycleTrajectoryMode();
+        Sound.playClickSound();
+        return true;
+    }
+
+    // Check Render Quality toggle button
+    const qualityBtn = getQualityButton(panelPosition.x, panelPosition.y);
+    if (isInsideButton(x, y, qualityBtn)) {
+        cycleRenderQuality();
         Sound.playClickSound();
         return true;
     }

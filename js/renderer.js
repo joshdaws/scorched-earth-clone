@@ -19,6 +19,7 @@ import {
     getScreenDimensions,
     onResize
 } from './screenSize.js';
+import { getRenderQualityProfile, onRenderQualityChange } from './renderQuality.js';
 
 // Canvas and context references
 let canvas = null;
@@ -80,6 +81,10 @@ export function init(canvasId = 'game') {
         resizeCanvas();
     });
 
+    onRenderQualityChange(() => {
+        resizeCanvas();
+    });
+
     console.log('Renderer initialized');
     return ctx;
 }
@@ -115,8 +120,11 @@ export function resizeCanvas() {
     const safeArea = getSafeAreaInsets();
     const gameScale = getGameScale();
 
-    // Get current device pixel ratio
-    devicePixelRatio = getScreenDPR();
+    // Use an effective DPR capped by render quality so high-density iOS
+    // devices do not allocate oversized gameplay framebuffers.
+    const quality = getRenderQualityProfile();
+    const nativeDpr = getScreenDPR();
+    devicePixelRatio = Math.min(nativeDpr, quality.maxCanvasDpr);
 
     // Calculate usable viewport dimensions (CSS pixels)
     canvasViewportWidth = screenDims.viewportWidth - safeArea.left - safeArea.right;
@@ -158,7 +166,7 @@ export function resizeCanvas() {
         `display=${Math.round(displayDims.width)}x${Math.round(displayDims.height)}, ` +
         `resolution=${resolutionWidth}x${resolutionHeight}, ` +
         `offset=(${Math.round(contentOffsetX)}, ${Math.round(contentOffsetY)}), ` +
-        `gameScale=${gameScale.toFixed(3)}, dpr=${devicePixelRatio}`
+        `gameScale=${gameScale.toFixed(3)}, dpr=${devicePixelRatio}, quality=${quality.id}`
     );
 }
 

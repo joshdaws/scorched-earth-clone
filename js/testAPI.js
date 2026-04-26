@@ -10,14 +10,48 @@
  * This module enables agents to test touch-based controls without touch hardware.
  */
 
-import { PHYSICS, TANK } from './constants.js';
-import { queueGameInput, INPUT_EVENTS } from './input.js';
+import { GAME_STATES, PHYSICS, TANK } from './constants.js';
+import { getAssetGroupStatus, getLoadedCount, getLoadingStatus } from './assets.js';
+import { queueGameInput, INPUT_EVENTS, isGameInputEnabled } from './input.js';
 import * as Wind from './wind.js';
 import * as Turn from './turn.js';
+import * as AimingControls from './aimingControls.js?v=20260111a';
+import * as TouchAiming from './touchAiming.js';
+import * as ControlSettings from './controls/controlSettings.js';
 import { getScreenWidth, getScreenHeight } from './screenSize.js';
 import { calculateDamage } from './damage.js';
 import { WeaponRegistry } from './weapons.js';
+import * as HUD from './ui.js?v=20260111d';
 import { generateTerrain as generateTerrainFromModule } from './terrain.js';
+import * as Sound from './sound.js';
+import * as Effects from './effects.js';
+import { Stars } from './stars.js';
+import * as Tokens from './tokens.js';
+import * as TankCollection from './tank-collection.js';
+import { DROP_TYPES, processDrop } from './drop-rates.js';
+import * as PitySystem from './pity-system.js';
+import * as SupplyDrop from './supply-drop.js';
+import * as Achievements from './achievements.js';
+import * as AchievementPopup from './achievement-popup.js';
+import {
+    getRenderQualitySummary,
+    setRenderQuality as setRenderQualityProfile
+} from './renderQuality.js';
+import { getParticleCount } from './effects.js';
+import { getTerrainDerezEffectCount } from './terrainDerezEffect.js';
+import { getPixiTerrainCacheStats, markPixiTerrainLayerDirty } from './pixiTerrainLayer.js';
+import { getOrCreateTerrainCellGrid, getTerrainGridStableContactHeight } from './terrainCells.js';
+import { updateTankTerrainPosition } from './tank.js';
+import {
+    evaluatePerformanceBudget,
+    getPerformanceSnapshot,
+    resetPerformanceMetrics
+} from './performanceMetrics.js';
+import { getLoopTimingSnapshot, getState as getGameState, setState as setGameState } from './game.js';
+import * as RunState from './runState.js';
+import * as HighScores from './highScores.js';
+import * as LifetimeStats from './lifetime-stats.js';
+import * as NameEntry from './nameEntry.js';
 
 // =============================================================================
 // MODULE STATE
@@ -38,6 +72,12 @@ let terrain = null;
 /** @type {Function|null} Reference to fire projectile function from main.js */
 let fireProjectileRef = null;
 
+/** @type {Function|null} Reference to terrain destruction function from main.js */
+let destroyTerrainAtRef = null;
+
+/** @type {Function|null} Reference to active Pixi terrain fragment counter */
+let getDerezFragmentCountRef = null;
+
 /** @type {Object|null} Reference to player aim state from main.js */
 let playerAimRef = null;
 
@@ -57,6 +97,8 @@ let onTerrainChangeCallback = null;
  * @param {() => import('./tank.js').Tank|null} refs.getEnemyTank - Function returning enemy tank
  * @param {() => import('./terrain.js').Terrain|null} refs.getTerrain - Function returning terrain
  * @param {Function} refs.fireProjectile - Function to fire projectile
+ * @param {Function} [refs.destroyTerrainAt] - Function to destroy terrain directly
+ * @param {Function} [refs.getDerezFragmentCount] - Function returning active de-rez fragment count
  * @param {{angle: number, power: number}} refs.playerAim - Reference to player aim state
  */
 export function init(refs) {
@@ -83,6 +125,8 @@ export function init(refs) {
         });
     }
     fireProjectileRef = refs.fireProjectile || null;
+    destroyTerrainAtRef = refs.destroyTerrainAt || null;
+    getDerezFragmentCountRef = refs.getDerezFragmentCount || null;
     playerAimRef = refs.playerAim || null;
 
     console.log('[TestAPI] Initialized');
@@ -834,6 +878,51 @@ export function getTerrainAt(x) {
 }
 
 /**
+ * Destroy terrain directly for deterministic visual/effects tests.
+ *
+ * @param {Object} options
+ * @param {number} options.x
+ * @param {number} options.y
+ * @param {number} options.radius
+ * @returns {{success: boolean, destroyed?: boolean, fragments?: number, error?: string}}
+ */
+export function destroyTerrain(options = {}) {
+    if (!destroyTerrainAtRef) {
+        console.warn('[TestAPI] destroyTerrain: destroyTerrainAt function not set');
+        return { success: false, error: 'Destroy terrain function not initialized' };
+    }
+
+    const { x, y, radius } = options;
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(radius)) {
+        return { success: false, error: 'x, y, and radius are required numbers' };
+    }
+
+    const destroyed = destroyTerrainAtRef(x, y, radius);
+    const fragments = getDerezFragmentCountRef ? getDerezFragmentCountRef() : undefined;
+    return {
+        success: true,
+        destroyed,
+        fragments
+    };
+}
+
+/**
+ * Get active Pixi terrain de-rez fragment count.
+ *
+ * @returns {{success: boolean, fragments?: number, error?: string}}
+ */
+export function getDerezFragmentCount() {
+    if (!getDerezFragmentCountRef) {
+        return { success: false, error: 'De-rez fragment counter not initialized' };
+    }
+
+    return {
+        success: true,
+        fragments: getDerezFragmentCountRef()
+    };
+}
+
+/**
  * Set tank positions on the terrain.
  * Tanks are automatically positioned at the correct Y coordinate based on terrain height.
  *
@@ -908,6 +997,8 @@ export function getTankPositions() {
         result.player = {
             x: player.x,
             y: player.y,
+            isFalling: Boolean(player.isFalling),
+            targetY: player.targetY ?? null,
             terrainHeight: currentTerrain ? currentTerrain.getHeight(Math.floor(player.x)) : null
         };
     }
@@ -916,11 +1007,76 @@ export function getTankPositions() {
         result.enemy = {
             x: enemy.x,
             y: enemy.y,
+            isFalling: Boolean(enemy.isFalling),
+            targetY: enemy.targetY ?? null,
             terrainHeight: currentTerrain ? currentTerrain.getHeight(Math.floor(enemy.x)) : null
         };
     }
 
     return result;
+}
+
+export function exerciseTankSupportPhysics() {
+    const currentTerrain = module.terrain || terrain;
+    const player = module.playerTank || playerTank;
+
+    if (!currentTerrain || !player) {
+        return { success: false, error: 'Terrain and player tank are required' };
+    }
+
+    const grid = getOrCreateTerrainCellGrid(currentTerrain);
+    if (!grid) {
+        return { success: false, error: 'TerrainCellGrid unavailable' };
+    }
+
+    const tankX = Math.round(currentTerrain.getWidth() * 0.32);
+    const minCol = Math.max(0, Math.floor((tankX - TANK.WIDTH / 2) / grid.cellSize));
+    const maxCol = Math.min(grid.columns - 1, Math.floor((tankX + TANK.WIDTH / 2) / grid.cellSize));
+    const lowCount = Math.max(2, Math.floor(grid.rows * 0.14));
+    const highCount = Math.min(grid.rows - 1, lowCount + 10);
+
+    for (let col = Math.max(0, minCol - 2); col <= Math.min(grid.columns - 1, maxCol + 2); col++) {
+        grid.setColumnSolidCount(col, lowCount);
+    }
+    grid.setColumnSolidCount(Math.min(maxCol, minCol + 1), highCount);
+    grid.setColumnSolidCount(Math.max(minCol, maxCol - 1), highCount);
+    grid.writeHeightsToTerrain(currentTerrain);
+    markPixiTerrainLayerDirty({ x: tankX, radius: TANK.WIDTH * 1.5 });
+
+    player.x = tankX;
+    player.y = currentTerrain.getScreenHeight() - highCount * grid.cellSize;
+    player.isFalling = false;
+    player.fallVelocity = 0;
+    player.targetY = player.y;
+
+    const stableHeight = getTerrainGridStableContactHeight(currentTerrain, tankX, TANK.WIDTH);
+    const targetY = currentTerrain.getScreenHeight() - stableHeight;
+    const before = {
+        x: player.x,
+        y: player.y,
+        stableHeight,
+        targetY
+    };
+    const startedFalling = updateTankTerrainPosition(player, currentTerrain);
+
+    return {
+        success: true,
+        startedFalling,
+        before,
+        after: {
+            x: player.x,
+            y: player.y,
+            isFalling: Boolean(player.isFalling),
+            targetY: player.targetY
+        },
+        footprint: {
+            minCol,
+            maxCol,
+            lowCount,
+            highCount,
+            cellSize: grid.cellSize
+        }
+    };
 }
 
 // =============================================================================
@@ -971,6 +1127,241 @@ export function getState() {
             health: enemy.health,
             isDestroyed: enemy.isDestroyed
         } : null
+    };
+}
+
+/**
+ * Get current control state and layout for browser QA smokes.
+ * @returns {Object}
+ */
+export function getControlState() {
+    const gameState = getState();
+    const aim = playerAimRef
+        ? { angle: playerAimRef.angle, power: playerAimRef.power }
+        : getAim();
+
+    return {
+        success: true,
+        inputEnabled: isGameInputEnabled(),
+        controlMode: ControlSettings.getControlMode(),
+        trajectoryMode: ControlSettings.getTrajectoryMode(),
+        slingshotEnabled: ControlSettings.isSlingshotEnabled(),
+        slidersVisible: ControlSettings.areSlidersVisible(),
+        aimingControlsEnabled: AimingControls.isEnabled(),
+        touchAiming: TouchAiming.getState(),
+        layout: AimingControls.getControlLayout(),
+        weaponBar: {
+            layout: HUD.getWeaponBarLayout(),
+            slots: HUD.getWeaponSlotPositions()
+        },
+        aim,
+        gameState: getGameState(),
+        state: gameState
+    };
+}
+
+/**
+ * Set the runtime control mode for browser QA smokes.
+ * @param {string} mode
+ * @returns {Object}
+ */
+export function setControlMode(mode) {
+    ControlSettings.setControlMode(mode);
+    return {
+        success: ControlSettings.getControlMode() === mode,
+        controlMode: ControlSettings.getControlMode()
+    };
+}
+
+// =============================================================================
+// HIGH SCORE AND STATISTICS QA API
+// =============================================================================
+
+const HIGH_SCORE_QA_STORAGE_KEYS = [
+    'scorched_earth_high_scores',
+    'scorched_earth_lifetime_stats',
+    'scorchedEarth_lifetimeStats',
+    'scorched_earth_local_scores',
+    'scorched_earth_offline_queue',
+    'scorched_earth_player_name'
+];
+
+function readJsonStorage(key, fallback) {
+    try {
+        const value = localStorage.getItem(key);
+        return value ? JSON.parse(value) : fallback;
+    } catch (_error) {
+        return fallback;
+    }
+}
+
+/**
+ * Clear persisted score/stat/name data used by browser QA smokes.
+ * @returns {Object}
+ */
+export function resetHighScoreQaData() {
+    for (const key of HIGH_SCORE_QA_STORAGE_KEYS) {
+        localStorage.removeItem(key);
+    }
+    HighScores.clearAllData();
+    return { success: true };
+}
+
+/**
+ * Show the name-entry modal for browser QA.
+ * @param {Object} options
+ * @returns {Object}
+ */
+export function showNameEntry(options = {}) {
+    NameEntry.show(options);
+    return getNameEntryState();
+}
+
+/**
+ * Get the current name-entry modal state.
+ * @returns {Object}
+ */
+export function getNameEntryState() {
+    return {
+        success: true,
+        isOpen: NameEntry.isOpen(),
+        currentName: NameEntry.getCurrentName(),
+        storedName: localStorage.getItem('scorched_earth_player_name')
+    };
+}
+
+/**
+ * Exercise run-state stat tracking with deterministic values.
+ * @returns {Object}
+ */
+export function exerciseRunStatistics() {
+    RunState.startNewRun();
+    RunState.setRoundNumber(5);
+    RunState.recordStat('damageDealt', 120);
+    RunState.recordStat('damageDealt', 40);
+    RunState.recordStat('damageTaken', 35);
+    RunState.recordStat('shotFired');
+    RunState.recordStat('shotFired');
+    RunState.recordStat('shotFired');
+    RunState.recordStat('shotHit');
+    RunState.recordStat('shotHit');
+    RunState.recordStat('enemyDestroyed');
+    RunState.recordStat('moneyEarned', 750);
+    RunState.recordStat('moneySpent', 200);
+    RunState.recordStat('weaponUsed', 'basic-shot');
+    RunState.recordStat('weaponUsed', 'laser-blast');
+    RunState.recordStat('nukeLaunched');
+    RunState.endRun(false);
+
+    return {
+        success: true,
+        state: RunState.getState(),
+        stats: RunState.getRunStats()
+    };
+}
+
+/**
+ * Save a deterministic local/global high score and update display lifetime stats.
+ * @param {Object} runStats
+ * @returns {Object}
+ */
+export function saveHighScoreForQa(runStats = {}) {
+    const normalized = {
+        roundsSurvived: runStats.roundsSurvived ?? 1,
+        totalDamageDealt: runStats.totalDamageDealt ?? runStats.totalDamage ?? 0,
+        enemiesDestroyed: runStats.enemiesDestroyed ?? 0,
+        shotsFired: runStats.shotsFired ?? 0,
+        shotsHit: runStats.shotsHit ?? 0,
+        moneyEarned: runStats.moneyEarned ?? 0,
+        moneySpent: runStats.moneySpent ?? 0,
+        biggestHit: runStats.biggestHit ?? 0,
+        totalScore: runStats.totalScore ?? ((runStats.roundsSurvived ?? 1) * 1000 + (runStats.totalDamageDealt ?? 0))
+    };
+    const result = HighScores.saveHighScore(normalized);
+    const lifetimeSaved = HighScores.updateLifetimeStats(normalized);
+
+    return {
+        success: true,
+        result,
+        lifetimeSaved,
+        scores: HighScores.getHighScores(),
+        lifetimeStats: HighScores.getFormattedLifetimeStats()
+    };
+}
+
+/**
+ * Record deterministic aggregate lifetime-stat events.
+ * @returns {Object}
+ */
+export function exerciseLifetimeStatistics() {
+    LifetimeStats.recordRunStarted();
+    LifetimeStats.recordDamageDealt(160);
+    LifetimeStats.recordDamageTaken(35);
+    LifetimeStats.recordShot(true);
+    LifetimeStats.recordShot(true);
+    LifetimeStats.recordShot(false);
+    LifetimeStats.recordKill('laser-blast');
+    LifetimeStats.recordKill('laser-blast');
+    LifetimeStats.recordKill('basic-shot');
+    LifetimeStats.recordMoneyEarned(750);
+    LifetimeStats.recordWin({
+        isFlawless: false,
+        roundNumber: 5,
+        damageDealt: 160,
+        shotsFired: 3,
+        shotsHit: 2
+    });
+    LifetimeStats.recordLoss({ roundNumber: 6 });
+
+    return {
+        success: true,
+        stats: LifetimeStats.getStats(),
+        summary: LifetimeStats.getSummary(),
+        accuracy: LifetimeStats.getOverallAccuracy(),
+        favoriteWeapon: LifetimeStats.getFavoriteWeapon(),
+        stored: readJsonStorage('scorchedEarth_lifetimeStats', null)
+    };
+}
+
+/**
+ * Get persisted high-score/stat data and active leaderboard state.
+ * @returns {Object}
+ */
+export function getHighScoreQaState() {
+    return {
+        success: true,
+        gameState: getGameState(),
+        highScores: HighScores.getHighScores(),
+        bestRun: HighScores.getBestRun(),
+        bestRound: HighScores.getBestRoundCount(),
+        qualifiesLowScore: HighScores.isNewHighScore(1),
+        displayLifetimeStats: HighScores.getFormattedLifetimeStats(),
+        aggregateLifetimeStats: LifetimeStats.getStats(),
+        aggregateLifetimeSummary: LifetimeStats.getSummary(),
+        globalLeaderboard: HighScores.getGlobalLeaderboard(),
+        connectionStatus: HighScores.getConnectionStatus(),
+        stored: {
+            playerName: localStorage.getItem('scorched_earth_player_name'),
+            highScores: readJsonStorage('scorched_earth_high_scores', []),
+            displayLifetimeStats: readJsonStorage('scorched_earth_lifetime_stats', null),
+            aggregateLifetimeStats: readJsonStorage('scorchedEarth_lifetimeStats', null),
+            localScores: readJsonStorage('scorched_earth_local_scores', [])
+        }
+    };
+}
+
+/**
+ * Open the high-scores screen from browser QA.
+ * @returns {Object}
+ */
+export function openHighScoresScreen() {
+    if (getGameState() !== GAME_STATES.MENU) {
+        setGameState(GAME_STATES.MENU);
+    }
+    setGameState(GAME_STATES.HIGH_SCORES);
+    return {
+        success: getGameState() === GAME_STATES.HIGH_SCORES,
+        gameState: getGameState()
     };
 }
 
@@ -1284,6 +1675,468 @@ export function getSnapshot(name) {
     };
 }
 
+/**
+ * Get the current render quality profile summary.
+ * @returns {Object}
+ */
+export function getRenderQuality() {
+    return {
+        success: true,
+        quality: getRenderQualitySummary()
+    };
+}
+
+/**
+ * Set the render quality profile for testing or debug tuning.
+ * @param {string} id - low, balanced, or high
+ * @returns {Object}
+ */
+export function setRenderQuality(id) {
+    try {
+        const profile = setRenderQualityProfile(id);
+        return {
+            success: true,
+            quality: getRenderQualitySummary(),
+            label: profile.label
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+}
+
+/**
+ * Get rolling runtime performance metrics and live visual effect counts.
+ * @returns {Object}
+ */
+export function getPerformanceMetrics() {
+    const pixiFragments = getDerezFragmentCountRef ? getDerezFragmentCountRef() : 0;
+    const loopTiming = getLoopTimingSnapshot();
+
+    return {
+        success: true,
+        metrics: getPerformanceSnapshot({
+            particles: getParticleCount(),
+            terrainDerezEffects: getTerrainDerezEffectCount(),
+            pixiFragments,
+            'loop.fixedTimestep': loopTiming.fixedTimestep,
+            'loop.maxFixedUpdatesPerFrame': loopTiming.maxFixedUpdatesPerFrame,
+            'loop.accumulator': loopTiming.accumulator,
+            'loop.interpolationAlpha': loopTiming.interpolationAlpha,
+            'loop.lastFixedSteps': loopTiming.lastUpdatePlan.steps,
+            'loop.lastDroppedTime': loopTiming.lastUpdatePlan.droppedTime,
+            ...Object.fromEntries(
+                Object.entries(getPixiTerrainCacheStats()).map(([key, value]) => [`pixiTerrain.${key}`, value])
+            )
+        }),
+        loopTiming
+    };
+}
+
+/**
+ * Reset rolling performance metrics before a smoke scenario.
+ * @returns {Object}
+ */
+export function resetPerformance() {
+    resetPerformanceMetrics();
+    return { success: true };
+}
+
+/**
+ * Evaluate the current performance snapshot against budgets.
+ * @param {Object} budgets
+ * @returns {Object}
+ */
+export function checkPerformanceBudget(budgets = {}) {
+    const metrics = getPerformanceMetrics().metrics;
+    const result = evaluatePerformanceBudget(metrics, budgets);
+    return {
+        success: true,
+        metrics,
+        ...result
+    };
+}
+
+/**
+ * Get grouped asset loading status for startup/lazy-load smokes.
+ * @returns {Object}
+ */
+export function getAssetStatus() {
+    return {
+        success: true,
+        loadedCount: getLoadedCount(),
+        loading: getLoadingStatus(),
+        groups: getAssetGroupStatus()
+    };
+}
+
+// =============================================================================
+// PROGRESSION, COLLECTION, AND SETTINGS QA API
+// =============================================================================
+
+/**
+ * Clear level progression data used by browser QA smokes.
+ * @returns {Object}
+ */
+export function resetProgressionQaData() {
+    Stars.resetAll();
+    return getProgressionQaState();
+}
+
+/**
+ * Record deterministic level completion data through the production star system.
+ * @param {Object} options
+ * @returns {Object}
+ */
+export function completeLevelForQa(options = {}) {
+    const {
+        levelId = 'world1-level1',
+        stats = {
+            damageDealt: 120,
+            accuracy: 1,
+            turnsUsed: 1,
+            won: true
+        }
+    } = options;
+
+    const previousStars = Stars.getForLevel(levelId);
+    const result = Stars.recordCompletion(levelId, stats);
+    return {
+        success: true,
+        levelId,
+        previousStars,
+        result,
+        progression: getProgressionQaState()
+    };
+}
+
+/**
+ * Get persisted level progression state for browser QA.
+ * @returns {Object}
+ */
+export function getProgressionQaState() {
+    return {
+        success: true,
+        gameState: getGameState(),
+        totalStars: Stars.getTotalStars(),
+        world1: Stars.getWorldStars(1),
+        worldUnlocks: Stars.getWorldUnlockStatus(),
+        nextLockedWorld: Stars.getNextLockedWorld(),
+        progress: Stars.getProgress(),
+        stored: readJsonStorage('scorched_earth_stars', null)
+    };
+}
+
+/**
+ * Reset collection/drop state used by browser QA smokes.
+ * @returns {Object}
+ */
+export function resetCollectionQaData() {
+    localStorage.removeItem('scorchedEarth_collection');
+    localStorage.removeItem('scorchedEarth_tokens');
+    localStorage.removeItem('scorchedEarth_pityState');
+    TankCollection.init();
+    PitySystem.init();
+    Tokens.init();
+    return getCollectionQaState();
+}
+
+/**
+ * Grant token currency through the production token module.
+ * @param {number} amount
+ * @returns {Object}
+ */
+export function grantTokensForQa(amount = 50) {
+    Tokens.init();
+    Tokens.addTokens(amount, 'browser_qa');
+    return getCollectionQaState();
+}
+
+/**
+ * Process a deterministic browser-QA supply drop and optionally start the overlay animation.
+ * @param {Object} options
+ * @returns {Object}
+ */
+export function openSupplyDropForQa(options = {}) {
+    const { dropType = DROP_TYPES.STANDARD, playAnimation = true, spendTokens = 0 } = options;
+    TankCollection.init();
+    PitySystem.init();
+    Tokens.init();
+
+    const spent = spendTokens > 0 ? Tokens.spendTokens(spendTokens) : true;
+    const drop = processDrop(dropType);
+    if (playAnimation && drop.tank) {
+        SupplyDrop.play(drop.tank);
+    }
+
+    return {
+        success: !!drop.tank && spent,
+        spent,
+        drop,
+        animation: {
+            isAnimating: SupplyDrop.isAnimating(),
+            revealTank: SupplyDrop.getRevealTank()
+        },
+        collection: getCollectionQaState()
+    };
+}
+
+/**
+ * Equip an owned tank for browser QA.
+ * @param {string} tankId
+ * @returns {Object}
+ */
+export function equipTankForQa(tankId) {
+    TankCollection.init();
+    const equipped = TankCollection.setEquippedTank(tankId);
+    return {
+        success: equipped,
+        tankId,
+        collection: getCollectionQaState()
+    };
+}
+
+/**
+ * Build up pity counters using deterministic rarity inputs.
+ * @param {Object} options
+ * @returns {Object}
+ */
+export function buildPityForQa(options = {}) {
+    const { rarity = 'common', count = 1 } = options;
+    PitySystem.init();
+    for (let i = 0; i < count; i++) {
+        PitySystem.onDropResult(rarity);
+    }
+    return getCollectionQaState();
+}
+
+/**
+ * Get collection/drop state for browser QA.
+ * @returns {Object}
+ */
+export function getCollectionQaState() {
+    TankCollection.init();
+    Tokens.init();
+    PitySystem.init();
+    return {
+        success: true,
+        gameState: getGameState(),
+        collection: {
+            ...TankCollection.getState(),
+            progress: TankCollection.getCollectionProgress(),
+            equippedTankId: TankCollection.getEquippedTankId()
+        },
+        tokens: {
+            balance: Tokens.getTokenBalance(),
+            lifetime: Tokens.getLifetimeStats()
+        },
+        pity: {
+            state: PitySystem.getPityState(),
+            bonus: PitySystem.getPityBonus(),
+            progress: PitySystem.getPityProgress(),
+            displayMessage: PitySystem.getPityDisplayMessage()
+        },
+        supplyDrop: {
+            isAnimating: SupplyDrop.isAnimating(),
+            revealTank: SupplyDrop.getRevealTank()
+        },
+        stored: {
+            collection: readJsonStorage('scorchedEarth_collection', null),
+            tokens: readJsonStorage('scorchedEarth_tokens', null),
+            pity: readJsonStorage('scorchedEarth_pityState', null)
+        }
+    };
+}
+
+// =============================================================================
+// ACHIEVEMENT QA API
+// =============================================================================
+
+/**
+ * Clear achievement state used by browser QA smokes.
+ * @returns {Object}
+ */
+export function resetAchievementQaData() {
+    localStorage.removeItem('scorched_earth_achievements');
+    localStorage.removeItem('scorchedEarth_tokens');
+    Achievements.resetAchievementState();
+    Achievements.clearRoundAchievements();
+    AchievementPopup.clearAll();
+    return getAchievementQaState();
+}
+
+/**
+ * Unlock an achievement through the production achievement system.
+ * @param {string} achievementId
+ * @returns {Object}
+ */
+export function unlockAchievementForQa(achievementId) {
+    const before = getAchievementQaState();
+    const result = Achievements.unlockAchievement(achievementId);
+    return {
+        success: result.unlocked,
+        achievementId,
+        result,
+        before,
+        after: getAchievementQaState()
+    };
+}
+
+/**
+ * Unlock multiple achievements through the production achievement system.
+ * @param {string[]} achievementIds
+ * @returns {Object}
+ */
+export function unlockAchievementsForQa(achievementIds = []) {
+    const before = getAchievementQaState();
+    const results = achievementIds.map(achievementId => ({
+        achievementId,
+        result: Achievements.unlockAchievement(achievementId)
+    }));
+    return {
+        success: results.every(entry => entry.result.unlocked),
+        results,
+        before,
+        after: getAchievementQaState()
+    };
+}
+
+/**
+ * Update an achievement counter through the production achievement system.
+ * @param {Object} options
+ * @returns {Object}
+ */
+export function progressAchievementForQa(options = {}) {
+    const {
+        achievementId = 'sharpshooter',
+        value = 1,
+        increment = true
+    } = options;
+    const result = Achievements.updateAchievementProgress(achievementId, value, increment);
+    return {
+        success: result.updated || result.unlocked,
+        achievementId,
+        result,
+        after: getAchievementQaState()
+    };
+}
+
+/**
+ * Get achievement, popup, and reward state for browser QA.
+ * @returns {Object}
+ */
+export function getAchievementQaState() {
+    const all = Achievements.getAllAchievements();
+    const visible = Achievements.getVisibleAchievements();
+    return {
+        success: true,
+        gameState: getGameState(),
+        stats: Achievements.getAchievementStats(),
+        state: Achievements.getAchievementState(),
+        unlockedIds: Achievements.getUnlockedAchievementIds(),
+        unviewedCount: Achievements.getUnviewedCount(),
+        roundAchievements: Achievements.getRoundAchievements(),
+        visibleAchievements: visible.map(achievement => ({
+            id: achievement.id,
+            name: achievement.name,
+            description: achievement.description,
+            category: achievement.category,
+            tokenReward: achievement.tokenReward,
+            unlocked: Achievements.isAchievementUnlocked(achievement.id),
+            progress: Achievements.getAchievementProgress(achievement.id)
+        })),
+        totalAchievements: all.length,
+        tokens: {
+            balance: Tokens.getTokenBalance(),
+            lifetime: Tokens.getLifetimeStats()
+        },
+        popup: AchievementPopup.getDebugState(),
+        stored: {
+            achievements: readJsonStorage('scorched_earth_achievements', null),
+            tokens: readJsonStorage('scorchedEarth_tokens', null)
+        }
+    };
+}
+
+/**
+ * Dismiss active achievement popups through the QA API.
+ * @returns {Object}
+ */
+export function dismissAchievementPopupsForQa() {
+    AchievementPopup.clearAll();
+    return getAchievementQaState();
+}
+
+/**
+ * Change audio/settings values through production modules.
+ * @param {Object} options
+ * @returns {Object}
+ */
+export function setSettingsAudioForQa(options = {}) {
+    if (typeof options.masterVolume === 'number') {
+        Sound.setMasterVolume(options.masterVolume);
+    }
+    if (typeof options.musicVolume === 'number') {
+        Sound.setMusicVolume(options.musicVolume);
+    }
+    if (typeof options.sfxVolume === 'number') {
+        Sound.setSfxVolume(options.sfxVolume);
+    }
+    if (typeof options.muted === 'boolean') {
+        Sound.setMuted(options.muted);
+    }
+    if (typeof options.crtEnabled === 'boolean') {
+        Effects.setCrtEnabled(options.crtEnabled);
+    }
+    if (options.controlMode) {
+        ControlSettings.setControlMode(options.controlMode);
+    }
+    if (options.trajectoryMode) {
+        ControlSettings.setTrajectoryMode(options.trajectoryMode);
+    }
+    if (options.renderQuality) {
+        setRenderQualityProfile(options.renderQuality);
+    }
+    return getSettingsAudioQaState();
+}
+
+/**
+ * Get audio/settings state and persisted values for browser QA.
+ * @returns {Object}
+ */
+export function getSettingsAudioQaState() {
+    return {
+        success: true,
+        gameState: getGameState(),
+        audio: {
+            masterVolume: Sound.getMasterVolume(),
+            musicVolume: Sound.getMusicVolume(),
+            sfxVolume: Sound.getSfxVolume(),
+            muted: Sound.getMuted()
+        },
+        controls: {
+            controlMode: ControlSettings.getControlMode(),
+            trajectoryMode: ControlSettings.getTrajectoryMode()
+        },
+        visual: {
+            crtEnabled: Effects.isCrtEnabled(),
+            renderQuality: getRenderQualitySummary()
+        },
+        stored: {
+            masterVolume: localStorage.getItem('scorched-earth-master-volume'),
+            musicVolume: localStorage.getItem('scorched-earth-music-volume'),
+            sfxVolume: localStorage.getItem('scorched-earth-sfx-volume'),
+            muted: localStorage.getItem('scorched-earth-muted'),
+            crtEnabled: localStorage.getItem('scorched_earth_crt_enabled'),
+            controlMode: localStorage.getItem('scorched_control_mode'),
+            trajectoryMode: localStorage.getItem('scorched_trajectory_mode'),
+            renderQuality: localStorage.getItem('scorched_earth_render_quality')
+        }
+    };
+}
+
 // =============================================================================
 // WINDOW EXPOSURE (for console access)
 // =============================================================================
@@ -1300,8 +2153,11 @@ const TestAPI = {
     // Terrain and tank manipulation
     generateTerrain,
     getTerrainAt,
+    destroyTerrain,
+    getDerezFragmentCount,
     setTankPositions,
     getTankPositions,
+    exerciseTankSupportPhysics,
     // Snapshot testing
     snapshot,
     compareSnapshots,
@@ -1313,6 +2169,39 @@ const TestAPI = {
     getWind,
     getWindForce,
     getState,
+    getControlState,
+    setControlMode,
+    resetHighScoreQaData,
+    showNameEntry,
+    getNameEntryState,
+    exerciseRunStatistics,
+    saveHighScoreForQa,
+    exerciseLifetimeStatistics,
+    getHighScoreQaState,
+    openHighScoresScreen,
+    getRenderQuality,
+    setRenderQuality,
+    getPerformanceMetrics,
+    resetPerformance,
+    checkPerformanceBudget,
+    getAssetStatus,
+    resetProgressionQaData,
+    completeLevelForQa,
+    getProgressionQaState,
+    resetCollectionQaData,
+    grantTokensForQa,
+    openSupplyDropForQa,
+    equipTankForQa,
+    buildPityForQa,
+    getCollectionQaState,
+    resetAchievementQaData,
+    unlockAchievementForQa,
+    unlockAchievementsForQa,
+    progressAchievementForQa,
+    getAchievementQaState,
+    dismissAchievementPopupsForQa,
+    setSettingsAudioForQa,
+    getSettingsAudioQaState,
     isInitialized,
     // Initialization (typically called by main.js)
     init,

@@ -9,6 +9,7 @@
 import { PHYSICS } from '../constants.js';
 import { getWindForce } from '../wind.js';
 import { getScreenWidth, getScreenHeight } from '../screenSize.js';
+import { getTerrainGridSurfaceYAt } from '../terrainCells.js';
 import * as ControlSettings from './controlSettings.js';
 
 /**
@@ -194,8 +195,7 @@ export class TrajectoryPreview {
 
             // Check terrain collision
             if (this.terrain && y > 0) {
-                const terrainHeight = this.terrain.getHeight(Math.floor(x));
-                const terrainSurfaceY = screenHeight - terrainHeight;
+                const terrainSurfaceY = getTerrainGridSurfaceYAt(this.terrain, Math.floor(x));
 
                 if (y >= terrainSurfaceY) {
                     this.impactPoint = { x, y: terrainSurfaceY };

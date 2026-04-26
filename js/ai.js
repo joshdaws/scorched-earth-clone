@@ -9,6 +9,7 @@
 import { PHYSICS } from './constants.js';
 import { getScreenWidth, getScreenHeight } from './screenSize.js';
 import { WEAPON_TYPES, WeaponRegistry } from './weapons.js';
+import { getTerrainGridHeightAt, getTerrainGridSurfaceYAt } from './terrainCells.js';
 
 // =============================================================================
 // AI DIFFICULTY LEVELS
@@ -428,8 +429,8 @@ function checkTerrainObstruction(aiTank, playerTank, terrain) {
 
     // Check terrain height along the path
     for (let x = startX + 10; x < endX - 10; x += 5) {
-        const terrainHeight = terrain.getHeight(x);
-        const terrainY = terrain.getScreenHeight() - terrainHeight;
+        const terrainHeight = getTerrainGridHeightAt(terrain, x);
+        const terrainY = getTerrainGridSurfaceYAt(terrain, x);
 
         if (terrainHeight > maxTerrainHeight) {
             maxTerrainHeight = terrainHeight;
@@ -457,7 +458,7 @@ function isPlayerInValley(playerTank, terrain) {
     if (!terrain) return false;
 
     const playerX = Math.floor(playerTank.x);
-    const playerTerrainHeight = terrain.getHeight(playerX);
+    const playerTerrainHeight = getTerrainGridHeightAt(terrain, playerX);
 
     // Check terrain height on both sides of the player
     const checkDistance = 100; // pixels to check on each side
@@ -466,7 +467,7 @@ function isPlayerInValley(playerTank, terrain) {
 
     // Check left side
     for (let x = playerX - 20; x >= Math.max(0, playerX - checkDistance); x -= 10) {
-        if (terrain.getHeight(x) > playerTerrainHeight + 30) {
+        if (getTerrainGridHeightAt(terrain, x) > playerTerrainHeight + 30) {
             higherOnLeft = true;
             break;
         }
@@ -474,7 +475,7 @@ function isPlayerInValley(playerTank, terrain) {
 
     // Check right side
     for (let x = playerX + 20; x <= Math.min(getScreenWidth() - 1, playerX + checkDistance); x += 10) {
-        if (terrain.getHeight(x) > playerTerrainHeight + 30) {
+        if (getTerrainGridHeightAt(terrain, x) > playerTerrainHeight + 30) {
             higherOnRight = true;
             break;
         }
@@ -1452,7 +1453,7 @@ export function setWeaponPoolForRound(roundNumber) {
         console.log(`[AI] Weapon pool set for round ${roundNumber}: [${currentWeaponPool.join(', ')}]`);
     }
 
-    return currentWeaponPool;
+    return [...currentWeaponPool];
 }
 
 /**

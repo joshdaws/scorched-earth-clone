@@ -3,13 +3,57 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { calculateDamage, DAMAGE } from '../../js/damage.js';
+import { applyExplosionToAllTanks, calculateDamage, DAMAGE } from '../../js/damage.js';
+import { WeaponRegistry } from '../../js/weapons.js';
 import { createMockTank, createMockExplosion } from '../helpers/game-fixtures.js';
 
 // Mock the debugTools module to avoid dependency issues
 vi.mock('../../js/debugTools.js', () => ({
   isGodModeEnabled: () => false
 }));
+
+const EXPECTED_WEAPON_DAMAGE_AND_RADIUS = {
+  'baby-shot': { damage: 15, blastRadius: 20 },
+  'basic-shot': { damage: 30, blastRadius: 30 },
+  missile: { damage: 40, blastRadius: 40 },
+  'big-shot': { damage: 50, blastRadius: 55 },
+  'mega-shot': { damage: 70, blastRadius: 70 },
+  'armor-piercer': { damage: 55, blastRadius: 25 },
+  tracer: { damage: 10, blastRadius: 15 },
+  'precision-strike': { damage: 45, blastRadius: 20 },
+  mirv: { damage: 20, blastRadius: 25 },
+  'deaths-head': { damage: 18, blastRadius: 22 },
+  'cluster-bomb': { damage: 12, blastRadius: 18 },
+  'chain-reaction': { damage: 25, blastRadius: 30 },
+  'scatter-shot': { damage: 15, blastRadius: 20 },
+  fireworks: { damage: 8, blastRadius: 15 },
+  roller: { damage: 30, blastRadius: 35 },
+  'heavy-roller': { damage: 45, blastRadius: 45 },
+  bouncer: { damage: 25, blastRadius: 30 },
+  'super-bouncer': { damage: 35, blastRadius: 35 },
+  'land-mine': { damage: 50, blastRadius: 40 },
+  'sticky-bomb': { damage: 40, blastRadius: 35 },
+  digger: { damage: 25, blastRadius: 25 },
+  'heavy-digger': { damage: 40, blastRadius: 35 },
+  sandhog: { damage: 30, blastRadius: 30 },
+  drill: { damage: 35, blastRadius: 28 },
+  'laser-drill': { damage: 45, blastRadius: 40 },
+  'tunnel-maker': { damage: 20, blastRadius: 22 },
+  'mini-nuke': { damage: 60, blastRadius: 80 },
+  nuke: { damage: 100, blastRadius: 150 },
+  'tactical-nuke': { damage: 120, blastRadius: 180 },
+  'neutron-bomb': { damage: 90, blastRadius: 100 },
+  'emp-blast': { damage: 40, blastRadius: 120 },
+  'fusion-strike': { damage: 150, blastRadius: 200 },
+  napalm: { damage: 25, blastRadius: 50 },
+  'liquid-dirt': { damage: 10, blastRadius: 40 },
+  teleporter: { damage: 0, blastRadius: 30 },
+  'shield-buster': { damage: 35, blastRadius: 35 },
+  'wind-bomb': { damage: 20, blastRadius: 30 },
+  'gravity-well': { damage: 30, blastRadius: 60 },
+  'lightning-strike': { damage: 55, blastRadius: 25 },
+  'ion-cannon': { damage: 70, blastRadius: 35 }
+};
 
 describe('calculateDamage', () => {
   let tank;
@@ -58,26 +102,58 @@ describe('calculateDamage', () => {
   });
 
   describe('linear falloff', () => {
-    it('deals maximum damage at center', () => {
+    it('deals maximum damage plus direct-hit multiplier at distance 0', () => {
       // Direct hit at tank position
       explosion.x = tank.x;
       explosion.y = tank.y - tank.height / 2;
       explosion.blastRadius = 40;
 
       const damage = calculateDamage(explosion, tank);
-      // Should get direct hit bonus (1.5x) on max damage
-      expect(damage).toBeGreaterThanOrEqual(DAMAGE.DEFAULT_MAX_DAMAGE);
+      expect(damage).toBe(Math.round(DAMAGE.DEFAULT_MAX_DAMAGE * DAMAGE.DIRECT_HIT_MULTIPLIER));
     });
 
-    it('deals less damage at edge of blast radius', () => {
-      // Position explosion at edge of blast
-      const edgeDistance = explosion.blastRadius - 5;
-      explosion.x = tank.x + edgeDistance;
+    it('deals zero damage at and beyond the blast radius', () => {
+      const bounds = tank.getBounds();
+      const radius = 40;
 
-      const centerDamage = calculateDamage(createMockExplosion({ x: tank.x, y: tank.y - tank.height / 2 }), tank);
-      const edgeDamage = calculateDamage(explosion, tank);
+      const atRadius = calculateDamage(
+        createMockExplosion({
+          x: bounds.x - radius,
+          y: bounds.y + bounds.height / 2,
+          blastRadius: radius
+        }),
+        tank
+      );
+      const beyondRadius = calculateDamage(
+        createMockExplosion({
+          x: bounds.x - radius - 1,
+          y: bounds.y + bounds.height / 2,
+          blastRadius: radius
+        }),
+        tank
+      );
 
-      expect(edgeDamage).toBeLessThan(centerDamage);
+      expect(atRadius).toBe(0);
+      expect(beyondRadius).toBe(0);
+    });
+
+    it('uses the linear falloff formula between center and radius', () => {
+      const bounds = tank.getBounds();
+      const radius = 40;
+      const distance = 20;
+      const weapon = { damage: 100, blastRadius: radius };
+
+      const damage = calculateDamage(
+        createMockExplosion({
+          x: bounds.x - distance,
+          y: bounds.y + bounds.height / 2,
+          blastRadius: radius
+        }),
+        tank,
+        weapon
+      );
+
+      expect(damage).toBe(Math.round(weapon.damage * (1 - distance / radius)));
     });
   });
 
@@ -93,6 +169,35 @@ describe('calculateDamage', () => {
       expect(damage).toBeGreaterThanOrEqual(
         Math.round(DAMAGE.DEFAULT_MAX_DAMAGE * DAMAGE.DIRECT_HIT_MULTIPLIER)
       );
+    });
+
+    it('applies direct-hit multiplier only below the distance threshold', () => {
+      const bounds = tank.getBounds();
+      const weapon = { damage: 100, blastRadius: 50 };
+      const y = bounds.y + bounds.height / 2;
+
+      const justInside = calculateDamage(createMockExplosion({ x: bounds.x - 4, y, blastRadius: 50 }), tank, weapon);
+      const atThreshold = calculateDamage(createMockExplosion({ x: bounds.x - 5, y, blastRadius: 50 }), tank, weapon);
+
+      expect(justInside).toBe(Math.round(weapon.damage * (1 - 4 / 50) * DAMAGE.DIRECT_HIT_MULTIPLIER));
+      expect(atThreshold).toBe(Math.round(weapon.damage * (1 - 5 / 50)));
+    });
+
+    it('uses weapon-specific direct hit multiplier after falloff', () => {
+      const bounds = tank.getBounds();
+      const weapon = { damage: 100, blastRadius: 50, directHitMultiplier: 2 };
+
+      const damage = calculateDamage(
+        createMockExplosion({
+          x: bounds.x - 4,
+          y: bounds.y + bounds.height / 2,
+          blastRadius: 50
+        }),
+        tank,
+        weapon
+      );
+
+      expect(damage).toBe(Math.round(weapon.damage * (1 - 4 / 50) * weapon.directHitMultiplier));
     });
   });
 
@@ -162,6 +267,45 @@ describe('calculateDamage', () => {
       expect(damage).toBeGreaterThan(0);
     });
   });
+
+  describe('edge cases', () => {
+    it('returns zero for zero blast radius weapons', () => {
+      delete explosion.blastRadius;
+      const damage = calculateDamage(explosion, tank, { damage: 100, blastRadius: 0 });
+
+      expect(damage).toBe(0);
+    });
+
+    it('keeps inside-rectangle distance at zero even for unusual explosion placement', () => {
+      const bounds = tank.getBounds();
+      const damage = calculateDamage(
+        createMockExplosion({
+          x: bounds.x + bounds.width / 2,
+          y: bounds.y + bounds.height / 2,
+          blastRadius: 40
+        }),
+        tank
+      );
+
+      expect(damage).toBe(Math.round(DAMAGE.DEFAULT_MAX_DAMAGE * DAMAGE.DIRECT_HIT_MULTIPLIER));
+    });
+
+    it('applies one explosion to multiple targets and excludes misses', () => {
+      const targetA = createMockTank({ x: 200, y: 300, team: 'player' });
+      const targetB = createMockTank({ x: 250, y: 300, team: 'enemy' });
+      const miss = createMockTank({ x: 500, y: 300, team: 'spectator' });
+
+      const results = applyExplosionToAllTanks(
+        createMockExplosion({ x: 220, y: 284, blastRadius: 70 }),
+        [targetA, targetB, miss],
+        { damage: 50, blastRadius: 70 }
+      );
+
+      expect(results).toHaveLength(2);
+      expect(results.map(result => result.tank.team)).toEqual(['player', 'enemy']);
+      expect(results.every(result => result.actualDamage > 0)).toBe(true);
+    });
+  });
 });
 
 describe('DAMAGE constants', () => {
@@ -179,5 +323,29 @@ describe('DAMAGE constants', () => {
 
   it('has correct default max damage', () => {
     expect(DAMAGE.DEFAULT_MAX_DAMAGE).toBe(25);
+  });
+});
+
+describe('weapon damage and radius values', () => {
+  it('matches the current 40-weapon damage and blast-radius table', () => {
+    const actual = Object.fromEntries(
+      WeaponRegistry.getAllWeapons().map(weapon => [
+        weapon.id,
+        {
+          damage: weapon.damage,
+          blastRadius: weapon.blastRadius
+        }
+      ])
+    );
+
+    expect(actual).toEqual(EXPECTED_WEAPON_DAMAGE_AND_RADIUS);
+  });
+
+  it('keeps key weapon blast values aligned with current gameplay tuning', () => {
+    expect(WeaponRegistry.getWeapon('basic-shot')).toMatchObject({ damage: 30, blastRadius: 30 });
+    expect(WeaponRegistry.getWeapon('missile')).toMatchObject({ damage: 40, blastRadius: 40 });
+    expect(WeaponRegistry.getWeapon('big-shot')).toMatchObject({ damage: 50, blastRadius: 55 });
+    expect(WeaponRegistry.getWeapon('mini-nuke')).toMatchObject({ damage: 60, blastRadius: 80 });
+    expect(WeaponRegistry.getWeapon('nuke')).toMatchObject({ damage: 100, blastRadius: 150 });
   });
 });

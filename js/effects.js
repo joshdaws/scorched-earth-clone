@@ -9,6 +9,8 @@
 import { CANVAS, COLORS, PHYSICS } from './constants.js';
 import { WeaponRegistry, WEAPON_TYPES } from './weapons.js';
 import { get as getAsset } from './assets.js';
+import { getRenderQualityProfile } from './renderQuality.js';
+import { recordMeasure, setPerformanceGauge } from './performanceMetrics.js';
 
 // =============================================================================
 // PARTICLE CONFIGURATION
@@ -973,6 +975,11 @@ export function updateBackground(deltaTime) {
 export function renderBackground(ctx, width, height) {
     ctx.save();
 
+    if (renderBakedGameplayBackground(ctx, width, height)) {
+        ctx.restore();
+        return;
+    }
+
     // Try to use the synthwave background image
     const bgImage = getAsset('backgrounds.synthwave');
     if (bgImage && bgImage.complete && bgImage.naturalWidth > 0) {
@@ -1019,6 +1026,62 @@ export function renderBackground(ctx, width, height) {
     }
 
     ctx.restore();
+}
+
+/**
+ * Render the baked generated gameplay background when available.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} width - Canvas width
+ * @param {number} height - Canvas height
+ * @returns {boolean} Whether the baked background was rendered
+ */
+function renderBakedGameplayBackground(ctx, width, height) {
+    const background = getAsset('backgrounds.gameplay');
+
+    if (!isRenderableImage(background)) {
+        return false;
+    }
+
+    drawImageCover(ctx, background, 0, 0, width, height);
+    return true;
+}
+
+/**
+ * Check whether an image asset is loaded and safe to render.
+ * @param {HTMLImageElement|null} image - Image asset
+ * @returns {boolean}
+ */
+function isRenderableImage(image) {
+    return Boolean(image && image.complete && image.naturalWidth > 0);
+}
+
+/**
+ * Draw an image using CSS-like cover behavior.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {HTMLImageElement} image - Image to draw
+ * @param {number} x - Target x
+ * @param {number} y - Target y
+ * @param {number} width - Target width
+ * @param {number} height - Target height
+ */
+function drawImageCover(ctx, image, x, y, width, height) {
+    const imgAspect = image.naturalWidth / image.naturalHeight;
+    const targetAspect = width / height;
+
+    let sourceX = 0;
+    let sourceY = 0;
+    let sourceWidth = image.naturalWidth;
+    let sourceHeight = image.naturalHeight;
+
+    if (targetAspect > imgAspect) {
+        sourceHeight = image.naturalWidth / targetAspect;
+        sourceY = (image.naturalHeight - sourceHeight) / 2;
+    } else {
+        sourceWidth = image.naturalHeight * targetAspect;
+        sourceX = (image.naturalWidth - sourceWidth) / 2;
+    }
+
+    ctx.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, x, y, width, height);
 }
 
 /**
@@ -1316,26 +1379,305 @@ let vhsGlitchState = {
 /**
  * CRT effects state
  */
-let crtEnabled = true;
+const CRT_ENABLED_STORAGE_KEY = 'scorched_earth_crt_enabled';
 
-/**
- * Cached scanline pattern for performance
- * @type {CanvasPattern|null}
- */
-let scanlinePattern = null;
+function loadCrtEnabled() {
+    try {
+        const stored = localStorage.getItem(CRT_ENABLED_STORAGE_KEY);
+        if (stored === 'true') return true;
+        if (stored === 'false') return false;
+    } catch (error) {
+        console.warn('Failed to load CRT setting:', error);
+    }
+    return true;
+}
 
-/**
- * Canvas dimensions for pattern regeneration
- */
-let patternWidth = 0;
-let patternHeight = 0;
+function saveCrtEnabled(enabled) {
+    try {
+        localStorage.setItem(CRT_ENABLED_STORAGE_KEY, enabled ? 'true' : 'false');
+    } catch (error) {
+        console.warn('Failed to save CRT setting:', error);
+    }
+}
+
+let crtEnabled = loadCrtEnabled();
+
+let crtOverlayCanvas = null;
+let crtOverlayKey = '';
+let crtDomOverlay = null;
+let crtDomGlitch = null;
+let crtDomOverlayKey = '';
+
+function getCrtQualitySettings() {
+    return getRenderQualityProfile().crt ?? {};
+}
+
+function getStaticCrtOverlay(width, height) {
+    const crtQuality = getCrtQualitySettings();
+    const scanlineOpacity = crtQuality.scanlineOpacity ?? CRT_CONFIG.SCANLINE_OPACITY;
+    const vignetteIntensity = crtQuality.vignetteIntensity ?? CRT_CONFIG.VIGNETTE_INTENSITY;
+    const vignetteRadius = crtQuality.vignetteRadius ?? CRT_CONFIG.VIGNETTE_RADIUS;
+    const chromaticEnabled = crtQuality.chromaticAberrationEnabled ?? CRT_CONFIG.CHROMATIC_ABERRATION_ENABLED;
+    const chromaticAlpha = crtQuality.chromaticAlpha ?? CRT_CONFIG.CHROMATIC_ALPHA;
+    const phosphorEnabled = crtQuality.phosphorGlowEnabled ?? CRT_CONFIG.PHOSPHOR_GLOW_ENABLED;
+    const phosphorIntensity = crtQuality.phosphorGlowIntensity ?? CRT_CONFIG.PHOSPHOR_GLOW_INTENSITY;
+    const key = [
+        width,
+        height,
+        scanlineOpacity,
+        vignetteIntensity,
+        vignetteRadius,
+        chromaticEnabled,
+        chromaticAlpha,
+        phosphorEnabled,
+        phosphorIntensity
+    ].join(':');
+
+    if (crtOverlayCanvas && crtOverlayKey === key) {
+        return crtOverlayCanvas;
+    }
+
+    const overlay = document.createElement('canvas');
+    overlay.width = Math.max(1, Math.ceil(width));
+    overlay.height = Math.max(1, Math.ceil(height));
+    const overlayCtx = overlay.getContext('2d');
+    if (!overlayCtx) return null;
+
+    if (phosphorEnabled) {
+        overlayCtx.save();
+        overlayCtx.globalCompositeOperation = 'lighter';
+        overlayCtx.globalAlpha = phosphorIntensity;
+        const gradient = overlayCtx.createRadialGradient(
+            width / 2, height / 2, 0,
+            width / 2, height / 2, Math.max(width, height) * 0.6
+        );
+        gradient.addColorStop(0, 'rgba(100, 200, 255, 0.05)');
+        gradient.addColorStop(0.5, 'rgba(100, 200, 255, 0.02)');
+        gradient.addColorStop(1, 'rgba(100, 200, 255, 0)');
+        overlayCtx.fillStyle = gradient;
+        overlayCtx.fillRect(0, 0, width, height);
+        overlayCtx.restore();
+    }
+
+    if (chromaticEnabled) {
+        overlayCtx.save();
+        overlayCtx.globalCompositeOperation = 'screen';
+        overlayCtx.globalAlpha = chromaticAlpha;
+        const redGradient = overlayCtx.createLinearGradient(0, 0, width, 0);
+        redGradient.addColorStop(0, 'rgba(255, 0, 0, 0.6)');
+        redGradient.addColorStop(0.15, 'rgba(255, 0, 0, 0)');
+        redGradient.addColorStop(0.85, 'rgba(255, 0, 0, 0)');
+        redGradient.addColorStop(1, 'rgba(255, 0, 0, 0.6)');
+        overlayCtx.fillStyle = redGradient;
+        overlayCtx.fillRect(0, 0, width, height);
+
+        const blueGradient = overlayCtx.createLinearGradient(0, 0, width, 0);
+        blueGradient.addColorStop(0, 'rgba(0, 100, 255, 0.6)');
+        blueGradient.addColorStop(0.15, 'rgba(0, 100, 255, 0)');
+        blueGradient.addColorStop(0.85, 'rgba(0, 100, 255, 0)');
+        blueGradient.addColorStop(1, 'rgba(0, 100, 255, 0.6)');
+        overlayCtx.fillStyle = blueGradient;
+        overlayCtx.fillRect(0, 0, width, height);
+        overlayCtx.restore();
+    }
+
+    if (scanlineOpacity > 0) {
+        overlayCtx.save();
+        overlayCtx.fillStyle = CRT_CONFIG.SCANLINE_COLOR;
+        overlayCtx.globalAlpha = scanlineOpacity;
+        for (let y = 0; y < height; y += CRT_CONFIG.SCANLINE_SPACING) {
+            overlayCtx.fillRect(0, y, width, 1);
+        }
+        overlayCtx.restore();
+    }
+
+    if (vignetteIntensity > 0) {
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const diagonal = Math.sqrt(width * width + height * height);
+        const innerRadius = diagonal * vignetteRadius * 0.5;
+        const outerRadius = diagonal * 0.75;
+        const gradient = overlayCtx.createRadialGradient(
+            centerX, centerY, innerRadius,
+            centerX, centerY, outerRadius
+        );
+        gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        gradient.addColorStop(0.5, `rgba(0, 0, 0, ${vignetteIntensity * 0.3})`);
+        gradient.addColorStop(1, `rgba(0, 0, 0, ${vignetteIntensity})`);
+        overlayCtx.fillStyle = gradient;
+        overlayCtx.fillRect(0, 0, width, height);
+    }
+
+    crtOverlayCanvas = overlay;
+    crtOverlayKey = key;
+    return crtOverlayCanvas;
+}
+
+function getCssPixels(value) {
+    return `${Math.max(1, Math.round(value))}px`;
+}
+
+function ensureCrtDomOverlay() {
+    if (typeof document === 'undefined' || !document.body) return null;
+
+    if (crtDomOverlay && crtDomOverlay.isConnected) {
+        return crtDomOverlay;
+    }
+
+    crtDomOverlay = document.getElementById('crtOverlay');
+    if (!crtDomOverlay) {
+        crtDomOverlay = document.createElement('div');
+        crtDomOverlay.id = 'crtOverlay';
+        document.body.appendChild(crtDomOverlay);
+    }
+
+    Object.assign(crtDomOverlay.style, {
+        position: 'fixed',
+        left: '0',
+        top: '0',
+        width: '100vw',
+        height: '100vh',
+        pointerEvents: 'none',
+        zIndex: '20',
+        display: 'none',
+        overflow: 'hidden',
+        contain: 'strict',
+        willChange: 'transform',
+        transform: 'translateZ(0)'
+    });
+
+    crtDomGlitch = crtDomOverlay.querySelector('[data-crt-glitch]');
+    if (!crtDomGlitch) {
+        crtDomGlitch = document.createElement('div');
+        crtDomGlitch.dataset.crtGlitch = 'true';
+        crtDomOverlay.appendChild(crtDomGlitch);
+    }
+
+    Object.assign(crtDomGlitch.style, {
+        position: 'absolute',
+        left: '0',
+        top: '0',
+        width: '100%',
+        height: '4px',
+        pointerEvents: 'none',
+        display: 'none',
+        opacity: '0.35',
+        mixBlendMode: 'screen',
+        background: 'linear-gradient(90deg, rgba(255,255,255,0.55), rgba(255,42,109,0.45), rgba(5,217,232,0.45), rgba(255,255,255,0.18))'
+    });
+
+    return crtDomOverlay;
+}
+
+function hideCrtDomOverlay() {
+    if (crtDomOverlay) {
+        crtDomOverlay.style.display = 'none';
+    }
+}
+
+function buildCrtCssBackground({ width, height }) {
+    const crtQuality = getCrtQualitySettings();
+    const scanlineOpacity = crtQuality.scanlineOpacity ?? CRT_CONFIG.SCANLINE_OPACITY;
+    const vignetteIntensity = crtQuality.vignetteIntensity ?? CRT_CONFIG.VIGNETTE_INTENSITY;
+    const vignetteRadius = crtQuality.vignetteRadius ?? CRT_CONFIG.VIGNETTE_RADIUS;
+    const chromaticEnabled = crtQuality.chromaticAberrationEnabled ?? CRT_CONFIG.CHROMATIC_ABERRATION_ENABLED;
+    const chromaticAlpha = crtQuality.chromaticAlpha ?? CRT_CONFIG.CHROMATIC_ALPHA;
+    const phosphorEnabled = crtQuality.phosphorGlowEnabled ?? CRT_CONFIG.PHOSPHOR_GLOW_ENABLED;
+    const phosphorIntensity = crtQuality.phosphorGlowIntensity ?? CRT_CONFIG.PHOSPHOR_GLOW_INTENSITY;
+    const spacing = CRT_CONFIG.SCANLINE_SPACING;
+    const layers = [];
+
+    // A very light glass tint keeps the compositor path closer to the old
+    // Canvas overlay without adding colored bands at the viewport edges.
+    layers.push('linear-gradient(to bottom, rgba(255,255,255,0.018), rgba(0,0,0,0.045))');
+
+    if (scanlineOpacity > 0) {
+        layers.push(
+            `repeating-linear-gradient(to bottom, rgba(0,0,0,${scanlineOpacity}) 0px, rgba(0,0,0,${scanlineOpacity}) 1px, transparent 1px, transparent ${spacing}px)`
+        );
+    }
+
+    if (chromaticEnabled && chromaticAlpha > 0) {
+        const edgeAlpha = Math.min(0.06, chromaticAlpha * 0.9);
+        layers.push(
+            `linear-gradient(to right, rgba(255,55,105,${edgeAlpha}) 0px, rgba(255,55,105,0) 18px, rgba(0,0,0,0) calc(100% - 18px), rgba(45,220,255,${edgeAlpha}) 100%)`
+        );
+    }
+
+    if (phosphorEnabled && phosphorIntensity > 0) {
+        layers.push(
+            `radial-gradient(circle at 50% 50%, rgba(100,200,255,${phosphorIntensity * 0.5}) 0%, rgba(100,200,255,${phosphorIntensity * 0.2}) 50%, rgba(100,200,255,0) 80%)`
+        );
+    }
+
+    if (vignetteIntensity > 0) {
+        const midpoint = Math.max(25, Math.min(80, vignetteRadius * 100));
+        layers.push(
+            `radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 0%, rgba(0,0,0,${vignetteIntensity * 0.28}) ${midpoint}%, rgba(0,0,0,${vignetteIntensity}) 100%)`
+        );
+    }
+
+    return {
+        key: [
+            width,
+            height,
+            scanlineOpacity,
+            vignetteIntensity,
+            vignetteRadius,
+            chromaticEnabled,
+            chromaticAlpha,
+            phosphorEnabled,
+            phosphorIntensity
+        ].join(':'),
+        image: layers.join(', ')
+    };
+}
+
+function renderCrtDomOverlay(width, height, fullscreenParams = null) {
+    const overlay = ensureCrtDomOverlay();
+    if (!overlay) return false;
+
+    const effectWidth = fullscreenParams?.viewportWidth ?? width;
+    const effectHeight = fullscreenParams?.viewportHeight ?? height;
+    overlay.style.display = 'block';
+    overlay.style.width = getCssPixels(effectWidth);
+    overlay.style.height = getCssPixels(effectHeight);
+
+    const background = buildCrtCssBackground({ width: effectWidth, height: effectHeight });
+    if (crtDomOverlayKey !== background.key) {
+        overlay.style.backgroundImage = background.image;
+        overlay.style.backgroundSize = '100% 100%';
+        overlay.style.backgroundRepeat = 'no-repeat';
+        overlay.style.backgroundPosition = 'center';
+        crtDomOverlayKey = background.key;
+    }
+
+    if (crtDomGlitch) {
+        const crtQuality = getCrtQualitySettings();
+        const glitchEnabled = crtQuality.vhsGlitchEnabled ?? CRT_CONFIG.VHS_GLITCH_ENABLED;
+        if (glitchEnabled && vhsGlitchState.active) {
+            const glitchHeight = crtQuality.vhsGlitchHeight ?? CRT_CONFIG.VHS_GLITCH_HEIGHT;
+            crtDomGlitch.style.display = 'block';
+            crtDomGlitch.style.height = getCssPixels(glitchHeight);
+            crtDomGlitch.style.transform = `translate3d(${vhsGlitchState.xDisplacement.toFixed(1)}px, ${vhsGlitchState.yOffset.toFixed(1)}px, 0)`;
+        } else {
+            crtDomGlitch.style.display = 'none';
+        }
+    }
+
+    return true;
+}
 
 /**
  * Enable or disable CRT effects.
  * @param {boolean} enabled - Whether CRT effects should be rendered
  */
 export function setCrtEnabled(enabled) {
-    crtEnabled = enabled;
+    crtEnabled = Boolean(enabled);
+    if (!crtEnabled) {
+        hideCrtDomOverlay();
+    }
+    saveCrtEnabled(crtEnabled);
     console.log(`CRT effects ${enabled ? 'enabled' : 'disabled'}`);
 }
 
@@ -1352,130 +1694,8 @@ export function isCrtEnabled() {
  * @returns {boolean} New enabled state
  */
 export function toggleCrt() {
-    crtEnabled = !crtEnabled;
-    console.log(`CRT effects ${crtEnabled ? 'enabled' : 'disabled'}`);
+    setCrtEnabled(!crtEnabled);
     return crtEnabled;
-}
-
-/**
- * Initialize/regenerate the scanline pattern.
- * Called automatically when rendering if dimensions change.
- * @param {CanvasRenderingContext2D} ctx - Canvas context
- * @param {number} width - Canvas width
- * @param {number} height - Canvas height
- */
-function initScanlinePattern(ctx, width, height) {
-    // Create a small canvas for the repeating pattern
-    const patternCanvas = document.createElement('canvas');
-    const patternCtx = patternCanvas.getContext('2d');
-
-    // Pattern is 1 pixel wide, SCANLINE_SPACING pixels tall
-    patternCanvas.width = 1;
-    patternCanvas.height = CRT_CONFIG.SCANLINE_SPACING;
-
-    // Clear (transparent)
-    patternCtx.clearRect(0, 0, 1, CRT_CONFIG.SCANLINE_SPACING);
-
-    // Draw single scanline (1 pixel tall)
-    patternCtx.fillStyle = CRT_CONFIG.SCANLINE_COLOR;
-    patternCtx.globalAlpha = CRT_CONFIG.SCANLINE_OPACITY;
-    patternCtx.fillRect(0, 0, 1, 1);
-
-    // Create repeating pattern
-    scanlinePattern = ctx.createPattern(patternCanvas, 'repeat');
-    patternWidth = width;
-    patternHeight = height;
-}
-
-/**
- * Render scanlines overlay.
- * @param {CanvasRenderingContext2D} ctx - Canvas context
- * @param {number} width - Canvas width
- * @param {number} height - Canvas height
- */
-function renderScanlines(ctx, width, height) {
-    // Regenerate pattern if dimensions changed
-    if (!scanlinePattern || patternWidth !== width || patternHeight !== height) {
-        initScanlinePattern(ctx, width, height);
-    }
-
-    ctx.save();
-    ctx.fillStyle = scanlinePattern;
-    ctx.fillRect(0, 0, width, height);
-    ctx.restore();
-}
-
-/**
- * Render vignette effect (darker corners).
- * @param {CanvasRenderingContext2D} ctx - Canvas context
- * @param {number} width - Canvas width
- * @param {number} height - Canvas height
- */
-function renderVignette(ctx, width, height) {
-    const centerX = width / 2;
-    const centerY = height / 2;
-
-    // Calculate radius based on canvas diagonal
-    const diagonal = Math.sqrt(width * width + height * height);
-    const innerRadius = diagonal * CRT_CONFIG.VIGNETTE_RADIUS * 0.5;
-    const outerRadius = diagonal * 0.75;
-
-    ctx.save();
-
-    // Create radial gradient from center (transparent) to edges (dark)
-    const gradient = ctx.createRadialGradient(
-        centerX, centerY, innerRadius,
-        centerX, centerY, outerRadius
-    );
-
-    gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    gradient.addColorStop(0.5, `rgba(0, 0, 0, ${CRT_CONFIG.VIGNETTE_INTENSITY * 0.3})`);
-    gradient.addColorStop(1, `rgba(0, 0, 0, ${CRT_CONFIG.VIGNETTE_INTENSITY})`);
-
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, height);
-
-    ctx.restore();
-}
-
-/**
- * Render chromatic aberration effect.
- * This is a subtle RGB color fringing at the edges.
- * Note: This is a lightweight approximation - true chromatic aberration
- * would require reading and shifting pixel data.
- * @param {CanvasRenderingContext2D} ctx - Canvas context
- * @param {number} width - Canvas width
- * @param {number} height - Canvas height
- */
-function renderChromaticAberration(ctx, width, height) {
-    if (!CRT_CONFIG.CHROMATIC_ABERRATION_ENABLED) return;
-
-    const offset = CRT_CONFIG.CHROMATIC_OFFSET;
-    const alpha = CRT_CONFIG.CHROMATIC_ALPHA;
-
-    ctx.save();
-    ctx.globalCompositeOperation = 'screen';
-    ctx.globalAlpha = alpha;
-
-    // Red channel offset (slight right/down shift at edges)
-    const redGradient = ctx.createLinearGradient(0, 0, width, 0);
-    redGradient.addColorStop(0, 'rgba(255, 0, 0, 0.6)');
-    redGradient.addColorStop(0.15, 'rgba(255, 0, 0, 0)');
-    redGradient.addColorStop(0.85, 'rgba(255, 0, 0, 0)');
-    redGradient.addColorStop(1, 'rgba(255, 0, 0, 0.6)');
-    ctx.fillStyle = redGradient;
-    ctx.fillRect(offset, 0, width, height);
-
-    // Blue channel offset (slight left/up shift at edges)
-    const blueGradient = ctx.createLinearGradient(0, 0, width, 0);
-    blueGradient.addColorStop(0, 'rgba(0, 100, 255, 0.6)');
-    blueGradient.addColorStop(0.15, 'rgba(0, 100, 255, 0)');
-    blueGradient.addColorStop(0.85, 'rgba(0, 100, 255, 0)');
-    blueGradient.addColorStop(1, 'rgba(0, 100, 255, 0.6)');
-    ctx.fillStyle = blueGradient;
-    ctx.fillRect(-offset, 0, width, height);
-
-    ctx.restore();
 }
 
 /**
@@ -1486,10 +1706,12 @@ function renderChromaticAberration(ctx, width, height) {
  * @param {number} height - Canvas height
  */
 function renderVhsNoise(ctx, width, height) {
-    if (!CRT_CONFIG.VHS_NOISE_ENABLED) return;
+    const crtQuality = getCrtQualitySettings();
+    const enabled = crtQuality.vhsNoiseEnabled ?? CRT_CONFIG.VHS_NOISE_ENABLED;
+    if (!enabled) return;
 
-    const scale = CRT_CONFIG.VHS_NOISE_SCALE;
-    const intensity = CRT_CONFIG.VHS_NOISE_INTENSITY;
+    const scale = crtQuality.vhsNoiseScale ?? CRT_CONFIG.VHS_NOISE_SCALE;
+    const intensity = crtQuality.vhsNoiseIntensity ?? CRT_CONFIG.VHS_NOISE_INTENSITY;
 
     ctx.save();
     ctx.globalAlpha = intensity;
@@ -1518,7 +1740,9 @@ function renderVhsNoise(ctx, width, height) {
  * @param {number} deltaTime - Time since last frame in ms
  */
 function updateVhsGlitch(deltaTime) {
-    if (!CRT_CONFIG.VHS_GLITCH_ENABLED) return;
+    const crtQuality = getCrtQualitySettings();
+    const enabled = crtQuality.vhsGlitchEnabled ?? CRT_CONFIG.VHS_GLITCH_ENABLED;
+    if (!enabled) return;
 
     if (vhsGlitchState.active) {
         vhsGlitchState.elapsed += deltaTime;
@@ -1527,11 +1751,11 @@ function updateVhsGlitch(deltaTime) {
         }
     } else {
         // Random chance to start a new glitch
-        if (Math.random() < CRT_CONFIG.VHS_GLITCH_CHANCE) {
+        if (Math.random() < (crtQuality.vhsGlitchChance ?? CRT_CONFIG.VHS_GLITCH_CHANCE)) {
             vhsGlitchState = {
                 active: true,
                 yOffset: Math.random() * 600, // Random vertical position
-                xDisplacement: (Math.random() - 0.5) * 2 * CRT_CONFIG.VHS_GLITCH_MAX_OFFSET,
+                xDisplacement: (Math.random() - 0.5) * 2 * (crtQuality.vhsGlitchMaxOffset ?? CRT_CONFIG.VHS_GLITCH_MAX_OFFSET),
                 duration: 50 + Math.random() * 100, // 50-150ms glitch duration
                 elapsed: 0
             };
@@ -1546,11 +1770,13 @@ function updateVhsGlitch(deltaTime) {
  * @param {number} width - Canvas width
  * @param {number} height - Canvas height
  */
-function renderVhsGlitch(ctx, width, height) {
-    if (!CRT_CONFIG.VHS_GLITCH_ENABLED || !vhsGlitchState.active) return;
+function renderVhsGlitch(ctx, width, _height) {
+    const crtQuality = getCrtQualitySettings();
+    const enabled = crtQuality.vhsGlitchEnabled ?? CRT_CONFIG.VHS_GLITCH_ENABLED;
+    if (!enabled || !vhsGlitchState.active) return;
 
     const { yOffset, xDisplacement } = vhsGlitchState;
-    const glitchHeight = CRT_CONFIG.VHS_GLITCH_HEIGHT;
+    const glitchHeight = crtQuality.vhsGlitchHeight ?? CRT_CONFIG.VHS_GLITCH_HEIGHT;
 
     ctx.save();
 
@@ -1572,36 +1798,6 @@ function renderVhsGlitch(ctx, width, height) {
 }
 
 /**
- * Render phosphor glow effect.
- * Adds a subtle bloom/glow to simulate CRT phosphor persistence.
- * @param {CanvasRenderingContext2D} ctx - Canvas context
- * @param {number} width - Canvas width
- * @param {number} height - Canvas height
- */
-function renderPhosphorGlow(ctx, width, height) {
-    if (!CRT_CONFIG.PHOSPHOR_GLOW_ENABLED) return;
-
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = CRT_CONFIG.PHOSPHOR_GLOW_INTENSITY;
-
-    // Create a subtle overall glow by applying a light overlay
-    // This simulates phosphor bleeding/persistence
-    const gradient = ctx.createRadialGradient(
-        width / 2, height / 2, 0,
-        width / 2, height / 2, Math.max(width, height) * 0.6
-    );
-    gradient.addColorStop(0, 'rgba(100, 200, 255, 0.05)');
-    gradient.addColorStop(0.5, 'rgba(100, 200, 255, 0.02)');
-    gradient.addColorStop(1, 'rgba(100, 200, 255, 0)');
-
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, height);
-
-    ctx.restore();
-}
-
-/**
  * Render all CRT effects as a post-processing overlay.
  * Call this AFTER all other rendering is complete.
  * Far Cry Blood Dragon / VHS inspired effects.
@@ -1618,10 +1814,23 @@ function renderPhosphorGlow(ctx, width, height) {
  * @param {number} fullscreenParams.dpr - Device pixel ratio
  */
 export function renderCrtEffects(ctx, width, height, fullscreenParams = null) {
-    if (!crtEnabled) return;
+    const start = performance.now();
+    if (!crtEnabled) {
+        hideCrtDomOverlay();
+        setPerformanceGauge('crtEnabled', 0);
+        recordMeasure('crtRender', performance.now() - start);
+        return;
+    }
 
     // Update glitch animation state
     updateVhsGlitch(16.67); // Assume ~60fps for delta time
+
+    if (renderCrtDomOverlay(width, height, fullscreenParams)) {
+        setPerformanceGauge('crtEnabled', 1);
+        setPerformanceGauge('crtRenderer', 1);
+        recordMeasure('crtRender', performance.now() - start);
+        return;
+    }
 
     let effectWidth = width;
     let effectHeight = height;
@@ -1636,29 +1845,23 @@ export function renderCrtEffects(ctx, width, height, fullscreenParams = null) {
         effectHeight = fullscreenParams.viewportHeight;
     }
 
-    // Render effects in order (back to front)
-    // 1. Phosphor glow (subtle bloom)
-    renderPhosphorGlow(ctx, effectWidth, effectHeight);
+    const staticOverlay = getStaticCrtOverlay(effectWidth, effectHeight);
+    if (staticOverlay) {
+        ctx.drawImage(staticOverlay, 0, 0, effectWidth, effectHeight);
+    }
 
-    // 2. Chromatic aberration (RGB color fringing)
-    renderChromaticAberration(ctx, effectWidth, effectHeight);
-
-    // 3. VHS noise/grain
+    // Render dynamic effects after the cached static overlay.
     renderVhsNoise(ctx, effectWidth, effectHeight);
-
-    // 4. VHS tracking glitch
     renderVhsGlitch(ctx, effectWidth, effectHeight);
-
-    // 5. Scanlines (horizontal lines)
-    renderScanlines(ctx, effectWidth, effectHeight);
-
-    // 6. Vignette (darker corners) - on top
-    renderVignette(ctx, effectWidth, effectHeight);
 
     // Restore transform if we modified it
     if (fullscreenParams) {
         ctx.restore();
     }
+
+    setPerformanceGauge('crtEnabled', 1);
+    setPerformanceGauge('crtRenderer', 0);
+    recordMeasure('crtRender', performance.now() - start);
 }
 
 /**
@@ -1666,7 +1869,7 @@ export function renderCrtEffects(ctx, width, height, fullscreenParams = null) {
  * Call when canvas dimensions change significantly.
  */
 export function clearCrtCache() {
-    scanlinePattern = null;
-    patternWidth = 0;
-    patternHeight = 0;
+    crtOverlayCanvas = null;
+    crtOverlayKey = '';
+    crtDomOverlayKey = '';
 }

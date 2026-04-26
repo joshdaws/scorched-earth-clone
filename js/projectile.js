@@ -9,6 +9,7 @@
 import { PHYSICS, PROJECTILE, DEBUG } from './constants.js';
 import { WeaponRegistry, WEAPON_TYPES } from './weapons.js';
 import { getScreenWidth, getScreenHeight } from './screenSize.js';
+import { getTerrainGridHeightAt, getTerrainGridSurfaceYAt } from './terrainCells.js';
 
 /**
  * Projectile entity for the game.
@@ -53,6 +54,18 @@ export class Projectile {
          * @type {number}
          */
         this.y = y;
+
+        /**
+         * Previous X position for fixed-step render interpolation.
+         * @type {number}
+         */
+        this.previousX = x;
+
+        /**
+         * Previous Y position for fixed-step render interpolation.
+         * @type {number}
+         */
+        this.previousY = y;
 
         /**
          * Current horizontal velocity (pixels per frame).
@@ -375,6 +388,8 @@ export class Projectile {
     update(wind = 0) {
         if (!this.active) return;
 
+        this.capturePreviousPosition();
+
         // Store previous vertical velocity for apex detection
         // Apex occurs when vy transitions from negative (going up) to positive (going down)
         this.prevVy = this.vy;
@@ -492,6 +507,27 @@ export class Projectile {
      */
     getPosition() {
         return { x: this.x, y: this.y };
+    }
+
+    /**
+     * Capture the current physics position before the next fixed update mutates it.
+     */
+    capturePreviousPosition() {
+        this.previousX = this.x;
+        this.previousY = this.y;
+    }
+
+    /**
+     * Get an interpolated render position between the previous and current physics positions.
+     * @param {number} [alpha=1] Fixed-step render interpolation alpha from 0 to 1
+     * @returns {{x: number, y: number}} Interpolated render position
+     */
+    getRenderPosition(alpha = 1) {
+        const t = Number.isFinite(alpha) ? Math.max(0, Math.min(1, alpha)) : 1;
+        return {
+            x: this.previousX + (this.x - this.previousX) * t,
+            y: this.previousY + (this.y - this.previousY) * t
+        };
     }
 
     /**
@@ -630,6 +666,7 @@ export class Projectile {
     startRolling(terrainY) {
         this.isRolling = true;
         this.rollStartTime = performance.now();
+        this.capturePreviousPosition();
 
         // Set roll direction based on horizontal velocity at impact
         // If vx is very small, default to rolling right
@@ -675,9 +712,7 @@ export class Projectile {
 
         // Get current terrain height at position
         // Use terrain's screen height for dynamic screen support
-        const screenHeight = terrain.getScreenHeight();
-        const currentTerrainHeight = terrain.getHeight(Math.floor(this.x));
-        const currentSurfaceY = screenHeight - currentTerrainHeight;
+        const currentSurfaceY = getTerrainGridSurfaceYAt(terrain, Math.floor(this.x));
 
         // Calculate slope at current position
         // Look ahead in roll direction to find slope
@@ -689,8 +724,7 @@ export class Projectile {
             return { explode: true, reason: 'wall' };
         }
 
-        const nextTerrainHeight = terrain.getHeight(nextX);
-        const nextSurfaceY = screenHeight - nextTerrainHeight;
+        const nextSurfaceY = getTerrainGridSurfaceYAt(terrain, nextX);
 
         // Calculate slope angle (positive = going downhill, negative = going uphill)
         // In canvas coords: lower Y = higher on screen
@@ -743,14 +777,15 @@ export class Projectile {
             return { explode: true, reason: 'valley' };
         }
 
+        this.capturePreviousPosition();
+
         // Update horizontal position
         this.x += this.rollVelocity;
 
         // Snap to terrain surface at new position
         const newX = Math.floor(this.x);
         if (newX >= 0 && newX < terrain.getWidth()) {
-            const newTerrainHeight = terrain.getHeight(newX);
-            this.y = screenHeight - newTerrainHeight;
+            this.y = getTerrainGridSurfaceYAt(terrain, newX);
         }
 
         // Update rotation for visual effect
@@ -868,9 +903,10 @@ export class Projectile {
      *
      * @param {import('./terrain.js').Terrain} terrain - The terrain to dig through
      * @param {import('./tank.js').Tank[]} tanks - Array of tanks to check for collision
+     * @param {{destroyTerrainAt?: (x: number, y: number, radius: number) => boolean}} [services]
      * @returns {{explode: boolean, reason: string, hitTank?: import('./tank.js').Tank}|null} Explosion trigger info or null to continue digging
      */
-    updateDigging(terrain, tanks) {
+    updateDigging(terrain, tanks, services = {}) {
         if (!this.isDigging) return null;
 
         const weapon = WeaponRegistry.getWeapon(this.weaponId);
@@ -878,6 +914,7 @@ export class Projectile {
         const tunnelRadius = weapon?.tunnelRadius || 10;
 
         // Move in digging direction
+        this.capturePreviousPosition();
         const prevX = this.x;
         const prevY = this.y;
 
@@ -893,7 +930,10 @@ export class Projectile {
 
         // Destroy terrain along the tunnel path
         // Use smaller destruction at current position to create smooth tunnel
-        terrain.destroyTerrain(this.x, this.y, tunnelRadius);
+        const destroyTerrain = typeof services.destroyTerrainAt === 'function'
+            ? services.destroyTerrainAt
+            : terrain.destroyTerrain.bind(terrain);
+        destroyTerrain(this.x, this.y, tunnelRadius);
 
         // Check for tank collision while underground
         for (const tank of tanks) {
@@ -916,8 +956,7 @@ export class Projectile {
         // Check if we've emerged from terrain (exited the other side)
         const flooredX = Math.floor(this.x);
         if (flooredX >= 0 && flooredX < terrain.getWidth()) {
-            const terrainHeight = terrain.getHeight(flooredX);
-            const terrainSurfaceY = terrain.getScreenHeight() - terrainHeight;
+            const terrainSurfaceY = terrain.getScreenHeight() - getTerrainGridHeightAt(terrain, flooredX);
 
             // We've emerged if we're above the terrain surface
             // Add a small buffer to prevent immediate re-triggering
@@ -1002,6 +1041,7 @@ export class Projectile {
      */
     bounce(terrainSurfaceY, slopeAngle = 0) {
         this.bouncesRemaining--;
+        this.capturePreviousPosition();
 
         // Position above terrain
         this.y = terrainSurfaceY - 2;
@@ -1061,6 +1101,7 @@ export class Projectile {
         this.isDeployed = true;
         this.deployStartTime = performance.now();
         this.deployPosition = { x, y };
+        this.capturePreviousPosition();
         this.x = x;
         this.y = y;
 
@@ -1458,9 +1499,11 @@ export function calculateTrajectory(startX, startY, angle, power, wind = 0, maxS
     // Add starting point
     points.push({ x: proj.x, y: proj.y });
 
+    const windForce = wind * PHYSICS.WIND_FORCE_MULTIPLIER;
+
     // Simulate trajectory
     for (let i = 0; i < maxSteps && proj.isActive(); i++) {
-        proj.update(wind);
+        proj.update(windForce);
         points.push({ x: proj.x, y: proj.y });
 
         // Early exit if below screen (terrain collision will be checked elsewhere)

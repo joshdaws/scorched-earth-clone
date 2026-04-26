@@ -17,7 +17,7 @@
 import { CANVAS, COLORS, PHYSICS, TANK, UI } from './constants.js';
 import { queueGameInput, INPUT_EVENTS, isGameInputEnabled, onMouseDown, onMouseUp, onMouseMove, onTouchStart, onTouchEnd, onTouchMove, getPointerPosition } from './input.js';
 import * as Wind from './wind.js';
-import { renderTrajectoryPreview } from './aimingControls.js';
+import { isInsideAngleArc, isInsideFireButton, renderTrajectoryPreview } from './aimingControls.js';
 import * as ControlSettings from './controls/controlSettings.js';
 
 // =============================================================================
@@ -215,6 +215,11 @@ function handlePointerDown(x, y) {
     // Check if slingshot controls are enabled in settings
     // SLINGSHOT and HYBRID modes both enable slingshot aiming
     if (!ControlSettings.isSlingshotEnabled()) return;
+
+    if (ControlSettings.areSlidersVisible() &&
+        (isInsideFireButton(x, y) || isInsideAngleArc(x, y, state.playerTank))) {
+        return;
+    }
 
     // Check if touch is near the tank
     if (isNearTank(x, y, state.playerTank)) {

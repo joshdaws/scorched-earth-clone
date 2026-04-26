@@ -533,6 +533,33 @@ export function getActivePopupCount() {
 }
 
 /**
+ * Get popup queue details for browser QA and debug tooling.
+ * @returns {Object}
+ */
+export function getDebugState() {
+    return {
+        initialized: isInitialized,
+        activeCount: activePopups.length,
+        pendingCount: pendingQueue.length,
+        hasActivePopups: hasActivePopups(),
+        active: activePopups.map(popup => ({
+            id: popup.achievement.id,
+            name: popup.achievement.name,
+            reward: popup.reward,
+            specialReward: popup.specialReward,
+            phase: popup.phase,
+            y: popup.y
+        })),
+        pending: pendingQueue.map(entry => ({
+            id: entry.achievement.id,
+            name: entry.achievement.name,
+            reward: entry.reward,
+            specialReward: entry.specialReward
+        }))
+    };
+}
+
+/**
  * Clear all active popups (for game reset).
  */
 export function clearAll() {

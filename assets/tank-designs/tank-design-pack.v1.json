@@ -1,0 +1,1842 @@
+{
+  "version": 1,
+  "exportedAt": "2026-04-25T00:00:00.000Z",
+  "designs": [
+    {
+      "version": 1,
+      "skinId": "forge-neon-recruit",
+      "rarity": "common",
+      "canvas": {
+        "width": 64,
+        "height": 32
+      },
+      "familyId": "retro-commander",
+      "layers": [
+        {
+          "id": "base-layer",
+          "type": "base",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[]"
+        },
+        {
+          "id": "paint-layer",
+          "type": "paint",
+          "blend": "screen",
+          "visible": true,
+          "pixels": "[{\"x\":10,\"y\":11,\"color\":\"#00e5ff\"},{\"x\":14,\"y\":11,\"color\":\"#00e5ff\"},{\"x\":18,\"y\":11,\"color\":\"#00e5ff\"},{\"x\":22,\"y\":11,\"color\":\"#00e5ff\"},{\"x\":26,\"y\":11,\"color\":\"#00e5ff\"},{\"x\":30,\"y\":11,\"color\":\"#00e5ff\"},{\"x\":34,\"y\":11,\"color\":\"#00e5ff\"},{\"x\":38,\"y\":11,\"color\":\"#00e5ff\"},{\"x\":42,\"y\":11,\"color\":\"#00e5ff\"},{\"x\":46,\"y\":11,\"color\":\"#00e5ff\"},{\"x\":50,\"y\":11,\"color\":\"#00e5ff\"},{\"x\":54,\"y\":11,\"color\":\"#00e5ff\"},{\"x\":12,\"y\":19,\"color\":\"#ff4fd8\"},{\"x\":13,\"y\":20,\"color\":\"#f8fbff\"},{\"x\":19,\"y\":19,\"color\":\"#ff4fd8\"},{\"x\":20,\"y\":20,\"color\":\"#f8fbff\"},{\"x\":26,\"y\":19,\"color\":\"#ff4fd8\"},{\"x\":27,\"y\":20,\"color\":\"#f8fbff\"},{\"x\":33,\"y\":19,\"color\":\"#ff4fd8\"},{\"x\":34,\"y\":20,\"color\":\"#f8fbff\"},{\"x\":40,\"y\":19,\"color\":\"#ff4fd8\"},{\"x\":41,\"y\":20,\"color\":\"#f8fbff\"},{\"x\":47,\"y\":19,\"color\":\"#ff4fd8\"},{\"x\":48,\"y\":20,\"color\":\"#f8fbff\"},{\"x\":18,\"y\":14,\"color\":\"#00e5ff\"},{\"x\":46,\"y\":14,\"color\":\"#ff4fd8\"},{\"x\":18,\"y\":17,\"color\":\"#00e5ff\"},{\"x\":46,\"y\":17,\"color\":\"#ff4fd8\"},{\"x\":18,\"y\":20,\"color\":\"#00e5ff\"},{\"x\":46,\"y\":20,\"color\":\"#ff4fd8\"}]"
+        },
+        {
+          "id": "decal-layer",
+          "type": "decal",
+          "blend": "add",
+          "visible": true,
+          "pixels": "[{\"x\":30,\"y\":12,\"color\":\"#f8fbff\"},{\"x\":29,\"y\":13,\"color\":\"#f8fbff\"},{\"x\":30,\"y\":13,\"color\":\"#f8fbff\"},{\"x\":31,\"y\":13,\"color\":\"#f8fbff\"},{\"x\":28,\"y\":14,\"color\":\"#f8fbff\"},{\"x\":29,\"y\":14,\"color\":\"#f8fbff\"},{\"x\":30,\"y\":14,\"color\":\"#f8fbff\"},{\"x\":31,\"y\":14,\"color\":\"#f8fbff\"},{\"x\":32,\"y\":14,\"color\":\"#f8fbff\"},{\"x\":29,\"y\":15,\"color\":\"#f8fbff\"},{\"x\":30,\"y\":15,\"color\":\"#f8fbff\"},{\"x\":31,\"y\":15,\"color\":\"#f8fbff\"},{\"x\":30,\"y\":16,\"color\":\"#f8fbff\"}]"
+        }
+      ],
+      "parts": {
+        "hullPreset": "standard",
+        "treadPreset": "classic",
+        "wheelPreset": "dual",
+        "barrelPreset": "standard"
+      },
+      "turret": {
+        "anchorX": 30,
+        "anchorY": 7,
+        "baseRadius": 7
+      },
+      "effects": [
+        {
+          "type": "neonPulse",
+          "color": "#00e5ff",
+          "intensity": 0.48,
+          "speed": 0.8
+        }
+      ],
+      "palette": [
+        "#142033",
+        "#00e5ff",
+        "#243b55",
+        "#f8fbff",
+        "#ff4fd8"
+      ],
+      "meta": {
+        "author": "Tank Forge Generator",
+        "updatedAt": 1777075200000,
+        "tags": [
+          "common",
+          "retro-commander",
+          "neonPulse"
+        ]
+      }
+    },
+    {
+      "version": 1,
+      "skinId": "forge-grid-runner",
+      "rarity": "common",
+      "canvas": {
+        "width": 64,
+        "height": 32
+      },
+      "familyId": "arcade-chaos",
+      "layers": [
+        {
+          "id": "base-layer",
+          "type": "base",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[]"
+        },
+        {
+          "id": "paint-layer",
+          "type": "paint",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[{\"x\":10,\"y\":12,\"color\":\"#6df7ff\"},{\"x\":14,\"y\":12,\"color\":\"#6df7ff\"},{\"x\":18,\"y\":12,\"color\":\"#6df7ff\"},{\"x\":22,\"y\":12,\"color\":\"#6df7ff\"},{\"x\":26,\"y\":12,\"color\":\"#6df7ff\"},{\"x\":30,\"y\":12,\"color\":\"#6df7ff\"},{\"x\":34,\"y\":12,\"color\":\"#6df7ff\"},{\"x\":38,\"y\":12,\"color\":\"#6df7ff\"},{\"x\":42,\"y\":12,\"color\":\"#6df7ff\"},{\"x\":46,\"y\":12,\"color\":\"#6df7ff\"},{\"x\":50,\"y\":12,\"color\":\"#6df7ff\"},{\"x\":54,\"y\":12,\"color\":\"#6df7ff\"},{\"x\":13,\"y\":19,\"color\":\"#ff3d81\"},{\"x\":14,\"y\":20,\"color\":\"#fff176\"},{\"x\":20,\"y\":19,\"color\":\"#ff3d81\"},{\"x\":21,\"y\":20,\"color\":\"#fff176\"},{\"x\":27,\"y\":19,\"color\":\"#ff3d81\"},{\"x\":28,\"y\":20,\"color\":\"#fff176\"},{\"x\":34,\"y\":19,\"color\":\"#ff3d81\"},{\"x\":35,\"y\":20,\"color\":\"#fff176\"},{\"x\":41,\"y\":19,\"color\":\"#ff3d81\"},{\"x\":42,\"y\":20,\"color\":\"#fff176\"},{\"x\":48,\"y\":19,\"color\":\"#ff3d81\"},{\"x\":49,\"y\":20,\"color\":\"#fff176\"},{\"x\":19,\"y\":14,\"color\":\"#6df7ff\"},{\"x\":45,\"y\":14,\"color\":\"#ff3d81\"},{\"x\":19,\"y\":17,\"color\":\"#6df7ff\"},{\"x\":45,\"y\":17,\"color\":\"#ff3d81\"},{\"x\":19,\"y\":20,\"color\":\"#6df7ff\"},{\"x\":45,\"y\":20,\"color\":\"#ff3d81\"}]"
+        },
+        {
+          "id": "decal-layer",
+          "type": "decal",
+          "blend": "add",
+          "visible": true,
+          "pixels": "[{\"x\":31,\"y\":13,\"color\":\"#fff176\"},{\"x\":30,\"y\":14,\"color\":\"#fff176\"},{\"x\":31,\"y\":14,\"color\":\"#fff176\"},{\"x\":32,\"y\":14,\"color\":\"#fff176\"},{\"x\":29,\"y\":15,\"color\":\"#fff176\"},{\"x\":30,\"y\":15,\"color\":\"#fff176\"},{\"x\":31,\"y\":15,\"color\":\"#fff176\"},{\"x\":32,\"y\":15,\"color\":\"#fff176\"},{\"x\":33,\"y\":15,\"color\":\"#fff176\"},{\"x\":30,\"y\":16,\"color\":\"#fff176\"},{\"x\":31,\"y\":16,\"color\":\"#fff176\"},{\"x\":32,\"y\":16,\"color\":\"#fff176\"},{\"x\":31,\"y\":17,\"color\":\"#fff176\"}]"
+        }
+      ],
+      "parts": {
+        "hullPreset": "wedge",
+        "treadPreset": "hover",
+        "wheelPreset": "triad",
+        "barrelPreset": "rail"
+      },
+      "turret": {
+        "anchorX": 31,
+        "anchorY": 8,
+        "baseRadius": 8
+      },
+      "effects": [
+        {
+          "type": "laserStripe",
+          "color": "#6df7ff",
+          "intensity": 0.56,
+          "speed": 0.98
+        }
+      ],
+      "palette": [
+        "#101827",
+        "#6df7ff",
+        "#293854",
+        "#fff176",
+        "#ff3d81"
+      ],
+      "meta": {
+        "author": "Tank Forge Generator",
+        "updatedAt": 1777075200000,
+        "tags": [
+          "common",
+          "arcade-chaos",
+          "laserStripe"
+        ]
+      }
+    },
+    {
+      "version": 1,
+      "skinId": "forge-night-patrol",
+      "rarity": "common",
+      "canvas": {
+        "width": 64,
+        "height": 32
+      },
+      "familyId": "retro-commander",
+      "layers": [
+        {
+          "id": "base-layer",
+          "type": "base",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[]"
+        },
+        {
+          "id": "paint-layer",
+          "type": "paint",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[{\"x\":10,\"y\":11,\"color\":\"#7cffe3\"},{\"x\":14,\"y\":11,\"color\":\"#7cffe3\"},{\"x\":18,\"y\":11,\"color\":\"#7cffe3\"},{\"x\":22,\"y\":11,\"color\":\"#7cffe3\"},{\"x\":26,\"y\":11,\"color\":\"#7cffe3\"},{\"x\":30,\"y\":11,\"color\":\"#7cffe3\"},{\"x\":34,\"y\":11,\"color\":\"#7cffe3\"},{\"x\":38,\"y\":11,\"color\":\"#7cffe3\"},{\"x\":42,\"y\":11,\"color\":\"#7cffe3\"},{\"x\":46,\"y\":11,\"color\":\"#7cffe3\"},{\"x\":50,\"y\":11,\"color\":\"#7cffe3\"},{\"x\":54,\"y\":11,\"color\":\"#7cffe3\"},{\"x\":14,\"y\":19,\"color\":\"#f45b69\"},{\"x\":15,\"y\":20,\"color\":\"#8ef9ff\"},{\"x\":21,\"y\":19,\"color\":\"#f45b69\"},{\"x\":22,\"y\":20,\"color\":\"#8ef9ff\"},{\"x\":28,\"y\":19,\"color\":\"#f45b69\"},{\"x\":29,\"y\":20,\"color\":\"#8ef9ff\"},{\"x\":35,\"y\":19,\"color\":\"#f45b69\"},{\"x\":36,\"y\":20,\"color\":\"#8ef9ff\"},{\"x\":42,\"y\":19,\"color\":\"#f45b69\"},{\"x\":43,\"y\":20,\"color\":\"#8ef9ff\"},{\"x\":49,\"y\":19,\"color\":\"#f45b69\"},{\"x\":50,\"y\":20,\"color\":\"#8ef9ff\"},{\"x\":20,\"y\":14,\"color\":\"#7cffe3\"},{\"x\":44,\"y\":14,\"color\":\"#f45b69\"},{\"x\":20,\"y\":17,\"color\":\"#7cffe3\"},{\"x\":44,\"y\":17,\"color\":\"#f45b69\"},{\"x\":20,\"y\":20,\"color\":\"#7cffe3\"},{\"x\":44,\"y\":20,\"color\":\"#f45b69\"}]"
+        },
+        {
+          "id": "decal-layer",
+          "type": "decal",
+          "blend": "add",
+          "visible": true,
+          "pixels": "[{\"x\":32,\"y\":14,\"color\":\"#8ef9ff\"},{\"x\":31,\"y\":15,\"color\":\"#8ef9ff\"},{\"x\":32,\"y\":15,\"color\":\"#8ef9ff\"},{\"x\":33,\"y\":15,\"color\":\"#8ef9ff\"},{\"x\":30,\"y\":16,\"color\":\"#8ef9ff\"},{\"x\":31,\"y\":16,\"color\":\"#8ef9ff\"},{\"x\":32,\"y\":16,\"color\":\"#8ef9ff\"},{\"x\":33,\"y\":16,\"color\":\"#8ef9ff\"},{\"x\":34,\"y\":16,\"color\":\"#8ef9ff\"},{\"x\":31,\"y\":17,\"color\":\"#8ef9ff\"},{\"x\":32,\"y\":17,\"color\":\"#8ef9ff\"},{\"x\":33,\"y\":17,\"color\":\"#8ef9ff\"},{\"x\":32,\"y\":18,\"color\":\"#8ef9ff\"}]"
+        }
+      ],
+      "parts": {
+        "hullPreset": "heavy",
+        "treadPreset": "spiked",
+        "wheelPreset": "micro",
+        "barrelPreset": "stubby"
+      },
+      "turret": {
+        "anchorX": 32,
+        "anchorY": 9,
+        "baseRadius": 9
+      },
+      "effects": [
+        {
+          "type": "scanline",
+          "color": "#7cffe3",
+          "intensity": 0.64,
+          "speed": 1.16
+        }
+      ],
+      "palette": [
+        "#171b2f",
+        "#7cffe3",
+        "#252a44",
+        "#8ef9ff",
+        "#f45b69"
+      ],
+      "meta": {
+        "author": "Tank Forge Generator",
+        "updatedAt": 1777075200000,
+        "tags": [
+          "common",
+          "retro-commander",
+          "scanline"
+        ]
+      }
+    },
+    {
+      "version": 1,
+      "skinId": "forge-sunrise-scout",
+      "rarity": "common",
+      "canvas": {
+        "width": 64,
+        "height": 32
+      },
+      "familyId": "arcade-chaos",
+      "layers": [
+        {
+          "id": "base-layer",
+          "type": "base",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[]"
+        },
+        {
+          "id": "paint-layer",
+          "type": "paint",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[{\"x\":10,\"y\":12,\"color\":\"#ffb347\"},{\"x\":14,\"y\":12,\"color\":\"#ffb347\"},{\"x\":18,\"y\":12,\"color\":\"#ffb347\"},{\"x\":22,\"y\":12,\"color\":\"#ffb347\"},{\"x\":26,\"y\":12,\"color\":\"#ffb347\"},{\"x\":30,\"y\":12,\"color\":\"#ffb347\"},{\"x\":34,\"y\":12,\"color\":\"#ffb347\"},{\"x\":38,\"y\":12,\"color\":\"#ffb347\"},{\"x\":42,\"y\":12,\"color\":\"#ffb347\"},{\"x\":46,\"y\":12,\"color\":\"#ffb347\"},{\"x\":50,\"y\":12,\"color\":\"#ffb347\"},{\"x\":54,\"y\":12,\"color\":\"#ffb347\"},{\"x\":12,\"y\":19,\"color\":\"#ff4f9a\"},{\"x\":13,\"y\":20,\"color\":\"#ffe66d\"},{\"x\":19,\"y\":19,\"color\":\"#ff4f9a\"},{\"x\":20,\"y\":20,\"color\":\"#ffe66d\"},{\"x\":26,\"y\":19,\"color\":\"#ff4f9a\"},{\"x\":27,\"y\":20,\"color\":\"#ffe66d\"},{\"x\":33,\"y\":19,\"color\":\"#ff4f9a\"},{\"x\":34,\"y\":20,\"color\":\"#ffe66d\"},{\"x\":40,\"y\":19,\"color\":\"#ff4f9a\"},{\"x\":41,\"y\":20,\"color\":\"#ffe66d\"},{\"x\":47,\"y\":19,\"color\":\"#ff4f9a\"},{\"x\":48,\"y\":20,\"color\":\"#ffe66d\"},{\"x\":21,\"y\":14,\"color\":\"#ffb347\"},{\"x\":43,\"y\":14,\"color\":\"#ff4f9a\"},{\"x\":21,\"y\":17,\"color\":\"#ffb347\"},{\"x\":43,\"y\":17,\"color\":\"#ff4f9a\"},{\"x\":21,\"y\":20,\"color\":\"#ffb347\"},{\"x\":43,\"y\":20,\"color\":\"#ff4f9a\"}]"
+        },
+        {
+          "id": "decal-layer",
+          "type": "decal",
+          "blend": "add",
+          "visible": true,
+          "pixels": "[{\"x\":33,\"y\":12,\"color\":\"#ffe66d\"},{\"x\":32,\"y\":13,\"color\":\"#ffe66d\"},{\"x\":33,\"y\":13,\"color\":\"#ffe66d\"},{\"x\":34,\"y\":13,\"color\":\"#ffe66d\"},{\"x\":31,\"y\":14,\"color\":\"#ffe66d\"},{\"x\":32,\"y\":14,\"color\":\"#ffe66d\"},{\"x\":33,\"y\":14,\"color\":\"#ffe66d\"},{\"x\":34,\"y\":14,\"color\":\"#ffe66d\"},{\"x\":35,\"y\":14,\"color\":\"#ffe66d\"},{\"x\":32,\"y\":15,\"color\":\"#ffe66d\"},{\"x\":33,\"y\":15,\"color\":\"#ffe66d\"},{\"x\":34,\"y\":15,\"color\":\"#ffe66d\"},{\"x\":33,\"y\":16,\"color\":\"#ffe66d\"}]"
+        }
+      ],
+      "parts": {
+        "hullPreset": "scout",
+        "treadPreset": "smooth",
+        "wheelPreset": null,
+        "barrelPreset": "long"
+      },
+      "turret": {
+        "anchorX": 33,
+        "anchorY": 10,
+        "baseRadius": 7
+      },
+      "effects": [
+        {
+          "type": "neonPulse",
+          "color": "#ffb347",
+          "intensity": 0.72,
+          "speed": 1.34
+        }
+      ],
+      "palette": [
+        "#21162d",
+        "#ffb347",
+        "#40294a",
+        "#ffe66d",
+        "#ff4f9a"
+      ],
+      "meta": {
+        "author": "Tank Forge Generator",
+        "updatedAt": 1777075200000,
+        "tags": [
+          "common",
+          "arcade-chaos",
+          "neonPulse"
+        ]
+      }
+    },
+    {
+      "version": 1,
+      "skinId": "forge-circuit-mule",
+      "rarity": "common",
+      "canvas": {
+        "width": 64,
+        "height": 32
+      },
+      "familyId": "legend-lab",
+      "layers": [
+        {
+          "id": "base-layer",
+          "type": "base",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[]"
+        },
+        {
+          "id": "paint-layer",
+          "type": "paint",
+          "blend": "screen",
+          "visible": true,
+          "pixels": "[{\"x\":10,\"y\":11,\"color\":\"#26ff9a\"},{\"x\":14,\"y\":11,\"color\":\"#26ff9a\"},{\"x\":18,\"y\":11,\"color\":\"#26ff9a\"},{\"x\":22,\"y\":11,\"color\":\"#26ff9a\"},{\"x\":26,\"y\":11,\"color\":\"#26ff9a\"},{\"x\":30,\"y\":11,\"color\":\"#26ff9a\"},{\"x\":34,\"y\":11,\"color\":\"#26ff9a\"},{\"x\":38,\"y\":11,\"color\":\"#26ff9a\"},{\"x\":42,\"y\":11,\"color\":\"#26ff9a\"},{\"x\":46,\"y\":11,\"color\":\"#26ff9a\"},{\"x\":50,\"y\":11,\"color\":\"#26ff9a\"},{\"x\":54,\"y\":11,\"color\":\"#26ff9a\"},{\"x\":13,\"y\":19,\"color\":\"#00c2ff\"},{\"x\":14,\"y\":20,\"color\":\"#b8ff6a\"},{\"x\":20,\"y\":19,\"color\":\"#00c2ff\"},{\"x\":21,\"y\":20,\"color\":\"#b8ff6a\"},{\"x\":27,\"y\":19,\"color\":\"#00c2ff\"},{\"x\":28,\"y\":20,\"color\":\"#b8ff6a\"},{\"x\":34,\"y\":19,\"color\":\"#00c2ff\"},{\"x\":35,\"y\":20,\"color\":\"#b8ff6a\"},{\"x\":41,\"y\":19,\"color\":\"#00c2ff\"},{\"x\":42,\"y\":20,\"color\":\"#b8ff6a\"},{\"x\":48,\"y\":19,\"color\":\"#00c2ff\"},{\"x\":49,\"y\":20,\"color\":\"#b8ff6a\"},{\"x\":22,\"y\":14,\"color\":\"#26ff9a\"},{\"x\":42,\"y\":14,\"color\":\"#00c2ff\"},{\"x\":22,\"y\":17,\"color\":\"#26ff9a\"},{\"x\":42,\"y\":17,\"color\":\"#00c2ff\"},{\"x\":22,\"y\":20,\"color\":\"#26ff9a\"},{\"x\":42,\"y\":20,\"color\":\"#00c2ff\"}]"
+        },
+        {
+          "id": "decal-layer",
+          "type": "decal",
+          "blend": "add",
+          "visible": true,
+          "pixels": "[{\"x\":34,\"y\":13,\"color\":\"#b8ff6a\"},{\"x\":33,\"y\":14,\"color\":\"#b8ff6a\"},{\"x\":34,\"y\":14,\"color\":\"#b8ff6a\"},{\"x\":35,\"y\":14,\"color\":\"#b8ff6a\"},{\"x\":32,\"y\":15,\"color\":\"#b8ff6a\"},{\"x\":33,\"y\":15,\"color\":\"#b8ff6a\"},{\"x\":34,\"y\":15,\"color\":\"#b8ff6a\"},{\"x\":35,\"y\":15,\"color\":\"#b8ff6a\"},{\"x\":36,\"y\":15,\"color\":\"#b8ff6a\"},{\"x\":33,\"y\":16,\"color\":\"#b8ff6a\"},{\"x\":34,\"y\":16,\"color\":\"#b8ff6a\"},{\"x\":35,\"y\":16,\"color\":\"#b8ff6a\"},{\"x\":34,\"y\":17,\"color\":\"#b8ff6a\"}]"
+        }
+      ],
+      "parts": {
+        "hullPreset": "standard",
+        "treadPreset": "classic",
+        "wheelPreset": "dual",
+        "barrelPreset": "standard"
+      },
+      "turret": {
+        "anchorX": 34,
+        "anchorY": 7,
+        "baseRadius": 8
+      },
+      "effects": [
+        {
+          "type": "laserStripe",
+          "color": "#26ff9a",
+          "intensity": 0.8,
+          "speed": 0.8
+        }
+      ],
+      "palette": [
+        "#10251f",
+        "#26ff9a",
+        "#233a32",
+        "#b8ff6a",
+        "#00c2ff"
+      ],
+      "meta": {
+        "author": "Tank Forge Generator",
+        "updatedAt": 1777075200000,
+        "tags": [
+          "common",
+          "legend-lab",
+          "laserStripe"
+        ]
+      }
+    },
+    {
+      "version": 1,
+      "skinId": "forge-vector-sentry",
+      "rarity": "common",
+      "canvas": {
+        "width": 64,
+        "height": 32
+      },
+      "familyId": "retro-commander",
+      "layers": [
+        {
+          "id": "base-layer",
+          "type": "base",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[]"
+        },
+        {
+          "id": "paint-layer",
+          "type": "paint",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[{\"x\":10,\"y\":12,\"color\":\"#51a7ff\"},{\"x\":14,\"y\":12,\"color\":\"#51a7ff\"},{\"x\":18,\"y\":12,\"color\":\"#51a7ff\"},{\"x\":22,\"y\":12,\"color\":\"#51a7ff\"},{\"x\":26,\"y\":12,\"color\":\"#51a7ff\"},{\"x\":30,\"y\":12,\"color\":\"#51a7ff\"},{\"x\":34,\"y\":12,\"color\":\"#51a7ff\"},{\"x\":38,\"y\":12,\"color\":\"#51a7ff\"},{\"x\":42,\"y\":12,\"color\":\"#51a7ff\"},{\"x\":46,\"y\":12,\"color\":\"#51a7ff\"},{\"x\":50,\"y\":12,\"color\":\"#51a7ff\"},{\"x\":54,\"y\":12,\"color\":\"#51a7ff\"},{\"x\":14,\"y\":19,\"color\":\"#ff5ec4\"},{\"x\":15,\"y\":20,\"color\":\"#c7f9ff\"},{\"x\":21,\"y\":19,\"color\":\"#ff5ec4\"},{\"x\":22,\"y\":20,\"color\":\"#c7f9ff\"},{\"x\":28,\"y\":19,\"color\":\"#ff5ec4\"},{\"x\":29,\"y\":20,\"color\":\"#c7f9ff\"},{\"x\":35,\"y\":19,\"color\":\"#ff5ec4\"},{\"x\":36,\"y\":20,\"color\":\"#c7f9ff\"},{\"x\":42,\"y\":19,\"color\":\"#ff5ec4\"},{\"x\":43,\"y\":20,\"color\":\"#c7f9ff\"},{\"x\":49,\"y\":19,\"color\":\"#ff5ec4\"},{\"x\":50,\"y\":20,\"color\":\"#c7f9ff\"},{\"x\":18,\"y\":14,\"color\":\"#51a7ff\"},{\"x\":46,\"y\":14,\"color\":\"#ff5ec4\"},{\"x\":18,\"y\":17,\"color\":\"#51a7ff\"},{\"x\":46,\"y\":17,\"color\":\"#ff5ec4\"},{\"x\":18,\"y\":20,\"color\":\"#51a7ff\"},{\"x\":46,\"y\":20,\"color\":\"#ff5ec4\"}]"
+        },
+        {
+          "id": "decal-layer",
+          "type": "decal",
+          "blend": "add",
+          "visible": true,
+          "pixels": "[{\"x\":30,\"y\":14,\"color\":\"#c7f9ff\"},{\"x\":29,\"y\":15,\"color\":\"#c7f9ff\"},{\"x\":30,\"y\":15,\"color\":\"#c7f9ff\"},{\"x\":31,\"y\":15,\"color\":\"#c7f9ff\"},{\"x\":28,\"y\":16,\"color\":\"#c7f9ff\"},{\"x\":29,\"y\":16,\"color\":\"#c7f9ff\"},{\"x\":30,\"y\":16,\"color\":\"#c7f9ff\"},{\"x\":31,\"y\":16,\"color\":\"#c7f9ff\"},{\"x\":32,\"y\":16,\"color\":\"#c7f9ff\"},{\"x\":29,\"y\":17,\"color\":\"#c7f9ff\"},{\"x\":30,\"y\":17,\"color\":\"#c7f9ff\"},{\"x\":31,\"y\":17,\"color\":\"#c7f9ff\"},{\"x\":30,\"y\":18,\"color\":\"#c7f9ff\"}]"
+        }
+      ],
+      "parts": {
+        "hullPreset": "wedge",
+        "treadPreset": "hover",
+        "wheelPreset": "triad",
+        "barrelPreset": "rail"
+      },
+      "turret": {
+        "anchorX": 30,
+        "anchorY": 8,
+        "baseRadius": 9
+      },
+      "effects": [
+        {
+          "type": "scanline",
+          "color": "#51a7ff",
+          "intensity": 0.48,
+          "speed": 0.98
+        }
+      ],
+      "palette": [
+        "#1d2332",
+        "#51a7ff",
+        "#2e3448",
+        "#c7f9ff",
+        "#ff5ec4"
+      ],
+      "meta": {
+        "author": "Tank Forge Generator",
+        "updatedAt": 1777075200000,
+        "tags": [
+          "common",
+          "retro-commander",
+          "scanline"
+        ]
+      }
+    },
+    {
+      "version": 1,
+      "skinId": "forge-cobalt-drifter",
+      "rarity": "uncommon",
+      "canvas": {
+        "width": 64,
+        "height": 32
+      },
+      "familyId": "arcade-chaos",
+      "layers": [
+        {
+          "id": "base-layer",
+          "type": "base",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[]"
+        },
+        {
+          "id": "paint-layer",
+          "type": "paint",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[{\"x\":10,\"y\":11,\"color\":\"#2f80ff\"},{\"x\":14,\"y\":11,\"color\":\"#2f80ff\"},{\"x\":18,\"y\":11,\"color\":\"#2f80ff\"},{\"x\":22,\"y\":11,\"color\":\"#2f80ff\"},{\"x\":26,\"y\":11,\"color\":\"#2f80ff\"},{\"x\":30,\"y\":11,\"color\":\"#2f80ff\"},{\"x\":34,\"y\":11,\"color\":\"#2f80ff\"},{\"x\":38,\"y\":11,\"color\":\"#2f80ff\"},{\"x\":42,\"y\":11,\"color\":\"#2f80ff\"},{\"x\":46,\"y\":11,\"color\":\"#2f80ff\"},{\"x\":50,\"y\":11,\"color\":\"#2f80ff\"},{\"x\":54,\"y\":11,\"color\":\"#2f80ff\"},{\"x\":12,\"y\":19,\"color\":\"#ff4f8b\"},{\"x\":13,\"y\":20,\"color\":\"#80ffe8\"},{\"x\":19,\"y\":19,\"color\":\"#ff4f8b\"},{\"x\":20,\"y\":20,\"color\":\"#80ffe8\"},{\"x\":26,\"y\":19,\"color\":\"#ff4f8b\"},{\"x\":27,\"y\":20,\"color\":\"#80ffe8\"},{\"x\":33,\"y\":19,\"color\":\"#ff4f8b\"},{\"x\":34,\"y\":20,\"color\":\"#80ffe8\"},{\"x\":40,\"y\":19,\"color\":\"#ff4f8b\"},{\"x\":41,\"y\":20,\"color\":\"#80ffe8\"},{\"x\":47,\"y\":19,\"color\":\"#ff4f8b\"},{\"x\":48,\"y\":20,\"color\":\"#80ffe8\"},{\"x\":19,\"y\":14,\"color\":\"#2f80ff\"},{\"x\":45,\"y\":14,\"color\":\"#ff4f8b\"},{\"x\":19,\"y\":17,\"color\":\"#2f80ff\"},{\"x\":45,\"y\":17,\"color\":\"#ff4f8b\"},{\"x\":19,\"y\":20,\"color\":\"#2f80ff\"},{\"x\":45,\"y\":20,\"color\":\"#ff4f8b\"}]"
+        },
+        {
+          "id": "decal-layer",
+          "type": "decal",
+          "blend": "add",
+          "visible": true,
+          "pixels": "[{\"x\":31,\"y\":12,\"color\":\"#80ffe8\"},{\"x\":30,\"y\":13,\"color\":\"#80ffe8\"},{\"x\":31,\"y\":13,\"color\":\"#80ffe8\"},{\"x\":32,\"y\":13,\"color\":\"#80ffe8\"},{\"x\":29,\"y\":14,\"color\":\"#80ffe8\"},{\"x\":30,\"y\":14,\"color\":\"#80ffe8\"},{\"x\":31,\"y\":14,\"color\":\"#80ffe8\"},{\"x\":32,\"y\":14,\"color\":\"#80ffe8\"},{\"x\":33,\"y\":14,\"color\":\"#80ffe8\"},{\"x\":30,\"y\":15,\"color\":\"#80ffe8\"},{\"x\":31,\"y\":15,\"color\":\"#80ffe8\"},{\"x\":32,\"y\":15,\"color\":\"#80ffe8\"},{\"x\":31,\"y\":16,\"color\":\"#80ffe8\"}]"
+        }
+      ],
+      "parts": {
+        "hullPreset": "heavy",
+        "treadPreset": "spiked",
+        "wheelPreset": "micro",
+        "barrelPreset": "stubby"
+      },
+      "turret": {
+        "anchorX": 31,
+        "anchorY": 9,
+        "baseRadius": 7
+      },
+      "effects": [
+        {
+          "type": "laserStripe",
+          "color": "#2f80ff",
+          "intensity": 0.56,
+          "speed": 1.16
+        }
+      ],
+      "palette": [
+        "#0c1a36",
+        "#2f80ff",
+        "#1b315d",
+        "#80ffe8",
+        "#ff4f8b"
+      ],
+      "meta": {
+        "author": "Tank Forge Generator",
+        "updatedAt": 1777075200000,
+        "tags": [
+          "uncommon",
+          "arcade-chaos",
+          "laserStripe"
+        ]
+      }
+    },
+    {
+      "version": 1,
+      "skinId": "forge-magenta-wasp",
+      "rarity": "uncommon",
+      "canvas": {
+        "width": 64,
+        "height": 32
+      },
+      "familyId": "arcade-chaos",
+      "layers": [
+        {
+          "id": "base-layer",
+          "type": "base",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[]"
+        },
+        {
+          "id": "paint-layer",
+          "type": "paint",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[{\"x\":10,\"y\":12,\"color\":\"#ff2bd6\"},{\"x\":14,\"y\":12,\"color\":\"#ff2bd6\"},{\"x\":18,\"y\":12,\"color\":\"#ff2bd6\"},{\"x\":22,\"y\":12,\"color\":\"#ff2bd6\"},{\"x\":26,\"y\":12,\"color\":\"#ff2bd6\"},{\"x\":30,\"y\":12,\"color\":\"#ff2bd6\"},{\"x\":34,\"y\":12,\"color\":\"#ff2bd6\"},{\"x\":38,\"y\":12,\"color\":\"#ff2bd6\"},{\"x\":42,\"y\":12,\"color\":\"#ff2bd6\"},{\"x\":46,\"y\":12,\"color\":\"#ff2bd6\"},{\"x\":50,\"y\":12,\"color\":\"#ff2bd6\"},{\"x\":54,\"y\":12,\"color\":\"#ff2bd6\"},{\"x\":13,\"y\":19,\"color\":\"#57f7ff\"},{\"x\":14,\"y\":20,\"color\":\"#ffe66d\"},{\"x\":20,\"y\":19,\"color\":\"#57f7ff\"},{\"x\":21,\"y\":20,\"color\":\"#ffe66d\"},{\"x\":27,\"y\":19,\"color\":\"#57f7ff\"},{\"x\":28,\"y\":20,\"color\":\"#ffe66d\"},{\"x\":34,\"y\":19,\"color\":\"#57f7ff\"},{\"x\":35,\"y\":20,\"color\":\"#ffe66d\"},{\"x\":41,\"y\":19,\"color\":\"#57f7ff\"},{\"x\":42,\"y\":20,\"color\":\"#ffe66d\"},{\"x\":48,\"y\":19,\"color\":\"#57f7ff\"},{\"x\":49,\"y\":20,\"color\":\"#ffe66d\"},{\"x\":20,\"y\":14,\"color\":\"#ff2bd6\"},{\"x\":44,\"y\":14,\"color\":\"#57f7ff\"},{\"x\":20,\"y\":17,\"color\":\"#ff2bd6\"},{\"x\":44,\"y\":17,\"color\":\"#57f7ff\"},{\"x\":20,\"y\":20,\"color\":\"#ff2bd6\"},{\"x\":44,\"y\":20,\"color\":\"#57f7ff\"}]"
+        },
+        {
+          "id": "decal-layer",
+          "type": "decal",
+          "blend": "add",
+          "visible": true,
+          "pixels": "[{\"x\":32,\"y\":13,\"color\":\"#ffe66d\"},{\"x\":31,\"y\":14,\"color\":\"#ffe66d\"},{\"x\":32,\"y\":14,\"color\":\"#ffe66d\"},{\"x\":33,\"y\":14,\"color\":\"#ffe66d\"},{\"x\":30,\"y\":15,\"color\":\"#ffe66d\"},{\"x\":31,\"y\":15,\"color\":\"#ffe66d\"},{\"x\":32,\"y\":15,\"color\":\"#ffe66d\"},{\"x\":33,\"y\":15,\"color\":\"#ffe66d\"},{\"x\":34,\"y\":15,\"color\":\"#ffe66d\"},{\"x\":31,\"y\":16,\"color\":\"#ffe66d\"},{\"x\":32,\"y\":16,\"color\":\"#ffe66d\"},{\"x\":33,\"y\":16,\"color\":\"#ffe66d\"},{\"x\":32,\"y\":17,\"color\":\"#ffe66d\"}]"
+        }
+      ],
+      "parts": {
+        "hullPreset": "scout",
+        "treadPreset": "smooth",
+        "wheelPreset": null,
+        "barrelPreset": "long"
+      },
+      "turret": {
+        "anchorX": 32,
+        "anchorY": 10,
+        "baseRadius": 8
+      },
+      "effects": [
+        {
+          "type": "neonPulse",
+          "color": "#ff2bd6",
+          "intensity": 0.64,
+          "speed": 1.34
+        }
+      ],
+      "palette": [
+        "#24132e",
+        "#ff2bd6",
+        "#3a2246",
+        "#ffe66d",
+        "#57f7ff"
+      ],
+      "meta": {
+        "author": "Tank Forge Generator",
+        "updatedAt": 1777075200000,
+        "tags": [
+          "uncommon",
+          "arcade-chaos",
+          "neonPulse"
+        ]
+      }
+    },
+    {
+      "version": 1,
+      "skinId": "forge-binary-comet",
+      "rarity": "uncommon",
+      "canvas": {
+        "width": 64,
+        "height": 32
+      },
+      "familyId": "legend-lab",
+      "layers": [
+        {
+          "id": "base-layer",
+          "type": "base",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[]"
+        },
+        {
+          "id": "paint-layer",
+          "type": "paint",
+          "blend": "screen",
+          "visible": true,
+          "pixels": "[{\"x\":10,\"y\":11,\"color\":\"#00f5a0\"},{\"x\":14,\"y\":11,\"color\":\"#00f5a0\"},{\"x\":18,\"y\":11,\"color\":\"#00f5a0\"},{\"x\":22,\"y\":11,\"color\":\"#00f5a0\"},{\"x\":26,\"y\":11,\"color\":\"#00f5a0\"},{\"x\":30,\"y\":11,\"color\":\"#00f5a0\"},{\"x\":34,\"y\":11,\"color\":\"#00f5a0\"},{\"x\":38,\"y\":11,\"color\":\"#00f5a0\"},{\"x\":42,\"y\":11,\"color\":\"#00f5a0\"},{\"x\":46,\"y\":11,\"color\":\"#00f5a0\"},{\"x\":50,\"y\":11,\"color\":\"#00f5a0\"},{\"x\":54,\"y\":11,\"color\":\"#00f5a0\"},{\"x\":14,\"y\":19,\"color\":\"#8f7dff\"},{\"x\":15,\"y\":20,\"color\":\"#ffffff\"},{\"x\":21,\"y\":19,\"color\":\"#8f7dff\"},{\"x\":22,\"y\":20,\"color\":\"#ffffff\"},{\"x\":28,\"y\":19,\"color\":\"#8f7dff\"},{\"x\":29,\"y\":20,\"color\":\"#ffffff\"},{\"x\":35,\"y\":19,\"color\":\"#8f7dff\"},{\"x\":36,\"y\":20,\"color\":\"#ffffff\"},{\"x\":42,\"y\":19,\"color\":\"#8f7dff\"},{\"x\":43,\"y\":20,\"color\":\"#ffffff\"},{\"x\":49,\"y\":19,\"color\":\"#8f7dff\"},{\"x\":50,\"y\":20,\"color\":\"#ffffff\"},{\"x\":21,\"y\":14,\"color\":\"#00f5a0\"},{\"x\":43,\"y\":14,\"color\":\"#8f7dff\"},{\"x\":21,\"y\":17,\"color\":\"#00f5a0\"},{\"x\":43,\"y\":17,\"color\":\"#8f7dff\"},{\"x\":21,\"y\":20,\"color\":\"#00f5a0\"},{\"x\":43,\"y\":20,\"color\":\"#8f7dff\"}]"
+        },
+        {
+          "id": "decal-layer",
+          "type": "decal",
+          "blend": "add",
+          "visible": true,
+          "pixels": "[{\"x\":33,\"y\":14,\"color\":\"#ffffff\"},{\"x\":32,\"y\":15,\"color\":\"#ffffff\"},{\"x\":33,\"y\":15,\"color\":\"#ffffff\"},{\"x\":34,\"y\":15,\"color\":\"#ffffff\"},{\"x\":31,\"y\":16,\"color\":\"#ffffff\"},{\"x\":32,\"y\":16,\"color\":\"#ffffff\"},{\"x\":33,\"y\":16,\"color\":\"#ffffff\"},{\"x\":34,\"y\":16,\"color\":\"#ffffff\"},{\"x\":35,\"y\":16,\"color\":\"#ffffff\"},{\"x\":32,\"y\":17,\"color\":\"#ffffff\"},{\"x\":33,\"y\":17,\"color\":\"#ffffff\"},{\"x\":34,\"y\":17,\"color\":\"#ffffff\"},{\"x\":33,\"y\":18,\"color\":\"#ffffff\"}]"
+        }
+      ],
+      "parts": {
+        "hullPreset": "standard",
+        "treadPreset": "classic",
+        "wheelPreset": "dual",
+        "barrelPreset": "standard"
+      },
+      "turret": {
+        "anchorX": 33,
+        "anchorY": 7,
+        "baseRadius": 9
+      },
+      "effects": [
+        {
+          "type": "scanline",
+          "color": "#00f5a0",
+          "intensity": 0.72,
+          "speed": 0.8
+        }
+      ],
+      "palette": [
+        "#111625",
+        "#00f5a0",
+        "#293047",
+        "#ffffff",
+        "#8f7dff"
+      ],
+      "meta": {
+        "author": "Tank Forge Generator",
+        "updatedAt": 1777075200000,
+        "tags": [
+          "uncommon",
+          "legend-lab",
+          "scanline"
+        ]
+      }
+    },
+    {
+      "version": 1,
+      "skinId": "forge-glass-cannon",
+      "rarity": "uncommon",
+      "canvas": {
+        "width": 64,
+        "height": 32
+      },
+      "familyId": "legend-lab",
+      "layers": [
+        {
+          "id": "base-layer",
+          "type": "base",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[]"
+        },
+        {
+          "id": "paint-layer",
+          "type": "paint",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[{\"x\":10,\"y\":12,\"color\":\"#b5f7ff\"},{\"x\":14,\"y\":12,\"color\":\"#b5f7ff\"},{\"x\":18,\"y\":12,\"color\":\"#b5f7ff\"},{\"x\":22,\"y\":12,\"color\":\"#b5f7ff\"},{\"x\":26,\"y\":12,\"color\":\"#b5f7ff\"},{\"x\":30,\"y\":12,\"color\":\"#b5f7ff\"},{\"x\":34,\"y\":12,\"color\":\"#b5f7ff\"},{\"x\":38,\"y\":12,\"color\":\"#b5f7ff\"},{\"x\":42,\"y\":12,\"color\":\"#b5f7ff\"},{\"x\":46,\"y\":12,\"color\":\"#b5f7ff\"},{\"x\":50,\"y\":12,\"color\":\"#b5f7ff\"},{\"x\":54,\"y\":12,\"color\":\"#b5f7ff\"},{\"x\":12,\"y\":19,\"color\":\"#ff77d9\"},{\"x\":13,\"y\":20,\"color\":\"#f8fbff\"},{\"x\":19,\"y\":19,\"color\":\"#ff77d9\"},{\"x\":20,\"y\":20,\"color\":\"#f8fbff\"},{\"x\":26,\"y\":19,\"color\":\"#ff77d9\"},{\"x\":27,\"y\":20,\"color\":\"#f8fbff\"},{\"x\":33,\"y\":19,\"color\":\"#ff77d9\"},{\"x\":34,\"y\":20,\"color\":\"#f8fbff\"},{\"x\":40,\"y\":19,\"color\":\"#ff77d9\"},{\"x\":41,\"y\":20,\"color\":\"#f8fbff\"},{\"x\":47,\"y\":19,\"color\":\"#ff77d9\"},{\"x\":48,\"y\":20,\"color\":\"#f8fbff\"},{\"x\":22,\"y\":14,\"color\":\"#b5f7ff\"},{\"x\":42,\"y\":14,\"color\":\"#ff77d9\"},{\"x\":22,\"y\":17,\"color\":\"#b5f7ff\"},{\"x\":42,\"y\":17,\"color\":\"#ff77d9\"},{\"x\":22,\"y\":20,\"color\":\"#b5f7ff\"},{\"x\":42,\"y\":20,\"color\":\"#ff77d9\"}]"
+        },
+        {
+          "id": "decal-layer",
+          "type": "decal",
+          "blend": "add",
+          "visible": true,
+          "pixels": "[{\"x\":34,\"y\":12,\"color\":\"#f8fbff\"},{\"x\":33,\"y\":13,\"color\":\"#f8fbff\"},{\"x\":34,\"y\":13,\"color\":\"#f8fbff\"},{\"x\":35,\"y\":13,\"color\":\"#f8fbff\"},{\"x\":32,\"y\":14,\"color\":\"#f8fbff\"},{\"x\":33,\"y\":14,\"color\":\"#f8fbff\"},{\"x\":34,\"y\":14,\"color\":\"#f8fbff\"},{\"x\":35,\"y\":14,\"color\":\"#f8fbff\"},{\"x\":36,\"y\":14,\"color\":\"#f8fbff\"},{\"x\":33,\"y\":15,\"color\":\"#f8fbff\"},{\"x\":34,\"y\":15,\"color\":\"#f8fbff\"},{\"x\":35,\"y\":15,\"color\":\"#f8fbff\"},{\"x\":34,\"y\":16,\"color\":\"#f8fbff\"}]"
+        }
+      ],
+      "parts": {
+        "hullPreset": "wedge",
+        "treadPreset": "hover",
+        "wheelPreset": "triad",
+        "barrelPreset": "rail"
+      },
+      "turret": {
+        "anchorX": 34,
+        "anchorY": 8,
+        "baseRadius": 7
+      },
+      "effects": [
+        {
+          "type": "plasmaVent",
+          "color": "#b5f7ff",
+          "intensity": 0.8,
+          "speed": 0.98
+        }
+      ],
+      "palette": [
+        "#172335",
+        "#b5f7ff",
+        "#304964",
+        "#f8fbff",
+        "#ff77d9"
+      ],
+      "meta": {
+        "author": "Tank Forge Generator",
+        "updatedAt": 1777075200000,
+        "tags": [
+          "uncommon",
+          "legend-lab",
+          "plasmaVent"
+        ]
+      }
+    },
+    {
+      "version": 1,
+      "skinId": "forge-sunset-cruiser",
+      "rarity": "uncommon",
+      "canvas": {
+        "width": 64,
+        "height": 32
+      },
+      "familyId": "retro-commander",
+      "layers": [
+        {
+          "id": "base-layer",
+          "type": "base",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[]"
+        },
+        {
+          "id": "paint-layer",
+          "type": "paint",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[{\"x\":10,\"y\":11,\"color\":\"#ff8a3d\"},{\"x\":14,\"y\":11,\"color\":\"#ff8a3d\"},{\"x\":18,\"y\":11,\"color\":\"#ff8a3d\"},{\"x\":22,\"y\":11,\"color\":\"#ff8a3d\"},{\"x\":26,\"y\":11,\"color\":\"#ff8a3d\"},{\"x\":30,\"y\":11,\"color\":\"#ff8a3d\"},{\"x\":34,\"y\":11,\"color\":\"#ff8a3d\"},{\"x\":38,\"y\":11,\"color\":\"#ff8a3d\"},{\"x\":42,\"y\":11,\"color\":\"#ff8a3d\"},{\"x\":46,\"y\":11,\"color\":\"#ff8a3d\"},{\"x\":50,\"y\":11,\"color\":\"#ff8a3d\"},{\"x\":54,\"y\":11,\"color\":\"#ff8a3d\"},{\"x\":13,\"y\":19,\"color\":\"#ef476f\"},{\"x\":14,\"y\":20,\"color\":\"#ffd166\"},{\"x\":20,\"y\":19,\"color\":\"#ef476f\"},{\"x\":21,\"y\":20,\"color\":\"#ffd166\"},{\"x\":27,\"y\":19,\"color\":\"#ef476f\"},{\"x\":28,\"y\":20,\"color\":\"#ffd166\"},{\"x\":34,\"y\":19,\"color\":\"#ef476f\"},{\"x\":35,\"y\":20,\"color\":\"#ffd166\"},{\"x\":41,\"y\":19,\"color\":\"#ef476f\"},{\"x\":42,\"y\":20,\"color\":\"#ffd166\"},{\"x\":48,\"y\":19,\"color\":\"#ef476f\"},{\"x\":49,\"y\":20,\"color\":\"#ffd166\"},{\"x\":18,\"y\":14,\"color\":\"#ff8a3d\"},{\"x\":46,\"y\":14,\"color\":\"#ef476f\"},{\"x\":18,\"y\":17,\"color\":\"#ff8a3d\"},{\"x\":46,\"y\":17,\"color\":\"#ef476f\"},{\"x\":18,\"y\":20,\"color\":\"#ff8a3d\"},{\"x\":46,\"y\":20,\"color\":\"#ef476f\"}]"
+        },
+        {
+          "id": "decal-layer",
+          "type": "decal",
+          "blend": "add",
+          "visible": true,
+          "pixels": "[{\"x\":30,\"y\":13,\"color\":\"#ffd166\"},{\"x\":29,\"y\":14,\"color\":\"#ffd166\"},{\"x\":30,\"y\":14,\"color\":\"#ffd166\"},{\"x\":31,\"y\":14,\"color\":\"#ffd166\"},{\"x\":28,\"y\":15,\"color\":\"#ffd166\"},{\"x\":29,\"y\":15,\"color\":\"#ffd166\"},{\"x\":30,\"y\":15,\"color\":\"#ffd166\"},{\"x\":31,\"y\":15,\"color\":\"#ffd166\"},{\"x\":32,\"y\":15,\"color\":\"#ffd166\"},{\"x\":29,\"y\":16,\"color\":\"#ffd166\"},{\"x\":30,\"y\":16,\"color\":\"#ffd166\"},{\"x\":31,\"y\":16,\"color\":\"#ffd166\"},{\"x\":30,\"y\":17,\"color\":\"#ffd166\"}]"
+        }
+      ],
+      "parts": {
+        "hullPreset": "heavy",
+        "treadPreset": "spiked",
+        "wheelPreset": "micro",
+        "barrelPreset": "stubby"
+      },
+      "turret": {
+        "anchorX": 30,
+        "anchorY": 9,
+        "baseRadius": 8
+      },
+      "effects": [
+        {
+          "type": "neonPulse",
+          "color": "#ff8a3d",
+          "intensity": 0.48,
+          "speed": 1.16
+        }
+      ],
+      "palette": [
+        "#281b34",
+        "#ff8a3d",
+        "#49305c",
+        "#ffd166",
+        "#ef476f"
+      ],
+      "meta": {
+        "author": "Tank Forge Generator",
+        "updatedAt": 1777075200000,
+        "tags": [
+          "uncommon",
+          "retro-commander",
+          "neonPulse"
+        ]
+      }
+    },
+    {
+      "version": 1,
+      "skinId": "forge-dataline-prowler",
+      "rarity": "uncommon",
+      "canvas": {
+        "width": 64,
+        "height": 32
+      },
+      "familyId": "arcade-chaos",
+      "layers": [
+        {
+          "id": "base-layer",
+          "type": "base",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[]"
+        },
+        {
+          "id": "paint-layer",
+          "type": "paint",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[{\"x\":10,\"y\":12,\"color\":\"#00d9ff\"},{\"x\":14,\"y\":12,\"color\":\"#00d9ff\"},{\"x\":18,\"y\":12,\"color\":\"#00d9ff\"},{\"x\":22,\"y\":12,\"color\":\"#00d9ff\"},{\"x\":26,\"y\":12,\"color\":\"#00d9ff\"},{\"x\":30,\"y\":12,\"color\":\"#00d9ff\"},{\"x\":34,\"y\":12,\"color\":\"#00d9ff\"},{\"x\":38,\"y\":12,\"color\":\"#00d9ff\"},{\"x\":42,\"y\":12,\"color\":\"#00d9ff\"},{\"x\":46,\"y\":12,\"color\":\"#00d9ff\"},{\"x\":50,\"y\":12,\"color\":\"#00d9ff\"},{\"x\":54,\"y\":12,\"color\":\"#00d9ff\"},{\"x\":14,\"y\":19,\"color\":\"#ff3f7f\"},{\"x\":15,\"y\":20,\"color\":\"#a2ff86\"},{\"x\":21,\"y\":19,\"color\":\"#ff3f7f\"},{\"x\":22,\"y\":20,\"color\":\"#a2ff86\"},{\"x\":28,\"y\":19,\"color\":\"#ff3f7f\"},{\"x\":29,\"y\":20,\"color\":\"#a2ff86\"},{\"x\":35,\"y\":19,\"color\":\"#ff3f7f\"},{\"x\":36,\"y\":20,\"color\":\"#a2ff86\"},{\"x\":42,\"y\":19,\"color\":\"#ff3f7f\"},{\"x\":43,\"y\":20,\"color\":\"#a2ff86\"},{\"x\":49,\"y\":19,\"color\":\"#ff3f7f\"},{\"x\":50,\"y\":20,\"color\":\"#a2ff86\"},{\"x\":19,\"y\":14,\"color\":\"#00d9ff\"},{\"x\":45,\"y\":14,\"color\":\"#ff3f7f\"},{\"x\":19,\"y\":17,\"color\":\"#00d9ff\"},{\"x\":45,\"y\":17,\"color\":\"#ff3f7f\"},{\"x\":19,\"y\":20,\"color\":\"#00d9ff\"},{\"x\":45,\"y\":20,\"color\":\"#ff3f7f\"}]"
+        },
+        {
+          "id": "decal-layer",
+          "type": "decal",
+          "blend": "add",
+          "visible": true,
+          "pixels": "[{\"x\":31,\"y\":14,\"color\":\"#a2ff86\"},{\"x\":30,\"y\":15,\"color\":\"#a2ff86\"},{\"x\":31,\"y\":15,\"color\":\"#a2ff86\"},{\"x\":32,\"y\":15,\"color\":\"#a2ff86\"},{\"x\":29,\"y\":16,\"color\":\"#a2ff86\"},{\"x\":30,\"y\":16,\"color\":\"#a2ff86\"},{\"x\":31,\"y\":16,\"color\":\"#a2ff86\"},{\"x\":32,\"y\":16,\"color\":\"#a2ff86\"},{\"x\":33,\"y\":16,\"color\":\"#a2ff86\"},{\"x\":30,\"y\":17,\"color\":\"#a2ff86\"},{\"x\":31,\"y\":17,\"color\":\"#a2ff86\"},{\"x\":32,\"y\":17,\"color\":\"#a2ff86\"},{\"x\":31,\"y\":18,\"color\":\"#a2ff86\"}]"
+        }
+      ],
+      "parts": {
+        "hullPreset": "scout",
+        "treadPreset": "smooth",
+        "wheelPreset": null,
+        "barrelPreset": "long"
+      },
+      "turret": {
+        "anchorX": 31,
+        "anchorY": 10,
+        "baseRadius": 9
+      },
+      "effects": [
+        {
+          "type": "laserStripe",
+          "color": "#00d9ff",
+          "intensity": 0.56,
+          "speed": 1.34
+        }
+      ],
+      "palette": [
+        "#101a2b",
+        "#00d9ff",
+        "#24324c",
+        "#a2ff86",
+        "#ff3f7f"
+      ],
+      "meta": {
+        "author": "Tank Forge Generator",
+        "updatedAt": 1777075200000,
+        "tags": [
+          "uncommon",
+          "arcade-chaos",
+          "laserStripe"
+        ]
+      }
+    },
+    {
+      "version": 1,
+      "skinId": "forge-ion-panther",
+      "rarity": "rare",
+      "canvas": {
+        "width": 64,
+        "height": 32
+      },
+      "familyId": "legend-lab",
+      "layers": [
+        {
+          "id": "base-layer",
+          "type": "base",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[]"
+        },
+        {
+          "id": "paint-layer",
+          "type": "paint",
+          "blend": "screen",
+          "visible": true,
+          "pixels": "[{\"x\":10,\"y\":11,\"color\":\"#9b5cff\"},{\"x\":14,\"y\":11,\"color\":\"#9b5cff\"},{\"x\":18,\"y\":11,\"color\":\"#9b5cff\"},{\"x\":22,\"y\":11,\"color\":\"#9b5cff\"},{\"x\":26,\"y\":11,\"color\":\"#9b5cff\"},{\"x\":30,\"y\":11,\"color\":\"#9b5cff\"},{\"x\":34,\"y\":11,\"color\":\"#9b5cff\"},{\"x\":38,\"y\":11,\"color\":\"#9b5cff\"},{\"x\":42,\"y\":11,\"color\":\"#9b5cff\"},{\"x\":46,\"y\":11,\"color\":\"#9b5cff\"},{\"x\":50,\"y\":11,\"color\":\"#9b5cff\"},{\"x\":54,\"y\":11,\"color\":\"#9b5cff\"},{\"x\":12,\"y\":19,\"color\":\"#ff4fd8\"},{\"x\":13,\"y\":20,\"color\":\"#5dffdc\"},{\"x\":19,\"y\":19,\"color\":\"#ff4fd8\"},{\"x\":20,\"y\":20,\"color\":\"#5dffdc\"},{\"x\":26,\"y\":19,\"color\":\"#ff4fd8\"},{\"x\":27,\"y\":20,\"color\":\"#5dffdc\"},{\"x\":33,\"y\":19,\"color\":\"#ff4fd8\"},{\"x\":34,\"y\":20,\"color\":\"#5dffdc\"},{\"x\":40,\"y\":19,\"color\":\"#ff4fd8\"},{\"x\":41,\"y\":20,\"color\":\"#5dffdc\"},{\"x\":47,\"y\":19,\"color\":\"#ff4fd8\"},{\"x\":48,\"y\":20,\"color\":\"#5dffdc\"},{\"x\":20,\"y\":14,\"color\":\"#9b5cff\"},{\"x\":44,\"y\":14,\"color\":\"#ff4fd8\"},{\"x\":20,\"y\":17,\"color\":\"#9b5cff\"},{\"x\":44,\"y\":17,\"color\":\"#ff4fd8\"},{\"x\":20,\"y\":20,\"color\":\"#9b5cff\"},{\"x\":44,\"y\":20,\"color\":\"#ff4fd8\"}]"
+        },
+        {
+          "id": "decal-layer",
+          "type": "decal",
+          "blend": "add",
+          "visible": true,
+          "pixels": "[{\"x\":32,\"y\":12,\"color\":\"#5dffdc\"},{\"x\":31,\"y\":13,\"color\":\"#5dffdc\"},{\"x\":32,\"y\":13,\"color\":\"#5dffdc\"},{\"x\":33,\"y\":13,\"color\":\"#5dffdc\"},{\"x\":30,\"y\":14,\"color\":\"#5dffdc\"},{\"x\":31,\"y\":14,\"color\":\"#5dffdc\"},{\"x\":32,\"y\":14,\"color\":\"#5dffdc\"},{\"x\":33,\"y\":14,\"color\":\"#5dffdc\"},{\"x\":34,\"y\":14,\"color\":\"#5dffdc\"},{\"x\":31,\"y\":15,\"color\":\"#5dffdc\"},{\"x\":32,\"y\":15,\"color\":\"#5dffdc\"},{\"x\":33,\"y\":15,\"color\":\"#5dffdc\"},{\"x\":32,\"y\":16,\"color\":\"#5dffdc\"}]"
+        }
+      ],
+      "parts": {
+        "hullPreset": "standard",
+        "treadPreset": "classic",
+        "wheelPreset": "dual",
+        "barrelPreset": "standard"
+      },
+      "turret": {
+        "anchorX": 32,
+        "anchorY": 7,
+        "baseRadius": 7
+      },
+      "effects": [
+        {
+          "type": "sparkArc",
+          "color": "#9b5cff",
+          "intensity": 0.64,
+          "speed": 0.8
+        }
+      ],
+      "palette": [
+        "#090f1f",
+        "#9b5cff",
+        "#1e2540",
+        "#5dffdc",
+        "#ff4fd8"
+      ],
+      "meta": {
+        "author": "Tank Forge Generator",
+        "updatedAt": 1777075200000,
+        "tags": [
+          "rare",
+          "legend-lab",
+          "sparkArc"
+        ]
+      }
+    },
+    {
+      "version": 1,
+      "skinId": "forge-plasma-mantis",
+      "rarity": "rare",
+      "canvas": {
+        "width": 64,
+        "height": 32
+      },
+      "familyId": "legend-lab",
+      "layers": [
+        {
+          "id": "base-layer",
+          "type": "base",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[]"
+        },
+        {
+          "id": "paint-layer",
+          "type": "paint",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[{\"x\":10,\"y\":12,\"color\":\"#54ff6a\"},{\"x\":14,\"y\":12,\"color\":\"#54ff6a\"},{\"x\":18,\"y\":12,\"color\":\"#54ff6a\"},{\"x\":22,\"y\":12,\"color\":\"#54ff6a\"},{\"x\":26,\"y\":12,\"color\":\"#54ff6a\"},{\"x\":30,\"y\":12,\"color\":\"#54ff6a\"},{\"x\":34,\"y\":12,\"color\":\"#54ff6a\"},{\"x\":38,\"y\":12,\"color\":\"#54ff6a\"},{\"x\":42,\"y\":12,\"color\":\"#54ff6a\"},{\"x\":46,\"y\":12,\"color\":\"#54ff6a\"},{\"x\":50,\"y\":12,\"color\":\"#54ff6a\"},{\"x\":54,\"y\":12,\"color\":\"#54ff6a\"},{\"x\":13,\"y\":19,\"color\":\"#00ccff\"},{\"x\":14,\"y\":20,\"color\":\"#d6ff00\"},{\"x\":20,\"y\":19,\"color\":\"#00ccff\"},{\"x\":21,\"y\":20,\"color\":\"#d6ff00\"},{\"x\":27,\"y\":19,\"color\":\"#00ccff\"},{\"x\":28,\"y\":20,\"color\":\"#d6ff00\"},{\"x\":34,\"y\":19,\"color\":\"#00ccff\"},{\"x\":35,\"y\":20,\"color\":\"#d6ff00\"},{\"x\":41,\"y\":19,\"color\":\"#00ccff\"},{\"x\":42,\"y\":20,\"color\":\"#d6ff00\"},{\"x\":48,\"y\":19,\"color\":\"#00ccff\"},{\"x\":49,\"y\":20,\"color\":\"#d6ff00\"},{\"x\":21,\"y\":14,\"color\":\"#54ff6a\"},{\"x\":43,\"y\":14,\"color\":\"#00ccff\"},{\"x\":21,\"y\":17,\"color\":\"#54ff6a\"},{\"x\":43,\"y\":17,\"color\":\"#00ccff\"},{\"x\":21,\"y\":20,\"color\":\"#54ff6a\"},{\"x\":43,\"y\":20,\"color\":\"#00ccff\"}]"
+        },
+        {
+          "id": "decal-layer",
+          "type": "decal",
+          "blend": "add",
+          "visible": true,
+          "pixels": "[{\"x\":33,\"y\":13,\"color\":\"#d6ff00\"},{\"x\":32,\"y\":14,\"color\":\"#d6ff00\"},{\"x\":33,\"y\":14,\"color\":\"#d6ff00\"},{\"x\":34,\"y\":14,\"color\":\"#d6ff00\"},{\"x\":31,\"y\":15,\"color\":\"#d6ff00\"},{\"x\":32,\"y\":15,\"color\":\"#d6ff00\"},{\"x\":33,\"y\":15,\"color\":\"#d6ff00\"},{\"x\":34,\"y\":15,\"color\":\"#d6ff00\"},{\"x\":35,\"y\":15,\"color\":\"#d6ff00\"},{\"x\":32,\"y\":16,\"color\":\"#d6ff00\"},{\"x\":33,\"y\":16,\"color\":\"#d6ff00\"},{\"x\":34,\"y\":16,\"color\":\"#d6ff00\"},{\"x\":33,\"y\":17,\"color\":\"#d6ff00\"}]"
+        }
+      ],
+      "parts": {
+        "hullPreset": "wedge",
+        "treadPreset": "hover",
+        "wheelPreset": "triad",
+        "barrelPreset": "rail"
+      },
+      "turret": {
+        "anchorX": 33,
+        "anchorY": 8,
+        "baseRadius": 8
+      },
+      "effects": [
+        {
+          "type": "plasmaVent",
+          "color": "#54ff6a",
+          "intensity": 0.72,
+          "speed": 0.98
+        }
+      ],
+      "palette": [
+        "#111821",
+        "#54ff6a",
+        "#243329",
+        "#d6ff00",
+        "#00ccff"
+      ],
+      "meta": {
+        "author": "Tank Forge Generator",
+        "updatedAt": 1777075200000,
+        "tags": [
+          "rare",
+          "legend-lab",
+          "plasmaVent"
+        ]
+      }
+    },
+    {
+      "version": 1,
+      "skinId": "forge-laser-lynx",
+      "rarity": "rare",
+      "canvas": {
+        "width": 64,
+        "height": 32
+      },
+      "familyId": "arcade-chaos",
+      "layers": [
+        {
+          "id": "base-layer",
+          "type": "base",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[]"
+        },
+        {
+          "id": "paint-layer",
+          "type": "paint",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[{\"x\":10,\"y\":11,\"color\":\"#ff3de8\"},{\"x\":14,\"y\":11,\"color\":\"#ff3de8\"},{\"x\":18,\"y\":11,\"color\":\"#ff3de8\"},{\"x\":22,\"y\":11,\"color\":\"#ff3de8\"},{\"x\":26,\"y\":11,\"color\":\"#ff3de8\"},{\"x\":30,\"y\":11,\"color\":\"#ff3de8\"},{\"x\":34,\"y\":11,\"color\":\"#ff3de8\"},{\"x\":38,\"y\":11,\"color\":\"#ff3de8\"},{\"x\":42,\"y\":11,\"color\":\"#ff3de8\"},{\"x\":46,\"y\":11,\"color\":\"#ff3de8\"},{\"x\":50,\"y\":11,\"color\":\"#ff3de8\"},{\"x\":54,\"y\":11,\"color\":\"#ff3de8\"},{\"x\":14,\"y\":19,\"color\":\"#44d7ff\"},{\"x\":15,\"y\":20,\"color\":\"#ffec99\"},{\"x\":21,\"y\":19,\"color\":\"#44d7ff\"},{\"x\":22,\"y\":20,\"color\":\"#ffec99\"},{\"x\":28,\"y\":19,\"color\":\"#44d7ff\"},{\"x\":29,\"y\":20,\"color\":\"#ffec99\"},{\"x\":35,\"y\":19,\"color\":\"#44d7ff\"},{\"x\":36,\"y\":20,\"color\":\"#ffec99\"},{\"x\":42,\"y\":19,\"color\":\"#44d7ff\"},{\"x\":43,\"y\":20,\"color\":\"#ffec99\"},{\"x\":49,\"y\":19,\"color\":\"#44d7ff\"},{\"x\":50,\"y\":20,\"color\":\"#ffec99\"},{\"x\":22,\"y\":14,\"color\":\"#ff3de8\"},{\"x\":42,\"y\":14,\"color\":\"#44d7ff\"},{\"x\":22,\"y\":17,\"color\":\"#ff3de8\"},{\"x\":42,\"y\":17,\"color\":\"#44d7ff\"},{\"x\":22,\"y\":20,\"color\":\"#ff3de8\"},{\"x\":42,\"y\":20,\"color\":\"#44d7ff\"}]"
+        },
+        {
+          "id": "decal-layer",
+          "type": "decal",
+          "blend": "add",
+          "visible": true,
+          "pixels": "[{\"x\":34,\"y\":14,\"color\":\"#ffec99\"},{\"x\":33,\"y\":15,\"color\":\"#ffec99\"},{\"x\":34,\"y\":15,\"color\":\"#ffec99\"},{\"x\":35,\"y\":15,\"color\":\"#ffec99\"},{\"x\":32,\"y\":16,\"color\":\"#ffec99\"},{\"x\":33,\"y\":16,\"color\":\"#ffec99\"},{\"x\":34,\"y\":16,\"color\":\"#ffec99\"},{\"x\":35,\"y\":16,\"color\":\"#ffec99\"},{\"x\":36,\"y\":16,\"color\":\"#ffec99\"},{\"x\":33,\"y\":17,\"color\":\"#ffec99\"},{\"x\":34,\"y\":17,\"color\":\"#ffec99\"},{\"x\":35,\"y\":17,\"color\":\"#ffec99\"},{\"x\":34,\"y\":18,\"color\":\"#ffec99\"}]"
+        }
+      ],
+      "parts": {
+        "hullPreset": "heavy",
+        "treadPreset": "spiked",
+        "wheelPreset": "micro",
+        "barrelPreset": "stubby"
+      },
+      "turret": {
+        "anchorX": 34,
+        "anchorY": 9,
+        "baseRadius": 9
+      },
+      "effects": [
+        {
+          "type": "laserStripe",
+          "color": "#ff3de8",
+          "intensity": 0.8,
+          "speed": 1.16
+        }
+      ],
+      "palette": [
+        "#1e1329",
+        "#ff3de8",
+        "#342247",
+        "#ffec99",
+        "#44d7ff"
+      ],
+      "meta": {
+        "author": "Tank Forge Generator",
+        "updatedAt": 1777075200000,
+        "tags": [
+          "rare",
+          "arcade-chaos",
+          "laserStripe"
+        ]
+      }
+    },
+    {
+      "version": 1,
+      "skinId": "forge-quantum-cobra",
+      "rarity": "rare",
+      "canvas": {
+        "width": 64,
+        "height": 32
+      },
+      "familyId": "legend-lab",
+      "layers": [
+        {
+          "id": "base-layer",
+          "type": "base",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[]"
+        },
+        {
+          "id": "paint-layer",
+          "type": "paint",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[{\"x\":10,\"y\":12,\"color\":\"#5f7dff\"},{\"x\":14,\"y\":12,\"color\":\"#5f7dff\"},{\"x\":18,\"y\":12,\"color\":\"#5f7dff\"},{\"x\":22,\"y\":12,\"color\":\"#5f7dff\"},{\"x\":26,\"y\":12,\"color\":\"#5f7dff\"},{\"x\":30,\"y\":12,\"color\":\"#5f7dff\"},{\"x\":34,\"y\":12,\"color\":\"#5f7dff\"},{\"x\":38,\"y\":12,\"color\":\"#5f7dff\"},{\"x\":42,\"y\":12,\"color\":\"#5f7dff\"},{\"x\":46,\"y\":12,\"color\":\"#5f7dff\"},{\"x\":50,\"y\":12,\"color\":\"#5f7dff\"},{\"x\":54,\"y\":12,\"color\":\"#5f7dff\"},{\"x\":12,\"y\":19,\"color\":\"#ff6bcb\"},{\"x\":13,\"y\":20,\"color\":\"#ffffff\"},{\"x\":19,\"y\":19,\"color\":\"#ff6bcb\"},{\"x\":20,\"y\":20,\"color\":\"#ffffff\"},{\"x\":26,\"y\":19,\"color\":\"#ff6bcb\"},{\"x\":27,\"y\":20,\"color\":\"#ffffff\"},{\"x\":33,\"y\":19,\"color\":\"#ff6bcb\"},{\"x\":34,\"y\":20,\"color\":\"#ffffff\"},{\"x\":40,\"y\":19,\"color\":\"#ff6bcb\"},{\"x\":41,\"y\":20,\"color\":\"#ffffff\"},{\"x\":47,\"y\":19,\"color\":\"#ff6bcb\"},{\"x\":48,\"y\":20,\"color\":\"#ffffff\"},{\"x\":18,\"y\":14,\"color\":\"#5f7dff\"},{\"x\":46,\"y\":14,\"color\":\"#ff6bcb\"},{\"x\":18,\"y\":17,\"color\":\"#5f7dff\"},{\"x\":46,\"y\":17,\"color\":\"#ff6bcb\"},{\"x\":18,\"y\":20,\"color\":\"#5f7dff\"},{\"x\":46,\"y\":20,\"color\":\"#ff6bcb\"}]"
+        },
+        {
+          "id": "decal-layer",
+          "type": "decal",
+          "blend": "add",
+          "visible": true,
+          "pixels": "[{\"x\":30,\"y\":12,\"color\":\"#ffffff\"},{\"x\":29,\"y\":13,\"color\":\"#ffffff\"},{\"x\":30,\"y\":13,\"color\":\"#ffffff\"},{\"x\":31,\"y\":13,\"color\":\"#ffffff\"},{\"x\":28,\"y\":14,\"color\":\"#ffffff\"},{\"x\":29,\"y\":14,\"color\":\"#ffffff\"},{\"x\":30,\"y\":14,\"color\":\"#ffffff\"},{\"x\":31,\"y\":14,\"color\":\"#ffffff\"},{\"x\":32,\"y\":14,\"color\":\"#ffffff\"},{\"x\":29,\"y\":15,\"color\":\"#ffffff\"},{\"x\":30,\"y\":15,\"color\":\"#ffffff\"},{\"x\":31,\"y\":15,\"color\":\"#ffffff\"},{\"x\":30,\"y\":16,\"color\":\"#ffffff\"}]"
+        }
+      ],
+      "parts": {
+        "hullPreset": "scout",
+        "treadPreset": "smooth",
+        "wheelPreset": null,
+        "barrelPreset": "long"
+      },
+      "turret": {
+        "anchorX": 30,
+        "anchorY": 10,
+        "baseRadius": 7
+      },
+      "effects": [
+        {
+          "type": "sparkArc",
+          "color": "#5f7dff",
+          "intensity": 0.48,
+          "speed": 1.34
+        }
+      ],
+      "palette": [
+        "#101226",
+        "#5f7dff",
+        "#272b52",
+        "#ffffff",
+        "#ff6bcb"
+      ],
+      "meta": {
+        "author": "Tank Forge Generator",
+        "updatedAt": 1777075200000,
+        "tags": [
+          "rare",
+          "legend-lab",
+          "sparkArc"
+        ]
+      }
+    },
+    {
+      "version": 1,
+      "skinId": "forge-nebula-bulldog",
+      "rarity": "rare",
+      "canvas": {
+        "width": 64,
+        "height": 32
+      },
+      "familyId": "retro-commander",
+      "layers": [
+        {
+          "id": "base-layer",
+          "type": "base",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[]"
+        },
+        {
+          "id": "paint-layer",
+          "type": "paint",
+          "blend": "screen",
+          "visible": true,
+          "pixels": "[{\"x\":10,\"y\":11,\"color\":\"#c084fc\"},{\"x\":14,\"y\":11,\"color\":\"#c084fc\"},{\"x\":18,\"y\":11,\"color\":\"#c084fc\"},{\"x\":22,\"y\":11,\"color\":\"#c084fc\"},{\"x\":26,\"y\":11,\"color\":\"#c084fc\"},{\"x\":30,\"y\":11,\"color\":\"#c084fc\"},{\"x\":34,\"y\":11,\"color\":\"#c084fc\"},{\"x\":38,\"y\":11,\"color\":\"#c084fc\"},{\"x\":42,\"y\":11,\"color\":\"#c084fc\"},{\"x\":46,\"y\":11,\"color\":\"#c084fc\"},{\"x\":50,\"y\":11,\"color\":\"#c084fc\"},{\"x\":54,\"y\":11,\"color\":\"#c084fc\"},{\"x\":13,\"y\":19,\"color\":\"#fb7185\"},{\"x\":14,\"y\":20,\"color\":\"#67e8f9\"},{\"x\":20,\"y\":19,\"color\":\"#fb7185\"},{\"x\":21,\"y\":20,\"color\":\"#67e8f9\"},{\"x\":27,\"y\":19,\"color\":\"#fb7185\"},{\"x\":28,\"y\":20,\"color\":\"#67e8f9\"},{\"x\":34,\"y\":19,\"color\":\"#fb7185\"},{\"x\":35,\"y\":20,\"color\":\"#67e8f9\"},{\"x\":41,\"y\":19,\"color\":\"#fb7185\"},{\"x\":42,\"y\":20,\"color\":\"#67e8f9\"},{\"x\":48,\"y\":19,\"color\":\"#fb7185\"},{\"x\":49,\"y\":20,\"color\":\"#67e8f9\"},{\"x\":19,\"y\":14,\"color\":\"#c084fc\"},{\"x\":45,\"y\":14,\"color\":\"#fb7185\"},{\"x\":19,\"y\":17,\"color\":\"#c084fc\"},{\"x\":45,\"y\":17,\"color\":\"#fb7185\"},{\"x\":19,\"y\":20,\"color\":\"#c084fc\"},{\"x\":45,\"y\":20,\"color\":\"#fb7185\"}]"
+        },
+        {
+          "id": "decal-layer",
+          "type": "decal",
+          "blend": "add",
+          "visible": true,
+          "pixels": "[{\"x\":31,\"y\":13,\"color\":\"#67e8f9\"},{\"x\":30,\"y\":14,\"color\":\"#67e8f9\"},{\"x\":31,\"y\":14,\"color\":\"#67e8f9\"},{\"x\":32,\"y\":14,\"color\":\"#67e8f9\"},{\"x\":29,\"y\":15,\"color\":\"#67e8f9\"},{\"x\":30,\"y\":15,\"color\":\"#67e8f9\"},{\"x\":31,\"y\":15,\"color\":\"#67e8f9\"},{\"x\":32,\"y\":15,\"color\":\"#67e8f9\"},{\"x\":33,\"y\":15,\"color\":\"#67e8f9\"},{\"x\":30,\"y\":16,\"color\":\"#67e8f9\"},{\"x\":31,\"y\":16,\"color\":\"#67e8f9\"},{\"x\":32,\"y\":16,\"color\":\"#67e8f9\"},{\"x\":31,\"y\":17,\"color\":\"#67e8f9\"}]"
+        }
+      ],
+      "parts": {
+        "hullPreset": "standard",
+        "treadPreset": "classic",
+        "wheelPreset": "dual",
+        "barrelPreset": "standard"
+      },
+      "turret": {
+        "anchorX": 31,
+        "anchorY": 7,
+        "baseRadius": 8
+      },
+      "effects": [
+        {
+          "type": "scanline",
+          "color": "#c084fc",
+          "intensity": 0.56,
+          "speed": 0.8
+        }
+      ],
+      "palette": [
+        "#19182f",
+        "#c084fc",
+        "#322f56",
+        "#67e8f9",
+        "#fb7185"
+      ],
+      "meta": {
+        "author": "Tank Forge Generator",
+        "updatedAt": 1777075200000,
+        "tags": [
+          "rare",
+          "retro-commander",
+          "scanline"
+        ]
+      }
+    },
+    {
+      "version": 1,
+      "skinId": "forge-oxide-phantom",
+      "rarity": "rare",
+      "canvas": {
+        "width": 64,
+        "height": 32
+      },
+      "familyId": "retro-commander",
+      "layers": [
+        {
+          "id": "base-layer",
+          "type": "base",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[]"
+        },
+        {
+          "id": "paint-layer",
+          "type": "paint",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[{\"x\":10,\"y\":12,\"color\":\"#ff6b35\"},{\"x\":14,\"y\":12,\"color\":\"#ff6b35\"},{\"x\":18,\"y\":12,\"color\":\"#ff6b35\"},{\"x\":22,\"y\":12,\"color\":\"#ff6b35\"},{\"x\":26,\"y\":12,\"color\":\"#ff6b35\"},{\"x\":30,\"y\":12,\"color\":\"#ff6b35\"},{\"x\":34,\"y\":12,\"color\":\"#ff6b35\"},{\"x\":38,\"y\":12,\"color\":\"#ff6b35\"},{\"x\":42,\"y\":12,\"color\":\"#ff6b35\"},{\"x\":46,\"y\":12,\"color\":\"#ff6b35\"},{\"x\":50,\"y\":12,\"color\":\"#ff6b35\"},{\"x\":54,\"y\":12,\"color\":\"#ff6b35\"},{\"x\":14,\"y\":19,\"color\":\"#00f5d4\"},{\"x\":15,\"y\":20,\"color\":\"#f7f052\"},{\"x\":21,\"y\":19,\"color\":\"#00f5d4\"},{\"x\":22,\"y\":20,\"color\":\"#f7f052\"},{\"x\":28,\"y\":19,\"color\":\"#00f5d4\"},{\"x\":29,\"y\":20,\"color\":\"#f7f052\"},{\"x\":35,\"y\":19,\"color\":\"#00f5d4\"},{\"x\":36,\"y\":20,\"color\":\"#f7f052\"},{\"x\":42,\"y\":19,\"color\":\"#00f5d4\"},{\"x\":43,\"y\":20,\"color\":\"#f7f052\"},{\"x\":49,\"y\":19,\"color\":\"#00f5d4\"},{\"x\":50,\"y\":20,\"color\":\"#f7f052\"},{\"x\":20,\"y\":14,\"color\":\"#ff6b35\"},{\"x\":44,\"y\":14,\"color\":\"#00f5d4\"},{\"x\":20,\"y\":17,\"color\":\"#ff6b35\"},{\"x\":44,\"y\":17,\"color\":\"#00f5d4\"},{\"x\":20,\"y\":20,\"color\":\"#ff6b35\"},{\"x\":44,\"y\":20,\"color\":\"#00f5d4\"}]"
+        },
+        {
+          "id": "decal-layer",
+          "type": "decal",
+          "blend": "add",
+          "visible": true,
+          "pixels": "[{\"x\":32,\"y\":14,\"color\":\"#f7f052\"},{\"x\":31,\"y\":15,\"color\":\"#f7f052\"},{\"x\":32,\"y\":15,\"color\":\"#f7f052\"},{\"x\":33,\"y\":15,\"color\":\"#f7f052\"},{\"x\":30,\"y\":16,\"color\":\"#f7f052\"},{\"x\":31,\"y\":16,\"color\":\"#f7f052\"},{\"x\":32,\"y\":16,\"color\":\"#f7f052\"},{\"x\":33,\"y\":16,\"color\":\"#f7f052\"},{\"x\":34,\"y\":16,\"color\":\"#f7f052\"},{\"x\":31,\"y\":17,\"color\":\"#f7f052\"},{\"x\":32,\"y\":17,\"color\":\"#f7f052\"},{\"x\":33,\"y\":17,\"color\":\"#f7f052\"},{\"x\":32,\"y\":18,\"color\":\"#f7f052\"}]"
+        }
+      ],
+      "parts": {
+        "hullPreset": "wedge",
+        "treadPreset": "hover",
+        "wheelPreset": "triad",
+        "barrelPreset": "rail"
+      },
+      "turret": {
+        "anchorX": 32,
+        "anchorY": 8,
+        "baseRadius": 9
+      },
+      "effects": [
+        {
+          "type": "plasmaVent",
+          "color": "#ff6b35",
+          "intensity": 0.64,
+          "speed": 0.98
+        }
+      ],
+      "palette": [
+        "#221b1b",
+        "#ff6b35",
+        "#3d2c2a",
+        "#f7f052",
+        "#00f5d4"
+      ],
+      "meta": {
+        "author": "Tank Forge Generator",
+        "updatedAt": 1777075200000,
+        "tags": [
+          "rare",
+          "retro-commander",
+          "plasmaVent"
+        ]
+      }
+    },
+    {
+      "version": 1,
+      "skinId": "forge-chroma-reaper",
+      "rarity": "epic",
+      "canvas": {
+        "width": 64,
+        "height": 32
+      },
+      "familyId": "arcade-chaos",
+      "layers": [
+        {
+          "id": "base-layer",
+          "type": "base",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[]"
+        },
+        {
+          "id": "paint-layer",
+          "type": "paint",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[{\"x\":10,\"y\":11,\"color\":\"#ff00cc\"},{\"x\":14,\"y\":11,\"color\":\"#ff00cc\"},{\"x\":18,\"y\":11,\"color\":\"#ff00cc\"},{\"x\":22,\"y\":11,\"color\":\"#ff00cc\"},{\"x\":26,\"y\":11,\"color\":\"#ff00cc\"},{\"x\":30,\"y\":11,\"color\":\"#ff00cc\"},{\"x\":34,\"y\":11,\"color\":\"#ff00cc\"},{\"x\":38,\"y\":11,\"color\":\"#ff00cc\"},{\"x\":42,\"y\":11,\"color\":\"#ff00cc\"},{\"x\":46,\"y\":11,\"color\":\"#ff00cc\"},{\"x\":50,\"y\":11,\"color\":\"#ff00cc\"},{\"x\":54,\"y\":11,\"color\":\"#ff00cc\"},{\"x\":12,\"y\":19,\"color\":\"#fff95c\"},{\"x\":13,\"y\":20,\"color\":\"#00f5ff\"},{\"x\":19,\"y\":19,\"color\":\"#fff95c\"},{\"x\":20,\"y\":20,\"color\":\"#00f5ff\"},{\"x\":26,\"y\":19,\"color\":\"#fff95c\"},{\"x\":27,\"y\":20,\"color\":\"#00f5ff\"},{\"x\":33,\"y\":19,\"color\":\"#fff95c\"},{\"x\":34,\"y\":20,\"color\":\"#00f5ff\"},{\"x\":40,\"y\":19,\"color\":\"#fff95c\"},{\"x\":41,\"y\":20,\"color\":\"#00f5ff\"},{\"x\":47,\"y\":19,\"color\":\"#fff95c\"},{\"x\":48,\"y\":20,\"color\":\"#00f5ff\"},{\"x\":21,\"y\":14,\"color\":\"#ff00cc\"},{\"x\":43,\"y\":14,\"color\":\"#fff95c\"},{\"x\":21,\"y\":17,\"color\":\"#ff00cc\"},{\"x\":43,\"y\":17,\"color\":\"#fff95c\"},{\"x\":21,\"y\":20,\"color\":\"#ff00cc\"},{\"x\":43,\"y\":20,\"color\":\"#fff95c\"}]"
+        },
+        {
+          "id": "decal-layer",
+          "type": "decal",
+          "blend": "add",
+          "visible": true,
+          "pixels": "[{\"x\":33,\"y\":12,\"color\":\"#00f5ff\"},{\"x\":32,\"y\":13,\"color\":\"#00f5ff\"},{\"x\":33,\"y\":13,\"color\":\"#00f5ff\"},{\"x\":34,\"y\":13,\"color\":\"#00f5ff\"},{\"x\":31,\"y\":14,\"color\":\"#00f5ff\"},{\"x\":32,\"y\":14,\"color\":\"#00f5ff\"},{\"x\":33,\"y\":14,\"color\":\"#00f5ff\"},{\"x\":34,\"y\":14,\"color\":\"#00f5ff\"},{\"x\":35,\"y\":14,\"color\":\"#00f5ff\"},{\"x\":32,\"y\":15,\"color\":\"#00f5ff\"},{\"x\":33,\"y\":15,\"color\":\"#00f5ff\"},{\"x\":34,\"y\":15,\"color\":\"#00f5ff\"},{\"x\":33,\"y\":16,\"color\":\"#00f5ff\"}]"
+        }
+      ],
+      "parts": {
+        "hullPreset": "heavy",
+        "treadPreset": "spiked",
+        "wheelPreset": "micro",
+        "barrelPreset": "stubby"
+      },
+      "turret": {
+        "anchorX": 33,
+        "anchorY": 9,
+        "baseRadius": 7
+      },
+      "effects": [
+        {
+          "type": "sparkArc",
+          "color": "#ff00cc",
+          "intensity": 0.72,
+          "speed": 1.16
+        }
+      ],
+      "palette": [
+        "#0b1023",
+        "#ff00cc",
+        "#20163d",
+        "#00f5ff",
+        "#fff95c"
+      ],
+      "meta": {
+        "author": "Tank Forge Generator",
+        "updatedAt": 1777075200000,
+        "tags": [
+          "epic",
+          "arcade-chaos",
+          "sparkArc"
+        ]
+      }
+    },
+    {
+      "version": 1,
+      "skinId": "forge-hyperion-rail",
+      "rarity": "epic",
+      "canvas": {
+        "width": 64,
+        "height": 32
+      },
+      "familyId": "legend-lab",
+      "layers": [
+        {
+          "id": "base-layer",
+          "type": "base",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[]"
+        },
+        {
+          "id": "paint-layer",
+          "type": "paint",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[{\"x\":10,\"y\":12,\"color\":\"#ffdd57\"},{\"x\":14,\"y\":12,\"color\":\"#ffdd57\"},{\"x\":18,\"y\":12,\"color\":\"#ffdd57\"},{\"x\":22,\"y\":12,\"color\":\"#ffdd57\"},{\"x\":26,\"y\":12,\"color\":\"#ffdd57\"},{\"x\":30,\"y\":12,\"color\":\"#ffdd57\"},{\"x\":34,\"y\":12,\"color\":\"#ffdd57\"},{\"x\":38,\"y\":12,\"color\":\"#ffdd57\"},{\"x\":42,\"y\":12,\"color\":\"#ffdd57\"},{\"x\":46,\"y\":12,\"color\":\"#ffdd57\"},{\"x\":50,\"y\":12,\"color\":\"#ffdd57\"},{\"x\":54,\"y\":12,\"color\":\"#ffdd57\"},{\"x\":13,\"y\":19,\"color\":\"#ff006e\"},{\"x\":14,\"y\":20,\"color\":\"#80ffdb\"},{\"x\":20,\"y\":19,\"color\":\"#ff006e\"},{\"x\":21,\"y\":20,\"color\":\"#80ffdb\"},{\"x\":27,\"y\":19,\"color\":\"#ff006e\"},{\"x\":28,\"y\":20,\"color\":\"#80ffdb\"},{\"x\":34,\"y\":19,\"color\":\"#ff006e\"},{\"x\":35,\"y\":20,\"color\":\"#80ffdb\"},{\"x\":41,\"y\":19,\"color\":\"#ff006e\"},{\"x\":42,\"y\":20,\"color\":\"#80ffdb\"},{\"x\":48,\"y\":19,\"color\":\"#ff006e\"},{\"x\":49,\"y\":20,\"color\":\"#80ffdb\"},{\"x\":22,\"y\":14,\"color\":\"#ffdd57\"},{\"x\":42,\"y\":14,\"color\":\"#ff006e\"},{\"x\":22,\"y\":17,\"color\":\"#ffdd57\"},{\"x\":42,\"y\":17,\"color\":\"#ff006e\"},{\"x\":22,\"y\":20,\"color\":\"#ffdd57\"},{\"x\":42,\"y\":20,\"color\":\"#ff006e\"}]"
+        },
+        {
+          "id": "decal-layer",
+          "type": "decal",
+          "blend": "add",
+          "visible": true,
+          "pixels": "[{\"x\":34,\"y\":13,\"color\":\"#80ffdb\"},{\"x\":33,\"y\":14,\"color\":\"#80ffdb\"},{\"x\":34,\"y\":14,\"color\":\"#80ffdb\"},{\"x\":35,\"y\":14,\"color\":\"#80ffdb\"},{\"x\":32,\"y\":15,\"color\":\"#80ffdb\"},{\"x\":33,\"y\":15,\"color\":\"#80ffdb\"},{\"x\":34,\"y\":15,\"color\":\"#80ffdb\"},{\"x\":35,\"y\":15,\"color\":\"#80ffdb\"},{\"x\":36,\"y\":15,\"color\":\"#80ffdb\"},{\"x\":33,\"y\":16,\"color\":\"#80ffdb\"},{\"x\":34,\"y\":16,\"color\":\"#80ffdb\"},{\"x\":35,\"y\":16,\"color\":\"#80ffdb\"},{\"x\":34,\"y\":17,\"color\":\"#80ffdb\"}]"
+        }
+      ],
+      "parts": {
+        "hullPreset": "scout",
+        "treadPreset": "smooth",
+        "wheelPreset": null,
+        "barrelPreset": "long"
+      },
+      "turret": {
+        "anchorX": 34,
+        "anchorY": 10,
+        "baseRadius": 8
+      },
+      "effects": [
+        {
+          "type": "laserStripe",
+          "color": "#ffdd57",
+          "intensity": 0.8,
+          "speed": 1.34
+        }
+      ],
+      "palette": [
+        "#10131f",
+        "#ffdd57",
+        "#2a2d42",
+        "#80ffdb",
+        "#ff006e"
+      ],
+      "meta": {
+        "author": "Tank Forge Generator",
+        "updatedAt": 1777075200000,
+        "tags": [
+          "epic",
+          "legend-lab",
+          "laserStripe"
+        ]
+      }
+    },
+    {
+      "version": 1,
+      "skinId": "forge-aurora-juggernaut",
+      "rarity": "epic",
+      "canvas": {
+        "width": 64,
+        "height": 32
+      },
+      "familyId": "legend-lab",
+      "layers": [
+        {
+          "id": "base-layer",
+          "type": "base",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[]"
+        },
+        {
+          "id": "paint-layer",
+          "type": "paint",
+          "blend": "screen",
+          "visible": true,
+          "pixels": "[{\"x\":10,\"y\":11,\"color\":\"#34d399\"},{\"x\":14,\"y\":11,\"color\":\"#34d399\"},{\"x\":18,\"y\":11,\"color\":\"#34d399\"},{\"x\":22,\"y\":11,\"color\":\"#34d399\"},{\"x\":26,\"y\":11,\"color\":\"#34d399\"},{\"x\":30,\"y\":11,\"color\":\"#34d399\"},{\"x\":34,\"y\":11,\"color\":\"#34d399\"},{\"x\":38,\"y\":11,\"color\":\"#34d399\"},{\"x\":42,\"y\":11,\"color\":\"#34d399\"},{\"x\":46,\"y\":11,\"color\":\"#34d399\"},{\"x\":50,\"y\":11,\"color\":\"#34d399\"},{\"x\":54,\"y\":11,\"color\":\"#34d399\"},{\"x\":14,\"y\":19,\"color\":\"#f472b6\"},{\"x\":15,\"y\":20,\"color\":\"#a78bfa\"},{\"x\":21,\"y\":19,\"color\":\"#f472b6\"},{\"x\":22,\"y\":20,\"color\":\"#a78bfa\"},{\"x\":28,\"y\":19,\"color\":\"#f472b6\"},{\"x\":29,\"y\":20,\"color\":\"#a78bfa\"},{\"x\":35,\"y\":19,\"color\":\"#f472b6\"},{\"x\":36,\"y\":20,\"color\":\"#a78bfa\"},{\"x\":42,\"y\":19,\"color\":\"#f472b6\"},{\"x\":43,\"y\":20,\"color\":\"#a78bfa\"},{\"x\":49,\"y\":19,\"color\":\"#f472b6\"},{\"x\":50,\"y\":20,\"color\":\"#a78bfa\"},{\"x\":18,\"y\":14,\"color\":\"#34d399\"},{\"x\":46,\"y\":14,\"color\":\"#f472b6\"},{\"x\":18,\"y\":17,\"color\":\"#34d399\"},{\"x\":46,\"y\":17,\"color\":\"#f472b6\"},{\"x\":18,\"y\":20,\"color\":\"#34d399\"},{\"x\":46,\"y\":20,\"color\":\"#f472b6\"}]"
+        },
+        {
+          "id": "decal-layer",
+          "type": "decal",
+          "blend": "add",
+          "visible": true,
+          "pixels": "[{\"x\":30,\"y\":14,\"color\":\"#a78bfa\"},{\"x\":29,\"y\":15,\"color\":\"#a78bfa\"},{\"x\":30,\"y\":15,\"color\":\"#a78bfa\"},{\"x\":31,\"y\":15,\"color\":\"#a78bfa\"},{\"x\":28,\"y\":16,\"color\":\"#a78bfa\"},{\"x\":29,\"y\":16,\"color\":\"#a78bfa\"},{\"x\":30,\"y\":16,\"color\":\"#a78bfa\"},{\"x\":31,\"y\":16,\"color\":\"#a78bfa\"},{\"x\":32,\"y\":16,\"color\":\"#a78bfa\"},{\"x\":29,\"y\":17,\"color\":\"#a78bfa\"},{\"x\":30,\"y\":17,\"color\":\"#a78bfa\"},{\"x\":31,\"y\":17,\"color\":\"#a78bfa\"},{\"x\":30,\"y\":18,\"color\":\"#a78bfa\"}]"
+        }
+      ],
+      "parts": {
+        "hullPreset": "standard",
+        "treadPreset": "classic",
+        "wheelPreset": "dual",
+        "barrelPreset": "standard"
+      },
+      "turret": {
+        "anchorX": 30,
+        "anchorY": 7,
+        "baseRadius": 9
+      },
+      "effects": [
+        {
+          "type": "plasmaVent",
+          "color": "#34d399",
+          "intensity": 0.48,
+          "speed": 0.8
+        }
+      ],
+      "palette": [
+        "#071927",
+        "#34d399",
+        "#17384e",
+        "#a78bfa",
+        "#f472b6"
+      ],
+      "meta": {
+        "author": "Tank Forge Generator",
+        "updatedAt": 1777075200000,
+        "tags": [
+          "epic",
+          "legend-lab",
+          "plasmaVent"
+        ]
+      }
+    },
+    {
+      "version": 1,
+      "skinId": "forge-void-hammer",
+      "rarity": "epic",
+      "canvas": {
+        "width": 64,
+        "height": 32
+      },
+      "familyId": "retro-commander",
+      "layers": [
+        {
+          "id": "base-layer",
+          "type": "base",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[]"
+        },
+        {
+          "id": "paint-layer",
+          "type": "paint",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[{\"x\":10,\"y\":12,\"color\":\"#7c3aed\"},{\"x\":14,\"y\":12,\"color\":\"#7c3aed\"},{\"x\":18,\"y\":12,\"color\":\"#7c3aed\"},{\"x\":22,\"y\":12,\"color\":\"#7c3aed\"},{\"x\":26,\"y\":12,\"color\":\"#7c3aed\"},{\"x\":30,\"y\":12,\"color\":\"#7c3aed\"},{\"x\":34,\"y\":12,\"color\":\"#7c3aed\"},{\"x\":38,\"y\":12,\"color\":\"#7c3aed\"},{\"x\":42,\"y\":12,\"color\":\"#7c3aed\"},{\"x\":46,\"y\":12,\"color\":\"#7c3aed\"},{\"x\":50,\"y\":12,\"color\":\"#7c3aed\"},{\"x\":54,\"y\":12,\"color\":\"#7c3aed\"},{\"x\":12,\"y\":19,\"color\":\"#ff477e\"},{\"x\":13,\"y\":20,\"color\":\"#22d3ee\"},{\"x\":19,\"y\":19,\"color\":\"#ff477e\"},{\"x\":20,\"y\":20,\"color\":\"#22d3ee\"},{\"x\":26,\"y\":19,\"color\":\"#ff477e\"},{\"x\":27,\"y\":20,\"color\":\"#22d3ee\"},{\"x\":33,\"y\":19,\"color\":\"#ff477e\"},{\"x\":34,\"y\":20,\"color\":\"#22d3ee\"},{\"x\":40,\"y\":19,\"color\":\"#ff477e\"},{\"x\":41,\"y\":20,\"color\":\"#22d3ee\"},{\"x\":47,\"y\":19,\"color\":\"#ff477e\"},{\"x\":48,\"y\":20,\"color\":\"#22d3ee\"},{\"x\":19,\"y\":14,\"color\":\"#7c3aed\"},{\"x\":45,\"y\":14,\"color\":\"#ff477e\"},{\"x\":19,\"y\":17,\"color\":\"#7c3aed\"},{\"x\":45,\"y\":17,\"color\":\"#ff477e\"},{\"x\":19,\"y\":20,\"color\":\"#7c3aed\"},{\"x\":45,\"y\":20,\"color\":\"#ff477e\"}]"
+        },
+        {
+          "id": "decal-layer",
+          "type": "decal",
+          "blend": "add",
+          "visible": true,
+          "pixels": "[{\"x\":31,\"y\":12,\"color\":\"#22d3ee\"},{\"x\":30,\"y\":13,\"color\":\"#22d3ee\"},{\"x\":31,\"y\":13,\"color\":\"#22d3ee\"},{\"x\":32,\"y\":13,\"color\":\"#22d3ee\"},{\"x\":29,\"y\":14,\"color\":\"#22d3ee\"},{\"x\":30,\"y\":14,\"color\":\"#22d3ee\"},{\"x\":31,\"y\":14,\"color\":\"#22d3ee\"},{\"x\":32,\"y\":14,\"color\":\"#22d3ee\"},{\"x\":33,\"y\":14,\"color\":\"#22d3ee\"},{\"x\":30,\"y\":15,\"color\":\"#22d3ee\"},{\"x\":31,\"y\":15,\"color\":\"#22d3ee\"},{\"x\":32,\"y\":15,\"color\":\"#22d3ee\"},{\"x\":31,\"y\":16,\"color\":\"#22d3ee\"}]"
+        }
+      ],
+      "parts": {
+        "hullPreset": "wedge",
+        "treadPreset": "hover",
+        "wheelPreset": "triad",
+        "barrelPreset": "rail"
+      },
+      "turret": {
+        "anchorX": 31,
+        "anchorY": 8,
+        "baseRadius": 7
+      },
+      "effects": [
+        {
+          "type": "neonPulse",
+          "color": "#7c3aed",
+          "intensity": 0.56,
+          "speed": 0.98
+        }
+      ],
+      "palette": [
+        "#090a14",
+        "#7c3aed",
+        "#1b1b33",
+        "#22d3ee",
+        "#ff477e"
+      ],
+      "meta": {
+        "author": "Tank Forge Generator",
+        "updatedAt": 1777075200000,
+        "tags": [
+          "epic",
+          "retro-commander",
+          "neonPulse"
+        ]
+      }
+    },
+    {
+      "version": 1,
+      "skinId": "forge-neon-samurai",
+      "rarity": "epic",
+      "canvas": {
+        "width": 64,
+        "height": 32
+      },
+      "familyId": "arcade-chaos",
+      "layers": [
+        {
+          "id": "base-layer",
+          "type": "base",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[]"
+        },
+        {
+          "id": "paint-layer",
+          "type": "paint",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[{\"x\":10,\"y\":11,\"color\":\"#ff3366\"},{\"x\":14,\"y\":11,\"color\":\"#ff3366\"},{\"x\":18,\"y\":11,\"color\":\"#ff3366\"},{\"x\":22,\"y\":11,\"color\":\"#ff3366\"},{\"x\":26,\"y\":11,\"color\":\"#ff3366\"},{\"x\":30,\"y\":11,\"color\":\"#ff3366\"},{\"x\":34,\"y\":11,\"color\":\"#ff3366\"},{\"x\":38,\"y\":11,\"color\":\"#ff3366\"},{\"x\":42,\"y\":11,\"color\":\"#ff3366\"},{\"x\":46,\"y\":11,\"color\":\"#ff3366\"},{\"x\":50,\"y\":11,\"color\":\"#ff3366\"},{\"x\":54,\"y\":11,\"color\":\"#ff3366\"},{\"x\":13,\"y\":19,\"color\":\"#38bdf8\"},{\"x\":14,\"y\":20,\"color\":\"#fef08a\"},{\"x\":20,\"y\":19,\"color\":\"#38bdf8\"},{\"x\":21,\"y\":20,\"color\":\"#fef08a\"},{\"x\":27,\"y\":19,\"color\":\"#38bdf8\"},{\"x\":28,\"y\":20,\"color\":\"#fef08a\"},{\"x\":34,\"y\":19,\"color\":\"#38bdf8\"},{\"x\":35,\"y\":20,\"color\":\"#fef08a\"},{\"x\":41,\"y\":19,\"color\":\"#38bdf8\"},{\"x\":42,\"y\":20,\"color\":\"#fef08a\"},{\"x\":48,\"y\":19,\"color\":\"#38bdf8\"},{\"x\":49,\"y\":20,\"color\":\"#fef08a\"},{\"x\":20,\"y\":14,\"color\":\"#ff3366\"},{\"x\":44,\"y\":14,\"color\":\"#38bdf8\"},{\"x\":20,\"y\":17,\"color\":\"#ff3366\"},{\"x\":44,\"y\":17,\"color\":\"#38bdf8\"},{\"x\":20,\"y\":20,\"color\":\"#ff3366\"},{\"x\":44,\"y\":20,\"color\":\"#38bdf8\"}]"
+        },
+        {
+          "id": "decal-layer",
+          "type": "decal",
+          "blend": "add",
+          "visible": true,
+          "pixels": "[{\"x\":32,\"y\":13,\"color\":\"#fef08a\"},{\"x\":31,\"y\":14,\"color\":\"#fef08a\"},{\"x\":32,\"y\":14,\"color\":\"#fef08a\"},{\"x\":33,\"y\":14,\"color\":\"#fef08a\"},{\"x\":30,\"y\":15,\"color\":\"#fef08a\"},{\"x\":31,\"y\":15,\"color\":\"#fef08a\"},{\"x\":32,\"y\":15,\"color\":\"#fef08a\"},{\"x\":33,\"y\":15,\"color\":\"#fef08a\"},{\"x\":34,\"y\":15,\"color\":\"#fef08a\"},{\"x\":31,\"y\":16,\"color\":\"#fef08a\"},{\"x\":32,\"y\":16,\"color\":\"#fef08a\"},{\"x\":33,\"y\":16,\"color\":\"#fef08a\"},{\"x\":32,\"y\":17,\"color\":\"#fef08a\"}]"
+        }
+      ],
+      "parts": {
+        "hullPreset": "heavy",
+        "treadPreset": "spiked",
+        "wheelPreset": "micro",
+        "barrelPreset": "stubby"
+      },
+      "turret": {
+        "anchorX": 32,
+        "anchorY": 9,
+        "baseRadius": 8
+      },
+      "effects": [
+        {
+          "type": "sparkArc",
+          "color": "#ff3366",
+          "intensity": 0.64,
+          "speed": 1.16
+        }
+      ],
+      "palette": [
+        "#160b1f",
+        "#ff3366",
+        "#2b193d",
+        "#fef08a",
+        "#38bdf8"
+      ],
+      "meta": {
+        "author": "Tank Forge Generator",
+        "updatedAt": 1777075200000,
+        "tags": [
+          "epic",
+          "arcade-chaos",
+          "sparkArc"
+        ]
+      }
+    },
+    {
+      "version": 1,
+      "skinId": "forge-solaris-titan",
+      "rarity": "legendary",
+      "canvas": {
+        "width": 64,
+        "height": 32
+      },
+      "familyId": "legend-lab",
+      "layers": [
+        {
+          "id": "base-layer",
+          "type": "base",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[]"
+        },
+        {
+          "id": "paint-layer",
+          "type": "paint",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[{\"x\":10,\"y\":12,\"color\":\"#ffb000\"},{\"x\":14,\"y\":12,\"color\":\"#ffb000\"},{\"x\":18,\"y\":12,\"color\":\"#ffb000\"},{\"x\":22,\"y\":12,\"color\":\"#ffb000\"},{\"x\":26,\"y\":12,\"color\":\"#ffb000\"},{\"x\":30,\"y\":12,\"color\":\"#ffb000\"},{\"x\":34,\"y\":12,\"color\":\"#ffb000\"},{\"x\":38,\"y\":12,\"color\":\"#ffb000\"},{\"x\":42,\"y\":12,\"color\":\"#ffb000\"},{\"x\":46,\"y\":12,\"color\":\"#ffb000\"},{\"x\":50,\"y\":12,\"color\":\"#ffb000\"},{\"x\":54,\"y\":12,\"color\":\"#ffb000\"},{\"x\":14,\"y\":19,\"color\":\"#ff2e63\"},{\"x\":15,\"y\":20,\"color\":\"#fff4a3\"},{\"x\":21,\"y\":19,\"color\":\"#ff2e63\"},{\"x\":22,\"y\":20,\"color\":\"#fff4a3\"},{\"x\":28,\"y\":19,\"color\":\"#ff2e63\"},{\"x\":29,\"y\":20,\"color\":\"#fff4a3\"},{\"x\":35,\"y\":19,\"color\":\"#ff2e63\"},{\"x\":36,\"y\":20,\"color\":\"#fff4a3\"},{\"x\":42,\"y\":19,\"color\":\"#ff2e63\"},{\"x\":43,\"y\":20,\"color\":\"#fff4a3\"},{\"x\":49,\"y\":19,\"color\":\"#ff2e63\"},{\"x\":50,\"y\":20,\"color\":\"#fff4a3\"},{\"x\":21,\"y\":14,\"color\":\"#ffb000\"},{\"x\":43,\"y\":14,\"color\":\"#ff2e63\"},{\"x\":21,\"y\":17,\"color\":\"#ffb000\"},{\"x\":43,\"y\":17,\"color\":\"#ff2e63\"},{\"x\":21,\"y\":20,\"color\":\"#ffb000\"},{\"x\":43,\"y\":20,\"color\":\"#ff2e63\"}]"
+        },
+        {
+          "id": "decal-layer",
+          "type": "decal",
+          "blend": "add",
+          "visible": true,
+          "pixels": "[{\"x\":33,\"y\":14,\"color\":\"#fff4a3\"},{\"x\":32,\"y\":15,\"color\":\"#fff4a3\"},{\"x\":33,\"y\":15,\"color\":\"#fff4a3\"},{\"x\":34,\"y\":15,\"color\":\"#fff4a3\"},{\"x\":31,\"y\":16,\"color\":\"#fff4a3\"},{\"x\":32,\"y\":16,\"color\":\"#fff4a3\"},{\"x\":33,\"y\":16,\"color\":\"#fff4a3\"},{\"x\":34,\"y\":16,\"color\":\"#fff4a3\"},{\"x\":35,\"y\":16,\"color\":\"#fff4a3\"},{\"x\":32,\"y\":17,\"color\":\"#fff4a3\"},{\"x\":33,\"y\":17,\"color\":\"#fff4a3\"},{\"x\":34,\"y\":17,\"color\":\"#fff4a3\"},{\"x\":33,\"y\":18,\"color\":\"#fff4a3\"}]"
+        }
+      ],
+      "parts": {
+        "hullPreset": "scout",
+        "treadPreset": "smooth",
+        "wheelPreset": null,
+        "barrelPreset": "long"
+      },
+      "turret": {
+        "anchorX": 33,
+        "anchorY": 10,
+        "baseRadius": 9
+      },
+      "effects": [
+        {
+          "type": "neonPulse",
+          "color": "#ffb000",
+          "intensity": 0.72,
+          "speed": 1.34
+        }
+      ],
+      "palette": [
+        "#190f10",
+        "#ffb000",
+        "#3a1f19",
+        "#fff4a3",
+        "#ff2e63"
+      ],
+      "meta": {
+        "author": "Tank Forge Generator",
+        "updatedAt": 1777075200000,
+        "tags": [
+          "legendary",
+          "legend-lab",
+          "neonPulse"
+        ]
+      }
+    },
+    {
+      "version": 1,
+      "skinId": "forge-moonfall-oracle",
+      "rarity": "legendary",
+      "canvas": {
+        "width": 64,
+        "height": 32
+      },
+      "familyId": "legend-lab",
+      "layers": [
+        {
+          "id": "base-layer",
+          "type": "base",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[]"
+        },
+        {
+          "id": "paint-layer",
+          "type": "paint",
+          "blend": "screen",
+          "visible": true,
+          "pixels": "[{\"x\":10,\"y\":11,\"color\":\"#b8c0ff\"},{\"x\":14,\"y\":11,\"color\":\"#b8c0ff\"},{\"x\":18,\"y\":11,\"color\":\"#b8c0ff\"},{\"x\":22,\"y\":11,\"color\":\"#b8c0ff\"},{\"x\":26,\"y\":11,\"color\":\"#b8c0ff\"},{\"x\":30,\"y\":11,\"color\":\"#b8c0ff\"},{\"x\":34,\"y\":11,\"color\":\"#b8c0ff\"},{\"x\":38,\"y\":11,\"color\":\"#b8c0ff\"},{\"x\":42,\"y\":11,\"color\":\"#b8c0ff\"},{\"x\":46,\"y\":11,\"color\":\"#b8c0ff\"},{\"x\":50,\"y\":11,\"color\":\"#b8c0ff\"},{\"x\":54,\"y\":11,\"color\":\"#b8c0ff\"},{\"x\":12,\"y\":19,\"color\":\"#7dd3fc\"},{\"x\":13,\"y\":20,\"color\":\"#ffffff\"},{\"x\":19,\"y\":19,\"color\":\"#7dd3fc\"},{\"x\":20,\"y\":20,\"color\":\"#ffffff\"},{\"x\":26,\"y\":19,\"color\":\"#7dd3fc\"},{\"x\":27,\"y\":20,\"color\":\"#ffffff\"},{\"x\":33,\"y\":19,\"color\":\"#7dd3fc\"},{\"x\":34,\"y\":20,\"color\":\"#ffffff\"},{\"x\":40,\"y\":19,\"color\":\"#7dd3fc\"},{\"x\":41,\"y\":20,\"color\":\"#ffffff\"},{\"x\":47,\"y\":19,\"color\":\"#7dd3fc\"},{\"x\":48,\"y\":20,\"color\":\"#ffffff\"},{\"x\":22,\"y\":14,\"color\":\"#b8c0ff\"},{\"x\":42,\"y\":14,\"color\":\"#7dd3fc\"},{\"x\":22,\"y\":17,\"color\":\"#b8c0ff\"},{\"x\":42,\"y\":17,\"color\":\"#7dd3fc\"},{\"x\":22,\"y\":20,\"color\":\"#b8c0ff\"},{\"x\":42,\"y\":20,\"color\":\"#7dd3fc\"}]"
+        },
+        {
+          "id": "decal-layer",
+          "type": "decal",
+          "blend": "add",
+          "visible": true,
+          "pixels": "[{\"x\":34,\"y\":12,\"color\":\"#ffffff\"},{\"x\":33,\"y\":13,\"color\":\"#ffffff\"},{\"x\":34,\"y\":13,\"color\":\"#ffffff\"},{\"x\":35,\"y\":13,\"color\":\"#ffffff\"},{\"x\":32,\"y\":14,\"color\":\"#ffffff\"},{\"x\":33,\"y\":14,\"color\":\"#ffffff\"},{\"x\":34,\"y\":14,\"color\":\"#ffffff\"},{\"x\":35,\"y\":14,\"color\":\"#ffffff\"},{\"x\":36,\"y\":14,\"color\":\"#ffffff\"},{\"x\":33,\"y\":15,\"color\":\"#ffffff\"},{\"x\":34,\"y\":15,\"color\":\"#ffffff\"},{\"x\":35,\"y\":15,\"color\":\"#ffffff\"},{\"x\":34,\"y\":16,\"color\":\"#ffffff\"}]"
+        }
+      ],
+      "parts": {
+        "hullPreset": "standard",
+        "treadPreset": "classic",
+        "wheelPreset": "dual",
+        "barrelPreset": "standard"
+      },
+      "turret": {
+        "anchorX": 34,
+        "anchorY": 7,
+        "baseRadius": 7
+      },
+      "effects": [
+        {
+          "type": "scanline",
+          "color": "#b8c0ff",
+          "intensity": 0.8,
+          "speed": 0.8
+        }
+      ],
+      "palette": [
+        "#0a1024",
+        "#b8c0ff",
+        "#202a55",
+        "#ffffff",
+        "#7dd3fc"
+      ],
+      "meta": {
+        "author": "Tank Forge Generator",
+        "updatedAt": 1777075200000,
+        "tags": [
+          "legendary",
+          "legend-lab",
+          "scanline"
+        ]
+      }
+    },
+    {
+      "version": 1,
+      "skinId": "forge-cosmic-dragon",
+      "rarity": "legendary",
+      "canvas": {
+        "width": 64,
+        "height": 32
+      },
+      "familyId": "arcade-chaos",
+      "layers": [
+        {
+          "id": "base-layer",
+          "type": "base",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[]"
+        },
+        {
+          "id": "paint-layer",
+          "type": "paint",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[{\"x\":10,\"y\":12,\"color\":\"#ff00ff\"},{\"x\":14,\"y\":12,\"color\":\"#ff00ff\"},{\"x\":18,\"y\":12,\"color\":\"#ff00ff\"},{\"x\":22,\"y\":12,\"color\":\"#ff00ff\"},{\"x\":26,\"y\":12,\"color\":\"#ff00ff\"},{\"x\":30,\"y\":12,\"color\":\"#ff00ff\"},{\"x\":34,\"y\":12,\"color\":\"#ff00ff\"},{\"x\":38,\"y\":12,\"color\":\"#ff00ff\"},{\"x\":42,\"y\":12,\"color\":\"#ff00ff\"},{\"x\":46,\"y\":12,\"color\":\"#ff00ff\"},{\"x\":50,\"y\":12,\"color\":\"#ff00ff\"},{\"x\":54,\"y\":12,\"color\":\"#ff00ff\"},{\"x\":13,\"y\":19,\"color\":\"#fff700\"},{\"x\":14,\"y\":20,\"color\":\"#00ffff\"},{\"x\":20,\"y\":19,\"color\":\"#fff700\"},{\"x\":21,\"y\":20,\"color\":\"#00ffff\"},{\"x\":27,\"y\":19,\"color\":\"#fff700\"},{\"x\":28,\"y\":20,\"color\":\"#00ffff\"},{\"x\":34,\"y\":19,\"color\":\"#fff700\"},{\"x\":35,\"y\":20,\"color\":\"#00ffff\"},{\"x\":41,\"y\":19,\"color\":\"#fff700\"},{\"x\":42,\"y\":20,\"color\":\"#00ffff\"},{\"x\":48,\"y\":19,\"color\":\"#fff700\"},{\"x\":49,\"y\":20,\"color\":\"#00ffff\"},{\"x\":18,\"y\":14,\"color\":\"#ff00ff\"},{\"x\":46,\"y\":14,\"color\":\"#fff700\"},{\"x\":18,\"y\":17,\"color\":\"#ff00ff\"},{\"x\":46,\"y\":17,\"color\":\"#fff700\"},{\"x\":18,\"y\":20,\"color\":\"#ff00ff\"},{\"x\":46,\"y\":20,\"color\":\"#fff700\"}]"
+        },
+        {
+          "id": "decal-layer",
+          "type": "decal",
+          "blend": "add",
+          "visible": true,
+          "pixels": "[{\"x\":30,\"y\":13,\"color\":\"#00ffff\"},{\"x\":29,\"y\":14,\"color\":\"#00ffff\"},{\"x\":30,\"y\":14,\"color\":\"#00ffff\"},{\"x\":31,\"y\":14,\"color\":\"#00ffff\"},{\"x\":28,\"y\":15,\"color\":\"#00ffff\"},{\"x\":29,\"y\":15,\"color\":\"#00ffff\"},{\"x\":30,\"y\":15,\"color\":\"#00ffff\"},{\"x\":31,\"y\":15,\"color\":\"#00ffff\"},{\"x\":32,\"y\":15,\"color\":\"#00ffff\"},{\"x\":29,\"y\":16,\"color\":\"#00ffff\"},{\"x\":30,\"y\":16,\"color\":\"#00ffff\"},{\"x\":31,\"y\":16,\"color\":\"#00ffff\"},{\"x\":30,\"y\":17,\"color\":\"#00ffff\"}]"
+        }
+      ],
+      "parts": {
+        "hullPreset": "wedge",
+        "treadPreset": "hover",
+        "wheelPreset": "triad",
+        "barrelPreset": "rail"
+      },
+      "turret": {
+        "anchorX": 30,
+        "anchorY": 8,
+        "baseRadius": 8
+      },
+      "effects": [
+        {
+          "type": "sparkArc",
+          "color": "#ff00ff",
+          "intensity": 0.48,
+          "speed": 0.98
+        }
+      ],
+      "palette": [
+        "#15051f",
+        "#ff00ff",
+        "#2a1040",
+        "#00ffff",
+        "#fff700"
+      ],
+      "meta": {
+        "author": "Tank Forge Generator",
+        "updatedAt": 1777075200000,
+        "tags": [
+          "legendary",
+          "arcade-chaos",
+          "sparkArc"
+        ]
+      }
+    },
+    {
+      "version": 1,
+      "skinId": "forge-singularity-ace",
+      "rarity": "legendary",
+      "canvas": {
+        "width": 64,
+        "height": 32
+      },
+      "familyId": "retro-commander",
+      "layers": [
+        {
+          "id": "base-layer",
+          "type": "base",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[]"
+        },
+        {
+          "id": "paint-layer",
+          "type": "paint",
+          "blend": "normal",
+          "visible": true,
+          "pixels": "[{\"x\":10,\"y\":11,\"color\":\"#00f0ff\"},{\"x\":14,\"y\":11,\"color\":\"#00f0ff\"},{\"x\":18,\"y\":11,\"color\":\"#00f0ff\"},{\"x\":22,\"y\":11,\"color\":\"#00f0ff\"},{\"x\":26,\"y\":11,\"color\":\"#00f0ff\"},{\"x\":30,\"y\":11,\"color\":\"#00f0ff\"},{\"x\":34,\"y\":11,\"color\":\"#00f0ff\"},{\"x\":38,\"y\":11,\"color\":\"#00f0ff\"},{\"x\":42,\"y\":11,\"color\":\"#00f0ff\"},{\"x\":46,\"y\":11,\"color\":\"#00f0ff\"},{\"x\":50,\"y\":11,\"color\":\"#00f0ff\"},{\"x\":54,\"y\":11,\"color\":\"#00f0ff\"},{\"x\":14,\"y\":19,\"color\":\"#ff007a\"},{\"x\":15,\"y\":20,\"color\":\"#a855f7\"},{\"x\":21,\"y\":19,\"color\":\"#ff007a\"},{\"x\":22,\"y\":20,\"color\":\"#a855f7\"},{\"x\":28,\"y\":19,\"color\":\"#ff007a\"},{\"x\":29,\"y\":20,\"color\":\"#a855f7\"},{\"x\":35,\"y\":19,\"color\":\"#ff007a\"},{\"x\":36,\"y\":20,\"color\":\"#a855f7\"},{\"x\":42,\"y\":19,\"color\":\"#ff007a\"},{\"x\":43,\"y\":20,\"color\":\"#a855f7\"},{\"x\":49,\"y\":19,\"color\":\"#ff007a\"},{\"x\":50,\"y\":20,\"color\":\"#a855f7\"},{\"x\":19,\"y\":14,\"color\":\"#00f0ff\"},{\"x\":45,\"y\":14,\"color\":\"#ff007a\"},{\"x\":19,\"y\":17,\"color\":\"#00f0ff\"},{\"x\":45,\"y\":17,\"color\":\"#ff007a\"},{\"x\":19,\"y\":20,\"color\":\"#00f0ff\"},{\"x\":45,\"y\":20,\"color\":\"#ff007a\"}]"
+        },
+        {
+          "id": "decal-layer",
+          "type": "decal",
+          "blend": "add",
+          "visible": true,
+          "pixels": "[{\"x\":31,\"y\":14,\"color\":\"#a855f7\"},{\"x\":30,\"y\":15,\"color\":\"#a855f7\"},{\"x\":31,\"y\":15,\"color\":\"#a855f7\"},{\"x\":32,\"y\":15,\"color\":\"#a855f7\"},{\"x\":29,\"y\":16,\"color\":\"#a855f7\"},{\"x\":30,\"y\":16,\"color\":\"#a855f7\"},{\"x\":31,\"y\":16,\"color\":\"#a855f7\"},{\"x\":32,\"y\":16,\"color\":\"#a855f7\"},{\"x\":33,\"y\":16,\"color\":\"#a855f7\"},{\"x\":30,\"y\":17,\"color\":\"#a855f7\"},{\"x\":31,\"y\":17,\"color\":\"#a855f7\"},{\"x\":32,\"y\":17,\"color\":\"#a855f7\"},{\"x\":31,\"y\":18,\"color\":\"#a855f7\"}]"
+        }
+      ],
+      "parts": {
+        "hullPreset": "heavy",
+        "treadPreset": "spiked",
+        "wheelPreset": "micro",
+        "barrelPreset": "stubby"
+      },
+      "turret": {
+        "anchorX": 31,
+        "anchorY": 9,
+        "baseRadius": 9
+      },
+      "effects": [
+        {
+          "type": "plasmaVent",
+          "color": "#00f0ff",
+          "intensity": 0.56,
+          "speed": 1.16
+        }
+      ],
+      "palette": [
+        "#050814",
+        "#00f0ff",
+        "#141a33",
+        "#a855f7",
+        "#ff007a"
+      ],
+      "meta": {
+        "author": "Tank Forge Generator",
+        "updatedAt": 1777075200000,
+        "tags": [
+          "legendary",
+          "retro-commander",
+          "plasmaVent"
+        ]
+      }
+    }
+  ]
+}

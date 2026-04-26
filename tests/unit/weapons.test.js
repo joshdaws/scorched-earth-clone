@@ -5,6 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   WeaponRegistry,
+  WEAPON_CATEGORIES,
   WEAPON_TYPES,
   BASIC_SHOT,
   BABY_SHOT,
@@ -14,6 +15,48 @@ import {
 } from '../../js/weapons.js';
 
 describe('WeaponRegistry', () => {
+  describe('registry integrity', () => {
+    it('registers exactly 40 unique weapons with required fields', () => {
+      const weapons = WeaponRegistry.getAllWeapons();
+      const ids = new Set();
+      const validTypes = new Set(Object.values(WEAPON_TYPES));
+      const validCategories = new Set(Object.values(WEAPON_CATEGORIES).map(category => category.id));
+
+      expect(weapons).toHaveLength(40);
+
+      for (const weapon of weapons) {
+        expect(typeof weapon.id).toBe('string');
+        expect(weapon.id.length).toBeGreaterThan(0);
+        expect(ids.has(weapon.id)).toBe(false);
+        ids.add(weapon.id);
+
+        expect(typeof weapon.name).toBe('string');
+        expect(weapon.name.length).toBeGreaterThan(0);
+        expect(validTypes.has(weapon.type)).toBe(true);
+        expect(validCategories.has(weapon.category)).toBe(true);
+        expect(typeof weapon.cost).toBe('number');
+        expect(weapon.cost).toBeGreaterThanOrEqual(0);
+        expect(typeof weapon.damage).toBe('number');
+        expect(weapon.damage).toBeGreaterThanOrEqual(0);
+        expect(typeof weapon.blastRadius).toBe('number');
+        expect(weapon.blastRadius).toBeGreaterThan(0);
+        expect(typeof weapon.ammo === 'number').toBe(true);
+        expect(weapon.ammo === Infinity || weapon.ammo > 0).toBe(true);
+        expect(Object.isFrozen(weapon)).toBe(true);
+      }
+    });
+
+    it('keeps only Teleporter as a zero-damage utility weapon', () => {
+      const zeroDamageWeapons = WeaponRegistry.getAllWeapons().filter(weapon => weapon.damage === 0);
+
+      expect(zeroDamageWeapons.map(weapon => weapon.id)).toEqual(['teleporter']);
+      expect(zeroDamageWeapons[0]).toMatchObject({
+        type: WEAPON_TYPES.SPECIAL,
+        teleport: true
+      });
+    });
+  });
+
   describe('getWeapon', () => {
     it('returns weapon by ID', () => {
       const weapon = WeaponRegistry.getWeapon('basic-shot');
@@ -133,6 +176,33 @@ describe('WeaponRegistry', () => {
       expect(WeaponRegistry.getWeaponsByCategory('digging').length).toBe(6);
       expect(WeaponRegistry.getWeaponsByCategory('nuclear').length).toBe(6);
       expect(WeaponRegistry.getWeaponsByCategory('special').length).toBe(8);
+    });
+
+    it('returns copies of category arrays to protect registry order', () => {
+      const standardWeapons = WeaponRegistry.getWeaponsByCategory('standard');
+      standardWeapons.pop();
+
+      expect(WeaponRegistry.getWeaponsByCategory('standard')).toHaveLength(8);
+      expect(WeaponRegistry.getWeaponsByCategory('missing')).toEqual([]);
+    });
+  });
+
+  describe('categories', () => {
+    it('returns category names and metadata', () => {
+      expect(WeaponRegistry.getCategories()).toEqual([
+        'standard',
+        'splitting',
+        'rolling',
+        'digging',
+        'nuclear',
+        'special'
+      ]);
+      expect(WeaponRegistry.getCategoryInfo('nuclear')).toEqual({
+        id: 'nuclear',
+        name: 'Nuclear',
+        description: 'High damage, massive explosions'
+      });
+      expect(WeaponRegistry.getCategoryInfo('missing')).toBeNull();
     });
   });
 

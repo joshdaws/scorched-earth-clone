@@ -8,7 +8,7 @@
  */
 
 import { DEBUG } from './constants.js';
-import { getTank, getDefaultTank, getTankCount, tankExists, getAllTanks } from './tank-skins.js';
+import { getTank, getTankCount, tankExists, getAllTanks } from './tank-skins.js';
 
 // =============================================================================
 // CONSTANTS
@@ -269,6 +269,30 @@ export function addTank(id) {
 
     saveState();
     return result;
+}
+
+/**
+ * Unlock a random tank for reward systems.
+ * Prefers unowned tanks; if the player owns everything, awards a duplicate for scrap.
+ *
+ * @returns {Object} Result from addTank()
+ */
+export function unlockRandomTank() {
+    if (!isInitialized) {
+        console.warn('[TankCollection] Not initialized');
+        return { success: false, reason: 'not_initialized' };
+    }
+
+    const allTanks = getAllTanks();
+    const candidates = allTanks.filter(tank => !state.owned.has(tank.id));
+    const pool = candidates.length > 0 ? candidates : allTanks;
+
+    if (pool.length === 0) {
+        return { success: false, reason: 'no_tanks_available' };
+    }
+
+    const selected = pool[Math.floor(Math.random() * pool.length)];
+    return addTank(selected.id);
 }
 
 /**

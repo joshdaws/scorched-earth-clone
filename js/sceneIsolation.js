@@ -5,8 +5,13 @@
  * Enables jumping directly to isolated test scenes via URL parameters:
  * - ?scene=slingshot-test - Aiming UI in isolation
  * - ?scene=physics-sandbox - Fire projectiles and see trajectories
+ * - ?scene=physics-playground - Direct terrain/weapon impact sandbox
  * - ?scene=shop - Shop UI with mock inventory
  * - ?scene=terrain-viewer - Terrain generation testing
+ * - ?scene=visual-hud - Deterministic HUD capture scene
+ * - ?scene=visual-impact - Deterministic projectile impact/de-rez capture scene
+ * - ?scene=visual-tank-pivots - Deterministic tank turret pivot capture scene
+ * - ?scene=visual-terrain-collapse - Deterministic terrain collapse capture scene
  * - ?scene=level-editor&slot=world1-level1 - Internal level editor
  * - ?scene=tank-editor&tank=standard&family=retro-commander - Internal tank forge
  * - ?debug=true&round=5 - Start at specific round with debug
@@ -279,6 +284,29 @@ export const SCENES = {
     },
 
     /**
+     * Physics Playground
+     * Mouse-driven terrain/weapon impact testing without progression gates.
+     */
+    'physics-playground': {
+        name: 'Physics Playground',
+        description: 'Direct terrain destruction and weapon impact sandbox',
+        initialState: 'playing',
+        setup: {
+            terrain: true,
+            playerTank: true,
+            enemyTank: true,
+            wind: false,
+            skipMenu: true,
+            physicsPlayground: true,
+            unlimitedAmmo: true,
+            seed: 6601,
+            windValue: 0,
+            startingWeapon: 'basic-shot',
+            craterRadius: 72
+        }
+    },
+
+    /**
      * Shop Test
      * Shop UI with configurable money and inventory.
      */
@@ -311,6 +339,101 @@ export const SCENES = {
             skipMenu: true,
             enableFiring: false,
             showTerrainInfo: true
+        }
+    },
+
+    /**
+     * Visual HUD Regression
+     * Deterministic gameplay/HUD composition for graphics captures.
+     */
+    'visual-hud': {
+        name: 'Visual HUD Regression',
+        description: 'Deterministic HUD, weapon dock, tanks, and terrain capture',
+        initialState: 'playing',
+        setup: {
+            terrain: true,
+            playerTank: true,
+            enemyTank: true,
+            wind: true,
+            skipMenu: true,
+            visualRegression: true,
+            visualType: 'hud',
+            seed: 2604,
+            round: 7,
+            money: 1500,
+            windValue: 1,
+            playerHealth: 76,
+            enemyHealth: 100
+        }
+    },
+
+    /**
+     * Visual Impact Regression
+     * Deterministic crater and de-rez fragment capture.
+     */
+    'visual-impact': {
+        name: 'Visual Impact Regression',
+        description: 'Deterministic projectile impact, crater, and terrain de-rez capture',
+        initialState: 'playing',
+        setup: {
+            terrain: true,
+            playerTank: true,
+            enemyTank: true,
+            wind: false,
+            skipMenu: true,
+            visualRegression: true,
+            visualType: 'impact',
+            seed: 4128,
+            round: 4,
+            windValue: 0,
+            impactX: 620,
+            impactRadius: 78
+        }
+    },
+
+    /**
+     * Visual Tank Pivot Regression
+     * Deterministic body/turret pivot angle capture.
+     */
+    'visual-tank-pivots': {
+        name: 'Visual Tank Pivot Regression',
+        description: 'Deterministic split tank body/turret pivot capture',
+        initialState: 'playing',
+        setup: {
+            terrain: true,
+            playerTank: true,
+            enemyTank: true,
+            wind: false,
+            skipMenu: true,
+            visualRegression: true,
+            visualType: 'tank-pivots',
+            seed: 1907,
+            windValue: 0,
+            playerAngle: 28,
+            enemyAngle: 152
+        }
+    },
+
+    /**
+     * Visual Terrain Collapse Regression
+     * Deterministic side-impact terrain settling capture.
+     */
+    'visual-terrain-collapse': {
+        name: 'Visual Terrain Collapse Regression',
+        description: 'Deterministic side crater and falling terrain capture',
+        initialState: 'playing',
+        setup: {
+            terrain: true,
+            playerTank: true,
+            enemyTank: true,
+            wind: false,
+            skipMenu: true,
+            visualRegression: true,
+            visualType: 'terrain-collapse',
+            seed: 8831,
+            windValue: 0,
+            impactX: 770,
+            impactRadius: 88
         }
     },
 

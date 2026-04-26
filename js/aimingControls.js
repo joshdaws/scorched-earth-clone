@@ -16,6 +16,7 @@ import { CANVAS, COLORS, UI, PHYSICS, TANK } from './constants.js';
 import { registerSliderZone, queueGameInput, INPUT_EVENTS, isGameInputEnabled } from './input.js';
 import * as Wind from './wind.js';
 import { getScreenWidth, getScreenHeight } from './screenSize.js';
+import { getTerrainGridSurfaceYAt } from './terrainCells.js';
 import {
     fromRight, fromBottom,
     scaled, scaledTouch, isVeryShortScreen, isMobileDevice
@@ -35,7 +36,7 @@ const CONTROLS_BASE = {
         WIDTH: 180,
         HEIGHT: 70,
         BORDER_RADIUS: 14,
-        RIGHT_OFFSET: 130,  // Distance from right edge to center
+        RIGHT_OFFSET: 180,  // Distance from right edge to center
         BOTTOM_OFFSET: 80   // Distance from bottom to center
     },
     ANGLE_ARC: {
@@ -73,7 +74,7 @@ function getControlsLayoutDynamic() {
 
     // Fire button position: from right and bottom edges - closer to edges on mobile
     const fireButtonBottomOffset = compactMode ? 40 : scaled(CONTROLS_BASE.FIRE_BUTTON.BOTTOM_OFFSET);
-    const fireButtonRightOffset = compactMode ? 70 : scaled(CONTROLS_BASE.FIRE_BUTTON.RIGHT_OFFSET);
+    const fireButtonRightOffset = compactMode ? 125 : scaled(CONTROLS_BASE.FIRE_BUTTON.RIGHT_OFFSET);
     const fireButtonX = fromRight(fireButtonRightOffset);
     const fireButtonY = fromBottom(fireButtonBottomOffset);
 
@@ -198,11 +199,30 @@ function renderAngleArc(ctx, tank, angle) {
 
     ctx.save();
 
+    // Subtle radar glass behind the arc.
+    const glassGradient = ctx.createRadialGradient(centerX, centerY, arc.RADIUS * 0.12, centerX, centerY, arc.RADIUS * 1.35);
+    glassGradient.addColorStop(0, 'rgba(5, 217, 232, 0.14)');
+    glassGradient.addColorStop(0.56, 'rgba(12, 10, 32, 0.1)');
+    glassGradient.addColorStop(1, 'rgba(5, 217, 232, 0)');
+    ctx.fillStyle = glassGradient;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, arc.RADIUS * 1.18, Math.PI, 0, false);
+    ctx.lineTo(centerX + arc.RADIUS * 1.18, centerY);
+    ctx.lineTo(centerX - arc.RADIUS * 1.18, centerY);
+    ctx.closePath();
+    ctx.fill();
+
     // Draw full arc background (semi-circle from 0 to 180 degrees)
     ctx.beginPath();
     ctx.arc(centerX, centerY, arc.RADIUS, Math.PI, 0, false);
-    ctx.strokeStyle = 'rgba(100, 100, 140, 0.4)';
-    ctx.lineWidth = arc.ARC_WIDTH;
+    ctx.strokeStyle = 'rgba(12, 14, 32, 0.88)';
+    ctx.lineWidth = arc.ARC_WIDTH + 7;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, arc.RADIUS, Math.PI, 0, false);
+    ctx.strokeStyle = 'rgba(155, 160, 205, 0.35)';
+    ctx.lineWidth = arc.ARC_WIDTH + 2;
     ctx.stroke();
 
     // Draw angle tick marks at 0, 45, 90, 135, 180
@@ -217,9 +237,12 @@ function renderAngleArc(ctx, tank, angle) {
                    centerY - Math.sin(rad) * innerR);
         ctx.lineTo(centerX + Math.cos(Math.PI - rad) * outerR,
                    centerY - Math.sin(rad) * outerR);
-        ctx.strokeStyle = tickAngle === 90 ? COLORS.NEON_YELLOW : 'rgba(150, 150, 180, 0.6)';
+        ctx.strokeStyle = tickAngle === 90 ? COLORS.NEON_YELLOW : 'rgba(165, 176, 214, 0.68)';
         ctx.lineWidth = tickAngle === 90 ? 3 : 2;
+        ctx.shadowColor = ctx.strokeStyle;
+        ctx.shadowBlur = tickAngle === 90 ? 5 : 0;
         ctx.stroke();
+        ctx.shadowBlur = 0;
 
         // Draw angle label (faded to reduce visual noise)
         if (tickAngle % 45 === 0) {
@@ -232,11 +255,16 @@ function renderAngleArc(ctx, tank, angle) {
             const isNearest = angleDiff <= 22.5; // Within half of 45° tick spacing
             const labelOpacity = isNearest ? 0.9 : 0.35;
 
-            ctx.fillStyle = `rgba(150, 150, 180, ${labelOpacity})`;
-            ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+            ctx.fillStyle = isNearest ? accentColor : `rgba(165, 176, 214, ${labelOpacity})`;
+            ctx.font = `${isNearest ? 'bold ' : ''}${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
+            if (isNearest) {
+                ctx.shadowColor = accentColor;
+                ctx.shadowBlur = 4;
+            }
             ctx.fillText(`${tickAngle}°`, labelX, labelY);
+            ctx.shadowBlur = 0;
         }
     }
 
@@ -259,6 +287,13 @@ function renderAngleArc(ctx, tank, angle) {
     const pointerX = centerX + Math.cos(Math.PI - angleRad) * pointerR;
     const pointerY = centerY - Math.sin(angleRad) * pointerR;
 
+    ctx.strokeStyle = withAlphaFallback(accentColor, 0.42);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY);
+    ctx.lineTo(pointerX, pointerY);
+    ctx.stroke();
+
     ctx.beginPath();
     ctx.arc(pointerX, pointerY, 8, 0, Math.PI * 2);
     ctx.fillStyle = accentColor;
@@ -271,16 +306,48 @@ function renderAngleArc(ctx, tank, angle) {
     ctx.arc(pointerX, pointerY, 4, 0, Math.PI * 2);
     ctx.fill();
 
-    // Draw current angle text below arc
-    ctx.fillStyle = accentColor;
+    // Draw current angle text in a compact instrument pill below arc
+    const readoutText = `${Math.round(angle)}°`;
+    const readoutWidth = 62;
+    const readoutHeight = 26;
+    const readoutX = centerX - readoutWidth / 2;
+    const readoutY = centerY + arc.RADIUS + 10;
+
+    const readoutGradient = ctx.createLinearGradient(0, readoutY, 0, readoutY + readoutHeight);
+    readoutGradient.addColorStop(0, withAlphaFallback(accentColor, 0.28));
+    readoutGradient.addColorStop(1, 'rgba(5, 6, 18, 0.88)');
+    ctx.fillStyle = readoutGradient;
+    ctx.beginPath();
+    ctx.roundRect(readoutX, readoutY, readoutWidth, readoutHeight, 7);
+    ctx.fill();
+    ctx.strokeStyle = accentColor;
+    ctx.lineWidth = 1.5;
+    ctx.shadowColor = accentColor;
+    ctx.shadowBlur = 7;
+    ctx.stroke();
+
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
     ctx.font = `bold ${UI.FONT_SIZE_LARGE}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
+    ctx.textBaseline = 'middle';
     ctx.shadowColor = accentColor;
     ctx.shadowBlur = 8;
-    ctx.fillText(`${Math.round(angle)}°`, centerX, centerY + arc.RADIUS + 20);
+    ctx.fillText(readoutText, centerX, readoutY + readoutHeight / 2 + 1);
 
     ctx.restore();
+}
+
+/**
+ * Apply alpha to a CSS color; supports project hex constants.
+ * @param {string} color - Color string
+ * @param {number} alpha - Alpha value
+ * @returns {string} rgba string
+ */
+function withAlphaFallback(color, alpha) {
+    const hex = color?.trim?.().match?.(/^#([0-9a-f]{6})$/i);
+    if (!hex) return color;
+    const value = Number.parseInt(hex[1], 16);
+    return `rgba(${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255}, ${alpha})`;
 }
 
 // =============================================================================
@@ -300,55 +367,177 @@ function renderFireButton(ctx, canFire) {
     const isPressed = controlState.fireButtonPressed;
     const isHovered = controlState.fireButtonHovered;
 
-    // Pulsing intensity when can fire
-    const pulse = canFire ? (Math.sin(animationTime * 4) * 0.15 + 0.85) : 0.5;
+    const pulse = canFire ? (Math.sin(animationTime * 4) * 0.14 + 0.86) : 0.35;
 
     ctx.save();
 
     const btnX = btn.X - btn.WIDTH / 2;
     const btnY = btn.Y - btn.HEIGHT / 2;
+    const offsetY = isPressed && canFire ? Math.max(3, Math.round(btn.HEIGHT * 0.07)) : 0;
+    const bodyY = btnY + offsetY;
+    const bodyHeight = btn.HEIGHT - offsetY;
+    const radius = Math.min(btn.BORDER_RADIUS + 6, btn.HEIGHT * 0.32);
+    const inset = Math.max(7, Math.round(btn.HEIGHT * 0.13));
+    const innerX = btnX + inset;
+    const innerY = bodyY + inset * 0.78;
+    const innerWidth = btn.WIDTH - inset * 2;
+    const innerHeight = bodyHeight - inset * 1.55;
+    const innerRadius = Math.max(7, radius - inset * 0.4);
+    const borderColor = canFire ? COLORS.NEON_PINK : COLORS.TEXT_MUTED;
+    const glowColor = canFire ? COLORS.NEON_PINK : 'rgba(120, 120, 150, 0.5)';
 
-    // Button shadow/press effect - more pronounced for touch feedback
-    const offsetY = isPressed ? 4 : 0;
-
-    // Button background - brighter when pressed
-    ctx.fillStyle = isPressed ? 'rgba(255, 42, 109, 0.4)' : 'rgba(10, 10, 26, 0.9)';
+    // Heavy contact shadow makes the button read as a physical control.
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
     ctx.beginPath();
-    ctx.roundRect(btnX, btnY + offsetY, btn.WIDTH, btn.HEIGHT, btn.BORDER_RADIUS);
+    ctx.roundRect(btnX + 8, btnY + btn.HEIGHT * 0.18, btn.WIDTH - 16, btn.HEIGHT, radius);
     ctx.fill();
 
-    // Inner highlight when pressed
-    if (isPressed && canFire) {
-        ctx.fillStyle = 'rgba(255, 42, 109, 0.25)';
+    if (canFire) {
+        ctx.shadowColor = glowColor;
+        ctx.shadowBlur = (isPressed ? 42 : 28) * pulse;
+        ctx.fillStyle = 'rgba(255, 42, 109, 0.42)';
+        ctx.globalAlpha = isPressed ? 0.42 : 0.22 + pulse * 0.1;
+        ctx.beginPath();
+        ctx.roundRect(btnX - 9, bodyY - 7, btn.WIDTH + 18, bodyHeight + 14, radius + 8);
         ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.shadowBlur = 0;
     }
 
-    // Neon border with glow - stronger when pressed
-    const borderColor = canFire ? COLORS.NEON_PINK : COLORS.TEXT_MUTED;
+    const frameGradient = ctx.createLinearGradient(0, bodyY, 0, bodyY + bodyHeight);
+    if (canFire) {
+        frameGradient.addColorStop(0, isPressed ? 'rgba(86, 36, 70, 0.98)' : 'rgba(96, 46, 82, 0.98)');
+        frameGradient.addColorStop(0.18, 'rgba(236, 96, 147, 0.36)');
+        frameGradient.addColorStop(0.5, 'rgba(22, 16, 34, 0.98)');
+        frameGradient.addColorStop(1, 'rgba(4, 4, 12, 0.98)');
+    } else {
+        frameGradient.addColorStop(0, 'rgba(54, 54, 72, 0.8)');
+        frameGradient.addColorStop(1, 'rgba(10, 10, 20, 0.88)');
+    }
+
+    ctx.fillStyle = frameGradient;
+    ctx.beginPath();
+    ctx.roundRect(btnX, bodyY, btn.WIDTH, bodyHeight, radius);
+    ctx.fill();
+
+    // Metallic upper lip.
+    const lipGradient = ctx.createLinearGradient(btnX, bodyY, btnX + btn.WIDTH, bodyY + bodyHeight);
+    lipGradient.addColorStop(0, 'rgba(255, 255, 255, 0.34)');
+    lipGradient.addColorStop(0.18, 'rgba(255, 255, 255, 0.08)');
+    lipGradient.addColorStop(0.55, 'rgba(255, 255, 255, 0.16)');
+    lipGradient.addColorStop(1, 'rgba(255, 255, 255, 0.04)');
+    ctx.fillStyle = lipGradient;
+    ctx.beginPath();
+    ctx.roundRect(btnX + 4, bodyY + 4, btn.WIDTH - 8, Math.max(8, bodyHeight * 0.34), Math.max(3, radius - 4));
+    ctx.fill();
+
+    const innerGradient = ctx.createLinearGradient(0, innerY, 0, innerY + innerHeight);
+    if (canFire) {
+        innerGradient.addColorStop(0, isPressed ? '#ff78a7' : '#ff9fc1');
+        innerGradient.addColorStop(0.18, '#ff2a6d');
+        innerGradient.addColorStop(0.58, '#b8144d');
+        innerGradient.addColorStop(1, '#4b0828');
+    } else {
+        innerGradient.addColorStop(0, 'rgba(92, 92, 112, 0.92)');
+        innerGradient.addColorStop(1, 'rgba(28, 28, 42, 0.92)');
+    }
+
+    if (canFire) {
+        ctx.shadowColor = glowColor;
+        ctx.shadowBlur = isPressed ? 20 : 14 * pulse;
+    }
+    ctx.fillStyle = innerGradient;
+    ctx.beginPath();
+    ctx.roundRect(innerX, innerY, innerWidth, innerHeight, innerRadius);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    if (canFire) {
+        const shineGradient = ctx.createLinearGradient(innerX, innerY, innerX, innerY + innerHeight * 0.48);
+        shineGradient.addColorStop(0, 'rgba(255, 255, 255, 0.46)');
+        shineGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        ctx.fillStyle = shineGradient;
+        ctx.beginPath();
+        ctx.roundRect(innerX + 5, innerY + 4, innerWidth - 10, innerHeight * 0.42, Math.max(3, innerRadius - 4));
+        ctx.fill();
+
+        const chargeWidth = (innerWidth - 16) * (0.6 + pulse * 0.28);
+        const chargeX = btn.X - chargeWidth / 2;
+        const railY = innerY + innerHeight - Math.max(8, innerHeight * 0.22);
+
+        const railGradient = ctx.createLinearGradient(chargeX, 0, chargeX + chargeWidth, 0);
+        railGradient.addColorStop(0, 'rgba(255, 42, 109, 0)');
+        railGradient.addColorStop(0.5, isPressed ? 'rgba(255, 246, 250, 0.95)' : 'rgba(255, 224, 238, 0.78)');
+        railGradient.addColorStop(1, 'rgba(255, 42, 109, 0)');
+
+        ctx.fillStyle = railGradient;
+        ctx.shadowColor = glowColor;
+        ctx.shadowBlur = isPressed ? 16 : 10 * pulse;
+        ctx.beginPath();
+        ctx.roundRect(chargeX, railY, chargeWidth, 5, 3);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 3; i++) {
+            const notchX = innerX + innerWidth * (0.18 + i * 0.14);
+            ctx.beginPath();
+            ctx.moveTo(notchX, innerY + 7);
+            ctx.lineTo(notchX + 16, innerY + innerHeight - 8);
+            ctx.stroke();
+        }
+    }
+
+    ctx.strokeStyle = canFire ? 'rgba(255, 235, 245, 0.62)' : 'rgba(255, 255, 255, 0.13)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(innerX, innerY, innerWidth, innerHeight, innerRadius);
+    ctx.stroke();
+
     ctx.strokeStyle = borderColor;
-    ctx.lineWidth = isPressed ? 5 : 4;
     ctx.shadowColor = borderColor;
-    ctx.shadowBlur = isPressed ? 25 : (canFire ? 15 * pulse : 0);
+    ctx.shadowBlur = canFire ? (isPressed ? 28 : 18 * pulse) : 0;
+    ctx.lineWidth = canFire ? 4 : 2;
+    ctx.beginPath();
+    ctx.roundRect(btnX, bodyY, btn.WIDTH, bodyHeight, radius);
     ctx.stroke();
     ctx.shadowBlur = 0;
 
-    // Inner glow when hovered (desktop) or pressed (touch)
+    ctx.strokeStyle = canFire ? 'rgba(255, 255, 255, 0.24)' : 'rgba(255, 255, 255, 0.08)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(btnX + 4, bodyY + 4, btn.WIDTH - 8, bodyHeight - 8, Math.max(2, radius - 4));
+    ctx.stroke();
+
     if ((isHovered || isPressed) && canFire) {
-        ctx.strokeStyle = 'rgba(255, 42, 109, 0.5)';
-        ctx.lineWidth = 10;
+        ctx.strokeStyle = 'rgba(255, 206, 225, 0.55)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(btnX + radius, bodyY + 3);
+        ctx.lineTo(btnX + btn.WIDTH - radius, bodyY + 3);
         ctx.stroke();
     }
 
-    // Button text - larger for touch
     ctx.fillStyle = canFire ? COLORS.TEXT_LIGHT : COLORS.TEXT_MUTED;
-    ctx.font = `bold ${UI.FONT_SIZE_LARGE + 8}px ${UI.FONT_FAMILY}`;
+    ctx.font = `bold ${UI.FONT_SIZE_LARGE + 10}px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     if (canFire) {
+        ctx.shadowColor = 'rgba(40, 0, 22, 0.9)';
+        ctx.shadowBlur = 3;
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = 'rgba(40, 0, 22, 0.65)';
+        ctx.strokeText('FIRE!', btn.X, btn.Y - 3 + offsetY);
         ctx.shadowColor = COLORS.NEON_PINK;
-        ctx.shadowBlur = isPressed ? 15 : 8 * pulse;
+        ctx.shadowBlur = isPressed ? 18 : 11 * pulse;
     }
-    ctx.fillText('FIRE!', btn.X, btn.Y + offsetY);
+    ctx.fillText('FIRE!', btn.X, btn.Y - 3 + offsetY);
+
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = canFire ? 'rgba(255, 232, 242, 0.92)' : 'rgba(170, 170, 190, 0.45)';
+    ctx.font = `bold ${Math.max(9, Math.round(UI.FONT_SIZE_SMALL * 0.85))}px ${UI.FONT_FAMILY}`;
+    ctx.fillText(canFire ? 'ARMED' : 'LOCKED', btn.X, btn.Y + btn.HEIGHT * 0.25 + offsetY);
 
     ctx.restore();
 }
@@ -415,8 +604,7 @@ function simulateTrajectory(tank, angle, power, windForce, terrain) {
 
         // Check terrain collision (if terrain is provided)
         if (terrain) {
-            const terrainHeight = terrain.getHeight(Math.floor(x));
-            const terrainY = getScreenHeight() - terrainHeight;
+            const terrainY = getTerrainGridSurfaceYAt(terrain, Math.floor(x));
             if (y >= terrainY) {
                 points.push({ x, y: terrainY });
                 break;

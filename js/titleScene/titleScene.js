@@ -14,6 +14,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { getSafeAreaInsets, onResize as registerResize, getScreenDimensions } from '../screenSize.js';
+import { getRenderQualityProfile, onRenderQualityChange } from '../renderQuality.js';
 
 // =============================================================================
 // CONFIGURATION
@@ -73,6 +74,9 @@ let renderer = null;
 /** @type {EffectComposer|null} */
 let composer = null;
 
+/** @type {UnrealBloomPass|null} */
+let bloomPass = null;
+
 /** @type {THREE.Clock|null} */
 let clock = null;
 
@@ -90,6 +94,16 @@ let fadeLineMaterial = null;
 
 /** @type {SimplexNoise|null} */
 let noise = null;
+
+/** @type {number} Timestamp of last rendered title frame */
+let lastTitleRenderTime = 0;
+
+/** @type {Function|null} Cleanup for render quality listener */
+let removeQualityListener = null;
+
+function getTitleQuality() {
+    return getRenderQualityProfile().title;
+}
 
 // =============================================================================
 // SIMPLEX NOISE
@@ -180,7 +194,7 @@ class GridChunk {
     createGeometry(zOffset) {
         const width = CONFIG.gridWidth;
         const length = CONFIG.chunkSize;
-        const resX = CONFIG.resX;
+        const resX = getTitleQuality().resX ?? CONFIG.resX;
         const resZ = CONFIG.resZ;
 
         const vertices = [];
@@ -326,19 +340,19 @@ export function init() {
         antialias: true,
         alpha: false
     });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, getTitleQuality().maxPixelRatio ?? 2));
 
     // Set up post-processing with bloom
     composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));
 
-    const bloom = new UnrealBloomPass(
+    bloomPass = new UnrealBloomPass(
         new THREE.Vector2(window.innerWidth, window.innerHeight),
-        CONFIG.bloomStrength,
+        getTitleQuality().bloomStrength ?? CONFIG.bloomStrength,
         CONFIG.bloomRadius,
         CONFIG.bloomThreshold
     );
-    composer.addPass(bloom);
+    composer.addPass(bloomPass);
 
     // Create custom line shader with distance-based fade
     fadeLineMaterial = new THREE.ShaderMaterial({
@@ -376,7 +390,8 @@ export function init() {
     });
 
     // Create grid chunks
-    for (let i = -1; i < CONFIG.chunkCount; i++) {
+    const chunkCount = getTitleQuality().chunkCount ?? CONFIG.chunkCount;
+    for (let i = -1; i < chunkCount; i++) {
         chunks.push(new GridChunk(-i * CONFIG.chunkSize));
     }
 
@@ -405,6 +420,10 @@ export function init() {
         const viewportW = dimensions.viewportWidth - safeArea.left - safeArea.right;
         const viewportH = dimensions.viewportHeight - safeArea.top - safeArea.bottom;
         resize(viewportW, viewportH);
+    });
+
+    removeQualityListener = onRenderQualityChange(() => {
+        applyRenderQuality();
     });
 
     // Pause animation when tab is hidden (battery/performance optimization)
@@ -600,7 +619,8 @@ export function start() {
     }
 
     isRunning = true;
-    animate();
+    lastTitleRenderTime = 0;
+    animate(performance.now());
     console.log('TitleScene started');
 }
 
@@ -642,10 +662,18 @@ export function stop() {
  * Animation loop.
  * Scrolls the grid and updates camera drift.
  */
-function animate() {
+function animate(currentTime = performance.now()) {
     if (!isRunning) return;
 
     animationFrameId = requestAnimationFrame(animate);
+
+    const titleQuality = getTitleQuality();
+    const targetFps = titleQuality.targetFps ?? 60;
+    const frameInterval = targetFps > 0 ? 1000 / targetFps : 0;
+    if (frameInterval > 0 && lastTitleRenderTime > 0 && currentTime - lastTitleRenderTime < frameInterval) {
+        return;
+    }
+    lastTitleRenderTime = currentTime;
 
     const delta = clock.getDelta();
     const time = clock.getElapsedTime();
@@ -680,8 +708,14 @@ function animate() {
         chunks.push(newChunk);
     }
 
-    // Render with post-processing
-    composer.render();
+    if (titleQuality.bloomEnabled === false || !composer) {
+        renderer.render(scene, camera);
+    } else {
+        if (bloomPass) {
+            bloomPass.strength = titleQuality.bloomStrength ?? CONFIG.bloomStrength;
+        }
+        composer.render();
+    }
 }
 
 /**
@@ -733,6 +767,7 @@ export function resize(width, height) {
     camera.updateProjectionMatrix();
 
     // Update renderer size
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, getTitleQuality().maxPixelRatio ?? 2));
     renderer.setSize(w, h);
 
     // Update composer size
@@ -743,6 +778,17 @@ export function resize(width, height) {
     canvas.style.top = `${safeArea.top}px`;
 
     console.log(`TitleScene resized to ${w}x${h}`);
+}
+
+function applyRenderQuality() {
+    if (!renderer || !composer || !camera) return;
+    const titleQuality = getTitleQuality();
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, titleQuality.maxPixelRatio ?? 2));
+    if (bloomPass) {
+        bloomPass.strength = titleQuality.bloomStrength ?? CONFIG.bloomStrength;
+    }
+    resize();
 }
 
 // =============================================================================
@@ -758,6 +804,10 @@ export function cleanup() {
 
     // Remove event listeners
     document.removeEventListener('visibilitychange', handleVisibilityChange);
+    if (removeQualityListener) {
+        removeQualityListener();
+        removeQualityListener = null;
+    }
 
     // Dispose chunks
     chunks.forEach(chunk => chunk.dispose());
@@ -774,6 +824,7 @@ export function cleanup() {
         composer.dispose();
         composer = null;
     }
+    bloomPass = null;
 
     // Dispose renderer
     if (renderer) {
