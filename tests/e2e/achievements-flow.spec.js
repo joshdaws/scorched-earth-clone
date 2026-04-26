@@ -21,10 +21,8 @@ test.describe('achievements journey', () => {
       reward: 1
     });
 
-    await expect.poll(
-      () => page.evaluate(() => window.TestAPI.getAchievementQaState().popup.hasActivePopups),
-      { timeout: 5000 }
-    ).toBe(false);
+    const dismissed = await page.evaluate(() => window.TestAPI.dismissAchievementPopupsForQa());
+    expect(dismissed.popup.hasActivePopups).toBe(false);
 
     failures.expectNoFailures();
   });

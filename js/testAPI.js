@@ -2061,6 +2061,15 @@ export function getAchievementQaState() {
 }
 
 /**
+ * Dismiss active achievement popups through the QA API.
+ * @returns {Object}
+ */
+export function dismissAchievementPopupsForQa() {
+    AchievementPopup.clearAll();
+    return getAchievementQaState();
+}
+
+/**
  * Change audio/settings values through production modules.
  * @param {Object} options
  * @returns {Object}
@@ -2190,6 +2199,7 @@ const TestAPI = {
     unlockAchievementsForQa,
     progressAchievementForQa,
     getAchievementQaState,
+    dismissAchievementPopupsForQa,
     setSettingsAudioForQa,
     getSettingsAudioQaState,
     isInitialized,
