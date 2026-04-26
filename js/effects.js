@@ -1587,6 +1587,10 @@ function buildCrtCssBackground({ width, height }) {
     const spacing = CRT_CONFIG.SCANLINE_SPACING;
     const layers = [];
 
+    // A very light glass tint keeps the compositor path closer to the old
+    // Canvas overlay without adding colored bands at the viewport edges.
+    layers.push('linear-gradient(to bottom, rgba(255,255,255,0.018), rgba(0,0,0,0.045))');
+
     if (scanlineOpacity > 0) {
         layers.push(
             `repeating-linear-gradient(to bottom, rgba(0,0,0,${scanlineOpacity}) 0px, rgba(0,0,0,${scanlineOpacity}) 1px, transparent 1px, transparent ${spacing}px)`
@@ -1594,9 +1598,9 @@ function buildCrtCssBackground({ width, height }) {
     }
 
     if (chromaticEnabled && chromaticAlpha > 0) {
-        const edgeAlpha = Math.min(0.5, chromaticAlpha * 6);
+        const edgeAlpha = Math.min(0.06, chromaticAlpha * 0.9);
         layers.push(
-            `linear-gradient(to right, rgba(255,0,70,${edgeAlpha}) 0%, rgba(255,0,70,0) 12%, rgba(0,180,255,0) 88%, rgba(0,180,255,${edgeAlpha}) 100%)`
+            `linear-gradient(to right, rgba(255,55,105,${edgeAlpha}) 0px, rgba(255,55,105,0) 18px, rgba(0,0,0,0) calc(100% - 18px), rgba(45,220,255,${edgeAlpha}) 100%)`
         );
     }
 
