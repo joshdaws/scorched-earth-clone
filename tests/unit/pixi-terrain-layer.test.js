@@ -29,7 +29,7 @@ describe('pixiTerrainLayer debris helpers', () => {
     expect(selected.at(-1)).toBe(cells[895]);
   });
 
-  it('builds debris from the exact removed terrain cell center and size', () => {
+  it('builds physics debris from the exact removed terrain cell center and size', () => {
     const spec = buildTerrainCellDebrisSpec({
       x: 100,
       y: 100,
@@ -49,12 +49,50 @@ describe('pixiTerrainLayer debris helpers', () => {
 
     expect(spec.startX).toBe(132);
     expect(spec.startY).toBe(100);
+    expect(spec.x).toBe(spec.startX);
+    expect(spec.y).toBe(spec.startY);
     expect(spec.size).toBe(8);
-    expect(spec.targetX).toBeGreaterThan(spec.startX);
+    expect(spec.vx).toBeGreaterThan(0);
+    expect(Math.abs(spec.vy)).toBeGreaterThan(0);
+    expect(spec.gravity).toBeGreaterThan(700);
+    expect(spec.drag).toBeGreaterThan(0.7);
+    expect(spec.drag).toBeLessThan(0.9);
     expect(spec.lifetime).toBeGreaterThanOrEqual(560);
     expect(spec.lifetime).toBeLessThanOrEqual(680);
     expect(spec.tint).toBeGreaterThanOrEqual(0);
     expect(spec.tint).toBeLessThanOrEqual(0xffffff);
+  });
+
+  it('pushes side-impact debris away from the blast epicenter', () => {
+    const leftSpec = buildTerrainCellDebrisSpec({
+      x: 160,
+      y: 120,
+      radius: 64,
+      index: 1,
+      cell: {
+        x: 120,
+        y: 120,
+        size: 8,
+        distance: 40
+      }
+    });
+    const rightSpec = buildTerrainCellDebrisSpec({
+      x: 160,
+      y: 120,
+      radius: 64,
+      index: 2,
+      cell: {
+        x: 200,
+        y: 120,
+        size: 8,
+        distance: 40
+      }
+    });
+
+    expect(leftSpec.vx).toBeLessThan(0);
+    expect(rightSpec.vx).toBeGreaterThan(0);
+    expect(leftSpec.vy).toBeLessThan(120);
+    expect(rightSpec.vy).toBeLessThan(120);
   });
 
   it('expands removed cells into anchored chunky debris clusters', () => {

@@ -16,6 +16,8 @@ const MAX_SWEEP_CELLS = 96;
 const MAX_ACTIVE_SWEEPS = 3;
 const DEFAULT_FRAGMENT_LIFETIME_MS = 560;
 const DEFAULT_SWEEP_LIFETIME_MS = 420;
+const DEBRIS_GRAVITY = 760;
+const DEBRIS_DRAG = 0.84;
 const SURFACE_GLOW_ROWS = 9;
 const TERRAIN_CHUNK_COLUMNS = 18;
 const DIRTY_PADDING_COLUMNS = 3;
@@ -331,18 +333,26 @@ export function buildTerrainCellDebrisSpec({ x, y, radius, cell, index = 0 }) {
     const fallbackAngle = hash01(seed + 8.9) * Math.PI * 2;
     const blastAngle = distance > 0.1 ? Math.atan2(startY - y, startX - x) : fallbackAngle;
     const angle = blastAngle + angleJitter;
-    const displacement = clamp(
-        radius * (0.28 + (1 - distanceFactor) * 0.42) + hash01(seed + 2.4) * 7,
-        size * 1.5,
-        radius * 0.85
+    const coreImpulse = 1 - distanceFactor;
+    const speed = clamp(
+        radius * (4.1 + coreImpulse * 3.2) + hash01(seed + 2.4) * 82,
+        120,
+        720
     );
-    const lift = Math.max(0, (1 - distanceFactor) * radius * 0.12);
+    const tangent = (hash01(seed + 3.6) - 0.5) * speed * 0.18;
+    const liftImpulse = radius * (1.15 + coreImpulse * 1.75) + hash01(seed + 10.3) * 54;
+    const vx = Math.cos(angle) * speed + Math.cos(angle + Math.PI * 0.5) * tangent;
+    const vy = Math.sin(angle) * speed + Math.sin(angle + Math.PI * 0.5) * tangent - liftImpulse;
 
     return {
         startX,
         startY,
-        targetX: Math.round(startX + Math.cos(angle) * displacement),
-        targetY: Math.round(startY + Math.sin(angle) * displacement - lift),
+        x: startX,
+        y: startY,
+        vx,
+        vy,
+        gravity: DEBRIS_GRAVITY + hash01(seed + 12.9) * 180,
+        drag: DEBRIS_DRAG - hash01(seed + 14.2) * 0.08,
         size,
         tint: getCellDebrisTint(cell, size),
         age: 0,
@@ -781,14 +791,20 @@ export function updatePixiTerrainLayer(deltaTime) {
             continue;
         }
 
-        const easeOut = 1 - Math.pow(1 - progress, 3);
         const fade = Math.pow(1 - progress, 1.18);
         const flash = clamp(localAge / 80, 0, 1);
-        const shimmer = Math.sin(localAge * 0.09 + fragment.phase) * (1 - progress) * 1.65;
-        const scale = fragment.size * (1.55 - progress * 0.62);
+        const timeSeconds = Math.min(0.05, Math.max(0, deltaTime / 1000));
+        const drag = Math.pow(fragment.drag, timeSeconds);
+        const shimmer = Math.sin(localAge * 0.09 + fragment.phase) * (1 - progress) * 0.9;
+        const scale = fragment.size * (1.48 - progress * 0.58);
 
-        fragment.particle.x = Math.round(fragment.startX + (fragment.targetX - fragment.startX) * easeOut + shimmer);
-        fragment.particle.y = Math.round(fragment.startY + (fragment.targetY - fragment.startY) * easeOut - Math.abs(shimmer) * 0.35);
+        fragment.vx *= drag;
+        fragment.vy = fragment.vy * drag + fragment.gravity * timeSeconds;
+        fragment.x += fragment.vx * timeSeconds;
+        fragment.y += fragment.vy * timeSeconds;
+
+        fragment.particle.x = Math.round(fragment.x + shimmer);
+        fragment.particle.y = Math.round(fragment.y - Math.abs(shimmer) * 0.25);
         fragment.particle.scaleX = scale;
         fragment.particle.scaleY = scale;
         fragment.particle.alpha = clamp(fade * flash, 0, 0.95);
