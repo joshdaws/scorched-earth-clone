@@ -15,7 +15,7 @@
     "test:coverage": "vitest run --coverage",
     "lint": "eslint js/",
     "lint:fix": "eslint js/ --fix",
-    "typecheck": "convex codegen --typecheck disable && tsc --noEmit",
+    "typecheck": "tsc --noEmit",
     "check": "npm run lint && npm run typecheck && npm run test",
     "precommit": "npm run check",
     "dev": "vite",

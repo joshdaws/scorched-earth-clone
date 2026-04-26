@@ -47,9 +47,6 @@ xcuserdata/
 # Runtime config (generated from env vars during deployment)
 config.js
 
-# Convex
-convex/_generated/
-
 # Unity (artifacts from native branch that may appear on main)
 Library/
 Temp/
