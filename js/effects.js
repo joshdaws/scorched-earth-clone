@@ -10,6 +10,7 @@ import { CANVAS, COLORS, PHYSICS } from './constants.js';
 import { WeaponRegistry, WEAPON_TYPES } from './weapons.js';
 import { get as getAsset } from './assets.js';
 import { getRenderQualityProfile } from './renderQuality.js';
+import { recordMeasure, setPerformanceGauge } from './performanceMetrics.js';
 
 // =============================================================================
 // PARTICLE CONFIGURATION
@@ -1403,6 +1404,9 @@ let crtEnabled = loadCrtEnabled();
 
 let crtOverlayCanvas = null;
 let crtOverlayKey = '';
+let crtDomOverlay = null;
+let crtDomGlitch = null;
+let crtDomOverlayKey = '';
 
 function getCrtQualitySettings() {
     return getRenderQualityProfile().crt ?? {};
@@ -1509,12 +1513,166 @@ function getStaticCrtOverlay(width, height) {
     return crtOverlayCanvas;
 }
 
+function getCssPixels(value) {
+    return `${Math.max(1, Math.round(value))}px`;
+}
+
+function ensureCrtDomOverlay() {
+    if (typeof document === 'undefined' || !document.body) return null;
+
+    if (crtDomOverlay && crtDomOverlay.isConnected) {
+        return crtDomOverlay;
+    }
+
+    crtDomOverlay = document.getElementById('crtOverlay');
+    if (!crtDomOverlay) {
+        crtDomOverlay = document.createElement('div');
+        crtDomOverlay.id = 'crtOverlay';
+        document.body.appendChild(crtDomOverlay);
+    }
+
+    Object.assign(crtDomOverlay.style, {
+        position: 'fixed',
+        left: '0',
+        top: '0',
+        width: '100vw',
+        height: '100vh',
+        pointerEvents: 'none',
+        zIndex: '20',
+        display: 'none',
+        overflow: 'hidden',
+        contain: 'strict',
+        willChange: 'transform',
+        transform: 'translateZ(0)'
+    });
+
+    crtDomGlitch = crtDomOverlay.querySelector('[data-crt-glitch]');
+    if (!crtDomGlitch) {
+        crtDomGlitch = document.createElement('div');
+        crtDomGlitch.dataset.crtGlitch = 'true';
+        crtDomOverlay.appendChild(crtDomGlitch);
+    }
+
+    Object.assign(crtDomGlitch.style, {
+        position: 'absolute',
+        left: '0',
+        top: '0',
+        width: '100%',
+        height: '4px',
+        pointerEvents: 'none',
+        display: 'none',
+        opacity: '0.35',
+        mixBlendMode: 'screen',
+        background: 'linear-gradient(90deg, rgba(255,255,255,0.55), rgba(255,42,109,0.45), rgba(5,217,232,0.45), rgba(255,255,255,0.18))'
+    });
+
+    return crtDomOverlay;
+}
+
+function hideCrtDomOverlay() {
+    if (crtDomOverlay) {
+        crtDomOverlay.style.display = 'none';
+    }
+}
+
+function buildCrtCssBackground({ width, height }) {
+    const crtQuality = getCrtQualitySettings();
+    const scanlineOpacity = crtQuality.scanlineOpacity ?? CRT_CONFIG.SCANLINE_OPACITY;
+    const vignetteIntensity = crtQuality.vignetteIntensity ?? CRT_CONFIG.VIGNETTE_INTENSITY;
+    const vignetteRadius = crtQuality.vignetteRadius ?? CRT_CONFIG.VIGNETTE_RADIUS;
+    const chromaticEnabled = crtQuality.chromaticAberrationEnabled ?? CRT_CONFIG.CHROMATIC_ABERRATION_ENABLED;
+    const chromaticAlpha = crtQuality.chromaticAlpha ?? CRT_CONFIG.CHROMATIC_ALPHA;
+    const phosphorEnabled = crtQuality.phosphorGlowEnabled ?? CRT_CONFIG.PHOSPHOR_GLOW_ENABLED;
+    const phosphorIntensity = crtQuality.phosphorGlowIntensity ?? CRT_CONFIG.PHOSPHOR_GLOW_INTENSITY;
+    const spacing = CRT_CONFIG.SCANLINE_SPACING;
+    const layers = [];
+
+    if (scanlineOpacity > 0) {
+        layers.push(
+            `repeating-linear-gradient(to bottom, rgba(0,0,0,${scanlineOpacity}) 0px, rgba(0,0,0,${scanlineOpacity}) 1px, transparent 1px, transparent ${spacing}px)`
+        );
+    }
+
+    if (chromaticEnabled && chromaticAlpha > 0) {
+        const edgeAlpha = Math.min(0.5, chromaticAlpha * 6);
+        layers.push(
+            `linear-gradient(to right, rgba(255,0,70,${edgeAlpha}) 0%, rgba(255,0,70,0) 12%, rgba(0,180,255,0) 88%, rgba(0,180,255,${edgeAlpha}) 100%)`
+        );
+    }
+
+    if (phosphorEnabled && phosphorIntensity > 0) {
+        layers.push(
+            `radial-gradient(circle at 50% 50%, rgba(100,200,255,${phosphorIntensity * 0.5}) 0%, rgba(100,200,255,${phosphorIntensity * 0.2}) 50%, rgba(100,200,255,0) 80%)`
+        );
+    }
+
+    if (vignetteIntensity > 0) {
+        const midpoint = Math.max(25, Math.min(80, vignetteRadius * 100));
+        layers.push(
+            `radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 0%, rgba(0,0,0,${vignetteIntensity * 0.28}) ${midpoint}%, rgba(0,0,0,${vignetteIntensity}) 100%)`
+        );
+    }
+
+    return {
+        key: [
+            width,
+            height,
+            scanlineOpacity,
+            vignetteIntensity,
+            vignetteRadius,
+            chromaticEnabled,
+            chromaticAlpha,
+            phosphorEnabled,
+            phosphorIntensity
+        ].join(':'),
+        image: layers.join(', ')
+    };
+}
+
+function renderCrtDomOverlay(width, height, fullscreenParams = null) {
+    const overlay = ensureCrtDomOverlay();
+    if (!overlay) return false;
+
+    const effectWidth = fullscreenParams?.viewportWidth ?? width;
+    const effectHeight = fullscreenParams?.viewportHeight ?? height;
+    overlay.style.display = 'block';
+    overlay.style.width = getCssPixels(effectWidth);
+    overlay.style.height = getCssPixels(effectHeight);
+
+    const background = buildCrtCssBackground({ width: effectWidth, height: effectHeight });
+    if (crtDomOverlayKey !== background.key) {
+        overlay.style.backgroundImage = background.image;
+        overlay.style.backgroundSize = '100% 100%';
+        overlay.style.backgroundRepeat = 'no-repeat';
+        overlay.style.backgroundPosition = 'center';
+        crtDomOverlayKey = background.key;
+    }
+
+    if (crtDomGlitch) {
+        const crtQuality = getCrtQualitySettings();
+        const glitchEnabled = crtQuality.vhsGlitchEnabled ?? CRT_CONFIG.VHS_GLITCH_ENABLED;
+        if (glitchEnabled && vhsGlitchState.active) {
+            const glitchHeight = crtQuality.vhsGlitchHeight ?? CRT_CONFIG.VHS_GLITCH_HEIGHT;
+            crtDomGlitch.style.display = 'block';
+            crtDomGlitch.style.height = getCssPixels(glitchHeight);
+            crtDomGlitch.style.transform = `translate3d(${vhsGlitchState.xDisplacement.toFixed(1)}px, ${vhsGlitchState.yOffset.toFixed(1)}px, 0)`;
+        } else {
+            crtDomGlitch.style.display = 'none';
+        }
+    }
+
+    return true;
+}
+
 /**
  * Enable or disable CRT effects.
  * @param {boolean} enabled - Whether CRT effects should be rendered
  */
 export function setCrtEnabled(enabled) {
     crtEnabled = Boolean(enabled);
+    if (!crtEnabled) {
+        hideCrtDomOverlay();
+    }
     saveCrtEnabled(crtEnabled);
     console.log(`CRT effects ${enabled ? 'enabled' : 'disabled'}`);
 }
@@ -1652,10 +1810,23 @@ function renderVhsGlitch(ctx, width, _height) {
  * @param {number} fullscreenParams.dpr - Device pixel ratio
  */
 export function renderCrtEffects(ctx, width, height, fullscreenParams = null) {
-    if (!crtEnabled) return;
+    const start = performance.now();
+    if (!crtEnabled) {
+        hideCrtDomOverlay();
+        setPerformanceGauge('crtEnabled', 0);
+        recordMeasure('crtRender', performance.now() - start);
+        return;
+    }
 
     // Update glitch animation state
     updateVhsGlitch(16.67); // Assume ~60fps for delta time
+
+    if (renderCrtDomOverlay(width, height, fullscreenParams)) {
+        setPerformanceGauge('crtEnabled', 1);
+        setPerformanceGauge('crtRenderer', 1);
+        recordMeasure('crtRender', performance.now() - start);
+        return;
+    }
 
     let effectWidth = width;
     let effectHeight = height;
@@ -1683,6 +1854,10 @@ export function renderCrtEffects(ctx, width, height, fullscreenParams = null) {
     if (fullscreenParams) {
         ctx.restore();
     }
+
+    setPerformanceGauge('crtEnabled', 1);
+    setPerformanceGauge('crtRenderer', 0);
+    recordMeasure('crtRender', performance.now() - start);
 }
 
 /**
@@ -1692,4 +1867,5 @@ export function renderCrtEffects(ctx, width, height, fullscreenParams = null) {
 export function clearCrtCache() {
     crtOverlayCanvas = null;
     crtOverlayKey = '';
+    crtDomOverlayKey = '';
 }

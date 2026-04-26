@@ -23,7 +23,8 @@ function parseArgs(argv) {
         outDir: DEFAULT_OUT_DIR,
         headed: false,
         timeoutMs: 20000,
-        maxDroppedBacklogMs: null
+        maxDroppedBacklogMs: null,
+        crtEnabled: null
     };
 
     for (let index = 0; index < argv.length; index++) {
@@ -36,6 +37,10 @@ function parseArgs(argv) {
         else if (arg === '--out-dir' && argv[index + 1]) args.outDir = argv[++index];
         else if (arg === '--timeout-ms' && argv[index + 1]) args.timeoutMs = Number(argv[++index]);
         else if (arg === '--max-dropped-backlog-ms' && argv[index + 1]) args.maxDroppedBacklogMs = Number(argv[++index]);
+        else if (arg === '--crt' && argv[index + 1]) {
+            const value = argv[++index].toLowerCase();
+            args.crtEnabled = value === 'on' || value === 'true' || value === '1';
+        }
         else if (arg === '--headed') args.headed = true;
         else if (arg === '--help' || arg === '-h') args.help = true;
     }
@@ -59,6 +64,8 @@ Examples:
   npm run smoke:browser -- --scenario terrain
   npm run smoke:browser -- --scenario tank-support
   npm run smoke:browser -- --scenario physics-playground --scene physics-playground
+  npm run smoke:browser -- --scenario impact --crt on
+  npm run smoke:browser -- --scenario impact --crt off
   npm run smoke:browser -- --scenario high-scores
 
 If Chromium is missing after a clean checkout, run:
@@ -833,6 +840,11 @@ async function main() {
 
         await page.goto(url, { waitUntil: 'domcontentloaded', timeout: args.timeoutMs });
         await waitForGameReady(page, args.scenario);
+        if (typeof args.crtEnabled === 'boolean') {
+            await page.evaluate((crtEnabled) => {
+                window.TestAPI?.setSettingsAudioForQa?.({ crtEnabled });
+            }, args.crtEnabled);
+        }
         await runScenario(page, args);
 
         const metricsResult = await page.evaluate(() => window.TestAPI?.getPerformanceMetrics?.() ?? null);
@@ -852,6 +864,7 @@ async function main() {
             url,
             scenario: args.scenario,
             quality: args.quality,
+            crtEnabled: args.crtEnabled,
             environment,
             metrics: metricsResult?.metrics ?? null,
             loopTiming: metricsResult?.loopTiming ?? null
