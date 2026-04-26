@@ -10,6 +10,7 @@
   "scripts": {
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",
+    "pretest:e2e": "npm run generate-config:offline",
     "test:e2e": "playwright test",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
