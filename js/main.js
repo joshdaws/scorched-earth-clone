@@ -4805,9 +4805,9 @@ function applyLevelLoadout(tank, level) {
     const loadout = LevelRegistry.getLoadout(level);
     tank.inventory = { ...loadout };
 
-    const introWeapon = level.progression?.introducedWeapon;
-    if (introWeapon && tank.getAmmo(introWeapon) > 0) {
-        tank.setWeapon(introWeapon);
+    const recommendedWeapon = level.progression?.recommendedWeapon || level.progression?.introducedWeapon;
+    if (recommendedWeapon && tank.getAmmo(recommendedWeapon) > 0) {
+        tank.setWeapon(recommendedWeapon);
     } else {
         tank.setWeapon('basic-shot');
     }

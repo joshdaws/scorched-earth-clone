@@ -76,10 +76,87 @@ test.describe('level mode journey', () => {
     expect(result.progression).toMatchObject({
       title: 'Tracer Trial',
       introducedWeapon: 'tracer',
-      isIntroLevel: true
+      isIntroLevel: true,
+      tuning: {
+        role: 'intro'
+      }
     });
     expect(result.weapon).toBe('tracer');
     expect(result.inventory.tracer).toBe(6);
+    failures.expectNoFailures();
+  });
+
+  test('late ammo intro levels keep their tuned arsenal and star targets', async ({ page }) => {
+    const failures = trackConsoleFailures(page);
+    await bootGame(page, '/');
+
+    const result = await page.evaluate(async () => {
+      const { LevelRegistry } = await import('/js/levels.js');
+      const level = LevelRegistry.getLevel('world6-level7');
+      window.dispatchEvent(new CustomEvent('levelSelected', {
+        detail: { levelId: level.id, level, worldNum: 6, levelNum: 7 }
+      }));
+      await new Promise(resolve => setTimeout(resolve, 600));
+
+      const controls = window.TestAPI.getControlState();
+      return {
+        level: {
+          enemyHealth: level.enemyHealth,
+          wind: level.wind,
+          star3Accuracy: level.star3Accuracy,
+          star3MaxTurns: level.star3MaxTurns,
+          progression: level.progression
+        },
+        weapon: controls.state.player?.weapon,
+        inventory: controls.state.player?.inventory
+      };
+    });
+
+    expect(result.level).toMatchObject({
+      enemyHealth: 150,
+      wind: { min: -8, max: 8 },
+      star3Accuracy: 0.66,
+      star3MaxTurns: 6,
+      progression: {
+        title: 'Nuke Trial',
+        introducedWeapon: 'nuke',
+        tuning: { role: 'intro' }
+      }
+    });
+    expect(result.weapon).toBe('nuke');
+    expect(result.inventory.nuke).toBe(1);
+    expect(result.inventory['neutron-bomb']).toBe(1);
+    failures.expectNoFailures();
+  });
+
+  test('follow-up challenge levels select the taught weapon from their loadout', async ({ page }) => {
+    const failures = trackConsoleFailures(page);
+    await bootGame(page, '/');
+
+    const result = await page.evaluate(async () => {
+      const { LevelRegistry } = await import('/js/levels.js');
+      const level = LevelRegistry.getLevel('world2-level4');
+      window.dispatchEvent(new CustomEvent('levelSelected', {
+        detail: { levelId: level.id, level, worldNum: 2, levelNum: 4 }
+      }));
+      await new Promise(resolve => setTimeout(resolve, 600));
+
+      const controls = window.TestAPI.getControlState();
+      return {
+        progression: level.progression,
+        weapon: controls.state.player?.weapon,
+        inventory: controls.state.player?.inventory
+      };
+    });
+
+    expect(result.progression).toMatchObject({
+      title: 'MIRV Trial',
+      isIntroLevel: false,
+      recommendedWeapon: 'mirv',
+      tuning: { role: 'challenge' }
+    });
+    expect(result.weapon).toBe('mirv');
+    expect(result.inventory.mirv).toBe(3);
     failures.expectNoFailures();
   });
 

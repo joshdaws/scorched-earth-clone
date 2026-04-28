@@ -265,6 +265,54 @@ const LEVEL_MILESTONES = Object.freeze([
     }
 ]);
 
+const INTRO_TUNING = Object.freeze({
+    'basic-shot': { enemyHealth: 70, wind: { min: 0, max: 0 }, star2Damage: 45, star3Accuracy: 0.38, star3MaxTurns: 12 },
+    tracer: { enemyHealth: 75, wind: { min: 0, max: 0 }, star2Damage: 35, star3Accuracy: 0.35, star3MaxTurns: 12 },
+    missile: { enemyHealth: 85, wind: { min: 0, max: 0 }, star2Damage: 60, star3Accuracy: 0.45, star3MaxTurns: 10 },
+    roller: { enemyHealth: 90, wind: { min: -1, max: 1 }, star2Damage: 60, star3Accuracy: 0.46, star3MaxTurns: 10 },
+    bouncer: { enemyHealth: 95, wind: { min: -2, max: 2 }, star2Damage: 65, star3Accuracy: 0.48, star3MaxTurns: 9 },
+    'big-shot': { enemyHealth: 95, wind: { min: -2, max: 2 }, star2Damage: 70, star3Accuracy: 0.52, star3MaxTurns: 9 },
+    mirv: { enemyHealth: 95, wind: { min: -2, max: 2 }, star2Damage: 70, star3Accuracy: 0.52, star3MaxTurns: 9 },
+    digger: { enemyHealth: 100, wind: { min: -3, max: 3 }, star2Damage: 65, star3Accuracy: 0.5, star3MaxTurns: 9 },
+    'wind-bomb': { enemyHealth: 105, wind: { min: -6, max: 6 }, star2Damage: 70, star3Accuracy: 0.52, star3MaxTurns: 9 },
+    'heavy-roller': { enemyHealth: 105, wind: { min: -3, max: 3 }, star2Damage: 75, star3Accuracy: 0.56, star3MaxTurns: 8 },
+    'liquid-dirt': { enemyHealth: 105, wind: { min: -4, max: 4 }, star2Damage: 70, star3Accuracy: 0.54, star3MaxTurns: 8 },
+    'heavy-digger': { enemyHealth: 110, wind: { min: -4, max: 4 }, star2Damage: 80, star3Accuracy: 0.56, star3MaxTurns: 8 },
+    'scatter-shot': { enemyHealth: 115, wind: { min: -5, max: 5 }, star2Damage: 85, star3Accuracy: 0.58, star3MaxTurns: 8 },
+    napalm: { enemyHealth: 115, wind: { min: -5, max: 5 }, star2Damage: 80, star3Accuracy: 0.58, star3MaxTurns: 8 },
+    'emp-blast': { enemyHealth: 115, wind: { min: -6, max: 6 }, star2Damage: 75, star3Accuracy: 0.58, star3MaxTurns: 8 },
+    'mini-nuke': { enemyHealth: 125, wind: { min: -6, max: 6 }, star2Damage: 95, star3Accuracy: 0.6, star3MaxTurns: 7 },
+    teleporter: { enemyHealth: 120, wind: { min: -6, max: 6 }, star2Damage: 80, star3Accuracy: 0.58, star3MaxTurns: 8 },
+    'armor-piercer': { enemyHealth: 125, wind: { min: -5, max: 5 }, star2Damage: 95, star3Accuracy: 0.62, star3MaxTurns: 7 },
+    'shield-buster': { enemyHealth: 125, wind: { min: -5, max: 5 }, star2Damage: 90, star3Accuracy: 0.62, star3MaxTurns: 7 },
+    'cluster-bomb': { enemyHealth: 130, wind: { min: -6, max: 6 }, star2Damage: 95, star3Accuracy: 0.62, star3MaxTurns: 7 },
+    'lightning-strike': { enemyHealth: 135, wind: { min: -7, max: 7 }, star2Damage: 105, star3Accuracy: 0.64, star3MaxTurns: 6 },
+    'deaths-head': { enemyHealth: 135, wind: { min: -7, max: 7 }, star2Damage: 100, star3Accuracy: 0.64, star3MaxTurns: 6 },
+    sandhog: { enemyHealth: 140, wind: { min: -7, max: 7 }, star2Damage: 100, star3Accuracy: 0.64, star3MaxTurns: 6 },
+    'neutron-bomb': { enemyHealth: 145, wind: { min: -8, max: 8 }, star2Damage: 110, star3Accuracy: 0.66, star3MaxTurns: 6 },
+    nuke: { enemyHealth: 150, wind: { min: -8, max: 8 }, star2Damage: 120, star3Accuracy: 0.66, star3MaxTurns: 6 },
+    'ion-cannon': { enemyHealth: 150, wind: { min: -10, max: 10 }, star2Damage: 120, star3Accuracy: 0.68, star3MaxTurns: 6 },
+    'fusion-strike': { enemyHealth: 170, wind: { min: -10, max: 10 }, star2Damage: 140, star3Accuracy: 0.7, star3MaxTurns: 6 }
+});
+
+const MIX_TUNING_BY_WORLD = Object.freeze({
+    1: { enemyHealth: 105, wind: { min: -2, max: 2 }, star2Damage: 80, star3Accuracy: 0.55, star3MaxTurns: 8 },
+    2: { enemyHealth: 120, wind: { min: -4, max: 4 }, star2Damage: 90, star3Accuracy: 0.6, star3MaxTurns: 8 },
+    3: { enemyHealth: 130, wind: { min: -6, max: 6 }, star2Damage: 100, star3Accuracy: 0.64, star3MaxTurns: 7 },
+    4: { enemyHealth: 140, wind: { min: -8, max: 8 }, star2Damage: 110, star3Accuracy: 0.66, star3MaxTurns: 7 },
+    5: { enemyHealth: 150, wind: { min: -7, max: 7 }, star2Damage: 120, star3Accuracy: 0.68, star3MaxTurns: 6 },
+    6: { enemyHealth: 165, wind: { min: -10, max: 10 }, star2Damage: 135, star3Accuracy: 0.7, star3MaxTurns: 6 }
+});
+
+const TUNING_FIELDS = Object.freeze([
+    'enemyHealth',
+    'playerHealth',
+    'wind',
+    'star2Damage',
+    'star3Accuracy',
+    'star3MaxTurns'
+]);
+
 function parseLevelOrder(levelId) {
     const match = /^world(\d+)-level(\d+)$/.exec(levelId || '');
     if (!match) return -1;
@@ -290,12 +338,85 @@ function getActiveMilestone(levelId) {
     return active;
 }
 
+function cloneTuning(tuning) {
+    return {
+        ...tuning,
+        wind: tuning.wind ? { ...tuning.wind } : undefined
+    };
+}
+
+function isMixMilestone(milestone) {
+    return !milestone.introducedWeapon && /mix|arsenal/i.test(milestone.title);
+}
+
+function buildChallengeTuning(level, introTuning) {
+    const source = cloneTuning(introTuning);
+    const windRange = Math.max(Math.abs(source.wind?.min || 0), Math.abs(source.wind?.max || 0));
+    const levelWindRange = Math.max(Math.abs(level.wind?.min || 0), Math.abs(level.wind?.max || 0));
+    const challengeWindRange = Math.min(levelWindRange, windRange + 1);
+
+    return {
+        enemyHealth: Math.min(level.enemyHealth, source.enemyHealth + 10),
+        wind: { min: -challengeWindRange, max: challengeWindRange },
+        star2Damage: Math.min(level.star2Damage, source.star2Damage + 10),
+        star3Accuracy: Math.min(level.star3Accuracy, Number((source.star3Accuracy + 0.03).toFixed(2))),
+        star3MaxTurns: Math.max(level.star3MaxTurns, source.star3MaxTurns - 1)
+    };
+}
+
+function getLevelTuning(level, progression) {
+    const milestone = getActiveMilestone(level.id);
+    const introWeapon = milestone.introducedWeapon || 'basic-shot';
+    const isIntro = progression.isIntroLevel || level.id === 'world1-level1';
+
+    if (isMixMilestone(milestone)) {
+        const tuning = cloneTuning(MIX_TUNING_BY_WORLD[level.world] || MIX_TUNING_BY_WORLD[1]);
+        return {
+            ...tuning,
+            role: level.id === milestone.levelId ? 'mix' : 'mastery',
+            note: 'Mixed arsenal check tuned around choosing the right weapon instead of shopping for more.'
+        };
+    }
+
+    if (isIntro) {
+        const tuning = cloneTuning(INTRO_TUNING[introWeapon]);
+        return {
+            ...tuning,
+            role: 'intro',
+            note: `${getWeaponName(introWeapon)} practice tuned for experimentation before the follow-up challenge.`
+        };
+    }
+
+    const tuning = buildChallengeTuning(level, INTRO_TUNING[introWeapon]);
+    return {
+        ...tuning,
+        role: 'challenge',
+        note: `${getWeaponName(introWeapon)} follow-up tuned to combine the new ammo with prior aiming skills.`
+    };
+}
+
+function applyLevelTuning(level, tuning) {
+    const tunedLevel = { ...level };
+
+    for (const field of TUNING_FIELDS) {
+        if (tuning[field] === undefined) continue;
+        tunedLevel[field] = typeof tuning[field] === 'object'
+            ? { ...tuning[field] }
+            : tuning[field];
+    }
+
+    return tunedLevel;
+}
+
 export function getLevelProgression(levelOrId) {
     const levelId = typeof levelOrId === 'string' ? levelOrId : levelOrId?.id;
     const milestone = getActiveMilestone(levelId);
     const isIntroLevel = milestone.levelId === levelId && Boolean(milestone.introducedWeapon);
     const introducedWeaponName = isIntroLevel ? getWeaponName(milestone.introducedWeapon) : null;
     const loadout = { ...milestone.loadout };
+    const recommendedWeapon = milestone.introducedWeapon && loadout[milestone.introducedWeapon] > 0
+        ? milestone.introducedWeapon
+        : null;
 
     return {
         title: milestone.title,
@@ -303,6 +424,8 @@ export function getLevelProgression(levelOrId) {
         summary: milestone.summary,
         introducedWeapon: isIntroLevel ? milestone.introducedWeapon : null,
         introducedWeaponName,
+        recommendedWeapon,
+        recommendedWeaponName: recommendedWeapon ? getWeaponName(recommendedWeapon) : null,
         isIntroLevel,
         loadout,
         loadoutWeaponNames: Object.keys(loadout).map(getWeaponName)
@@ -314,9 +437,16 @@ export function getLevelLoadout(levelOrId) {
 }
 
 export function enrichLevelProgression(level) {
+    const progression = getLevelProgression(level.id);
+    const tuning = getLevelTuning(level, progression);
+    const tunedLevel = applyLevelTuning(level, tuning);
+
     return {
-        ...level,
-        progression: getLevelProgression(level.id)
+        ...tunedLevel,
+        progression: {
+            ...progression,
+            tuning
+        }
     };
 }
 

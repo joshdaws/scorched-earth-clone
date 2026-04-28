@@ -104,7 +104,11 @@ describe('level registry', () => {
         summary: expect.any(String),
         isIntroLevel: expect.any(Boolean),
         loadout: expect.any(Object),
-        loadoutWeaponNames: expect.any(Array)
+        loadoutWeaponNames: expect.any(Array),
+        tuning: {
+          role: expect.any(String),
+          note: expect.any(String)
+        }
       });
       expect(level.progression.loadout['basic-shot']).toBe(Infinity);
     }
@@ -128,7 +132,9 @@ describe('level registry', () => {
       expect(level.progression).toMatchObject({
         isIntroLevel: true,
         introducedWeapon: milestone.introducedWeapon,
-        introducedWeaponName: weapon.name
+        introducedWeaponName: weapon.name,
+        recommendedWeapon: milestone.introducedWeapon,
+        recommendedWeaponName: weapon.name
       });
       expect(LevelRegistry.getLoadout(level)[milestone.introducedWeapon]).toBeGreaterThan(0);
     }
@@ -143,11 +149,58 @@ describe('level registry', () => {
 
     expect(LevelRegistry.getLevel('world2-level4').progression).toMatchObject({
       title: 'MIRV Trial',
-      isIntroLevel: false
+      isIntroLevel: false,
+      recommendedWeapon: 'mirv',
+      tuning: {
+        role: 'challenge'
+      }
     });
     expect(LevelRegistry.getLoadout('world2-level4')).toMatchObject({
       'basic-shot': Infinity,
       mirv: 3
+    });
+  });
+
+  it('tunes ammo introductions as forgiving practice before harder follow-ups', () => {
+    const introMilestones = getProgressionMilestones()
+      .filter(milestone => milestone.introducedWeapon);
+
+    for (const milestone of introMilestones) {
+      const introLevel = LevelRegistry.getLevel(milestone.levelId);
+      const nextLevel = LevelRegistry.getNextLevel(milestone.levelId);
+
+      expect(introLevel.progression.tuning.role).toBe('intro');
+      expect(introLevel.star3MaxTurns).toBeGreaterThanOrEqual(6);
+      expect(introLevel.star3Accuracy).toBeLessThanOrEqual(0.7);
+      expect(introLevel.wind.min).toBeLessThanOrEqual(0);
+      expect(introLevel.wind.max).toBeGreaterThanOrEqual(0);
+
+      if (nextLevel && nextLevel.progression.title === introLevel.progression.title) {
+        expect(nextLevel.progression.tuning.role).toBe('challenge');
+        expect(nextLevel.enemyHealth).toBeGreaterThanOrEqual(introLevel.enemyHealth);
+        expect(nextLevel.star2Damage).toBeGreaterThanOrEqual(introLevel.star2Damage);
+        expect(nextLevel.star3Accuracy).toBeGreaterThanOrEqual(introLevel.star3Accuracy);
+      }
+    }
+
+    expect(LevelRegistry.getLevel('world1-level2')).toMatchObject({
+      enemyHealth: 75,
+      wind: { min: 0, max: 0 },
+      star3Accuracy: 0.35,
+      star3MaxTurns: 12,
+      progression: {
+        title: 'Tracer Trial',
+        tuning: { role: 'intro' }
+      }
+    });
+    expect(LevelRegistry.getLevel('world6-level7')).toMatchObject({
+      enemyHealth: 150,
+      wind: { min: -8, max: 8 },
+      star3MaxTurns: 6,
+      progression: {
+        title: 'Nuke Trial',
+        tuning: { role: 'intro' }
+      }
     });
   });
 
@@ -215,6 +268,8 @@ describe('star calculation and persistence', () => {
   });
 
   it('awards zero stars for losses and one star for wins that miss bonus criteria', () => {
+    const level = LevelRegistry.getLevel('world1-level1');
+
     expect(calculate('world1-level1', { won: false, damageDealt: 999, accuracy: 1, turnsUsed: 1 })).toMatchObject({
       stars: 0,
       breakdown: {
@@ -225,7 +280,12 @@ describe('star calculation and persistence', () => {
       }
     });
 
-    expect(calculate('world1-level1', { won: true, damageDealt: 49, accuracy: 1, turnsUsed: 1 })).toMatchObject({
+    expect(calculate(level.id, {
+      won: true,
+      damageDealt: level.star2Damage - 1,
+      accuracy: 1,
+      turnsUsed: 1
+    })).toMatchObject({
       stars: 1,
       breakdown: {
         won: true,
