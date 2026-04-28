@@ -83,7 +83,7 @@ function createConfig(calls, overrides = {}) {
 }
 
 describe('menuRenderer', () => {
-  it('renders title, menu controls, metric tiles, engagement UI, and CRT effects', () => {
+  it('renders simplified home controls, metric tiles, engagement UI, and CRT effects', () => {
     const calls = [];
     const ctx = createCtx(calls);
     const config = createConfig(calls);
@@ -96,10 +96,15 @@ describe('menuRenderer', () => {
     expect(calls).toContain('title:SCORCHED');
     expect(calls).toContain('title:EARTH');
     expect(calls).toContain('subtitle:SYNTHWAVE EDITION');
-    expect(calls).toContain('achievements:2');
-    expect(calls).toContain('collection:3');
-    expect(calls).toContain('dailyChallenges:3');
-    expect(calls).toContain('dailyRewards:true');
+    expect(calls).toContain('start');
+    expect(calls).toContain('highScores');
+    expect(calls).toContain('collection');
+    expect(calls).toContain('options');
+    expect(calls).not.toContain('achievements:2');
+    expect(calls).not.toContain('collection:3');
+    expect(calls).not.toContain('supplyDrop');
+    expect(calls).not.toContain('dailyChallenges:3');
+    expect(calls).not.toContain('dailyRewards:true');
     expect(calls).toContain('tile:TOKENS');
     expect(calls).toContain('tile:BEST RUN');
     expect(calls).toContain('tile:STARS');

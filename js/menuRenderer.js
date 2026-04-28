@@ -26,10 +26,6 @@ export function renderMenuScene(ctx, config) {
         drawNeonSubtitle,
         drawMenuMetricTile,
         menuButtons,
-        getUnviewedCount,
-        getNewTankCount,
-        getDailyChallengeCompletionCounts,
-        canClaimDailyReward,
         getTokenBalance,
         getBestRoundCount,
         getTotalStars,
@@ -115,22 +111,10 @@ export function renderMenuScene(ctx, config) {
     drawSynthwaveText(ctx, 'EARTH', width / 2, earthY, earthFontSize, pulseIntensity);
     drawNeonSubtitle(ctx, 'SYNTHWAVE EDITION', width / 2, subtitleY, subtitleFontSize, pulseIntensity);
 
-    const unviewedAchievements = getUnviewedCount();
-    const newTanks = getNewTankCount();
-
     menuButtons.start.render(ctx, pulseIntensity);
     menuButtons.highScores.render(ctx, pulseIntensity);
-    menuButtons.achievements.renderWithBadge(ctx, pulseIntensity, unviewedAchievements);
-    menuButtons.collection.renderWithBadge(ctx, pulseIntensity, newTanks);
-    menuButtons.supplyDrop.render(ctx, pulseIntensity);
+    menuButtons.collection.render(ctx, pulseIntensity);
     menuButtons.options.render(ctx, pulseIntensity);
-
-    const challengeCounts = getDailyChallengeCompletionCounts();
-    const incompleteChallenges = challengeCounts.total - challengeCounts.completed;
-    menuButtons.dailyChallenges.renderWithBadge(ctx, pulseIntensity, incompleteChallenges);
-
-    const rewardClaimable = canClaimDailyReward();
-    menuButtons.dailyRewards.renderWithDot(ctx, pulseIntensity, rewardClaimable);
 
     const tokenPadding = isCompact ? 15 : 25;
     const tokenCardWidth = isCompact ? 75 : 90;

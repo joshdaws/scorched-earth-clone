@@ -144,10 +144,10 @@ const buttons = {
         autoSize: false
     }),
     shop: new Button({
-        text: 'SHOP',
+        text: 'ARMORY',
         x: 0,
         y: 0,
-        width: 140,
+        width: 200,
         height: 50,
         fontSize: UI.FONT_SIZE_MEDIUM,
         bgColor: ROUND_TRANSITION_BUTTON_STYLES.bgColor,
@@ -193,10 +193,10 @@ function updateButtonPositions() {
     const height = Renderer.getHeight();
     const centerX = width / 2;
 
-    buttons.continue.setPosition(centerX - 170, height - 100);
-    buttons.shop.setPosition(centerX, height - 100);
-    buttons.collection.setPosition(centerX + 170, height - 100);
-    buttons.supplyDrop.setPosition(centerX, height - 160);
+    buttons.continue.setPosition(centerX - 115, height - 100);
+    buttons.shop.setPosition(centerX + 115, height - 100);
+    buttons.collection.setPosition(-1000, -1000);
+    buttons.supplyDrop.setPosition(-1000, -1000);
 }
 
 // =============================================================================
@@ -342,34 +342,6 @@ export function handleClick(x, y) {
             // Default: go to shop
             hide();
             Game.setState(GAME_STATES.SHOP);
-        }
-        return true;
-    }
-
-    // Check Collection button
-    if (buttons.collection.containsPoint(x, y)) {
-        playClickSound();
-        console.log('[RoundTransition] Collection clicked');
-        if (onCollectionCallback) {
-            onCollectionCallback();
-        } else {
-            // Default: go to collection screen
-            hide();
-            Game.setState(GAME_STATES.COLLECTION);
-        }
-        return true;
-    }
-
-    // Check Supply Drop button (only if can afford)
-    if (tokenBalance >= SUPPLY_DROP_COST && buttons.supplyDrop.containsPoint(x, y)) {
-        playClickSound();
-        console.log('[RoundTransition] Supply Drop clicked');
-        if (onSupplyDropCallback) {
-            onSupplyDropCallback();
-        } else {
-            // Default: go to supply drop screen
-            hide();
-            Game.setState(GAME_STATES.SUPPLY_DROP);
         }
         return true;
     }
@@ -698,19 +670,10 @@ export function render(ctx) {
     ctx.restore();
 
     // =========================================================================
-    // SUPPLY DROP BUTTON (if can afford)
-    // =========================================================================
-    const canAffordSupplyDrop = tokenBalance >= SUPPLY_DROP_COST;
-    if (canAffordSupplyDrop) {
-        buttons.supplyDrop.render(ctx, pulseIntensity);
-    }
-
-    // =========================================================================
-    // BOTTOM BUTTONS: CONTINUE | SHOP | COLLECTION
+    // BOTTOM BUTTONS: CONTINUE | ARMORY
     // =========================================================================
     buttons.continue.render(ctx, pulseIntensity);
     buttons.shop.render(ctx, pulseIntensity);
-    buttons.collection.render(ctx, pulseIntensity);
 
     // =========================================================================
     // DECORATIVE FRAME

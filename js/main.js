@@ -53,7 +53,7 @@ import * as PrecisionAchievements from './precision-achievements.js';
 import * as WeaponAchievements from './weapon-achievements.js';
 import * as ProgressionAchievements from './progression-achievements.js';
 import * as HiddenAchievements from './hidden-achievements.js';
-import { onAchievementUnlock, clearRoundAchievements, getRoundAchievements, getUnviewedCount, markAllAchievementsViewed } from './achievements.js';
+import { onAchievementUnlock, clearRoundAchievements, getRoundAchievements } from './achievements.js';
 import * as Tokens from './tokens.js';
 import * as TankCollection from './tank-collection.js';
 import { getTank as getTankSkin } from './tank-skins.js';
@@ -865,12 +865,13 @@ const MENU_BUTTON_STYLES = {
 
 /**
  * Button definitions for menu
- * Layout: START GAME (wide), then pairs (HIGH SCORES/ACHIEVEMENTS, COLLECTION/SUPPLY DROPS), OPTIONS (centered)
- * Color scheme per design: left column = cyan, right column = pink, START GAME = gold, OPTIONS = white
+ * Layout: PLAY (wide), SURVIVAL/GARAGE, OPTIONS.
+ * Secondary collection, drop, and achievement screens still exist, but are no
+ * longer first-screen decisions.
  */
 const menuButtons = {
     start: new Button({
-        text: 'START GAME',
+        text: 'PLAY',
         x: CANVAS.DESIGN_WIDTH / 2,
         y: CANVAS.DESIGN_HEIGHT / 2 - 30,
         width: 350,  // Wide primary button
@@ -883,7 +884,7 @@ const menuButtons = {
         autoSize: false
     }),
     highScores: new Button({
-        text: 'HIGH SCORES',
+        text: 'SURVIVAL',
         x: CANVAS.DESIGN_WIDTH / 2,
         y: CANVAS.DESIGN_HEIGHT / 2 + 30,
         width: 180,  // Half-width for paired buttons
@@ -909,7 +910,7 @@ const menuButtons = {
         autoSize: false
     }),
     collection: new Button({
-        text: 'COLLECTION',
+        text: 'GARAGE',
         x: CANVAS.DESIGN_WIDTH / 2,
         y: CANVAS.DESIGN_HEIGHT / 2 + 90,
         width: 180,
@@ -978,7 +979,7 @@ const menuButtons = {
 /**
  * Calculate adaptive menu button layout based on screen dimensions.
  * Scales button size and spacing for small screens (phones).
- * New layout: 4 rows (START GAME, pair, pair, OPTIONS)
+ * New layout: 3 rows (PLAY, secondary pair, OPTIONS)
  * @param {number} height - Available screen height
  * @param {number} width - Available screen width
  * @returns {Object} Layout configuration
@@ -1012,7 +1013,7 @@ function calculateMenuLayout(height, width) {
     // Footer area - for hint text and stats
     const footerAreaHeight = isCompact ? 40 : 80;
 
-    // Calculate available space for buttons (4 rows now, not 6)
+    // Calculate available space for buttons (3 rows)
     const availableHeight = height - titleAreaHeight - footerAreaHeight;
 
     // Default (desktop) layout values
@@ -1026,7 +1027,7 @@ function calculateMenuLayout(height, width) {
     const defaultFontSize = UI.FONT_SIZE_LARGE;
 
     // Calculate scale factor based on available height
-    const numRows = 4;
+    const numRows = 3;
     const defaultTotalHeight = (numRows - 1) * defaultRowSpacing + defaultPrimaryHeight;
     const scaleFactor = Math.min(1, availableHeight / defaultTotalHeight);
 
@@ -1106,12 +1107,12 @@ function updateMenuButtonPositions() {
     const layout = calculateMenuLayout(height, width);
     currentMenuLayout = layout;
 
-    // Row 0: START GAME (centered, wide)
+    // Row 0: PLAY (centered, wide)
     menuButtons.start.setPosition(centerX, layout.startY);
     menuButtons.start.setSize(layout.primaryWidth, layout.primaryHeight);
     menuButtons.start.fontSize = layout.primaryFontSize;
 
-    // Row 1: HIGH SCORES (left) and ACHIEVEMENTS (right)
+    // Row 1: SURVIVAL (left) and GARAGE (right)
     const row1Y = layout.startY + layout.rowSpacing;
     const pairOffset = (layout.pairedWidth + layout.pairGap) / 2;
 
@@ -1119,24 +1120,17 @@ function updateMenuButtonPositions() {
     menuButtons.highScores.setSize(layout.pairedWidth, layout.secondaryHeight);
     menuButtons.highScores.fontSize = layout.secondaryFontSize;
 
-    menuButtons.achievements.setPosition(centerX + pairOffset, row1Y);
-    menuButtons.achievements.setSize(layout.pairedWidth, layout.secondaryHeight);
-    menuButtons.achievements.fontSize = layout.secondaryFontSize;
-
-    // Row 2: COLLECTION (left) and SUPPLY DROPS (right)
-    const row2Y = layout.startY + layout.rowSpacing * 2;
-
-    menuButtons.collection.setPosition(centerX - pairOffset, row2Y);
+    menuButtons.collection.setPosition(centerX + pairOffset, row1Y);
     menuButtons.collection.setSize(layout.pairedWidth, layout.secondaryHeight);
     menuButtons.collection.fontSize = layout.secondaryFontSize;
 
-    menuButtons.supplyDrop.setPosition(centerX + pairOffset, row2Y);
-    menuButtons.supplyDrop.setSize(layout.pairedWidth, layout.secondaryHeight);
-    menuButtons.supplyDrop.fontSize = layout.secondaryFontSize;
+    // Hidden from the simplified home screen, but preserved for direct state use.
+    menuButtons.achievements.setPosition(-1000, -1000);
+    menuButtons.supplyDrop.setPosition(-1000, -1000);
 
-    // Row 3: OPTIONS (centered)
-    const row3Y = layout.startY + layout.rowSpacing * 3;
-    menuButtons.options.setPosition(centerX, row3Y);
+    // Row 2: OPTIONS (centered)
+    const row2Y = layout.startY + layout.rowSpacing * 2;
+    menuButtons.options.setPosition(centerX, row2Y);
     menuButtons.options.setSize(layout.optionsWidth, layout.secondaryHeight);
     menuButtons.options.fontSize = layout.secondaryFontSize;
 
@@ -1291,57 +1285,22 @@ function handleMenuClick(pos) {
 
     if (menuButtons.start.containsPoint(pos.x, pos.y)) {
         menuButtons.start.setPressed(true);
-        // Play click sound
         Sound.playClickSound();
-        // Start fade-out transition, then go to MODE_SELECT state
-        startMenuTransition(GAME_STATES.MODE_SELECT);
+        startMenuTransition(GAME_STATES.LEVEL_SELECT);
     } else if (menuButtons.highScores.containsPoint(pos.x, pos.y)) {
         menuButtons.highScores.setPressed(true);
-        // Play click sound
         Sound.playClickSound();
-        // Go to HIGH_SCORES state
-        Game.setState(GAME_STATES.HIGH_SCORES);
-    } else if (menuButtons.achievements.containsPoint(pos.x, pos.y)) {
-        menuButtons.achievements.setPressed(true);
-        // Play click sound
-        Sound.playClickSound();
-        // Mark achievements as viewed when opening the screen
-        markAllAchievementsViewed();
-        // Go to ACHIEVEMENTS state
-        Game.setState(GAME_STATES.ACHIEVEMENTS);
+        Game.setState(GAME_STATES.DIFFICULTY_SELECT);
     } else if (menuButtons.collection.containsPoint(pos.x, pos.y)) {
         menuButtons.collection.setPressed(true);
-        // Play click sound
         Sound.playClickSound();
-        // Mark new tanks as viewed when opening collection
         TankCollection.markAllTanksViewed();
-        // Go to COLLECTION state
         Game.setState(GAME_STATES.COLLECTION);
-    } else if (menuButtons.supplyDrop.containsPoint(pos.x, pos.y)) {
-        menuButtons.supplyDrop.setPressed(true);
-        // Play click sound
-        Sound.playClickSound();
-        // Go to SUPPLY_DROP state
-        Game.setState(GAME_STATES.SUPPLY_DROP);
     } else if (menuButtons.options.containsPoint(pos.x, pos.y) && !menuButtons.options.disabled) {
         menuButtons.options.setPressed(true);
-        // Play click sound
         Sound.playClickSound();
-        // Show options overlay with volume controls
         optionsOverlayVisible = true;
         console.log('Options overlay opened');
-    } else if (menuButtons.dailyChallenges.containsPoint(pos.x, pos.y)) {
-        menuButtons.dailyChallenges.setPressed(true);
-        // Play click sound
-        Sound.playClickSound();
-        // Show daily challenges panel
-        EngagementUI.showChallengePanel();
-    } else if (menuButtons.dailyRewards.containsPoint(pos.x, pos.y)) {
-        menuButtons.dailyRewards.setPressed(true);
-        // Play click sound
-        Sound.playClickSound();
-        // Show daily rewards popup
-        EngagementUI.showDailyRewardsPopup();
     }
 }
 
@@ -1874,10 +1833,6 @@ function renderMenu(ctx) {
         drawNeonSubtitle,
         drawMenuMetricTile,
         menuButtons,
-        getUnviewedCount,
-        getNewTankCount: TankCollection.getNewTankCount,
-        getDailyChallengeCompletionCounts: DailyChallenges.getCompletionCounts,
-        canClaimDailyReward: DailyRewards.canClaim,
         getTokenBalance: Tokens.getTokenBalance,
         getBestRoundCount: HighScores.getBestRoundCount,
         getTotalStars: Stars.getTotalStars,
@@ -1951,14 +1906,8 @@ function setupMenuState() {
             TitleScene.start();
             const didScheduleNameEntry = scheduleDeferredNameEntryIfNeeded();
 
-            // Auto-show daily reward popup if claimable (slight delay for transition)
-            if (!didScheduleNameEntry && EngagementUI.shouldShowDailyReward()) {
-                setTimeout(() => {
-                    if (Game.getState() === GAME_STATES.MENU && !NameEntry.isOpen()) {
-                        EngagementUI.showDailyRewardsPopup();
-                    }
-                }, 500);
-            }
+            // Keep the home screen calm: no automatic daily reward modal.
+            void didScheduleNameEntry;
         },
         onExit: (toState) => {
             console.log('Exiting MENU state');
@@ -2072,9 +2021,9 @@ function setupMenuState() {
                 return;
             }
 
-            // Space/Enter starts game (only if options not open) - go to mode selection
+            // Space/Enter starts the primary level journey.
             if (!optionsOverlayVisible && (keyCode === 'Space' || keyCode === 'Enter')) {
-                Game.setState(GAME_STATES.MODE_SELECT);
+                Game.setState(GAME_STATES.LEVEL_SELECT);
             }
         }
     });
@@ -7586,13 +7535,7 @@ async function init() {
     // On initial startup, defer first-time name entry until after first completed round.
     // (The MENU onEnter handler doesn't fire on initial state since Game.init() sets state directly.)
     const didScheduleNameEntry = scheduleDeferredNameEntryIfNeeded();
-    if (!didScheduleNameEntry && EngagementUI.shouldShowDailyReward()) {
-        setTimeout(() => {
-            if (Game.getState() === GAME_STATES.MENU && !NameEntry.isOpen()) {
-                EngagementUI.showDailyRewardsPopup();
-            }
-        }, 500);
-    }
+    void didScheduleNameEntry;
 
     // Register performance tracking callback for achievement unlocks (grants +15% bonus)
     onAchievementUnlock(() => {
