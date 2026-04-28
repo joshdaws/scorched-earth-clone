@@ -393,6 +393,7 @@ export function render(ctx) {
     // Render components
     renderHeader(ctx);
     renderLevelGrid(ctx);
+    renderLevelFocusPanel(ctx);
     renderWorldNavigation(ctx);
     renderBackButton(ctx);
     renderFooter(ctx);
@@ -547,6 +548,10 @@ function renderLevelButton(ctx, { rect, levelNum, level, stars, unlocked, isHove
         ctx.fillText(String(levelNum), centerX, centerY - 12);
         ctx.shadowBlur = 0;
 
+        if (level?.progression?.isIntroLevel) {
+            renderNewAmmoBadge(ctx, x + width - 42, y + 8, theme, pulseIntensity);
+        }
+
         // Star display
         renderStars(ctx, centerX, centerY + 28, stars, isHovered);
     } else {
@@ -557,6 +562,104 @@ function renderLevelButton(ctx, { rect, levelNum, level, stars, unlocked, isHove
         ctx.textBaseline = 'middle';
         ctx.fillText('\uD83D\uDD12', centerX, centerY); // Lock emoji
     }
+
+    ctx.restore();
+}
+
+function renderNewAmmoBadge(ctx, x, y, theme, pulseIntensity) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(10, 10, 26, 0.9)';
+    ctx.strokeStyle = theme.primaryColor;
+    ctx.lineWidth = 1;
+    ctx.shadowColor = theme.primaryColor;
+    ctx.shadowBlur = 5 + pulseIntensity * 5;
+    ctx.beginPath();
+    ctx.roundRect(x, y, 34, 16, 4);
+    ctx.fill();
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = theme.primaryColor;
+    ctx.font = `bold 9px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('NEW', x + 17, y + 8);
+    ctx.restore();
+}
+
+function getFeaturedLevel() {
+    if (hoveredLevel >= 0) {
+        const hoveredLevelNum = hoveredLevel + 1;
+        if (isLevelUnlocked(currentWorld, hoveredLevelNum)) {
+            return LevelRegistry.getLevelByNumber(currentWorld, hoveredLevelNum);
+        }
+    }
+
+    for (let levelNum = 1; levelNum <= LEVEL_CONSTANTS.LEVELS_PER_WORLD; levelNum++) {
+        if (!isLevelUnlocked(currentWorld, levelNum)) continue;
+        const level = LevelRegistry.getLevelByNumber(currentWorld, levelNum);
+        if (level && Stars.getForLevel(level.id) < 3) {
+            return level;
+        }
+    }
+
+    return LevelRegistry.getLevelByNumber(currentWorld, 1);
+}
+
+function truncateText(ctx, text, maxWidth) {
+    if (!text || ctx.measureText(text).width <= maxWidth) return text || '';
+
+    let truncated = text;
+    while (truncated.length > 0 && ctx.measureText(`${truncated}...`).width > maxWidth) {
+        truncated = truncated.slice(0, -1);
+    }
+    return `${truncated}...`;
+}
+
+function renderLevelFocusPanel(ctx) {
+    const level = getFeaturedLevel();
+    if (!level?.progression) return;
+
+    const theme = WORLD_THEMES[currentWorld];
+    const { startY, gridHeight } = getGridLayout();
+    const panelY = startY + gridHeight + 22;
+    const panelWidth = Math.min(760, Renderer.getWidth() - 180);
+    const panelX = (Renderer.getWidth() - panelWidth) / 2;
+    const progression = level.progression;
+    const introText = progression.isIntroLevel
+        ? `NEW AMMO: ${progression.introducedWeaponName}`
+        : `FOCUS: ${progression.mechanic}`;
+    const loadoutText = `LOADOUT: ${progression.loadoutWeaponNames.join(', ')}`;
+
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    ctx.fillStyle = theme.primaryColor;
+    ctx.font = `bold 16px ${UI.FONT_FAMILY}`;
+    ctx.shadowColor = theme.primaryColor;
+    ctx.shadowBlur = 8;
+    ctx.fillText(`${level.world}-${level.level} ${progression.title}`, Renderer.getWidth() / 2, panelY);
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = progression.isIntroLevel ? COLORS.NEON_YELLOW : COLORS.NEON_CYAN;
+    ctx.font = `bold 13px ${UI.FONT_FAMILY}`;
+    ctx.fillText(introText, Renderer.getWidth() / 2, panelY + 20);
+
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.font = `12px ${UI.FONT_FAMILY}`;
+    ctx.fillText(truncateText(ctx, progression.summary, panelWidth), Renderer.getWidth() / 2, panelY + 39);
+
+    ctx.fillStyle = COLORS.TEXT_MUTED;
+    ctx.font = `11px ${UI.FONT_FAMILY}`;
+    ctx.fillText(truncateText(ctx, loadoutText, panelWidth), Renderer.getWidth() / 2, panelY + 56);
+
+    ctx.strokeStyle = `${theme.secondaryColor}66`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(panelX, panelY + 70);
+    ctx.lineTo(panelX + panelWidth, panelY + 70);
+    ctx.stroke();
 
     ctx.restore();
 }

@@ -48,6 +48,41 @@ test.describe('level mode journey', () => {
     failures.expectNoFailures();
   });
 
+  test('ammo intro levels grant the curated practice loadout', async ({ page }) => {
+    const failures = trackConsoleFailures(page);
+    await bootGame(page, '/');
+
+    const result = await page.evaluate(async () => {
+      window.TestAPI.completeLevelForQa({
+        levelId: 'world1-level1',
+        stats: { damageDealt: 260, accuracy: 1, turnsUsed: 1, won: true }
+      });
+
+      const { LevelRegistry } = await import('/js/levels.js');
+      const level = LevelRegistry.getLevel('world1-level2');
+      window.dispatchEvent(new CustomEvent('levelSelected', {
+        detail: { levelId: level.id, level, worldNum: 1, levelNum: 2 }
+      }));
+      await new Promise(resolve => setTimeout(resolve, 600));
+
+      const controls = window.TestAPI.getControlState();
+      return {
+        progression: level.progression,
+        weapon: controls.state.player?.weapon,
+        inventory: controls.state.player?.inventory
+      };
+    });
+
+    expect(result.progression).toMatchObject({
+      title: 'Tracer Trial',
+      introducedWeapon: 'tracer',
+      isIntroLevel: true
+    });
+    expect(result.weapon).toBe('tracer');
+    expect(result.inventory.tracer).toBe(6);
+    failures.expectNoFailures();
+  });
+
   test('star totals unlock the next world and replay only improves records', async ({ page }) => {
     const failures = trackConsoleFailures(page);
     await bootGame(page, '/');

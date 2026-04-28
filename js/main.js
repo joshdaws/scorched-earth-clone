@@ -4794,6 +4794,33 @@ function getAvailableWeapons() {
 }
 
 /**
+ * Grant the curated loadout for level-mode play.
+ * This keeps level mode focused on mechanic practice instead of pre-level shop prep.
+ * @param {Tank} tank - Player tank
+ * @param {object} level - Level definition
+ */
+function applyLevelLoadout(tank, level) {
+    if (!tank || !level) return;
+
+    const loadout = LevelRegistry.getLoadout(level);
+    tank.inventory = { ...loadout };
+
+    const introWeapon = level.progression?.introducedWeapon;
+    if (introWeapon && tank.getAmmo(introWeapon) > 0) {
+        tank.setWeapon(introWeapon);
+    } else {
+        tank.setWeapon('basic-shot');
+    }
+
+    console.log('[Main] Applied level loadout', {
+        levelId: level.id,
+        mechanic: level.progression?.mechanic,
+        inventory: tank.inventory,
+        selectedWeapon: tank.currentWeapon
+    });
+}
+
+/**
  * Handle weapon select input event.
  * Cycles through available weapons that the player has ammo for.
  * The cycle order follows the weapon registry order:
@@ -5717,9 +5744,11 @@ function setupPlayingState() {
             if (savedPlayerInventory) {
                 playerTank.inventory = savedPlayerInventory;
                 console.log('[Main] Restored player inventory from previous round');
+            } else if (isLevelMode && currentLevelData) {
+                applyLevelLoadout(playerTank, currentLevelData);
             }
-            // Note: New games start with only basic-shot (default tank inventory)
-            // Additional weapons must be purchased from the shop
+            // Endless runs start with only basic-shot; level mode receives a
+            // curated practice loadout for its current mechanic.
 
             // Hidden achievement: track initial inventory for Minimalist detection
             HiddenAchievements.onInventoryChanged(playerTank.inventory);

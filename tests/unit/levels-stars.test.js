@@ -5,6 +5,8 @@ import {
   LevelRegistry,
   WORLD_THEMES
 } from '../../js/levels.js';
+import { getProgressionMilestones } from '../../js/level-progression.js';
+import { WeaponRegistry } from '../../js/weapons.js';
 import {
   STORAGE_KEY,
   Stars,
@@ -96,7 +98,57 @@ describe('level registry', () => {
       });
       expect(level.rewards.coins).toBeGreaterThan(0);
       expect(level.rewards.firstClear).toBeGreaterThan(0);
+      expect(level.progression).toMatchObject({
+        title: expect.any(String),
+        mechanic: expect.any(String),
+        summary: expect.any(String),
+        isIntroLevel: expect.any(Boolean),
+        loadout: expect.any(Object),
+        loadoutWeaponNames: expect.any(Array)
+      });
+      expect(level.progression.loadout['basic-shot']).toBe(Infinity);
     }
+  });
+
+  it('maps the journey to staged ammo introductions and curated level loadouts', () => {
+    const milestones = getProgressionMilestones();
+    const introMilestones = milestones.filter(milestone => milestone.introducedWeapon);
+
+    expect(milestones[0]).toMatchObject({
+      levelId: 'world1-level1',
+      title: 'Aim Lab'
+    });
+    expect(introMilestones.length).toBeGreaterThan(20);
+
+    for (const milestone of introMilestones) {
+      const weapon = WeaponRegistry.getWeapon(milestone.introducedWeapon);
+      const level = LevelRegistry.getLevel(milestone.levelId);
+
+      expect(weapon).not.toBeNull();
+      expect(level.progression).toMatchObject({
+        isIntroLevel: true,
+        introducedWeapon: milestone.introducedWeapon,
+        introducedWeaponName: weapon.name
+      });
+      expect(LevelRegistry.getLoadout(level)[milestone.introducedWeapon]).toBeGreaterThan(0);
+    }
+
+    for (let i = 1; i < milestones.length; i++) {
+      const prev = LevelRegistry.parseLevelId(milestones[i - 1].levelId);
+      const next = LevelRegistry.parseLevelId(milestones[i].levelId);
+      const gap = (next.worldNum - prev.worldNum) * LEVEL_CONSTANTS.LEVELS_PER_WORLD +
+        (next.levelNum - prev.levelNum);
+      expect(gap).toBeLessThanOrEqual(2);
+    }
+
+    expect(LevelRegistry.getLevel('world2-level4').progression).toMatchObject({
+      title: 'MIRV Trial',
+      isIntroLevel: false
+    });
+    expect(LevelRegistry.getLoadout('world2-level4')).toMatchObject({
+      'basic-shot': Infinity,
+      mirv: 3
+    });
   });
 
   it('returns ordered world slices and defensive arrays', () => {

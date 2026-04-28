@@ -12,6 +12,11 @@
  */
 
 import { AI_DIFFICULTY } from './ai.js';
+import {
+    enrichLevelProgression,
+    getLevelLoadout,
+    getLevelProgression
+} from './level-progression.js';
 
 // =============================================================================
 // LEVEL CONSTANTS
@@ -1349,7 +1354,7 @@ const ALL_LEVELS = [
     ...WORLD_4_LEVELS,
     ...WORLD_5_LEVELS,
     ...WORLD_6_LEVELS
-];
+].map(enrichLevelProgression);
 
 // Create level lookup map
 const levelMap = new Map();
@@ -1475,6 +1480,24 @@ export const LevelRegistry = {
      */
     getLevelByNumber(worldNum, levelNum) {
         return levelMap.get(levelId(worldNum, levelNum)) || null;
+    },
+
+    /**
+     * Get the mechanic/weapon teaching metadata for a level.
+     * @param {string|object} levelOrId - Level ID or level definition
+     * @returns {object} Progression metadata
+     */
+    getProgression(levelOrId) {
+        return getLevelProgression(levelOrId);
+    },
+
+    /**
+     * Get the curated starting loadout for a level.
+     * @param {string|object} levelOrId - Level ID or level definition
+     * @returns {Object.<string, number>} Weapon ammo counts
+     */
+    getLoadout(levelOrId) {
+        return getLevelLoadout(levelOrId);
     },
 
     /**

@@ -1119,7 +1119,8 @@ export function getState() {
             health: player.health,
             angle: player.angle,
             power: player.power,
-            weapon: player.currentWeapon
+            weapon: player.currentWeapon,
+            inventory: { ...player.inventory }
         } : null,
         enemy: enemy ? {
             x: enemy.x,
