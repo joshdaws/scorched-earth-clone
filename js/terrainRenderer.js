@@ -13,10 +13,11 @@ export const TERRAIN_EDGE_COLOR = '#ff2a6d';
 export function renderTerrainScene(ctx, terrain, services = {}) {
     if (!terrain) return;
 
-    const renderPixiTerrainLayerToCanvas = services.renderPixiTerrainLayerToCanvas;
-    if (typeof renderPixiTerrainLayerToCanvas === 'function' && renderPixiTerrainLayerToCanvas(ctx, terrain)) {
-        return;
-    }
+    // The previous Pixi bridge rendered quickly in WebGL, but copying its full
+    // 1200x800 canvas back into the 2D frame cost 7-9ms per frame in browser
+    // smoke tests. Keep launch gameplay on the native Canvas terrain path until
+    // Pixi terrain can be composited as its own DOM layer without readback/copy.
+    void services.renderPixiTerrainLayerToCanvas;
 
     renderCanvasTerrain(ctx, terrain);
 }

@@ -30,15 +30,17 @@ function createTerrain() {
 }
 
 describe('terrainRenderer', () => {
-  it('delegates to the Pixi terrain layer when it renders successfully', () => {
+  it('keeps launch gameplay on the canvas terrain path even when Pixi is available', () => {
     const ctx = createCtx();
     const terrain = createTerrain();
     const renderPixiTerrainLayerToCanvas = vi.fn(() => true);
 
     renderTerrainScene(ctx, terrain, { renderPixiTerrainLayerToCanvas });
 
-    expect(renderPixiTerrainLayerToCanvas).toHaveBeenCalledWith(ctx, terrain);
-    expect(ctx.beginPath).not.toHaveBeenCalled();
+    expect(renderPixiTerrainLayerToCanvas).not.toHaveBeenCalled();
+    expect(ctx.beginPath).toHaveBeenCalledTimes(2);
+    expect(ctx.fill).toHaveBeenCalledTimes(1);
+    expect(ctx.stroke).toHaveBeenCalledTimes(1);
   });
 
   it('falls back to the canvas terrain path when Pixi is unavailable', () => {
