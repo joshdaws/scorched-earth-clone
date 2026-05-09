@@ -25,7 +25,7 @@ The game is complete only when all of the following are true:
 | --- | --- | --- |
 | Use `$imagegen` | Generated supply-drop and weapon-icon raster assets were added under `assets/images/...`; manifest now covers all 40 weapon icons and 40 projectile visual entries; `tests/unit/weapon-visual-assets.test.js` passed in `npm run check`. | Covered for current asset replacement work. |
 | Use `$computer-use` | `mcp__computer_use__.list_apps` saw Google Chrome running. `mcp__computer_use__.get_app_state({ app: "Google Chrome" })` failed with `Apple event error -10005: cgWindowNotFound`. Earlier attempts hit the same failure. | Blocked by tool/app-state failure; browser verification uses Playwright instead. |
-| Open a browser and play/verify the game | `npm run smoke:browser -- --scenario controls --quality balanced` passed and wrote `artifacts/browser-smoke/2026-05-09T19-24-12-185Z-controls.png` plus metrics/console JSON. Playwright collection/drop flow passed. | Covered through repo browser automation, not Computer Use. |
+| Open a browser and play/verify the game | `npm run smoke:browser -- --scenario controls --quality balanced` passed and wrote `artifacts/browser-smoke/2026-05-09T19-24-12-185Z-controls.png` plus metrics/console JSON. Expanded browser smokes for idle, projectile, terrain, high-scores, and visual impact also passed. Playwright collection/drop flow passed. | Covered through repo browser automation, not Computer Use. |
 | Map every feature branch | `docs/branch-map.md` maps `codex/gameplay-improvements`, `feature/game-engine-upgrade`, `native`, `legacy-v1`, `origin/codex/find-and-fix-important-bug`, `main`, and origin aliases with ahead/behind counts and disposition. | Covered. |
 | Replace temporary assets | `find assets -type f` found no files named placeholder/temp/test except reference grid templates. `rg` still finds placeholder fallback code in `js/assets.js`, tank fallback rendering, and historical spec docs. Manifest/file tests passed as part of `npm run check`. | Mostly covered for runtime files; fallback code remains intentionally for missing-load resilience. |
 | Weapon types increase in difficulty | Commits `7796310`, `bf9d30f`, and `6120d80` staged ammo progression and completed visual coverage. `tests/unit/weapon-bar.test.js`, `tests/unit/weapon-visual-assets.test.js`, and `tests/e2e/level-mode-journey.spec.js` passed through `npm run check`. | Covered by progression tests and weapon visual tests. |
@@ -34,7 +34,7 @@ The game is complete only when all of the following are true:
 | Long weapon scroller fixed | Compact weapon bar changes landed in `js/ui.js`/`js/main.js`; `tests/unit/weapon-bar.test.js` passed. | Covered. |
 | Secondary screens and star earning polished | Level-complete threshold/theme/button polish landed; Garage/Armory secondary progression entry points landed in `c499a26`; `tests/e2e/collection-gacha.spec.js` and `tests/unit/levels-stars.test.js` passed. | Covered in web automation. |
 | Animation where expected | Existing effect systems and level-complete/supply-drop flows are covered by e2e/smoke tests. `npm run audit:visual` passed 90 captures across title/menu, secondary screens, gameplay HUD, aiming, pause, shop, victory/defeat, round transition, level complete, impact effects, tank pivots, and terrain collapse. | Covered in automated visual audit; physical-device feel still needs TestFlight feedback. |
-| No lag / strong performance | `npm run check`, `npm run build`, `npm run ios:check`, and browser smoke controls passed. Prior projectile and terrain frame pacing work passed budgets. Current controls smoke wrote metrics JSON. | Covered for automated smoke paths; physical-device thermal/performance testing remains. |
+| No lag / strong performance | `npm run check`, `npm run build`, `npm run ios:check`, browser smoke controls, and expanded browser smokes passed. Latest balanced smoke p95 frame times: idle 16.7ms, projectile 16.7ms with max dropped backlog 50ms under the 80ms cap, terrain 16.7ms with zero dropped backlog, high-scores 9.2ms, visual impact 17.4ms. | Covered for automated smoke paths; physical-device thermal/performance testing remains. |
 | Ready to convert/sync to iOS | `npm run ios:check` passed, including build, release budget, and `npx cap sync ios`. | Covered for local Capacitor readiness. |
 | Ready to upload to App Store | Open/blocked beads remain: `scorched-earth-3fe.4` App Store submission preparation, `scorched-earth-3fe.5` Submit to App Store and launch, `scorched-earth-3fe.2` beta feedback, and deferred monetization epic `scorched-earth-ttk`. | Not complete. |
 
@@ -48,6 +48,11 @@ npm run test:e2e -- tests/e2e/collection-gacha.spec.js
 npm run build
 npm run ios:check
 npm run smoke:browser -- --scenario controls --quality balanced
+npm run smoke:browser -- --scenario idle --quality balanced
+npm run smoke:browser -- --scenario projectile --quality balanced --max-dropped-backlog-ms 80
+npm run smoke:browser -- --scenario terrain --quality balanced
+npm run smoke:browser -- --scenario high-scores --quality balanced
+npm run smoke:browser -- --scenario visual --scene visual-impact --quality balanced
 npm run audit:visual
 bd ready
 ```
@@ -71,6 +76,16 @@ The latest full visual audit passed:
 
 ```text
 Passed 90 captures. Summary: artifacts/visual-audit/2026-05-09T19-32-31-161Z/summary.json
+```
+
+The latest expanded browser smoke pass wrote these receipts:
+
+```text
+artifacts/browser-smoke/2026-05-09T19-39-07-669Z-idle.metrics.json
+artifacts/browser-smoke/2026-05-09T19-39-16-357Z-projectile.metrics.json
+artifacts/browser-smoke/2026-05-09T19-39-25-220Z-terrain.metrics.json
+artifacts/browser-smoke/2026-05-09T19-39-30-260Z-high-scores.metrics.json
+artifacts/browser-smoke/2026-05-09T19-39-38-199Z-visual.metrics.json
 ```
 
 ## Remaining Blockers
