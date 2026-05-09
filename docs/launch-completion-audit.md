@@ -64,6 +64,7 @@ The pushed branch is up to date with `origin/codex/gameplay-improvements` after:
 c499a26 Rehome progression entry points
 f7aa1f2 Document feature branch map
 a059189 Record launch completion audit
+450f105 Fix visual audit canvas sampling
 ```
 
 The latest full visual audit passed:
