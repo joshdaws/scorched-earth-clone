@@ -3985,14 +3985,33 @@ function hexToRgb(hex) {
 /**
  * Resolve generated projectile sprite for supported weapons.
  * @param {string} weaponId - Weapon id
- * @returns {HTMLImageElement|null}
+ * @returns {{image: HTMLImageElement, width: number, height: number, source: string}|null}
  */
 function getProjectileSprite(weaponId) {
     const key = PROJECTILE_ASSET_KEYS[weaponId];
-    if (!key) return null;
+    if (key) {
+        const sprite = Assets.get(key);
+        if (isRealSprite(sprite)) {
+            return {
+                image: sprite,
+                width: sprite.width,
+                height: sprite.height,
+                source: key
+            };
+        }
+    }
 
-    const sprite = Assets.get(key);
-    return isRealSprite(sprite) ? sprite : null;
+    const weaponIcon = Assets.get(`weaponIcons.${weaponId}`);
+    if (!isRealSprite(weaponIcon)) return null;
+
+    const weapon = WeaponRegistry.getWeapon(weaponId);
+    const size = weapon?.type === WEAPON_TYPES.NUCLEAR.id ? 18 : 14;
+    return {
+        image: weaponIcon,
+        width: size,
+        height: size,
+        source: `weaponIcons.${weaponId}`
+    };
 }
 
 /**
@@ -4132,7 +4151,7 @@ function renderProjectile(ctx, projectile) {
     const rgb = hexToRgb(projectileColor);
     const sprite = getProjectileSprite(projectile.weaponId);
 
-    if (sprite) {
+    if (sprite && !projectile.isDigging && !projectile.isDeployed) {
         renderProjectileAsset(ctx, projectile, sprite, x, y, projectileColor);
         return;
     }
@@ -4355,7 +4374,7 @@ function renderProjectile(ctx, projectile) {
  * Render a generated projectile sprite with the same glow language as procedural shots.
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  * @param {import('./projectile.js').Projectile} projectile - Active projectile
- * @param {HTMLImageElement} sprite - Loaded projectile sprite
+ * @param {{image: HTMLImageElement, width: number, height: number, source: string}} sprite - Loaded projectile sprite
  * @param {number} x - Projectile x
  * @param {number} y - Projectile y
  * @param {string} projectileColor - Glow color
@@ -4377,7 +4396,7 @@ function renderProjectileAsset(ctx, projectile, sprite, x, y, projectileColor) {
     ctx.shadowColor = projectileColor;
     ctx.shadowBlur = PROJECTILE_VISUAL.GLOW_BLUR;
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(sprite, -displayWidth / 2, -displayHeight / 2, displayWidth, displayHeight);
+    ctx.drawImage(sprite.image, -displayWidth / 2, -displayHeight / 2, displayWidth, displayHeight);
     ctx.restore();
 }
 

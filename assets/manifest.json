@@ -513,6 +513,12 @@
     }
   },
   "weaponIcons": {
+    "baby-shot": {
+      "path": "images/ui/weapon-icon-baby-shot.png",
+      "width": 64,
+      "height": 64,
+      "source": "imagegen-synthwave-weapon-atlas-2026-05-09"
+    },
     "basic-shot": {
       "path": "images/ui/weapon-icon-basic-shot.png",
       "width": 64,
@@ -528,6 +534,30 @@
       "width": 64,
       "height": 64
     },
+    "mega-shot": {
+      "path": "images/ui/weapon-icon-mega-shot.png",
+      "width": 64,
+      "height": 64,
+      "source": "imagegen-synthwave-weapon-atlas-2026-05-09"
+    },
+    "armor-piercer": {
+      "path": "images/ui/weapon-icon-armor-piercer.png",
+      "width": 64,
+      "height": 64,
+      "source": "imagegen-synthwave-weapon-atlas-2026-05-09"
+    },
+    "tracer": {
+      "path": "images/ui/weapon-icon-tracer.png",
+      "width": 64,
+      "height": 64,
+      "source": "imagegen-synthwave-weapon-atlas-2026-05-09"
+    },
+    "precision-strike": {
+      "path": "images/ui/weapon-icon-precision-strike.png",
+      "width": 64,
+      "height": 64,
+      "source": "imagegen-synthwave-weapon-atlas-2026-05-09"
+    },
     "mirv": {
       "path": "images/ui/weapon-icon-mirv.png",
       "width": 64,
@@ -537,6 +567,30 @@
       "path": "images/ui/weapon-icon-deaths-head.png",
       "width": 64,
       "height": 64
+    },
+    "cluster-bomb": {
+      "path": "images/ui/weapon-icon-cluster-bomb.png",
+      "width": 64,
+      "height": 64,
+      "source": "imagegen-synthwave-weapon-atlas-2026-05-09"
+    },
+    "chain-reaction": {
+      "path": "images/ui/weapon-icon-chain-reaction.png",
+      "width": 64,
+      "height": 64,
+      "source": "imagegen-synthwave-weapon-atlas-2026-05-09"
+    },
+    "scatter-shot": {
+      "path": "images/ui/weapon-icon-scatter-shot.png",
+      "width": 64,
+      "height": 64,
+      "source": "imagegen-synthwave-weapon-atlas-2026-05-09"
+    },
+    "fireworks": {
+      "path": "images/ui/weapon-icon-fireworks.png",
+      "width": 64,
+      "height": 64,
+      "source": "imagegen-synthwave-weapon-atlas-2026-05-09"
     },
     "roller": {
       "path": "images/ui/weapon-icon-roller.png",
@@ -548,6 +602,30 @@
       "width": 64,
       "height": 64
     },
+    "bouncer": {
+      "path": "images/ui/weapon-icon-bouncer.png",
+      "width": 64,
+      "height": 64,
+      "source": "imagegen-synthwave-weapon-atlas-2026-05-09"
+    },
+    "super-bouncer": {
+      "path": "images/ui/weapon-icon-super-bouncer.png",
+      "width": 64,
+      "height": 64,
+      "source": "imagegen-synthwave-weapon-atlas-2026-05-09"
+    },
+    "land-mine": {
+      "path": "images/ui/weapon-icon-land-mine.png",
+      "width": 64,
+      "height": 64,
+      "source": "imagegen-synthwave-weapon-atlas-2026-05-09"
+    },
+    "sticky-bomb": {
+      "path": "images/ui/weapon-icon-sticky-bomb.png",
+      "width": 64,
+      "height": 64,
+      "source": "imagegen-synthwave-weapon-atlas-2026-05-09"
+    },
     "digger": {
       "path": "images/ui/weapon-icon-digger.png",
       "width": 64,
@@ -558,6 +636,30 @@
       "width": 64,
       "height": 64
     },
+    "sandhog": {
+      "path": "images/ui/weapon-icon-sandhog.png",
+      "width": 64,
+      "height": 64,
+      "source": "imagegen-synthwave-weapon-atlas-2026-05-09"
+    },
+    "drill": {
+      "path": "images/ui/weapon-icon-drill.png",
+      "width": 64,
+      "height": 64,
+      "source": "imagegen-synthwave-weapon-atlas-2026-05-09"
+    },
+    "laser-drill": {
+      "path": "images/ui/weapon-icon-laser-drill.png",
+      "width": 64,
+      "height": 64,
+      "source": "imagegen-synthwave-weapon-atlas-2026-05-09"
+    },
+    "tunnel-maker": {
+      "path": "images/ui/weapon-icon-tunnel-maker.png",
+      "width": 64,
+      "height": 64,
+      "source": "imagegen-synthwave-weapon-atlas-2026-05-09"
+    },
     "mini-nuke": {
       "path": "images/ui/weapon-icon-mini-nuke.png",
       "width": 64,
@@ -567,6 +669,78 @@
       "path": "images/ui/weapon-icon-nuke.png",
       "width": 64,
       "height": 64
+    },
+    "tactical-nuke": {
+      "path": "images/ui/weapon-icon-tactical-nuke.png",
+      "width": 64,
+      "height": 64,
+      "source": "imagegen-synthwave-weapon-atlas-2026-05-09"
+    },
+    "neutron-bomb": {
+      "path": "images/ui/weapon-icon-neutron-bomb.png",
+      "width": 64,
+      "height": 64,
+      "source": "imagegen-synthwave-weapon-atlas-2026-05-09"
+    },
+    "emp-blast": {
+      "path": "images/ui/weapon-icon-emp-blast.png",
+      "width": 64,
+      "height": 64,
+      "source": "imagegen-synthwave-weapon-atlas-2026-05-09"
+    },
+    "fusion-strike": {
+      "path": "images/ui/weapon-icon-fusion-strike.png",
+      "width": 64,
+      "height": 64,
+      "source": "imagegen-synthwave-weapon-atlas-2026-05-09"
+    },
+    "napalm": {
+      "path": "images/ui/weapon-icon-napalm.png",
+      "width": 64,
+      "height": 64,
+      "source": "imagegen-synthwave-weapon-atlas-2026-05-09"
+    },
+    "liquid-dirt": {
+      "path": "images/ui/weapon-icon-liquid-dirt.png",
+      "width": 64,
+      "height": 64,
+      "source": "imagegen-synthwave-weapon-atlas-2026-05-09"
+    },
+    "teleporter": {
+      "path": "images/ui/weapon-icon-teleporter.png",
+      "width": 64,
+      "height": 64,
+      "source": "imagegen-synthwave-weapon-atlas-2026-05-09"
+    },
+    "shield-buster": {
+      "path": "images/ui/weapon-icon-shield-buster.png",
+      "width": 64,
+      "height": 64,
+      "source": "imagegen-synthwave-weapon-atlas-2026-05-09"
+    },
+    "wind-bomb": {
+      "path": "images/ui/weapon-icon-wind-bomb.png",
+      "width": 64,
+      "height": 64,
+      "source": "imagegen-synthwave-weapon-atlas-2026-05-09"
+    },
+    "gravity-well": {
+      "path": "images/ui/weapon-icon-gravity-well.png",
+      "width": 64,
+      "height": 64,
+      "source": "imagegen-synthwave-weapon-atlas-2026-05-09"
+    },
+    "lightning-strike": {
+      "path": "images/ui/weapon-icon-lightning-strike.png",
+      "width": 64,
+      "height": 64,
+      "source": "imagegen-synthwave-weapon-atlas-2026-05-09"
+    },
+    "ion-cannon": {
+      "path": "images/ui/weapon-icon-ion-cannon.png",
+      "width": 64,
+      "height": 64,
+      "source": "imagegen-synthwave-weapon-atlas-2026-05-09"
     }
   },
   "backgrounds": {
@@ -611,6 +785,216 @@
       },
       "tank-hit": {
         "path": "audio/sfx/armor-hit.wav"
+      }
+    }
+  },
+  "weaponVisuals": {
+    "projectileCoverage": {
+      "baby-shot": {
+        "renderMode": "bitmap",
+        "assetKey": "weaponIcons.baby-shot",
+        "approved": true
+      },
+      "basic-shot": {
+        "renderMode": "bitmap",
+        "assetKey": "projectiles.basic",
+        "approved": true
+      },
+      "missile": {
+        "renderMode": "bitmap",
+        "assetKey": "weaponIcons.missile",
+        "approved": true
+      },
+      "big-shot": {
+        "renderMode": "bitmap",
+        "assetKey": "weaponIcons.big-shot",
+        "approved": true
+      },
+      "mega-shot": {
+        "renderMode": "bitmap",
+        "assetKey": "weaponIcons.mega-shot",
+        "approved": true
+      },
+      "armor-piercer": {
+        "renderMode": "bitmap",
+        "assetKey": "weaponIcons.armor-piercer",
+        "approved": true
+      },
+      "tracer": {
+        "renderMode": "bitmap",
+        "assetKey": "weaponIcons.tracer",
+        "approved": true
+      },
+      "precision-strike": {
+        "renderMode": "bitmap",
+        "assetKey": "weaponIcons.precision-strike",
+        "approved": true
+      },
+      "mirv": {
+        "renderMode": "bitmap",
+        "assetKey": "projectiles.mirv",
+        "approved": true
+      },
+      "deaths-head": {
+        "renderMode": "bitmap",
+        "assetKey": "weaponIcons.deaths-head",
+        "approved": true
+      },
+      "cluster-bomb": {
+        "renderMode": "bitmap",
+        "assetKey": "weaponIcons.cluster-bomb",
+        "approved": true
+      },
+      "chain-reaction": {
+        "renderMode": "bitmap",
+        "assetKey": "weaponIcons.chain-reaction",
+        "approved": true
+      },
+      "scatter-shot": {
+        "renderMode": "bitmap",
+        "assetKey": "weaponIcons.scatter-shot",
+        "approved": true
+      },
+      "fireworks": {
+        "renderMode": "bitmap",
+        "assetKey": "weaponIcons.fireworks",
+        "approved": true
+      },
+      "roller": {
+        "renderMode": "bitmap",
+        "assetKey": "projectiles.roller",
+        "approved": true
+      },
+      "heavy-roller": {
+        "renderMode": "bitmap",
+        "assetKey": "projectiles.roller",
+        "approved": true
+      },
+      "bouncer": {
+        "renderMode": "bitmap",
+        "assetKey": "weaponIcons.bouncer",
+        "approved": true
+      },
+      "super-bouncer": {
+        "renderMode": "bitmap",
+        "assetKey": "weaponIcons.super-bouncer",
+        "approved": true
+      },
+      "land-mine": {
+        "renderMode": "hybrid",
+        "assetKey": "weaponIcons.land-mine",
+        "proceduralState": "deployed mine/bomb animation",
+        "approved": true
+      },
+      "sticky-bomb": {
+        "renderMode": "hybrid",
+        "assetKey": "weaponIcons.sticky-bomb",
+        "proceduralState": "deployed mine/bomb animation",
+        "approved": true
+      },
+      "digger": {
+        "renderMode": "bitmap",
+        "assetKey": "projectiles.digger",
+        "approved": true
+      },
+      "heavy-digger": {
+        "renderMode": "bitmap",
+        "assetKey": "projectiles.digger",
+        "approved": true
+      },
+      "sandhog": {
+        "renderMode": "hybrid",
+        "assetKey": "weaponIcons.sandhog",
+        "proceduralState": "deployed mine/bomb animation",
+        "approved": true
+      },
+      "drill": {
+        "renderMode": "hybrid",
+        "assetKey": "weaponIcons.drill",
+        "proceduralState": "deployed mine/bomb animation",
+        "approved": true
+      },
+      "laser-drill": {
+        "renderMode": "hybrid",
+        "assetKey": "weaponIcons.laser-drill",
+        "proceduralState": "deployed mine/bomb animation",
+        "approved": true
+      },
+      "tunnel-maker": {
+        "renderMode": "hybrid",
+        "assetKey": "weaponIcons.tunnel-maker",
+        "proceduralState": "deployed mine/bomb animation",
+        "approved": true
+      },
+      "mini-nuke": {
+        "renderMode": "bitmap",
+        "assetKey": "projectiles.miniNuke",
+        "approved": true
+      },
+      "nuke": {
+        "renderMode": "bitmap",
+        "assetKey": "projectiles.nuke",
+        "approved": true
+      },
+      "tactical-nuke": {
+        "renderMode": "bitmap",
+        "assetKey": "weaponIcons.tactical-nuke",
+        "approved": true
+      },
+      "neutron-bomb": {
+        "renderMode": "bitmap",
+        "assetKey": "weaponIcons.neutron-bomb",
+        "approved": true
+      },
+      "emp-blast": {
+        "renderMode": "bitmap",
+        "assetKey": "weaponIcons.emp-blast",
+        "approved": true
+      },
+      "fusion-strike": {
+        "renderMode": "bitmap",
+        "assetKey": "weaponIcons.fusion-strike",
+        "approved": true
+      },
+      "napalm": {
+        "renderMode": "bitmap",
+        "assetKey": "weaponIcons.napalm",
+        "approved": true
+      },
+      "liquid-dirt": {
+        "renderMode": "bitmap",
+        "assetKey": "weaponIcons.liquid-dirt",
+        "approved": true
+      },
+      "teleporter": {
+        "renderMode": "bitmap",
+        "assetKey": "weaponIcons.teleporter",
+        "approved": true
+      },
+      "shield-buster": {
+        "renderMode": "bitmap",
+        "assetKey": "weaponIcons.shield-buster",
+        "approved": true
+      },
+      "wind-bomb": {
+        "renderMode": "bitmap",
+        "assetKey": "weaponIcons.wind-bomb",
+        "approved": true
+      },
+      "gravity-well": {
+        "renderMode": "bitmap",
+        "assetKey": "weaponIcons.gravity-well",
+        "approved": true
+      },
+      "lightning-strike": {
+        "renderMode": "bitmap",
+        "assetKey": "weaponIcons.lightning-strike",
+        "approved": true
+      },
+      "ion-cannon": {
+        "renderMode": "bitmap",
+        "assetKey": "weaponIcons.ion-cannon",
+        "approved": true
       }
     }
   }
