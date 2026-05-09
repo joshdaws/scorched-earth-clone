@@ -164,6 +164,22 @@ Confirm again when the final build configuration is selected.
 The iOS target supports both iPhone and iPad in landscape. Apple currently
 accepts one to ten screenshots per device size.
 
+Generate release-build screenshot sets with:
+
+```bash
+npm run screenshots:app-store
+```
+
+The script writes PNGs plus `summary.json` and `index.md` under
+`artifacts/app-store-screenshots/<timestamp>/`. It captures the recommended
+sequence from the built `www` bundle served through Vite preview.
+
+Latest verified local release-build set:
+
+- `artifacts/app-store-screenshots/2026-05-09T20-00-50-710Z/summary.json`
+- 24 captures passed across iPhone 6.9-inch, iPhone 6.5-inch, iPhone 5.5-inch,
+  and iPad 13-inch landscape slots.
+
 | Slot | Required status | Landscape dimensions | Notes |
 | --- | --- | --- | --- |
 | iPhone 6.9-inch | Preferred current iPhone top tier | `2736x1260`, `2796x1290`, or `2868x1320` | If this set is provided, 6.5-inch screenshots are not required for 6.9-inch scaling. |
@@ -197,8 +213,9 @@ Existing source captures that can guide final screenshot selection:
 - `artifacts/visual-audit/2026-05-09T19-32-31-161Z/shop-ipad.png`
 
 These visual-audit captures are validation receipts, not final App Store
-screenshots. Final captures should be produced at Apple-accepted pixel sizes,
-from the release build or TestFlight build, with no debug overlays.
+screenshots. Use `npm run screenshots:app-store` for Apple-accepted pixel sizes
+from the release build, then repeat from TestFlight on real devices before
+submission if final review screenshots must match the uploaded native build.
 
 ## Icon And Launch Assets
 
@@ -224,5 +241,6 @@ The following remain outside this local documentation task:
 - TestFlight build upload, physical device testing, and beta feedback.
 - Any monetization/IAP/ads configuration if the deferred monetization epic is
   unblocked later.
-- Final screenshots captured from a release/TestFlight build at Apple-accepted
-  pixel dimensions.
+- Final screenshot selection/upload in App Store Connect. Local release-build
+  screenshot generation is automated; TestFlight/device recapture may still be
+  needed for final submission.

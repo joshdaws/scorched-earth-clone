@@ -24,7 +24,7 @@ The game is complete only when all of the following are true:
 | Requirement | Evidence inspected | Status |
 | --- | --- | --- |
 | Use `$imagegen` | Generated supply-drop and weapon-icon raster assets were added under `assets/images/...`; manifest now covers all 40 weapon icons and 40 projectile visual entries; `tests/unit/weapon-visual-assets.test.js` passed in `npm run check`. | Covered for current asset replacement work. |
-| Use `$computer-use` | `mcp__computer_use__.list_apps` saw Google Chrome running. `mcp__computer_use__.get_app_state({ app: "Google Chrome" })` failed with `Apple event error -10005: cgWindowNotFound`. Earlier attempts hit the same failure. | Blocked by tool/app-state failure; browser verification uses Playwright instead. |
+| Use `$computer-use` | Opened the Vite preview in Google Chrome, read the app state through Computer Use, clicked Play, selected level 1, and reached the gameplay HUD with the Your Turn state, weapon bar, and Fire button visible. Earlier attempts failed with `cgWindowNotFound`, but the Chrome target is now drivable in this session. | Covered for the current browser click-through. |
 | Open a browser and play/verify the game | `npm run smoke:browser -- --scenario controls --quality balanced` passed and wrote `artifacts/browser-smoke/2026-05-09T19-24-12-185Z-controls.png` plus metrics/console JSON. Expanded browser smokes for idle, projectile, terrain, high-scores, and visual impact also passed. Playwright collection/drop flow passed. | Covered through repo browser automation, not Computer Use. |
 | Map every feature branch | `docs/branch-map.md` maps `codex/gameplay-improvements`, `feature/game-engine-upgrade`, `native`, `legacy-v1`, `origin/codex/find-and-fix-important-bug`, `main`, and origin aliases with ahead/behind counts and disposition. | Covered. |
 | Replace temporary assets | `find assets -type f` found no files named placeholder/temp/test except reference grid templates. `rg` still finds placeholder fallback code in `js/assets.js`, tank fallback rendering, and historical spec docs. Manifest/file tests passed as part of `npm run check`. | Mostly covered for runtime files; fallback code remains intentionally for missing-load resilience. |
@@ -54,6 +54,8 @@ npm run smoke:browser -- --scenario terrain --quality balanced
 npm run smoke:browser -- --scenario high-scores --quality balanced
 npm run smoke:browser -- --scenario visual --scene visual-impact --quality balanced
 npm run audit:visual
+npm run screenshots:app-store -- --skip-build --devices iphone-6-5 --targets 01-title-menu
+npm run screenshots:app-store
 bd ready
 ```
 
@@ -70,12 +72,27 @@ The build gate now verifies that `www/index.html` references existing generated
 JS/CSS chunks, after browser verification found that the old static asset copy
 step could delete the Vite bundle from `www/assets`.
 
+App Store screenshot capture is automated by:
+
+```text
+scripts/capture-app-store-screenshots.js
+npm run screenshots:app-store
+```
+
+The latest full App Store screenshot capture passed 24 captures across four
+device slots and six recommended scenes:
+
+```text
+artifacts/app-store-screenshots/2026-05-09T20-00-50-710Z/summary.json
+```
+
 Local App Store material preparation now has an in-repo draft:
 
 ```text
 docs/release/app-store-materials.md
 public/privacy.html
 public/support.html
+scripts/capture-app-store-screenshots.js
 ```
 
 `bd ready` reports:
@@ -117,8 +134,7 @@ The objective is not complete because App Store launch readiness cannot be hones
 - `scorched-earth-3fe.5` is still open and depends on `scorched-earth-3fe.4`. It requires uploading the final build, Apple approval, launch date, live App Store release, and post-launch monitoring.
 - `scorched-earth-3fe.2` is blocked pending TestFlight/beta setup and feedback. It requires real beta tester feedback and P0/P1 bug triage.
 - `scorched-earth-ttk` and its monetization children are explicitly deferred by notes: "Do not work on this epic until explicitly unblocked by Josh." This blocks any App Store path that requires ads/IAP products.
-- `docs/release/app-store-materials.md` drafts metadata and a screenshot inventory, and local privacy/support pages now exist with in-app Settings navigation, but deployed public URLs, any region-specific support contact details, owner copyright string, final pricing/availability, TestFlight build, and final release screenshots still need owner/account work.
-- Computer Use cannot currently drive Chrome because the plugin returns `cgWindowNotFound`; browser verification is covered through Playwright instead.
+- `docs/release/app-store-materials.md` drafts metadata and a screenshot inventory, local privacy/support pages now exist with in-app Settings navigation, and release-build App Store screenshot capture is automated. Deployed public URLs, any region-specific support contact details, owner copyright string, final pricing/availability, TestFlight build, final screenshot selection/upload, and App Store Connect submission still need owner/account work.
 
 ## Conclusion
 
