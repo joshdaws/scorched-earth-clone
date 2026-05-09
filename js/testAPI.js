@@ -88,6 +88,16 @@ let playerAimRef = null;
 let onTerrainChangeCallback = null;
 
 // =============================================================================
+
+function isTankDestroyed(tank) {
+    if (!tank) return true;
+    if (typeof tank.isDestroyed === 'function') {
+        return tank.isDestroyed();
+    }
+    return Boolean(tank.isDestroyed);
+}
+
+// =============================================================================
 // INITIALIZATION
 // =============================================================================
 
@@ -469,21 +479,8 @@ export function simulateProjectile(options = {}) {
             break;
         }
 
-        // Check terrain collision
-        if (currentTerrain) {
-            const terrainHeight = currentTerrain.getHeight(Math.floor(x));
-            const terrainY = screenHeight - terrainHeight;
-            if (y >= terrainY) {
-                result.terrainHit = true;
-                result.landingX = x;
-                result.landingY = terrainY;
-                trajectory.push({ x, y: terrainY, t: step });
-                break;
-            }
-        }
-
-        // Check tank collision (simple bounding box)
-        if (enemy && !enemy.isDestroyed) {
+        // Match gameplay order: tank collision resolves before terrain collision.
+        if (enemy && !isTankDestroyed(enemy)) {
             const dx = Math.abs(x - enemy.x);
             const dy = Math.abs(y - (enemy.y - TANK.HEIGHT / 2));
             if (dx < TANK.WIDTH / 2 && dy < TANK.HEIGHT / 2) {
@@ -493,13 +490,26 @@ export function simulateProjectile(options = {}) {
                 break;
             }
         }
-        if (player && !player.isDestroyed && step > 10) {  // Skip first few frames to avoid self-hit
+        if (player && !isTankDestroyed(player) && step > 10) {  // Skip first few frames to avoid self-hit
             const dx = Math.abs(x - player.x);
             const dy = Math.abs(y - (player.y - TANK.HEIGHT / 2));
             if (dx < TANK.WIDTH / 2 && dy < TANK.HEIGHT / 2) {
                 result.tankHit = 'player';
                 result.landingX = x;
                 result.landingY = y;
+                break;
+            }
+        }
+
+        // Check terrain collision
+        if (currentTerrain) {
+            const terrainHeight = currentTerrain.getHeight(Math.floor(x));
+            const terrainY = screenHeight - terrainHeight;
+            if (y >= terrainY) {
+                result.terrainHit = true;
+                result.landingX = x;
+                result.landingY = terrainY;
+                trajectory.push({ x, y: terrainY, t: step });
                 break;
             }
         }
@@ -618,10 +628,10 @@ export function fireAndCollect(options = {}) {
         const player = module.playerTank || playerTank;
         const enemy = module.enemyTank || enemyTank;
 
-        if (player && !player.isDestroyed) {
+        if (player && !isTankDestroyed(player)) {
             playerDamage = calculateDamage(explosion, player, weapon);
         }
-        if (enemy && !enemy.isDestroyed) {
+        if (enemy && !isTankDestroyed(enemy)) {
             enemyDamage = calculateDamage(explosion, enemy, weapon);
         }
     }
@@ -1139,7 +1149,7 @@ export function getState() {
             power: enemy.power,
             weapon: enemy.currentWeapon,
             inventory: { ...enemy.inventory },
-            isDestroyed: enemy.isDestroyed
+            isDestroyed: isTankDestroyed(enemy)
         } : null
     };
 }
@@ -1430,14 +1440,14 @@ export function snapshot(name) {
         angle: player.angle,
         power: player.power,
         currentWeapon: player.currentWeapon,
-        isDestroyed: player.isDestroyed || false
+        isDestroyed: isTankDestroyed(player)
     } : null;
 
     const enemyState = enemy ? {
         x: enemy.x,
         y: enemy.y,
         health: enemy.health,
-        isDestroyed: enemy.isDestroyed || false
+        isDestroyed: isTankDestroyed(enemy)
     } : null;
 
     // Capture wind and turn state

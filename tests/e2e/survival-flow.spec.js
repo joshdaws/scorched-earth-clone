@@ -152,6 +152,22 @@ test.describe('survival flow', () => {
     expect(observed[5].aiPool).not.toContain('nuke');
     expect(observed[6].aiPool).toContain('nuke');
     expect(observed[6].enemy.inventory).toHaveProperty('nuke');
+
+    await bootScene(page, '/?scene=round-start&round=10&seed=73010&wind=0');
+    const tunedShot = await page.evaluate(() => {
+      for (let angle = 15; angle <= 80; angle += 1) {
+        for (let power = 30; power <= 100; power += 1) {
+          const shot = window.TestAPI.fireAndCollect({ angle, power, wind: 0, weaponId: 'basic-shot' });
+          const damage = shot.damageDealt || shot.splashDamage?.enemy || 0;
+          if (damage > 0) {
+            return { ...shot, effectiveDamage: damage };
+          }
+        }
+      }
+      return null;
+    });
+    expect(tunedShot).not.toBeNull();
+    expect(tunedShot.effectiveDamage).toBeGreaterThan(0);
     failures.expectNoFailures();
   });
 

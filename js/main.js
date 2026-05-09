@@ -459,6 +459,28 @@ const FALLOUT_CONFIG = {
     DEFAULT_DURATION: 2
 };
 
+function getSurvivalTerrainOptionsForRound(round) {
+    if (round <= 2) {
+        return {
+            roughness: 0.35,
+            minHeightPercent: 0.18,
+            maxHeightPercent: 0.45
+        };
+    }
+    if (round <= 6) {
+        return {
+            roughness: 0.42,
+            minHeightPercent: 0.2,
+            maxHeightPercent: 0.56
+        };
+    }
+    return {
+        roughness: 0.5,
+        minHeightPercent: 0.2,
+        maxHeightPercent: 0.68
+    };
+}
+
 /**
  * Create a new fallout zone at the specified position.
  * Fallout deals damage to tanks within radius at the start of each turn.
@@ -5831,11 +5853,13 @@ function setupPlayingState() {
                 // Generate new terrain for this game
                 // Uses midpoint displacement algorithm for natural-looking hills and valleys
                 // Terrain adapts to dynamic screen dimensions (no fixed width/height)
-                let terrainOptions = {
-                    roughness: 0.5,  // Balanced jaggedness (0.4-0.6 recommended)
-                    minHeightPercent: 0.2,  // Terrain starts at 20% of screen height minimum
-                    maxHeightPercent: 0.7   // Terrain peaks at 70% of screen height maximum
-                };
+                let terrainOptions = isLevelMode
+                    ? {
+                        roughness: 0.5,  // Balanced jaggedness (0.4-0.6 recommended)
+                        minHeightPercent: 0.2,  // Terrain starts at 20% of screen height minimum
+                        maxHeightPercent: 0.7   // Terrain peaks at 70% of screen height maximum
+                    }
+                    : getSurvivalTerrainOptionsForRound(currentRound);
 
                 // In level mode fallback, use level-specific terrain config
                 if (isLevelMode && currentLevelData && currentLevelData.terrain) {
@@ -7986,9 +8010,7 @@ function setupPhysicsSandboxScene(scene, params) {
 
     // Generate terrain
     currentTerrain = generateTerrain(undefined, undefined, {
-        roughness: 0.5,
-        minHeightPercent: 0.2,
-        maxHeightPercent: 0.7,
+        ...getSurvivalTerrainOptionsForRound(currentRound),
         seed: params.seed
     });
 
