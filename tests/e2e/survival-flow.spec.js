@@ -100,7 +100,7 @@ test.describe('survival flow', () => {
     expect(result.rewardComplete.tokenBalance).toBe(18);
     expect(result.selected).toBe('field-repair');
     expect(result.gameState).toBe('playing');
-    expect(result.player.health).toBe(120);
+    expect(result.player.health).toBe(135);
     failures.expectNoFailures();
   });
 

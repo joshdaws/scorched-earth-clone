@@ -141,14 +141,14 @@ export const RUN_PERKS = Object.freeze([
     {
         id: 'field-repair',
         title: 'FIELD REPAIR',
-        effect: '+20 hull next round',
+        effect: '+35 hull next round',
         description: 'Start the next duel with reinforced armor.',
         color: COLORS.NEON_CYAN
     },
     {
         id: 'hardlight-shield',
         title: 'HARDLIGHT SHIELD',
-        effect: '+40 shield',
+        effect: '+35 shield',
         description: 'Absorb the first clean hit before hull damage.',
         color: COLORS.NEON_YELLOW
     },

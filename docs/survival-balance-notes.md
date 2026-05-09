@@ -4,9 +4,9 @@ Updated 2026-05-09.
 
 ## Current Tuning Slice
 
-This pass fixes the survival AI progression wiring and smooths the first run-perk
-set. The goal is not final balance; it is to make the curve coherent enough for
-hands-on playtesting.
+This pass fixes the survival AI progression wiring, smooths generated survival
+terrain, and tunes the first run-perk set so Endless Neon Run has a coherent
+early/mid/late curve.
 
 ## Round Curve
 
@@ -29,9 +29,16 @@ hands-on playtesting.
 
 | Perk | Value | Role |
 | --- | --- | --- |
-| Field Repair | +20 hull next round | Reliable survivability without outclassing shield. |
-| Hardlight Shield | +40 shield | Best against burst/first-hit threats. |
+| Field Repair | +35 hull next round | Reliable all-purpose survivability. |
+| Hardlight Shield | +35 shield | Best against burst/first-hit threats, but shield-buster weapons bypass it. |
 | Ammo Cache | +3 missiles, +2 bouncers | Route/damage option for players who want tempo over defense. |
+
+Field Repair and Hardlight Shield now grant the same raw protection so neither
+defense option is mathematically dominant. Field Repair is better when the
+player expects multiple chip hits, while Hardlight Shield is better against the
+first burst hit and can still be bypassed by shield-buster weapons. Ammo Cache
+stays as the offensive tempo choice: it can shorten a duel, but it does not help
+if the player loses the opening exchange.
 
 ## Notes
 
@@ -86,10 +93,33 @@ captured locally in `artifacts/survival-balance/2026-05-09-rounds/`.
   `TestAPI.fire()` path cleared the opener in three player shots, ending at
   player 100 HP and transitioning to `round_transition`.
 
-## Remaining Playtest
+## Browser Playthrough Ledger
 
-- Play rounds 2-10 by hand with the current perk values.
-- Verify round 10 Hard+ is dangerous but not a sudden one-shot wall.
-- Verify round 11+ nuke access feels like a late-run escalation.
-- Tune rewards/shop pressure after observing whether players can consistently
-  buy at least one meaningful weapon pack every two wins.
+Generated with Chromium against `round-start` scenes on 2026-05-09 using earned
+Armory-style loadouts for each tier. Evidence was captured locally in
+`artifacts/survival-balance/2026-05-09-playthroughs/`.
+
+| Round | Seed | Player loadout | Shots to win | Player HP | Earnings | Money after | Read |
+| --- | ---: | --- | ---: | ---: | ---: | ---: | --- |
+| 2 | 75002 | Basic | 3 | 100 | $850 | $2,350 | Clean second opener; no economy pressure yet. |
+| 3 | 75003 | Missile | 2 | 100 | $916 | $2,416 | Missile unlock gives a visible power bump. |
+| 4 | 75004 | Missile | 3 | 55 | $960 | $2,460 | First enemy hit lands; still recoverable. |
+| 5 | 75005 | Big Shot | 2 | 100 | $1,060 | $2,560 | Mid-tier burst feels earned, not mandatory earlier. |
+| 6 | 75006 | Big Shot | 2 | 25 | $1,068 | $2,568 | Hard AI becomes dangerous without ending the run outright. |
+| 7 | 75007 | Big Shot | 2 | 100 | $1,310 | $2,810 | Route-denial tier starts cleanly. |
+| 8 | 75008 | Big Shot | 2 | 40 | $1,310 | $2,810 | Same tier can punish mistakes without becoming a wall. |
+| 9 | 75009 | Mini Nuke | 2 | 100 | $1,455 | $2,955 | Late burst arrives before full nuke access. |
+| 10 | 75010 | Mini Nuke | 2 | 66 | $1,512 | $3,012 | Hard+ is threatening but not a sudden one-shot gate. |
+| 11 | 75011 | Nuke | 1 | 100 | $1,725 | $3,225 | Full nuke reads as explicit late-run escalation. |
+
+Rewards now leave the player with roughly $850-$1,725 earned per win in the
+tested curve. That is enough to make a meaningful Armory purchase every round or
+two, but not enough to buy the whole arsenal and erase weapon-choice pressure.
+
+## Follow-Up Risk
+
+- Add a longer organic run once campaign puzzle polish is stable, because these
+  captures isolate rounds rather than preserving every spent dollar across a
+  single uninterrupted survival save.
+- Revisit late-round nuke frequency after more manual runs; round 11 should feel
+  climactic, not like a permanent one-shot routine.

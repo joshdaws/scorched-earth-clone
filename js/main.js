@@ -6053,10 +6053,10 @@ function applyPendingSurvivalRunPerk(tank) {
     pendingSurvivalRunPerk = null;
 
     if (perk.id === 'field-repair') {
-        tank.maxHealth += 20;
+        tank.maxHealth += 35;
         tank.health = tank.maxHealth;
     } else if (perk.id === 'hardlight-shield') {
-        tank.addShield(40);
+        tank.addShield(35);
     } else if (perk.id === 'ammo-cache') {
         tank.inventory.missile = (tank.inventory.missile || 0) + 3;
         tank.inventory.bouncer = (tank.inventory.bouncer || 0) + 2;
