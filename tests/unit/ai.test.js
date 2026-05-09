@@ -228,17 +228,20 @@ describe('AI weapon selection and progression', () => {
   it('progresses the AI weapon pool by round and returns copies', () => {
     expect(getAIWeaponPoolForRound(1)).toEqual(['basic-shot']);
     expect(getAIWeaponPoolForRound(3)).toEqual(['basic-shot', 'missile']);
-    expect(getAIWeaponPoolForRound(5)).toEqual(['basic-shot', 'missile', 'roller']);
+    expect(getAIWeaponPoolForRound(5)).toEqual(['basic-shot', 'missile', 'roller', 'big-shot']);
     expect(getAIWeaponPoolForRound(7)).toContain('digger');
     expect(getAIWeaponPoolForRound(9)).toEqual([
       'basic-shot',
       'missile',
       'roller',
+      'big-shot',
       'digger',
+      'heavy-roller',
+      'heavy-digger',
       'mirv',
-      'mini-nuke',
-      'nuke'
+      'mini-nuke'
     ]);
+    expect(getAIWeaponPoolForRound(11)).toContain('nuke');
 
     const pool = setWeaponPoolForRound(9);
     pool.push('mutated');
@@ -277,7 +280,7 @@ describe('AI weapon selection and progression', () => {
 
     vi.restoreAllMocks();
     setDifficulty(AI_DIFFICULTY.HARD);
-    setWeaponPoolForRound(9);
+    setWeaponPoolForRound(11);
     mockRandomSequence([0.1, 0.1]);
     expect(selectWeapon(aiTank, createPlayerTank(), null)).toBe('nuke');
   });
@@ -290,23 +293,27 @@ describe('AI weapon selection and progression', () => {
     expect(setup).toMatchObject({
       difficulty: AI_DIFFICULTY.HARD,
       difficultyName: 'Hard',
-      weaponPool: ['basic-shot', 'missile', 'roller', 'digger', 'mirv', 'mini-nuke', 'nuke']
+      weaponPool: ['basic-shot', 'missile', 'roller', 'big-shot', 'digger', 'heavy-roller', 'heavy-digger', 'mirv', 'mini-nuke']
     });
     expect(setup.ammoGiven).toEqual([
       { weaponId: 'missile', ammo: 10 },
       { weaponId: 'roller', ammo: 5 },
+      { weaponId: 'big-shot', ammo: 3 },
       { weaponId: 'digger', ammo: 5 },
+      { weaponId: 'heavy-roller', ammo: 3 },
+      { weaponId: 'heavy-digger', ammo: 3 },
       { weaponId: 'mirv', ammo: 3 },
-      { weaponId: 'mini-nuke', ammo: 2 },
-      { weaponId: 'nuke', ammo: 1 }
+      { weaponId: 'mini-nuke', ammo: 2 }
     ]);
     expect(aiTank.getInventory()).toMatchObject({
       missile: 10,
       roller: 5,
+      'big-shot': 3,
       digger: 5,
+      'heavy-roller': 3,
+      'heavy-digger': 3,
       mirv: 3,
-      'mini-nuke': 2,
-      nuke: 1
+      'mini-nuke': 2
     });
   });
 });
@@ -333,6 +340,7 @@ describe('AI economy and turn timing', () => {
     });
 
     const mediumTank = createAITank();
+    setWeaponPoolForRound(5);
     expect(purchaseWeaponsForAI(mediumTank, AI_DIFFICULTY.MEDIUM)).toEqual({
       purchased: [
         { weaponId: 'missile', cost: 500, ammo: 5 },
@@ -341,6 +349,22 @@ describe('AI economy and turn timing', () => {
       totalSpent: 2000
     });
     expect(mediumTank.getInventory()).toMatchObject({ missile: 5, roller: 3 });
+
+    const hardTank = createAITank();
+    setWeaponPoolForRound(7);
+    expect(purchaseWeaponsForAI(hardTank, AI_DIFFICULTY.HARD)).toEqual({
+      purchased: [
+        { weaponId: 'heavy-roller', cost: 2500, ammo: 2 },
+        { weaponId: 'big-shot', cost: 1000, ammo: 3 },
+        { weaponId: 'missile', cost: 500, ammo: 5 }
+      ],
+      totalSpent: 4000
+    });
+    expect(hardTank.getInventory()).toMatchObject({
+      'heavy-roller': 2,
+      'big-shot': 3,
+      missile: 5
+    });
   });
 
   it('returns difficulty-specific thinking delay inside configured bounds', () => {

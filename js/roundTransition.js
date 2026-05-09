@@ -141,21 +141,21 @@ export const RUN_PERKS = Object.freeze([
     {
         id: 'field-repair',
         title: 'FIELD REPAIR',
-        effect: '+25 hull next round',
+        effect: '+20 hull next round',
         description: 'Start the next duel with reinforced armor.',
         color: COLORS.NEON_CYAN
     },
     {
         id: 'hardlight-shield',
         title: 'HARDLIGHT SHIELD',
-        effect: '+25 shield',
+        effect: '+40 shield',
         description: 'Absorb the first clean hit before hull damage.',
         color: COLORS.NEON_YELLOW
     },
     {
         id: 'ammo-cache',
         title: 'AMMO CACHE',
-        effect: '+2 missiles, +1 bouncer',
+        effect: '+3 missiles, +2 bouncers',
         description: 'Add tactical shots without opening the Armory.',
         color: COLORS.NEON_PURPLE
     }

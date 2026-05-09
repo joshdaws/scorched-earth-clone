@@ -1266,11 +1266,12 @@ export function setDifficultyForRound(roundNumber) {
  * Uses weapon IDs matching those in weapons.js.
  */
 const AI_WEAPON_POOLS = {
-    1: ['basic-shot'],                                          // Rounds 1-2
-    3: ['basic-shot', 'missile'],                               // Rounds 3-4
-    5: ['basic-shot', 'missile', 'roller'],                     // Rounds 5-6
-    7: ['basic-shot', 'missile', 'roller', 'digger'],           // Rounds 7-8
-    9: ['basic-shot', 'missile', 'roller', 'digger', 'mirv', 'mini-nuke', 'nuke']  // Rounds 9+
+    1: ['basic-shot'],                                                              // Rounds 1-2
+    3: ['basic-shot', 'missile'],                                                   // Rounds 3-4
+    5: ['basic-shot', 'missile', 'roller', 'big-shot'],                             // Rounds 5-6
+    7: ['basic-shot', 'missile', 'roller', 'big-shot', 'digger', 'heavy-roller'],   // Rounds 7-8
+    9: ['basic-shot', 'missile', 'roller', 'big-shot', 'digger', 'heavy-roller', 'heavy-digger', 'mirv', 'mini-nuke'], // Rounds 9-10
+    11: ['basic-shot', 'missile', 'roller', 'big-shot', 'digger', 'heavy-roller', 'heavy-digger', 'mirv', 'mini-nuke', 'nuke'] // Rounds 11+
 };
 
 /**
@@ -1280,9 +1281,10 @@ const AI_WEAPON_POOLS = {
  * Weapon Pool Progression:
  * - Rounds 1-2: Basic Shot only
  * - Rounds 3-4: Basic, Missile
- * - Rounds 5-6: Basic, Missile, Roller
- * - Rounds 7-8: Basic, Missile, Roller, Digger
- * - Rounds 9+: All weapons (including MIRV, Nukes)
+ * - Rounds 5-6: Basic, Missile, Roller, Big Shot
+ * - Rounds 7-8: Adds Digger and Heavy Roller
+ * - Rounds 9-10: Adds Heavy Digger, MIRV, and Mini Nuke
+ * - Rounds 11+: Adds Nuke
  *
  * @param {number} roundNumber - Current round (1-based)
  * @returns {string[]} Array of weapon IDs available to AI
@@ -1385,6 +1387,14 @@ export function purchaseWeaponsForAI(aiTank, difficulty = currentDifficulty) {
 
         if (!weapon) {
             console.warn(`[AI] Unknown weapon: ${weaponId}`);
+            continue;
+        }
+
+        // Do not buy weapons that are not unlocked for this round.
+        if (!isWeaponInPool(weaponId)) {
+            if (debugMode) {
+                console.log(`[AI] Skipping ${weapon.name} (not in current round pool)`);
+            }
             continue;
         }
 

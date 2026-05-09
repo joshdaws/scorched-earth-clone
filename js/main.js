@@ -5905,6 +5905,9 @@ function setupPlayingState() {
                 console.log(`Round ${currentRound}: AI difficulty is ${AI.getDifficultyName(difficulty)} (player selected: ${selectedDifficulty ? 'yes' : 'no'})`);
             }
             AI.setDifficulty(difficulty);
+            if (!isLevelMode) {
+                AI.setWeaponPoolForRound(currentRound);
+            }
             // Purchase weapons based on difficulty
             AI.purchaseWeaponsForAI(enemyTank, difficulty);
 
@@ -6026,13 +6029,13 @@ function applyPendingSurvivalRunPerk(tank) {
     pendingSurvivalRunPerk = null;
 
     if (perk.id === 'field-repair') {
-        tank.maxHealth += 25;
+        tank.maxHealth += 20;
         tank.health = tank.maxHealth;
     } else if (perk.id === 'hardlight-shield') {
-        tank.addShield(25);
+        tank.addShield(40);
     } else if (perk.id === 'ammo-cache') {
-        tank.inventory.missile = (tank.inventory.missile || 0) + 2;
-        tank.inventory.bouncer = (tank.inventory.bouncer || 0) + 1;
+        tank.inventory.missile = (tank.inventory.missile || 0) + 3;
+        tank.inventory.bouncer = (tank.inventory.bouncer || 0) + 2;
         tank.currentWeapon = 'missile';
     }
 
