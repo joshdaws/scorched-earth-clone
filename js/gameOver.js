@@ -105,6 +105,12 @@ let celebrationParticles = [];
 let onNewRunCallback = null;
 
 /**
+ * Callback to execute when "Garage" is clicked.
+ * @type {Function|null}
+ */
+let onGarageCallback = null;
+
+/**
  * Callback to execute when "Main Menu" is clicked.
  * @type {Function|null}
  */
@@ -124,15 +130,23 @@ const buttons = {
     newRun: {
         x: 0,
         y: 0,
-        width: 200,
+        width: 180,
         height: 50,
         text: 'NEW RUN',
         color: COLORS.NEON_CYAN
     },
+    garage: {
+        x: 0,
+        y: 0,
+        width: 180,
+        height: 50,
+        text: 'GARAGE',
+        color: COLORS.NEON_YELLOW
+    },
     mainMenu: {
         x: 0,
         y: 0,
-        width: 200,
+        width: 180,
         height: 50,
         text: 'MAIN MENU',
         color: COLORS.NEON_PURPLE
@@ -148,10 +162,13 @@ function updateButtonPositions() {
     const height = Renderer.getHeight();
     const centerX = width / 2;
 
-    buttons.newRun.x = centerX - 155;
+    buttons.newRun.x = centerX - 220;
     buttons.newRun.y = height - 130;
 
-    buttons.mainMenu.x = centerX + 155;
+    buttons.garage.x = centerX;
+    buttons.garage.y = height - 130;
+
+    buttons.mainMenu.x = centerX + 220;
     buttons.mainMenu.y = height - 130;
 }
 
@@ -235,6 +252,14 @@ export function onNewRun(callback) {
 }
 
 /**
+ * Register callback for "Garage" button.
+ * @param {Function} callback - Function to call when button is clicked
+ */
+export function onGarage(callback) {
+    onGarageCallback = callback;
+}
+
+/**
  * Register callback for "Main Menu" button.
  * @param {Function} callback - Function to call when button is clicked
  */
@@ -300,6 +325,16 @@ export function handleClick(x, y) {
             onNewRunCallback();
         }
         // Don't hide here - let the callback handle state transition
+        return true;
+    }
+
+    // Check Garage button
+    if (isInsideButton(x, y, buttons.garage)) {
+        playClickSound();
+        console.log('[GameOver] Garage clicked');
+        if (onGarageCallback) {
+            onGarageCallback();
+        }
         return true;
     }
 
@@ -555,14 +590,14 @@ export function render(ctx) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = mainColor;
-    ctx.fillText('GAME OVER', Renderer.getWidth() / 2, titleY);
+    ctx.fillText('RUN OVER', Renderer.getWidth() / 2, titleY);
 
     // Title outline for extra depth
     ctx.shadowBlur = 0;
     ctx.strokeStyle = COLORS.TEXT_LIGHT;
     ctx.lineWidth = 2;
     ctx.lineJoin = 'round'; // Prevent miter artifacts on letters like 'A' and 'M'
-    ctx.strokeText('GAME OVER', Renderer.getWidth() / 2, titleY);
+    ctx.strokeText('RUN OVER', Renderer.getWidth() / 2, titleY);
     ctx.restore();
 
     // Subtitle for draw condition
@@ -676,6 +711,15 @@ export function render(ctx) {
         ctx.restore();
 
         statsStartY += 35;
+    } else if (previousBest > 0) {
+        ctx.save();
+        ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+        ctx.fillStyle = COLORS.TEXT_MUTED;
+        ctx.textAlign = 'center';
+        ctx.fillText(`Best Run: ${previousBest} rounds`, Renderer.getWidth() / 2, statsStartY);
+        ctx.restore();
+
+        statsStartY += 30;
     }
 
     // Render celebration particles (above other elements)
@@ -729,6 +773,7 @@ export function render(ctx) {
     // BUTTONS
     // =========================================================================
     renderButton(ctx, buttons.newRun, pulseIntensity);
+    renderButton(ctx, buttons.garage, pulseIntensity);
     renderButton(ctx, buttons.mainMenu, pulseIntensity);
 
     // =========================================================================

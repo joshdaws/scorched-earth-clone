@@ -27,4 +27,27 @@ test.describe('survival flow', () => {
     expect(Object.keys(result.player.inventory)).toEqual(['basic-shot']);
     failures.expectNoFailures();
   });
+
+  test('run-over screen offers a garage route without returning through the menu', async ({ page }) => {
+    const failures = trackConsoleFailures(page);
+    await bootScene(page, '/?scene=round-start&seed=72002&wind=0&difficulty=easy');
+    await expectCanvasReady(page);
+
+    const result = await page.evaluate(async () => {
+      window.GameOver.show({ rounds: 5, draw: false, delay: 0 });
+      window.Game.setState('game_over');
+      await new Promise(resolve => setTimeout(resolve, 50));
+      window.GameOver.handleClick(600, 670);
+      await new Promise(resolve => setTimeout(resolve, 600));
+
+      return {
+        gameState: window.Game.getState(),
+        collection: window.TestAPI.getCollectionQaState()
+      };
+    });
+
+    expect(result.gameState).toBe('collection');
+    expect(result.collection.collection.owned).toContain('standard');
+    failures.expectNoFailures();
+  });
 });

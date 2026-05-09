@@ -6407,6 +6407,17 @@ function setupGameOverState() {
         startNewRun();
     });
 
+    // Register callback for "Garage" button
+    GameOver.onGarage(() => {
+        GameOver.hide();
+        if (isLevelEditorPlaytestMode || isTankEditorPlaytestMode) {
+            returnToEditorFromPlaytest();
+            return;
+        }
+        clearLevelEditorPlaytestState();
+        Game.setState(GAME_STATES.COLLECTION);
+    });
+
     // Register callback for "Main Menu" button
     GameOver.onMainMenu(() => {
         GameOver.hide();

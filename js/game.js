@@ -339,6 +339,7 @@ const validTransitions = {
         GAME_STATES.PLAYING,
         GAME_STATES.LEVEL_EDITOR,
         GAME_STATES.TANK_EDITOR,
+        GAME_STATES.COLLECTION,
         GAME_STATES.MENU
     ]
 };
