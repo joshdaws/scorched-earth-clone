@@ -163,4 +163,38 @@ describe('level layouts', () => {
       pairId: 'w4l1-vortex',
     });
   });
+
+  it('authors an intro, remix, and combined puzzle-object route in every world', () => {
+    const expectedMechanicsByWorld = {
+      1: ['ricochet', 'bunker'],
+      2: ['ricochet', 'bunker'],
+      3: ['shield', 'bunker', 'ricochet'],
+      4: ['teleport', 'shield', 'ricochet', 'bunker'],
+      5: ['bunker', 'shield', 'ricochet', 'teleport'],
+      6: ['ricochet', 'shield', 'bunker', 'teleport'],
+    };
+
+    for (let world = 1; world <= 6; world++) {
+      const authoredLevels = [];
+      const seenTypes = new Set();
+
+      for (let level = 1; level <= 10; level++) {
+        const slot = getSlotLayout(`world${world}-level${level}`);
+        if (slot.objects.length === 0) continue;
+
+        authoredLevels.push({ level, types: slot.objects.map(object => object.type) });
+        for (const object of slot.objects) {
+          seenTypes.add(object.type);
+        }
+      }
+
+      expect(authoredLevels.length).toBeGreaterThanOrEqual(3);
+      expect(authoredLevels.some(entry => entry.types.length >= 2)).toBe(true);
+      expect(new Set(authoredLevels.at(-1).types).size).toBeGreaterThanOrEqual(2);
+
+      for (const type of expectedMechanicsByWorld[world]) {
+        expect(seenTypes.has(type)).toBe(true);
+      }
+    }
+  });
 });

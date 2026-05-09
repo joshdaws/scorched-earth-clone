@@ -159,6 +159,22 @@ describe('level registry', () => {
       'basic-shot': Infinity,
       mirv: 3
     });
+
+    expect(LevelRegistry.getLevel('world2-level1').progression).toMatchObject({
+      title: 'Chrome Bank Trial',
+      mechanic: 'Ricochet panel routing',
+      introducedWeapon: 'big-shot'
+    });
+    expect(LevelRegistry.getLevel('world3-level1').progression).toMatchObject({
+      title: 'Prism Shield Trial',
+      mechanic: 'Shield and bunker reading',
+      introducedWeapon: 'heavy-roller'
+    });
+    expect(LevelRegistry.getLevel('world4-level1').progression).toMatchObject({
+      title: 'Vortex Gate Trial',
+      mechanic: 'Projectile teleport gates',
+      introducedWeapon: 'napalm'
+    });
   });
 
   it('tunes ammo introductions as forgiving practice before harder follow-ups', () => {

@@ -3,12 +3,12 @@
  * Level Registry - 60 levels across 6 worlds
  *
  * World Themes:
- * - World 1: Neon Wasteland (Tutorial + Easy)
- * - World 2: Cyber City (Medium)
- * - World 3: Retro Ridge (Medium-Hard)
- * - World 4: Digital Desert (Hard, wind mechanics)
- * - World 5: Pixel Paradise (Very Hard)
- * - World 6: Synthwave Summit (Expert)
+ * - World 1: Neon Dunes (Tutorial + Easy)
+ * - World 2: Chrome Canyons (Medium)
+ * - World 3: Prism Bunkers (Medium-Hard)
+ * - World 4: Vector Vortex (Hard)
+ * - World 5: Pixel Wastes (Very Hard)
+ * - World 6: Midnight Citadel (Expert)
  */
 
 import { AI_DIFFICULTY } from './ai.js';
@@ -47,8 +47,8 @@ export const LEVEL_CONSTANTS = {
 export const WORLD_THEMES = {
     1: {
         id: 1,
-        name: 'Neon Wasteland',
-        description: 'Learn the basics in the glowing wasteland',
+        name: 'Neon Dunes',
+        description: 'Learn clean arcs, wind reads, and first bank shots',
         difficulty: 'tutorial-easy',
         primaryColor: '#ff2a6d',    // Neon pink
         secondaryColor: '#05d9e8',  // Cyan
@@ -56,8 +56,8 @@ export const WORLD_THEMES = {
     },
     2: {
         id: 2,
-        name: 'Cyber City',
-        description: 'Urban combat amid the skyscrapers',
+        name: 'Chrome Canyons',
+        description: 'Bank shots through reflective city canyons',
         difficulty: 'medium',
         primaryColor: '#05d9e8',    // Cyan
         secondaryColor: '#d300c5',  // Purple
@@ -65,8 +65,8 @@ export const WORLD_THEMES = {
     },
     3: {
         id: 3,
-        name: 'Retro Ridge',
-        description: 'Mountain warfare with tricky terrain',
+        name: 'Prism Bunkers',
+        description: 'Break shields and bypass hardlight cover',
         difficulty: 'medium-hard',
         primaryColor: '#d300c5',    // Purple
         secondaryColor: '#ff6b35',  // Orange
@@ -74,8 +74,8 @@ export const WORLD_THEMES = {
     },
     4: {
         id: 4,
-        name: 'Digital Desert',
-        description: 'Master the wind in the silicon sands',
+        name: 'Vector Vortex',
+        description: 'Route shots through gates and warped vector ruins',
         difficulty: 'hard',
         primaryColor: '#ff6b35',    // Orange
         secondaryColor: '#f9f002',  // Yellow
@@ -83,8 +83,8 @@ export const WORLD_THEMES = {
     },
     5: {
         id: 5,
-        name: 'Pixel Paradise',
-        description: 'Precision shots in paradise',
+        name: 'Pixel Wastes',
+        description: 'Solve unstable glitch fields with advanced weapons',
         difficulty: 'very-hard',
         primaryColor: '#f9f002',    // Yellow
         secondaryColor: '#05d9e8',  // Cyan
@@ -92,8 +92,8 @@ export const WORLD_THEMES = {
     },
     6: {
         id: 6,
-        name: 'Synthwave Summit',
-        description: 'The ultimate test atop the peak',
+        name: 'Midnight Citadel',
+        description: 'Final multi-step puzzles inside the neon fortress',
         difficulty: 'expert',
         primaryColor: '#ff2a6d',    // Pink
         secondaryColor: '#05d9e8',  // Cyan

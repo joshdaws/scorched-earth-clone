@@ -66,4 +66,20 @@ describe('puzzle objects', () => {
     expect(busted).toMatchObject({ type: 'shield-busted', continueFlight: true });
     expect(objects[0].active).toBe(false);
   });
+
+  it('blocks shots with bunkers until their strength is depleted', () => {
+    const objects = createPuzzleObjects([
+      { id: 'bunker', type: 'bunker', xNorm: 0.1, yNorm: 0.2, widthNorm: 0.12, heightNorm: 0.08, strength: 2 },
+    ], 1000, 500);
+
+    const firstHit = resolvePuzzleObjectCollision(makeProjectile(), objects, {});
+
+    expect(firstHit).toMatchObject({ type: 'bunker-hit', block: true });
+    expect(objects[0].active).toBe(true);
+
+    const secondHit = resolvePuzzleObjectCollision(makeProjectile(), objects, {});
+
+    expect(secondHit).toMatchObject({ type: 'bunker-hit', block: true });
+    expect(objects[0].active).toBe(false);
+  });
 });

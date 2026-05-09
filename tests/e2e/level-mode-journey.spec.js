@@ -204,6 +204,33 @@ test.describe('level mode journey', () => {
     failures.expectNoFailures();
   });
 
+  test('late campaign levels combine gates, shields, banks, and bunkers', async ({ page }) => {
+    const failures = trackConsoleFailures(page);
+    await bootGame(page, '/');
+
+    const result = await page.evaluate(async () => {
+      const { LevelRegistry } = await import('/js/levels.js');
+      const level = LevelRegistry.getLevel('world6-level10');
+      window.dispatchEvent(new CustomEvent('levelSelected', {
+        detail: { levelId: level.id, level, worldNum: 6, levelNum: 10 }
+      }));
+      await new Promise(resolve => setTimeout(resolve, 700));
+
+      return JSON.parse(window.render_game_to_text());
+    });
+
+    expect(result.mode).toBe('playing');
+    expect(result.puzzleObjects.map(object => object.type)).toEqual([
+      'teleport',
+      'teleport',
+      'ricochet',
+      'shield',
+      'bunker'
+    ]);
+    expect(result.puzzleObjects.map(object => object.id)).toContain('w6l10-final-shield');
+    failures.expectNoFailures();
+  });
+
   test('star totals unlock the next world and replay only improves records', async ({ page }) => {
     const failures = trackConsoleFailures(page);
     await bootGame(page, '/');

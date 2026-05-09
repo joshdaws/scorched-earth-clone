@@ -627,7 +627,7 @@ function renderLevelFocusPanel(ctx) {
     const panelX = (Renderer.getWidth() - panelWidth) / 2;
     const progression = level.progression;
     const introText = progression.isIntroLevel
-        ? `NEW AMMO: ${progression.introducedWeaponName}`
+        ? `NEW AMMO: ${progression.introducedWeaponName} - ${progression.mechanic}`
         : `FOCUS: ${progression.mechanic}`;
     const loadoutText = `LOADOUT: ${progression.loadoutWeaponNames.join(', ')}`;
 

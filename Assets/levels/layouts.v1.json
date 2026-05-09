@@ -1725,7 +1725,19 @@
         0.343701,
         0.344326
       ],
-      "enemyXNorm": 0.82
+      "enemyXNorm": 0.82,
+      "objects": [
+        {
+          "id": "w1l7-training-bank",
+          "type": "ricochet",
+          "label": "Training Bank",
+          "xNorm": 0.58,
+          "yNorm": 0.45,
+          "widthNorm": 0.14,
+          "angleDeg": -28,
+          "retention": 0.94
+        }
+      ]
     },
     "world1-level8": {
       "terrainSamples": [
@@ -2215,7 +2227,29 @@
         0.401837,
         0.401744
       ],
-      "enemyXNorm": 0.785
+      "enemyXNorm": 0.785,
+      "objects": [
+        {
+          "id": "w1l9-low-bank",
+          "type": "ricochet",
+          "label": "Low Bank",
+          "xNorm": 0.55,
+          "yNorm": 0.49,
+          "widthNorm": 0.15,
+          "angleDeg": -34,
+          "retention": 0.92
+        },
+        {
+          "id": "w1l9-light-cover",
+          "type": "bunker",
+          "label": "Light Cover",
+          "xNorm": 0.73,
+          "yNorm": 0.58,
+          "widthNorm": 0.1,
+          "heightNorm": 0.06,
+          "strength": 1
+        }
+      ]
     },
     "world1-level10": {
       "terrainSamples": [
@@ -2460,7 +2494,29 @@
         0.386828,
         0.386444
       ],
-      "enemyXNorm": 0.81
+      "enemyXNorm": 0.81,
+      "objects": [
+        {
+          "id": "w1l10-split-bank",
+          "type": "ricochet",
+          "label": "Split Bank",
+          "xNorm": 0.49,
+          "yNorm": 0.39,
+          "widthNorm": 0.14,
+          "angleDeg": 30,
+          "retention": 0.92
+        },
+        {
+          "id": "w1l10-crown-cover",
+          "type": "bunker",
+          "label": "Crown Cover",
+          "xNorm": 0.77,
+          "yNorm": 0.54,
+          "widthNorm": 0.11,
+          "heightNorm": 0.07,
+          "strength": 1
+        }
+      ]
     },
     "world2-level1": {
       "terrainSamples": [
@@ -3707,7 +3763,29 @@
         0.344396,
         0.324
       ],
-      "enemyXNorm": 0.79
+      "enemyXNorm": 0.79,
+      "objects": [
+        {
+          "id": "w2l5-rooftop-bank",
+          "type": "ricochet",
+          "label": "Rooftop Bank",
+          "xNorm": 0.48,
+          "yNorm": 0.31,
+          "widthNorm": 0.16,
+          "angleDeg": 23,
+          "retention": 0.9
+        },
+        {
+          "id": "w2l5-alley-bunker",
+          "type": "bunker",
+          "label": "Alley Bunker",
+          "xNorm": 0.69,
+          "yNorm": 0.5,
+          "widthNorm": 0.12,
+          "heightNorm": 0.07,
+          "strength": 2
+        }
+      ]
     },
     "world2-level6": {
       "terrainSamples": [
@@ -4687,7 +4765,39 @@
         0.416396,
         0.396
       ],
-      "enemyXNorm": 0.785
+      "enemyXNorm": 0.785,
+      "objects": [
+        {
+          "id": "w2l9-left-bank",
+          "type": "ricochet",
+          "label": "Left Bank",
+          "xNorm": 0.47,
+          "yNorm": 0.36,
+          "widthNorm": 0.14,
+          "angleDeg": -30,
+          "retention": 0.91
+        },
+        {
+          "id": "w2l9-right-bank",
+          "type": "ricochet",
+          "label": "Right Bank",
+          "xNorm": 0.68,
+          "yNorm": 0.3,
+          "widthNorm": 0.13,
+          "angleDeg": 34,
+          "retention": 0.89
+        },
+        {
+          "id": "w2l9-chrome-cover",
+          "type": "bunker",
+          "label": "Chrome Cover",
+          "xNorm": 0.79,
+          "yNorm": 0.52,
+          "widthNorm": 0.1,
+          "heightNorm": 0.08,
+          "strength": 2
+        }
+      ]
     },
     "world2-level10": {
       "terrainSamples": [
@@ -4932,7 +5042,39 @@
         0.398615,
         0.378
       ],
-      "enemyXNorm": 0.81
+      "enemyXNorm": 0.81,
+      "objects": [
+        {
+          "id": "w2l10-sky-bank",
+          "type": "ricochet",
+          "label": "Sky Bank",
+          "xNorm": 0.51,
+          "yNorm": 0.28,
+          "widthNorm": 0.17,
+          "angleDeg": 27,
+          "retention": 0.9
+        },
+        {
+          "id": "w2l10-return-bank",
+          "type": "ricochet",
+          "label": "Return Bank",
+          "xNorm": 0.74,
+          "yNorm": 0.41,
+          "widthNorm": 0.13,
+          "angleDeg": -38,
+          "retention": 0.88
+        },
+        {
+          "id": "w2l10-tower-cover",
+          "type": "bunker",
+          "label": "Tower Cover",
+          "xNorm": 0.82,
+          "yNorm": 0.5,
+          "widthNorm": 0.11,
+          "heightNorm": 0.08,
+          "strength": 2
+        }
+      ]
     },
     "world3-level1": {
       "terrainSamples": [
@@ -6178,7 +6320,28 @@
         0.355083,
         0.353598
       ],
-      "enemyXNorm": 0.79
+      "enemyXNorm": 0.79,
+      "objects": [
+        {
+          "id": "w3l5-deep-shield",
+          "type": "shield",
+          "label": "Deep Prism Shield",
+          "xNorm": 0.76,
+          "yNorm": 0.42,
+          "radiusNorm": 0.12,
+          "strength": 2
+        },
+        {
+          "id": "w3l5-core-bunker",
+          "type": "bunker",
+          "label": "Core Bunker",
+          "xNorm": 0.66,
+          "yNorm": 0.45,
+          "widthNorm": 0.13,
+          "heightNorm": 0.08,
+          "strength": 2
+        }
+      ]
     },
     "world3-level6": {
       "terrainSamples": [
@@ -7158,7 +7321,38 @@
         0.428699,
         0.42634
       ],
-      "enemyXNorm": 0.785
+      "enemyXNorm": 0.785,
+      "objects": [
+        {
+          "id": "w3l9-bank-injector",
+          "type": "ricochet",
+          "label": "Bank Injector",
+          "xNorm": 0.49,
+          "yNorm": 0.35,
+          "widthNorm": 0.15,
+          "angleDeg": -26,
+          "retention": 0.9
+        },
+        {
+          "id": "w3l9-prism-shield",
+          "type": "shield",
+          "label": "Prism Shield",
+          "xNorm": 0.78,
+          "yNorm": 0.38,
+          "radiusNorm": 0.13,
+          "strength": 3
+        },
+        {
+          "id": "w3l9-hardlight-lip",
+          "type": "bunker",
+          "label": "Hardlight Lip",
+          "xNorm": 0.68,
+          "yNorm": 0.49,
+          "widthNorm": 0.11,
+          "heightNorm": 0.07,
+          "strength": 2
+        }
+      ]
     },
     "world3-level10": {
       "terrainSamples": [
@@ -7403,7 +7597,37 @@
         0.41369,
         0.41104
       ],
-      "enemyXNorm": 0.81
+      "enemyXNorm": 0.81,
+      "objects": [
+        {
+          "id": "w3l10-left-shield",
+          "type": "shield",
+          "label": "Left Prism Shield",
+          "xNorm": 0.64,
+          "yNorm": 0.43,
+          "radiusNorm": 0.1,
+          "strength": 2
+        },
+        {
+          "id": "w3l10-right-shield",
+          "type": "shield",
+          "label": "Right Prism Shield",
+          "xNorm": 0.82,
+          "yNorm": 0.38,
+          "radiusNorm": 0.12,
+          "strength": 3
+        },
+        {
+          "id": "w3l10-bunker-keystone",
+          "type": "bunker",
+          "label": "Keystone Bunker",
+          "xNorm": 0.73,
+          "yNorm": 0.5,
+          "widthNorm": 0.12,
+          "heightNorm": 0.08,
+          "strength": 2
+        }
+      ]
     },
     "world4-level1": {
       "terrainSamples": [
@@ -7663,7 +7887,7 @@
           "type": "teleport",
           "label": "Exit Gate",
           "xNorm": 0.78,
-          "yNorm": 0.30,
+          "yNorm": 0.3,
           "radiusNorm": 0.055,
           "pairId": "w4l1-vortex"
         },
@@ -8658,7 +8882,36 @@
         0.324889,
         0.325522
       ],
-      "enemyXNorm": 0.8
+      "enemyXNorm": 0.8,
+      "objects": [
+        {
+          "id": "w4l5-entry-gate",
+          "type": "teleport",
+          "label": "Entry Gate",
+          "xNorm": 0.44,
+          "yNorm": 0.31,
+          "radiusNorm": 0.052,
+          "pairId": "w4l5-vortex"
+        },
+        {
+          "id": "w4l5-exit-gate",
+          "type": "teleport",
+          "label": "Exit Gate",
+          "xNorm": 0.74,
+          "yNorm": 0.34,
+          "radiusNorm": 0.052,
+          "pairId": "w4l5-vortex"
+        },
+        {
+          "id": "w4l5-sand-shield",
+          "type": "shield",
+          "label": "Sand Shield",
+          "xNorm": 0.8,
+          "yNorm": 0.43,
+          "radiusNorm": 0.11,
+          "strength": 2
+        }
+      ]
     },
     "world4-level6": {
       "terrainSamples": [
@@ -9638,7 +9891,46 @@
         0.446816,
         0.444436
       ],
-      "enemyXNorm": 0.785
+      "enemyXNorm": 0.785,
+      "objects": [
+        {
+          "id": "w4l9-entry-gate",
+          "type": "teleport",
+          "label": "Entry Gate",
+          "xNorm": 0.42,
+          "yNorm": 0.28,
+          "radiusNorm": 0.052,
+          "pairId": "w4l9-vortex"
+        },
+        {
+          "id": "w4l9-exit-gate",
+          "type": "teleport",
+          "label": "Exit Gate",
+          "xNorm": 0.7,
+          "yNorm": 0.31,
+          "radiusNorm": 0.052,
+          "pairId": "w4l9-vortex"
+        },
+        {
+          "id": "w4l9-exit-bank",
+          "type": "ricochet",
+          "label": "Exit Bank",
+          "xNorm": 0.79,
+          "yNorm": 0.39,
+          "widthNorm": 0.13,
+          "angleDeg": 34,
+          "retention": 0.9
+        },
+        {
+          "id": "w4l9-vortex-shield",
+          "type": "shield",
+          "label": "Vortex Shield",
+          "xNorm": 0.83,
+          "yNorm": 0.43,
+          "radiusNorm": 0.11,
+          "strength": 2
+        }
+      ]
     },
     "world4-level10": {
       "terrainSamples": [
@@ -9883,7 +10175,47 @@
         0.398226,
         0.395679
       ],
-      "enemyXNorm": 0.81
+      "enemyXNorm": 0.81,
+      "objects": [
+        {
+          "id": "w4l10-entry-gate",
+          "type": "teleport",
+          "label": "Entry Gate",
+          "xNorm": 0.39,
+          "yNorm": 0.29,
+          "radiusNorm": 0.052,
+          "pairId": "w4l10-vortex"
+        },
+        {
+          "id": "w4l10-exit-gate",
+          "type": "teleport",
+          "label": "Exit Gate",
+          "xNorm": 0.72,
+          "yNorm": 0.28,
+          "radiusNorm": 0.052,
+          "pairId": "w4l10-vortex"
+        },
+        {
+          "id": "w4l10-return-bank",
+          "type": "ricochet",
+          "label": "Return Bank",
+          "xNorm": 0.82,
+          "yNorm": 0.4,
+          "widthNorm": 0.13,
+          "angleDeg": -32,
+          "retention": 0.88
+        },
+        {
+          "id": "w4l10-hardlight-cover",
+          "type": "bunker",
+          "label": "Hardlight Cover",
+          "xNorm": 0.78,
+          "yNorm": 0.49,
+          "widthNorm": 0.11,
+          "heightNorm": 0.08,
+          "strength": 2
+        }
+      ]
     },
     "world5-level1": {
       "terrainSamples": [
@@ -10128,7 +10460,19 @@
         0.351588,
         0.371988
       ],
-      "enemyXNorm": 0.86
+      "enemyXNorm": 0.86,
+      "objects": [
+        {
+          "id": "w5l1-precision-slit",
+          "type": "bunker",
+          "label": "Precision Slit",
+          "xNorm": 0.78,
+          "yNorm": 0.47,
+          "widthNorm": 0.1,
+          "heightNorm": 0.08,
+          "strength": 2
+        }
+      ]
     },
     "world5-level2": {
       "terrainSamples": [
@@ -10618,7 +10962,28 @@
         0.358602,
         0.385421
       ],
-      "enemyXNorm": 0.835
+      "enemyXNorm": 0.835,
+      "objects": [
+        {
+          "id": "w5l3-glitch-shield",
+          "type": "shield",
+          "label": "Glitch Shield",
+          "xNorm": 0.82,
+          "yNorm": 0.43,
+          "radiusNorm": 0.13,
+          "strength": 3
+        },
+        {
+          "id": "w5l3-cover-node",
+          "type": "bunker",
+          "label": "Cover Node",
+          "xNorm": 0.7,
+          "yNorm": 0.52,
+          "widthNorm": 0.11,
+          "heightNorm": 0.07,
+          "strength": 2
+        }
+      ]
     },
     "world5-level4": {
       "terrainSamples": [
@@ -11108,7 +11473,29 @@
         0.368805,
         0.396
       ],
-      "enemyXNorm": 0.785
+      "enemyXNorm": 0.785,
+      "objects": [
+        {
+          "id": "w5l5-cluster-bank",
+          "type": "ricochet",
+          "label": "Cluster Bank",
+          "xNorm": 0.51,
+          "yNorm": 0.31,
+          "widthNorm": 0.16,
+          "angleDeg": 31,
+          "retention": 0.88
+        },
+        {
+          "id": "w5l5-breakwall",
+          "type": "bunker",
+          "label": "Breakwall",
+          "xNorm": 0.74,
+          "yNorm": 0.49,
+          "widthNorm": 0.12,
+          "heightNorm": 0.08,
+          "strength": 3
+        }
+      ]
     },
     "world5-level6": {
       "terrainSamples": [
@@ -11598,7 +11985,36 @@
         0.387604,
         0.408
       ],
-      "enemyXNorm": 0.74
+      "enemyXNorm": 0.74,
+      "objects": [
+        {
+          "id": "w5l7-entry-gate",
+          "type": "teleport",
+          "label": "Vertical Entry",
+          "xNorm": 0.45,
+          "yNorm": 0.27,
+          "radiusNorm": 0.05,
+          "pairId": "w5l7-glitch"
+        },
+        {
+          "id": "w5l7-exit-gate",
+          "type": "teleport",
+          "label": "Vertical Exit",
+          "xNorm": 0.72,
+          "yNorm": 0.24,
+          "radiusNorm": 0.05,
+          "pairId": "w5l7-glitch"
+        },
+        {
+          "id": "w5l7-top-shield",
+          "type": "shield",
+          "label": "Top Shield",
+          "xNorm": 0.74,
+          "yNorm": 0.39,
+          "radiusNorm": 0.1,
+          "strength": 2
+        }
+      ]
     },
     "world5-level8": {
       "terrainSamples": [
@@ -12088,7 +12504,46 @@
         0.444686,
         0.468
       ],
-      "enemyXNorm": 0.785
+      "enemyXNorm": 0.785,
+      "objects": [
+        {
+          "id": "w5l9-entry-gate",
+          "type": "teleport",
+          "label": "Glitch Entry",
+          "xNorm": 0.42,
+          "yNorm": 0.3,
+          "radiusNorm": 0.05,
+          "pairId": "w5l9-glitch"
+        },
+        {
+          "id": "w5l9-exit-gate",
+          "type": "teleport",
+          "label": "Glitch Exit",
+          "xNorm": 0.67,
+          "yNorm": 0.3,
+          "radiusNorm": 0.05,
+          "pairId": "w5l9-glitch"
+        },
+        {
+          "id": "w5l9-rebound",
+          "type": "ricochet",
+          "label": "Rebound",
+          "xNorm": 0.77,
+          "yNorm": 0.4,
+          "widthNorm": 0.12,
+          "angleDeg": -30,
+          "retention": 0.88
+        },
+        {
+          "id": "w5l9-glitch-shield",
+          "type": "shield",
+          "label": "Glitch Shield",
+          "xNorm": 0.82,
+          "yNorm": 0.44,
+          "radiusNorm": 0.11,
+          "strength": 3
+        }
+      ]
     },
     "world5-level10": {
       "terrainSamples": [
@@ -12333,7 +12788,48 @@
         0.423604,
         0.444
       ],
-      "enemyXNorm": 0.81
+      "enemyXNorm": 0.81,
+      "objects": [
+        {
+          "id": "w5l10-left-bank",
+          "type": "ricochet",
+          "label": "Left Glitch Bank",
+          "xNorm": 0.46,
+          "yNorm": 0.32,
+          "widthNorm": 0.15,
+          "angleDeg": 25,
+          "retention": 0.88
+        },
+        {
+          "id": "w5l10-right-bank",
+          "type": "ricochet",
+          "label": "Right Glitch Bank",
+          "xNorm": 0.7,
+          "yNorm": 0.3,
+          "widthNorm": 0.15,
+          "angleDeg": -31,
+          "retention": 0.88
+        },
+        {
+          "id": "w5l10-prism-lock",
+          "type": "shield",
+          "label": "Prism Lock",
+          "xNorm": 0.82,
+          "yNorm": 0.43,
+          "radiusNorm": 0.12,
+          "strength": 3
+        },
+        {
+          "id": "w5l10-hardlight-wall",
+          "type": "bunker",
+          "label": "Hardlight Wall",
+          "xNorm": 0.75,
+          "yNorm": 0.51,
+          "widthNorm": 0.12,
+          "heightNorm": 0.08,
+          "strength": 3
+        }
+      ]
     },
     "world6-level1": {
       "terrainSamples": [
@@ -12578,7 +13074,28 @@
         0.369268,
         0.366065
       ],
-      "enemyXNorm": 0.785
+      "enemyXNorm": 0.785,
+      "objects": [
+        {
+          "id": "w6l1-bank-prism",
+          "type": "ricochet",
+          "label": "Citadel Bank",
+          "xNorm": 0.48,
+          "yNorm": 0.31,
+          "widthNorm": 0.16,
+          "angleDeg": -28,
+          "retention": 0.89
+        },
+        {
+          "id": "w6l1-citadel-shield",
+          "type": "shield",
+          "label": "Citadel Shield",
+          "xNorm": 0.8,
+          "yNorm": 0.4,
+          "radiusNorm": 0.13,
+          "strength": 3
+        }
+      ]
     },
     "world6-level2": {
       "terrainSamples": [
@@ -13068,7 +13585,28 @@
         0.372701,
         0.370157
       ],
-      "enemyXNorm": 0.79
+      "enemyXNorm": 0.79,
+      "objects": [
+        {
+          "id": "w6l3-tunnel-bunker",
+          "type": "bunker",
+          "label": "Tunnel Bunker",
+          "xNorm": 0.65,
+          "yNorm": 0.41,
+          "widthNorm": 0.14,
+          "heightNorm": 0.09,
+          "strength": 3
+        },
+        {
+          "id": "w6l3-core-shield",
+          "type": "shield",
+          "label": "Core Shield",
+          "xNorm": 0.78,
+          "yNorm": 0.38,
+          "radiusNorm": 0.12,
+          "strength": 3
+        }
+      ]
     },
     "world6-level4": {
       "terrainSamples": [
@@ -13558,7 +14096,36 @@
         0.386,
         0.383934
       ],
-      "enemyXNorm": 0.785
+      "enemyXNorm": 0.785,
+      "objects": [
+        {
+          "id": "w6l5-entry-gate",
+          "type": "teleport",
+          "label": "Citadel Entry",
+          "xNorm": 0.41,
+          "yNorm": 0.27,
+          "radiusNorm": 0.052,
+          "pairId": "w6l5-citadel"
+        },
+        {
+          "id": "w6l5-exit-gate",
+          "type": "teleport",
+          "label": "Citadel Exit",
+          "xNorm": 0.7,
+          "yNorm": 0.28,
+          "radiusNorm": 0.052,
+          "pairId": "w6l5-citadel"
+        },
+        {
+          "id": "w6l5-clean-shield",
+          "type": "shield",
+          "label": "Clean Shield",
+          "xNorm": 0.82,
+          "yNorm": 0.42,
+          "radiusNorm": 0.12,
+          "strength": 3
+        }
+      ]
     },
     "world6-level6": {
       "terrainSamples": [
@@ -14048,7 +14615,37 @@
         0.401747,
         0.399467
       ],
-      "enemyXNorm": 0.8
+      "enemyXNorm": 0.8,
+      "objects": [
+        {
+          "id": "w6l7-blast-wall",
+          "type": "bunker",
+          "label": "Blast Wall",
+          "xNorm": 0.62,
+          "yNorm": 0.36,
+          "widthNorm": 0.15,
+          "heightNorm": 0.1,
+          "strength": 4
+        },
+        {
+          "id": "w6l7-left-shield",
+          "type": "shield",
+          "label": "Left Reactor Shield",
+          "xNorm": 0.72,
+          "yNorm": 0.39,
+          "radiusNorm": 0.11,
+          "strength": 3
+        },
+        {
+          "id": "w6l7-right-shield",
+          "type": "shield",
+          "label": "Right Reactor Shield",
+          "xNorm": 0.84,
+          "yNorm": 0.38,
+          "radiusNorm": 0.11,
+          "strength": 3
+        }
+      ]
     },
     "world6-level8": {
       "terrainSamples": [
@@ -14538,7 +15135,46 @@
         0.409691,
         0.406743
       ],
-      "enemyXNorm": 0.74
+      "enemyXNorm": 0.74,
+      "objects": [
+        {
+          "id": "w6l9-entry-gate",
+          "type": "teleport",
+          "label": "Ion Entry",
+          "xNorm": 0.4,
+          "yNorm": 0.25,
+          "radiusNorm": 0.05,
+          "pairId": "w6l9-ion"
+        },
+        {
+          "id": "w6l9-exit-gate",
+          "type": "teleport",
+          "label": "Ion Exit",
+          "xNorm": 0.67,
+          "yNorm": 0.25,
+          "radiusNorm": 0.05,
+          "pairId": "w6l9-ion"
+        },
+        {
+          "id": "w6l9-crown-bank",
+          "type": "ricochet",
+          "label": "Crown Bank",
+          "xNorm": 0.76,
+          "yNorm": 0.34,
+          "widthNorm": 0.14,
+          "angleDeg": 32,
+          "retention": 0.88
+        },
+        {
+          "id": "w6l9-crown-shield",
+          "type": "shield",
+          "label": "Crown Shield",
+          "xNorm": 0.75,
+          "yNorm": 0.42,
+          "radiusNorm": 0.12,
+          "strength": 4
+        }
+      ]
     },
     "world6-level10": {
       "terrainSamples": [
@@ -14783,7 +15419,56 @@
         0.409682,
         0.406443
       ],
-      "enemyXNorm": 0.8
+      "enemyXNorm": 0.8,
+      "objects": [
+        {
+          "id": "w6l10-entry-gate",
+          "type": "teleport",
+          "label": "Final Entry",
+          "xNorm": 0.38,
+          "yNorm": 0.25,
+          "radiusNorm": 0.052,
+          "pairId": "w6l10-final"
+        },
+        {
+          "id": "w6l10-exit-gate",
+          "type": "teleport",
+          "label": "Final Exit",
+          "xNorm": 0.68,
+          "yNorm": 0.25,
+          "radiusNorm": 0.052,
+          "pairId": "w6l10-final"
+        },
+        {
+          "id": "w6l10-reactor-bank",
+          "type": "ricochet",
+          "label": "Reactor Bank",
+          "xNorm": 0.78,
+          "yNorm": 0.35,
+          "widthNorm": 0.14,
+          "angleDeg": -34,
+          "retention": 0.88
+        },
+        {
+          "id": "w6l10-final-shield",
+          "type": "shield",
+          "label": "Final Shield",
+          "xNorm": 0.82,
+          "yNorm": 0.41,
+          "radiusNorm": 0.13,
+          "strength": 4
+        },
+        {
+          "id": "w6l10-citadel-core",
+          "type": "bunker",
+          "label": "Citadel Core",
+          "xNorm": 0.73,
+          "yNorm": 0.49,
+          "widthNorm": 0.13,
+          "heightNorm": 0.09,
+          "strength": 4
+        }
+      ]
     }
   }
 }
