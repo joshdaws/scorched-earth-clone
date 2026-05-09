@@ -86,6 +86,23 @@ device slots and six recommended scenes:
 artifacts/app-store-screenshots/2026-05-09T20-00-50-710Z/summary.json
 ```
 
+The latest public release deployment serves the offline-first build and App
+Store support pages:
+
+```text
+https://scorched-earth.vercel.app/
+https://scorched-earth.vercel.app/privacy.html
+https://scorched-earth.vercel.app/support.html
+```
+
+Verification on 2026-05-09:
+
+```text
+privacy.html: HTTP 200
+support.html: HTTP 200
+config.js: SERVICE_MODE 'offline', OFFLINE_SERVICES true, CONVEX_URL ''
+```
+
 Local App Store material preparation now has an in-repo draft:
 
 ```text
@@ -135,7 +152,7 @@ The objective is not complete because App Store launch readiness cannot be hones
 - `scorched-earth-3fe.5` is still open and depends on `scorched-earth-3fe.4`. It requires uploading the final build, Apple approval, launch date, live App Store release, and post-launch monitoring.
 - `scorched-earth-3fe.2` is blocked pending TestFlight/beta setup and feedback. It requires real beta tester feedback and P0/P1 bug triage.
 - `scorched-earth-ttk` and its monetization children are explicitly deferred by notes: "Do not work on this epic until explicitly unblocked by Josh." This blocks any App Store path that requires ads/IAP products.
-- `docs/release/app-store-materials.md` drafts metadata and a screenshot inventory, `docs/release/app-store-submission-checklist.md` maps the final upload handoff and privacy-label draft, local privacy/support pages now exist with in-app Settings navigation, and release-build App Store screenshot capture is automated. Deployed public URLs, any region-specific support contact details, owner copyright string, final pricing/availability, TestFlight build, final screenshot selection/upload, and App Store Connect submission still need owner/account work.
+- `docs/release/app-store-materials.md` drafts metadata and a screenshot inventory, `docs/release/app-store-submission-checklist.md` maps the final upload handoff and privacy-label draft, local privacy/support pages now exist with in-app Settings navigation, verified public privacy/support URLs are live, and release-build App Store screenshot capture is automated. Any region-specific support contact details, owner copyright string, final pricing/availability, TestFlight build, final screenshot selection/upload, and App Store Connect submission still need owner/account work.
 
 ## Conclusion
 

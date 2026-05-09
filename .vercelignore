@@ -1,4 +1,7 @@
 .beads
 .ralph
 .git
+.serena
+artifacts
+ARCHITECTURE_REVIEW.md
 *.sock

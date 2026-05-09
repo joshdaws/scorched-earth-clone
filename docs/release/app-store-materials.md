@@ -104,6 +104,11 @@ Draft public URL after deployment:
 
 - `https://scorched-earth.vercel.app/support.html`
 
+Verified production URL:
+
+- `https://scorched-earth.vercel.app/support.html` returned HTTP 200 on
+  2026-05-09 after deploying the offline-first release build.
+
 The support page currently routes issue reports and feedback to the public
 GitHub issue tracker. Confirm whether a dedicated support email, telephone
 number, or legal address is required for the release regions before submission.
@@ -127,6 +132,11 @@ Current local target:
 Draft public URL after deployment:
 
 - `https://scorched-earth.vercel.app/privacy.html`
+
+Verified production URL:
+
+- `https://scorched-earth.vercel.app/privacy.html` returned HTTP 200 on
+  2026-05-09 after deploying the offline-first release build.
 
 The in-app settings panel includes Privacy and Support actions that navigate to
 the local pages bundled into the release build.

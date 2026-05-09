@@ -46,8 +46,8 @@ leaderboard privacy disclosure, service availability, and account-review risk.
 | App icon | `assets/icons/app-icon-1024.png` and `ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png`. | Ready locally |
 | Launch assets | `assets/icons/splash-*.png` and `ios/App/App/Assets.xcassets/Splash.imageset/`. | Ready locally |
 | Metadata draft | `docs/release/app-store-materials.md`. | Ready locally; owner fields remain |
-| Privacy page | `public/privacy.html`, bundled by `npm run ios:check`. | Ready locally; deploy public URL before submission |
-| Support page | `public/support.html`, bundled by `npm run ios:check`. | Ready locally; add direct contact details if release regions require them |
+| Privacy page | `public/privacy.html`, bundled by `npm run ios:check`; `https://scorched-earth.vercel.app/privacy.html` returned HTTP 200 on 2026-05-09. | Ready |
+| Support page | `public/support.html`, bundled by `npm run ios:check`; `https://scorched-earth.vercel.app/support.html` returned HTTP 200 on 2026-05-09. | Ready; add direct contact details if release regions require them |
 | Screenshots | `npm run screenshots:app-store` generated 24 accepted-size captures at `artifacts/app-store-screenshots/2026-05-09T20-00-50-710Z/summary.json`. | Ready locally; upload/select final images in App Store Connect |
 | TestFlight guide | `docs/ios-testflight-setup.md`. | Ready locally; account action required |
 | Device QA guide | `docs/ios-release-readiness.md`. | Ready locally; physical devices required |
@@ -71,8 +71,8 @@ leaderboard privacy disclosure, service availability, and account-review risk.
 | Copyright | `2026 Josh Daws` draft | Confirm legal owner string |
 | Price | Product decision required | Choose free/paid tier |
 | Availability | Product decision required | Choose countries/regions |
-| Privacy policy URL | `https://scorched-earth.vercel.app/privacy.html` draft | Deploy and verify public URL |
-| Support URL | `https://scorched-earth.vercel.app/support.html` draft | Deploy and verify public URL with contact route |
+| Privacy policy URL | `https://scorched-earth.vercel.app/privacy.html` | Paste verified public URL |
+| Support URL | `https://scorched-earth.vercel.app/support.html` | Paste verified public URL; confirm contact route is sufficient for selected regions |
 | Marketing URL | `https://scorched-earth.vercel.app` draft | Optional |
 
 ## Privacy Nutrition Label Draft
@@ -179,8 +179,10 @@ Expected result:
 
 Do not submit for App Review until every item below is resolved:
 
-- Public privacy policy URL is live and reachable.
-- Public support URL is live and includes an appropriate contact route.
+- Public privacy policy URL is live and reachable. Current verified URL:
+  `https://scorched-earth.vercel.app/privacy.html`.
+- Public support URL is live and includes an appropriate contact route. Current
+  verified URL: `https://scorched-earth.vercel.app/support.html`.
 - App Store Connect privacy answers match the exact build behavior.
 - Screenshots are uploaded for iPhone and iPad.
 - App icon displays correctly in App Store Connect.
