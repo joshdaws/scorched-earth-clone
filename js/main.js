@@ -6371,15 +6371,17 @@ function startNewRun() {
     }
 
     console.log('[Main] Starting new run');
-    // Reset round counter
     currentRound = 1;
-    // Reset money system (init resets to starting amount)
+    isLevelMode = false;
+    currentLevelId = null;
+    currentLevelData = null;
+    activeProjectiles = [];
+    currentPuzzleObjects = [];
+    resetLevelModeStats();
     Money.init();
-    // Hide game over screen
     GameOver.hide();
     clearLevelEditorPlaytestState();
-    // Return to menu for now (later this will start directly into a new run)
-    Game.setState(GAME_STATES.MENU);
+    Game.setState(GAME_STATES.PLAYING);
 }
 
 /**
@@ -7729,6 +7731,7 @@ async function init() {
     window.Shop = Shop;
     window.Money = Money;
     window.VictoryDefeat = VictoryDefeat;
+    window.GameOver = GameOver;
     window.RoundTransition = RoundTransition;
     window.DebugTools = DebugTools;
     window.AchievementPopup = AchievementPopup;
