@@ -55,6 +55,7 @@ import * as RunState from './runState.js';
 import * as HighScores from './highScores.js';
 import * as LifetimeStats from './lifetime-stats.js';
 import * as NameEntry from './nameEntry.js';
+import { resolvePuzzleObjectCollision } from './puzzleObjects.js';
 
 // =============================================================================
 // MODULE STATE
@@ -71,6 +72,9 @@ let enemyTank = null;
 
 /** @type {import('./terrain.js').Terrain|null} Reference to terrain */
 let terrain = null;
+
+/** @type {Function|null} Getter for active runtime puzzle objects */
+let getPuzzleObjectsRef = null;
 
 /** @type {Function|null} Reference to fire projectile function from main.js */
 let fireProjectileRef = null;
@@ -109,6 +113,7 @@ function isTankDestroyed(tank) {
  * @param {() => import('./tank.js').Tank|null} refs.getPlayerTank - Function returning player tank
  * @param {() => import('./tank.js').Tank|null} refs.getEnemyTank - Function returning enemy tank
  * @param {() => import('./terrain.js').Terrain|null} refs.getTerrain - Function returning terrain
+ * @param {() => Array<object>} [refs.getPuzzleObjects] - Function returning active puzzle objects
  * @param {Function} refs.fireProjectile - Function to fire projectile
  * @param {Function} [refs.destroyTerrainAt] - Function to destroy terrain directly
  * @param {Function} [refs.getDerezFragmentCount] - Function returning active de-rez fragment count
@@ -137,6 +142,7 @@ export function init(refs) {
             configurable: true
         });
     }
+    getPuzzleObjectsRef = refs.getPuzzleObjects || null;
     fireProjectileRef = refs.fireProjectile || null;
     destroyTerrainAtRef = refs.destroyTerrainAt || null;
     getDerezFragmentCountRef = refs.getDerezFragmentCount || null;
@@ -366,6 +372,8 @@ export function fireDirect() {
  * @param {number} [options.startX] - Starting X position (uses tank position if not specified)
  * @param {number} [options.startY] - Starting Y position (uses tank position if not specified)
  * @param {number} [options.maxSteps=500] - Maximum simulation steps
+ * @param {string} [options.weaponId='basic-shot'] - Weapon ID for puzzle-object interaction rules
+ * @param {boolean} [options.includePuzzleObjects=false] - Whether to include active puzzle objects
  * @returns {Object} Simulation result with trajectory data
  */
 export function simulateProjectile(options = {}) {
@@ -373,7 +381,9 @@ export function simulateProjectile(options = {}) {
         angle = 45,
         power = 50,
         wind = Wind.getWind(),
-        maxSteps = 500
+        maxSteps = 500,
+        weaponId = 'basic-shot',
+        includePuzzleObjects = false
     } = options;
 
     // Get starting position
@@ -413,8 +423,15 @@ export function simulateProjectile(options = {}) {
         landingY: null,
         tankHit: null,
         terrainHit: false,
+        puzzleHit: null,
+        puzzleInteractions: [],
         outOfBounds: false
     };
+
+    const weapon = WeaponRegistry.getWeapon(weaponId);
+    const puzzleObjects = includePuzzleObjects && getPuzzleObjectsRef
+        ? getPuzzleObjectsRef().map(object => ({ ...object }))
+        : [];
 
     // Calculate initial velocity
     const velocityMagnitude = (power / 100) * PHYSICS.MAX_VELOCITY;
@@ -449,6 +466,8 @@ export function simulateProjectile(options = {}) {
         }
 
         // Apply physics
+        const previousX = x;
+        const previousY = y;
         vy += PHYSICS.GRAVITY;
         vx += windForce;
 
@@ -464,6 +483,54 @@ export function simulateProjectile(options = {}) {
         x += vx;
         y += vy;
         step++;
+
+        if (puzzleObjects.length > 0) {
+            const probeProjectile = {
+                x,
+                y,
+                vx,
+                vy,
+                previousX,
+                previousY,
+                weaponId,
+                puzzleTeleportCooldown: result.puzzleTeleportCooldown || 0,
+                active: true,
+                isActive() { return this.active; },
+                capturePreviousPosition() {
+                    this.previousX = this.x;
+                    this.previousY = this.y;
+                }
+            };
+
+            const puzzleHit = resolvePuzzleObjectCollision(probeProjectile, puzzleObjects, weapon);
+            result.puzzleTeleportCooldown = probeProjectile.puzzleTeleportCooldown || 0;
+            x = probeProjectile.x;
+            y = probeProjectile.y;
+            vx = probeProjectile.vx;
+            vy = probeProjectile.vy;
+
+            if (puzzleHit) {
+                const interaction = {
+                    type: puzzleHit.type,
+                    objectId: puzzleHit.object?.id || null,
+                    targetId: puzzleHit.target?.id || null,
+                    x: Math.round(x),
+                    y: Math.round(y)
+                };
+                result.puzzleInteractions.push(interaction);
+
+                if (puzzleHit.continueFlight) {
+                    continue;
+                }
+
+                if (puzzleHit.block) {
+                    result.puzzleHit = interaction;
+                    result.landingX = puzzleHit.pos?.x ?? x;
+                    result.landingY = puzzleHit.pos?.y ?? y;
+                    break;
+                }
+            }
+        }
 
         // Check bounds
         if (x < 0 || x > screenWidth) {
@@ -523,7 +590,7 @@ export function simulateProjectile(options = {}) {
 
     console.log(`[TestAPI] simulateProjectile({ angle: ${angle}, power: ${power}, wind: ${wind} }) - ` +
                 `steps: ${step}, landing: (${result.landingX?.toFixed(1)}, ${result.landingY?.toFixed(1)}), ` +
-                `tankHit: ${result.tankHit}, terrainHit: ${result.terrainHit}`);
+                `tankHit: ${result.tankHit}, terrainHit: ${result.terrainHit}, puzzleHit: ${result.puzzleHit?.type || null}`);
 
     return result;
 }
@@ -542,6 +609,7 @@ export function simulateProjectile(options = {}) {
  * @param {number} [options.power=50] - Launch power percentage (0-100)
  * @param {string} [options.weaponId='basic-shot'] - Weapon ID to use for damage calculation
  * @param {number} [options.wind] - Wind value (uses current game wind if not specified)
+ * @param {boolean} [options.includePuzzleObjects=false] - Whether to include active puzzle objects
  * @returns {Object} Comprehensive trajectory and impact data
  */
 export function fireAndCollect(options = {}) {
@@ -549,7 +617,8 @@ export function fireAndCollect(options = {}) {
         angle = 45,
         power = 50,
         weaponId = 'basic-shot',
-        wind = Wind.getWind()
+        wind = Wind.getWind(),
+        includePuzzleObjects = false
     } = options;
 
     // Validate inputs
@@ -581,6 +650,8 @@ export function fireAndCollect(options = {}) {
         angle,
         power,
         wind,
+        weaponId,
+        includePuzzleObjects,
         maxSteps: 1000 // Higher limit for full trajectory
     });
 
@@ -657,6 +728,8 @@ export function fireAndCollect(options = {}) {
         // Collision data
         tankHit: simulation.tankHit, // 'player' | 'enemy' | null
         terrainHit: simulation.terrainHit,
+        puzzleHit: simulation.puzzleHit,
+        puzzleInteractions: simulation.puzzleInteractions || [],
         outOfBounds: simulation.outOfBounds,
         // Damage data
         damageDealt, // Damage to the directly hit tank
@@ -684,6 +757,89 @@ export function fireAndCollect(options = {}) {
                 `damageDealt: ${result.damageDealt}`);
 
     return result;
+}
+
+/**
+ * Scan the current level for a damaging shot that optionally uses a puzzle
+ * mechanic. This is intended for campaign QA and does not mutate game state.
+ *
+ * @param {Object} options
+ * @param {Array<string>} [options.weaponIds] Weapons to scan. Defaults to current player inventory.
+ * @param {Array<number>} [options.angles] Angles to scan.
+ * @param {Array<number>} [options.powers] Powers to scan.
+ * @param {string} [options.requiredInteraction] Puzzle interaction type that must be used.
+ * @param {number} [options.minDamage=1] Minimum enemy damage.
+ * @returns {Object}
+ */
+export function findPlayableShotForQa(options = {}) {
+    const player = module.playerTank || playerTank;
+    const inventory = player?.inventory || { 'basic-shot': Infinity };
+    const weaponIds = Array.isArray(options.weaponIds) && options.weaponIds.length > 0
+        ? options.weaponIds
+        : Object.keys(inventory);
+    const angles = Array.isArray(options.angles) && options.angles.length > 0
+        ? options.angles
+        : Array.from({ length: 18 }, (_, index) => 5 + index * 5);
+    const powers = Array.isArray(options.powers) && options.powers.length > 0
+        ? options.powers
+        : Array.from({ length: 14 }, (_, index) => 35 + index * 5);
+    const requiredInteraction = options.requiredInteraction || null;
+    const minDamage = Number.isFinite(options.minDamage) ? options.minDamage : 1;
+    const wind = Number.isFinite(options.wind) ? options.wind : Wind.getWind();
+
+    let attempts = 0;
+    let best = null;
+
+    for (const weaponId of weaponIds) {
+        if (!WeaponRegistry.getWeapon(weaponId)) continue;
+
+        for (const angle of angles) {
+            for (const power of powers) {
+                attempts++;
+                const probe = fireAndCollect({
+                    angle,
+                    power,
+                    weaponId,
+                    wind,
+                    includePuzzleObjects: true
+                });
+                const interactionTypes = probe.puzzleInteractions.map(interaction => interaction.type);
+                const enemyDamage = Math.max(probe.damageDealt || 0, probe.splashDamage?.enemy || 0);
+                const usesRequiredInteraction = !requiredInteraction || interactionTypes.includes(requiredInteraction);
+
+                if (!best || enemyDamage > best.enemyDamage) {
+                    best = { angle, power, weaponId, enemyDamage, interactionTypes };
+                }
+
+                if (usesRequiredInteraction && enemyDamage >= minDamage) {
+                    return {
+                        success: true,
+                        attempts,
+                        requiredInteraction,
+                        angle,
+                        power,
+                        weaponId,
+                        enemyDamage,
+                        interactionTypes,
+                        impact: {
+                            tankHit: probe.tankHit,
+                            terrainHit: probe.terrainHit,
+                            puzzleHit: probe.puzzleHit,
+                            landingX: probe.landingX,
+                            landingY: probe.landingY
+                        }
+                    };
+                }
+            }
+        }
+    }
+
+    return {
+        success: false,
+        attempts,
+        requiredInteraction,
+        best
+    };
 }
 
 /**
@@ -2185,6 +2341,7 @@ const TestAPI = {
     simulateProjectile,
     // Trajectory collection and physics validation
     fireAndCollect,
+    findPlayableShotForQa,
     validatePhysics,
     // Terrain and tank manipulation
     generateTerrain,

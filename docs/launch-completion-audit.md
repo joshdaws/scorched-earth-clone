@@ -29,10 +29,10 @@ The game is complete only when all of the following are true:
 | Map every feature branch | `docs/branch-map.md` maps `codex/gameplay-improvements`, `feature/game-engine-upgrade`, `native`, `legacy-v1`, `origin/codex/find-and-fix-important-bug`, `main`, and origin aliases with ahead/behind counts and disposition. | Covered. |
 | Replace temporary assets | `find assets -type f` found no files named placeholder/temp/test except reference grid templates. `rg` still finds placeholder fallback code in `js/assets.js`, tank fallback rendering, and historical spec docs. Manifest/file tests passed as part of `npm run check`. | Mostly covered for runtime files; fallback code remains intentionally for missing-load resilience. |
 | Weapon types increase in difficulty | Commits `7796310`, `bf9d30f`, and `6120d80` staged ammo progression and completed visual coverage. `tests/unit/weapon-bar.test.js`, `tests/unit/weapon-visual-assets.test.js`, and `tests/e2e/level-mode-journey.spec.js` passed through `npm run check`. | Covered by progression tests and weapon visual tests. |
-| Level designs increase in difficulty and feel like synth worlds | `Assets/levels/layouts.v1.json`, `js/level-progression.js`, and level tests were updated in prior polish commits. `tests/unit/level-layouts.test.js` and `tests/unit/levels-stars.test.js` passed. | Covered by authored layouts/tests; subjective level feel still benefits from real player feedback. |
+| Level designs increase in difficulty and feel like synth worlds | `assets/levels/layouts.v1.json`, `js/level-progression.js`, `docs/campaign-puzzle-balance-notes.md`, and level tests cover six synthworlds with ricochet, shield, teleport, and bunker mechanics. `tests/unit/level-layouts.test.js` and `tests/e2e/level-mode-journey.spec.js` now prove authored object coverage and playable browser routes. | Covered by authored layouts/tests; subjective level feel still benefits from real player feedback. |
 | Intuitive controls | Browser smoke controls scenario passed at balanced quality; `tests/e2e/new-player-journey.spec.js` and `tests/e2e/level-mode-journey.spec.js` are part of the test suite. | Covered in automation; needs physical iOS device confirmation. |
 | Long weapon scroller fixed | Compact weapon bar changes landed in `js/ui.js`/`js/main.js`; `tests/unit/weapon-bar.test.js` passed. | Covered. |
-| Secondary screens and star earning polished | Level-complete threshold/theme/button polish landed; Garage/Armory secondary progression entry points landed in `c499a26`; `tests/e2e/collection-gacha.spec.js` and `tests/unit/levels-stars.test.js` passed. | Covered in web automation. |
+| Secondary screens and star earning polished | Level-complete threshold/theme/button polish landed; Garage/Armory secondary progression entry points landed in `c499a26`; survival now uses Run Over/New Run/Garage actions, delayed battlefield-preserving reveals, between-round perks, and animated reward count-ups. `tests/e2e/collection-gacha.spec.js`, `tests/e2e/survival-flow.spec.js`, and `tests/unit/levels-stars.test.js` passed. | Covered in web automation. |
 | Animation where expected | Existing effect systems and level-complete/supply-drop flows are covered by e2e/smoke tests. `npm run audit:visual` passed 90 captures across title/menu, secondary screens, gameplay HUD, aiming, pause, shop, victory/defeat, round transition, level complete, impact effects, tank pivots, and terrain collapse. | Covered in automated visual audit; physical-device feel still needs TestFlight feedback. |
 | No lag / strong performance | `npm run check`, `npm run build`, `npm run ios:check`, browser smoke controls, and expanded browser smokes passed. Latest balanced smoke p95 frame times: idle 16.7ms, projectile 16.7ms with max dropped backlog 50ms under the 80ms cap, terrain 16.7ms with zero dropped backlog, high-scores 9.2ms, visual impact 17.4ms. | Covered for automated smoke paths; physical-device thermal/performance testing remains. |
 | Ready to convert/sync to iOS | `npm run ios:check` passed, including build, release budget, and `npx cap sync ios`. | Covered for local Capacitor readiness. |
@@ -43,6 +43,9 @@ The game is complete only when all of the following are true:
 Recent commands run successfully on `codex/gameplay-improvements`:
 
 ```bash
+npm run test -- tests/unit/puzzle-objects.test.js tests/unit/level-layouts.test.js
+npm run test:e2e -- tests/e2e/level-mode-journey.spec.js --project=chromium-desktop
+npm run test:e2e -- tests/e2e/survival-flow.spec.js --project=chromium-desktop
 npm run check
 npm run test:e2e -- tests/e2e/collection-gacha.spec.js
 npm run build
@@ -132,6 +135,15 @@ The latest full visual audit passed:
 
 ```text
 Passed 90 captures. Summary: artifacts/visual-audit/2026-05-09T19-32-31-161Z/summary.json
+```
+
+Latest gameplay-polish receipts added after the original audit:
+
+```text
+docs/survival-balance-notes.md
+docs/campaign-puzzle-balance-notes.md
+scorched-earth-cro closed: survival rounds 1-11 documented, perk/economy tuning verified.
+scorched-earth-k9s closed: all world puzzle-object progression and playable route coverage verified.
 ```
 
 The latest expanded browser smoke pass wrote these receipts:

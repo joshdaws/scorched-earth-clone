@@ -231,6 +231,103 @@ test.describe('level mode journey', () => {
     failures.expectNoFailures();
   });
 
+  test('campaign puzzle mechanics have at least one playable route', async ({ page }) => {
+    const failures = trackConsoleFailures(page);
+    await bootGame(page, '/');
+
+    const cases = [
+      {
+        mechanic: 'ricochet',
+        levelId: 'world1-level7',
+        worldNum: 1,
+        levelNum: 7,
+        expectedObjects: ['ricochet'],
+        requiredInteraction: 'ricochet',
+        weaponIds: ['bouncer', 'missile', 'basic-shot']
+      },
+      {
+        mechanic: 'shield',
+        levelId: 'world5-level3',
+        worldNum: 5,
+        levelNum: 3,
+        expectedObjects: ['shield', 'bunker'],
+        requiredInteraction: 'shield-busted',
+        weaponIds: ['shield-buster', 'armor-piercer', 'basic-shot']
+      },
+      {
+        mechanic: 'teleport',
+        levelId: 'world4-level1',
+        worldNum: 4,
+        levelNum: 1,
+        expectedObjects: ['teleport', 'teleport', 'ricochet'],
+        requiredInteraction: 'teleport',
+        weaponIds: ['bouncer', 'napalm', 'missile', 'basic-shot']
+      },
+      {
+        mechanic: 'bunker',
+        levelId: 'world5-level1',
+        worldNum: 5,
+        levelNum: 1,
+        expectedObjects: ['bunker'],
+        requiredInteraction: 'bunker-hit',
+        weaponIds: ['armor-piercer', 'tracer', 'basic-shot'],
+        acceptsBlockedInteraction: true
+      }
+    ];
+
+    const results = await page.evaluate(async testCases => {
+      const { LevelRegistry } = await import('/js/levels.js');
+      const output = [];
+
+      for (const testCase of testCases) {
+        const level = LevelRegistry.getLevel(testCase.levelId);
+        window.Game.setState('menu');
+        await new Promise(resolve => setTimeout(resolve, 50));
+        window.dispatchEvent(new CustomEvent('levelSelected', {
+          detail: {
+            levelId: level.id,
+            level,
+            worldNum: testCase.worldNum,
+            levelNum: testCase.levelNum
+          }
+        }));
+        await new Promise(resolve => setTimeout(resolve, 700));
+
+        const snapshot = JSON.parse(window.render_game_to_text());
+        const route = window.TestAPI.findPlayableShotForQa({
+          weaponIds: testCase.weaponIds,
+          requiredInteraction: testCase.requiredInteraction,
+          minDamage: testCase.acceptsBlockedInteraction ? 0 : 1
+        });
+        const damageRoute = window.TestAPI.findPlayableShotForQa({
+          weaponIds: testCase.weaponIds,
+          minDamage: 1
+        });
+
+        output.push({
+          mechanic: testCase.mechanic,
+          levelId: testCase.levelId,
+          objects: snapshot.puzzleObjects.map(object => object.type),
+          route,
+          damageRoute
+        });
+      }
+
+      return output;
+    }, cases);
+
+    for (const [index, result] of results.entries()) {
+      const testCase = cases[index];
+      expect(result.objects).toEqual(testCase.expectedObjects);
+      expect(result.route.success, `${result.mechanic} route`).toBe(true);
+      expect(result.route.interactionTypes).toContain(testCase.requiredInteraction);
+      expect(result.damageRoute.success, `${result.mechanic} damage route`).toBe(true);
+      expect(result.damageRoute.enemyDamage).toBeGreaterThan(0);
+    }
+
+    failures.expectNoFailures();
+  });
+
   test('star totals unlock the next world and replay only improves records', async ({ page }) => {
     const failures = trackConsoleFailures(page);
     await bootGame(page, '/');

@@ -7664,6 +7664,7 @@ async function init() {
         getPlayerTank: () => playerTank,
         getEnemyTank: () => enemyTank,
         getTerrain: () => currentTerrain,
+        getPuzzleObjects: () => currentPuzzleObjects,
         fireProjectile: fireProjectile,
         destroyTerrainAt,
         getDerezFragmentCount: getPixiTerrainFragmentCount,
