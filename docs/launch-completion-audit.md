@@ -33,7 +33,7 @@ The game is complete only when all of the following are true:
 | Intuitive controls | Browser smoke controls scenario passed at balanced quality; `tests/e2e/new-player-journey.spec.js` and `tests/e2e/level-mode-journey.spec.js` are part of the test suite. | Covered in automation; needs physical iOS device confirmation. |
 | Long weapon scroller fixed | Compact weapon bar changes landed in `js/ui.js`/`js/main.js`; `tests/unit/weapon-bar.test.js` passed. | Covered. |
 | Secondary screens and star earning polished | Level-complete threshold/theme/button polish landed; Garage/Armory secondary progression entry points landed in `c499a26`; `tests/e2e/collection-gacha.spec.js` and `tests/unit/levels-stars.test.js` passed. | Covered in web automation. |
-| Animation where expected | Existing effect systems and level-complete/supply-drop flows are covered by e2e/smoke tests; visual audit tooling exists in `docs/performance-smokes.md`. | Partially covered; full visual audit across all viewports was not rerun in this audit pass. |
+| Animation where expected | Existing effect systems and level-complete/supply-drop flows are covered by e2e/smoke tests. `npm run audit:visual` passed 90 captures across title/menu, secondary screens, gameplay HUD, aiming, pause, shop, victory/defeat, round transition, level complete, impact effects, tank pivots, and terrain collapse. | Covered in automated visual audit; physical-device feel still needs TestFlight feedback. |
 | No lag / strong performance | `npm run check`, `npm run build`, `npm run ios:check`, and browser smoke controls passed. Prior projectile and terrain frame pacing work passed budgets. Current controls smoke wrote metrics JSON. | Covered for automated smoke paths; physical-device thermal/performance testing remains. |
 | Ready to convert/sync to iOS | `npm run ios:check` passed, including build, release budget, and `npx cap sync ios`. | Covered for local Capacitor readiness. |
 | Ready to upload to App Store | Open/blocked beads remain: `scorched-earth-3fe.4` App Store submission preparation, `scorched-earth-3fe.5` Submit to App Store and launch, `scorched-earth-3fe.2` beta feedback, and deferred monetization epic `scorched-earth-ttk`. | Not complete. |
@@ -48,6 +48,7 @@ npm run test:e2e -- tests/e2e/collection-gacha.spec.js
 npm run build
 npm run ios:check
 npm run smoke:browser -- --scenario controls --quality balanced
+npm run audit:visual
 bd ready
 ```
 
@@ -62,6 +63,13 @@ The pushed branch is up to date with `origin/codex/gameplay-improvements` after:
 ```text
 c499a26 Rehome progression entry points
 f7aa1f2 Document feature branch map
+a059189 Record launch completion audit
+```
+
+The latest full visual audit passed:
+
+```text
+Passed 90 captures. Summary: artifacts/visual-audit/2026-05-09T19-32-31-161Z/summary.json
 ```
 
 ## Remaining Blockers

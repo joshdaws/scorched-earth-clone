@@ -240,20 +240,36 @@ async function getCanvasAudit(page) {
       let nonBlankSamples = null;
 
       if (context && canvas.width > 0 && canvas.height > 0) {
-        const sampleWidth = Math.min(40, canvas.width);
-        const sampleHeight = Math.min(40, canvas.height);
-        const imageData = context.getImageData(
-          Math.max(0, Math.floor((canvas.width - sampleWidth) / 2)),
-          Math.max(0, Math.floor((canvas.height - sampleHeight) / 2)),
-          sampleWidth,
-          sampleHeight
-        ).data;
+        const sampleWidth = Math.min(32, canvas.width);
+        const sampleHeight = Math.min(32, canvas.height);
+        const sampleAnchors = [
+          [0.25, 0.25],
+          [0.5, 0.25],
+          [0.75, 0.25],
+          [0.25, 0.5],
+          [0.5, 0.5],
+          [0.75, 0.5],
+          [0.25, 0.75],
+          [0.5, 0.75],
+          [0.75, 0.75]
+        ];
         let nonBlank = 0;
-        for (let i = 0; i < imageData.length; i += 4) {
-          if (imageData[i + 3] > 8 && (imageData[i] > 8 || imageData[i + 1] > 8 || imageData[i + 2] > 8)) {
-            nonBlank++;
+
+        for (const [anchorX, anchorY] of sampleAnchors) {
+          const imageData = context.getImageData(
+            Math.max(0, Math.min(canvas.width - sampleWidth, Math.floor(canvas.width * anchorX - sampleWidth / 2))),
+            Math.max(0, Math.min(canvas.height - sampleHeight, Math.floor(canvas.height * anchorY - sampleHeight / 2))),
+            sampleWidth,
+            sampleHeight
+          ).data;
+
+          for (let i = 0; i < imageData.length; i += 4) {
+            if (imageData[i + 3] > 8 && (imageData[i] > 8 || imageData[i + 1] > 8 || imageData[i + 2] > 8)) {
+              nonBlank++;
+            }
           }
         }
+
         nonBlankSamples = nonBlank;
       }
 
