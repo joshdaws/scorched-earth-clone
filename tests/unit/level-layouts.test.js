@@ -3,6 +3,7 @@ import {
   createLayoutsExportPayload,
   enforcePlayerSlingGuardrail,
   getGlobalLayoutConfig,
+  getPuzzleObjectsForSlot,
   getSlotLayout,
   getSpawnForSlot,
   validateLayoutsPayload,
@@ -145,5 +146,21 @@ describe('level layouts', () => {
     expect(sampleAt(digger, 0.55)).toBeGreaterThan(sampleAt(digger, digger.enemyXNorm) + 0.18);
     expect(sampleAt(vertical, vertical.enemyXNorm)).toBeGreaterThan(sampleAt(vertical, 0.2) + 0.08);
     expect(Math.max(...nuke.terrainSamples)).toBeGreaterThan(0.64);
+  });
+
+  it('normalizes authored puzzle objects and scales them for runtime', () => {
+    const ricochetSlot = getSlotLayout('world2-level1');
+    const shieldSlot = getSlotLayout('world3-level1');
+    const teleportObjects = getPuzzleObjectsForSlot('world4-level1', 1200, 800);
+
+    expect(ricochetSlot.objects.map(object => object.type)).toEqual(['ricochet', 'ricochet']);
+    expect(shieldSlot.objects.map(object => object.type)).toEqual(['shield', 'bunker']);
+    expect(teleportObjects.map(object => object.type)).toEqual(['teleport', 'teleport', 'ricochet']);
+    expect(teleportObjects[0]).toMatchObject({
+      x: 588,
+      y: 272,
+      radius: 44,
+      pairId: 'w4l1-vortex',
+    });
   });
 });

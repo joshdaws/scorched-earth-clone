@@ -16,6 +16,7 @@ import {
     createBaselineSlotLayout,
     resampleArray
 } from './level-layouts-baseline.js';
+import { clonePuzzleObjects, createPuzzleObjects, normalizePuzzleObjects } from './puzzleObjects.js';
 
 export const LEVEL_LAYOUT_VERSION = 1;
 export const LEVEL_LAYOUT_DRAFT_STORAGE_KEY = 'scorched_earth_level_editor_drafts_v1';
@@ -26,13 +27,14 @@ const ALL_LEVEL_ID_SET = new Set(ALL_LEVEL_IDS);
 
 /**
  * Clone a slot layout object.
- * @param {{terrainSamples: number[], enemyXNorm: number}} slot - Slot layout
- * @returns {{terrainSamples: number[], enemyXNorm: number}}
+ * @param {{terrainSamples: number[], enemyXNorm: number, objects?: object[]}} slot - Slot layout
+ * @returns {{terrainSamples: number[], enemyXNorm: number, objects: object[]}}
  */
 function cloneSlotLayout(slot) {
     return {
         terrainSamples: [...slot.terrainSamples],
-        enemyXNorm: slot.enemyXNorm
+        enemyXNorm: slot.enemyXNorm,
+        objects: clonePuzzleObjects(slot.objects)
     };
 }
 
@@ -86,7 +88,7 @@ function normalizeGlobalConfig(globalConfig = {}) {
  * @param {number} sampleCount - Expected sample count
  * @param {object} [options] - Normalization options
  * @param {boolean} [options.warnOnFallback=false] - Log warning if fallback baseline is used
- * @returns {{terrainSamples: number[], enemyXNorm: number}}
+ * @returns {{terrainSamples: number[], enemyXNorm: number, objects: object[]}}
  */
 function normalizeSlotLayout(levelId, slot, sampleCount, options = {}) {
     const expectedSamples = normalizeSampleCount(sampleCount);
@@ -108,6 +110,7 @@ function normalizeSlotLayout(levelId, slot, sampleCount, options = {}) {
             width: CANVAS.DESIGN_WIDTH,
             height: CANVAS.DESIGN_HEIGHT
         });
+        fallback.objects = [];
         return fallback;
     };
 
@@ -137,14 +140,15 @@ function normalizeSlotLayout(levelId, slot, sampleCount, options = {}) {
 
     return {
         terrainSamples,
-        enemyXNorm
+        enemyXNorm,
+        objects: normalizePuzzleObjects(slot.objects)
     };
 }
 
 /**
  * Build runtime payload from imported committed JSON.
  * @param {object} source - Imported payload candidate
- * @returns {{version: number, meta: object, global: object, slots: Record<string, {terrainSamples:number[], enemyXNorm:number}>}}
+ * @returns {{version: number, meta: object, global: object, slots: Record<string, {terrainSamples:number[], enemyXNorm:number, objects: object[]}>}}
  */
 function buildRuntimePayload(source) {
     const sourcePayload = source && typeof source === 'object' ? source : {};
@@ -208,7 +212,7 @@ export function getGlobalLayoutConfig() {
 
 /**
  * Get full committed layout payload.
- * @returns {{version:number, meta:object, global:object, slots:Record<string, {terrainSamples:number[], enemyXNorm:number}>}}
+ * @returns {{version:number, meta:object, global:object, slots:Record<string, {terrainSamples:number[], enemyXNorm:number, objects: object[]}>}}
  */
 export function getCommittedLayoutsPayload() {
     const slots = {};
@@ -228,9 +232,9 @@ export function getCommittedLayoutsPayload() {
  * Get one slot layout with optional override.
  * @param {string} levelId - Level ID
  * @param {object} [options] - Optional overrides
- * @param {{terrainSamples:number[], enemyXNorm:number}} [options.slotOverride] - Slot override
+ * @param {{terrainSamples:number[], enemyXNorm:number, objects?: object[]}} [options.slotOverride] - Slot override
  * @param {number} [options.sampleCount] - Explicit sample count for returned layout
- * @returns {{terrainSamples: number[], enemyXNorm: number}}
+ * @returns {{terrainSamples: number[], enemyXNorm: number, objects: object[]}}
  */
 export function getSlotLayout(levelId, options = {}) {
     if (!isKnownLevelId(levelId)) {
@@ -244,6 +248,23 @@ export function getSlotLayout(levelId, options = {}) {
     }
 
     return normalizeSlotLayout(levelId, RUNTIME_LAYOUTS.slots[levelId], sampleCount);
+}
+
+/**
+ * Get runtime puzzle objects for one level slot.
+ * @param {string} levelId - Level ID
+ * @param {number} width - Canvas width
+ * @param {number} height - Canvas height
+ * @param {object} [options] - Optional overrides
+ * @param {{terrainSamples:number[], enemyXNorm:number, objects?: object[]}} [options.slotOverride] - Slot override
+ * @returns {Array<object>}
+ */
+export function getPuzzleObjectsForSlot(levelId, width, height, options = {}) {
+    const slotLayout = getSlotLayout(levelId, {
+        slotOverride: options.slotOverride
+    });
+
+    return createPuzzleObjects(slotLayout.objects, width, height);
 }
 
 /**
@@ -292,7 +313,8 @@ export function enforcePlayerSlingGuardrail(
         terrainSamples: Array.isArray(slotLayout?.terrainSamples)
             ? [...slotLayout.terrainSamples].map(clamp01)
             : new Array(getLayoutSampleCount()).fill(0),
-        enemyXNorm: clamp01(typeof slotLayout?.enemyXNorm === 'number' ? slotLayout.enemyXNorm : 0.8)
+        enemyXNorm: clamp01(typeof slotLayout?.enemyXNorm === 'number' ? slotLayout.enemyXNorm : 0.8),
+        objects: clonePuzzleObjects(slotLayout?.objects)
     };
 
     const before = getPlayerClearance(source, normalizedGlobal.playerAnchorXNorm, safeHeight);

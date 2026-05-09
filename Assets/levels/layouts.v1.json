@@ -2705,6 +2705,28 @@
         0.326321,
         0.305932
       ],
+      "objects": [
+        {
+          "id": "w2l1-bank-left",
+          "type": "ricochet",
+          "label": "Chrome Bank",
+          "xNorm": 0.61,
+          "yNorm": 0.42,
+          "widthNorm": 0.16,
+          "angleDeg": -34,
+          "retention": 0.92
+        },
+        {
+          "id": "w2l1-bank-right",
+          "type": "ricochet",
+          "label": "Return Bank",
+          "xNorm": 0.73,
+          "yNorm": 0.34,
+          "widthNorm": 0.13,
+          "angleDeg": 24,
+          "retention": 0.88
+        }
+      ],
       "enemyXNorm": 0.785
     },
     "world2-level2": {
@@ -5155,6 +5177,27 @@
         0.288262,
         0.285651
       ],
+      "objects": [
+        {
+          "id": "w3l1-prism-shield",
+          "type": "shield",
+          "label": "Prism Shield",
+          "xNorm": 0.81,
+          "yNorm": 0.42,
+          "radiusNorm": 0.15,
+          "strength": 2
+        },
+        {
+          "id": "w3l1-forward-bunker",
+          "type": "bunker",
+          "label": "Hardlight Bunker",
+          "xNorm": 0.67,
+          "yNorm": 0.56,
+          "widthNorm": 0.11,
+          "heightNorm": 0.08,
+          "strength": 2
+        }
+      ],
       "enemyXNorm": 0.84
     },
     "world3-level2": {
@@ -7604,6 +7647,36 @@
         0.370194,
         0.370321,
         0.370424
+      ],
+      "objects": [
+        {
+          "id": "w4l1-entry-gate",
+          "type": "teleport",
+          "label": "Entry Gate",
+          "xNorm": 0.49,
+          "yNorm": 0.34,
+          "radiusNorm": 0.055,
+          "pairId": "w4l1-vortex"
+        },
+        {
+          "id": "w4l1-exit-gate",
+          "type": "teleport",
+          "label": "Exit Gate",
+          "xNorm": 0.78,
+          "yNorm": 0.30,
+          "radiusNorm": 0.055,
+          "pairId": "w4l1-vortex"
+        },
+        {
+          "id": "w4l1-exit-bank",
+          "type": "ricochet",
+          "label": "Exit Bank",
+          "xNorm": 0.83,
+          "yNorm": 0.43,
+          "widthNorm": 0.12,
+          "angleDeg": 38,
+          "retention": 0.9
+        }
       ],
       "enemyXNorm": 0.785
     },

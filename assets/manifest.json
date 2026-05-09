@@ -59,9 +59,29 @@
           "y": 6
         }
       }
+    },
+    "playerPro": {
+      "path": "images/tanks/tank-player-pro.png",
+      "width": 96,
+      "height": 56
+    },
+    "enemyPro": {
+      "path": "images/tanks/tank-enemy-pro.png",
+      "width": 96,
+      "height": 52
     }
   },
   "tankSkins": {
+    "legendary-neon-vanguard": {
+      "path": "images/tanks/tank-player-pro.png",
+      "width": 96,
+      "height": 56
+    },
+    "legendary-obsidian-judge": {
+      "path": "images/tanks/tank-enemy-pro.png",
+      "width": 96,
+      "height": 52
+    },
     "common-arctic": {
       "path": "images/tanks/tank-common-arctic.png",
       "width": 64,
@@ -370,9 +390,9 @@
       "height": 48
     },
     "crate": {
-      "path": "images/supply-drop/crate.png",
-      "width": 64,
-      "height": 64
+      "path": "images/supply-drop/crate-pro.png",
+      "width": 128,
+      "height": 128
     },
     "helicopter": {
       "path": "images/supply-drop/helicopter.png",
@@ -428,6 +448,32 @@
       "path": "images/supply-drop/banner-legendary.png",
       "width": 200,
       "height": 40
+    }
+  },
+  "puzzleObjects": {
+    "shieldGenerator": {
+      "path": "images/puzzle-objects/shield-generator.png",
+      "width": 128,
+      "height": 120,
+      "runtimeGroup": "gameplay"
+    },
+    "ricochetPanel": {
+      "path": "images/puzzle-objects/ricochet-panel.png",
+      "width": 160,
+      "height": 112,
+      "runtimeGroup": "gameplay"
+    },
+    "teleportGate": {
+      "path": "images/puzzle-objects/teleport-gate.png",
+      "width": 128,
+      "height": 146,
+      "runtimeGroup": "gameplay"
+    },
+    "hardlightBunker": {
+      "path": "images/puzzle-objects/hardlight-bunker.png",
+      "width": 192,
+      "height": 92,
+      "runtimeGroup": "gameplay"
     }
   },
   "projectiles": {

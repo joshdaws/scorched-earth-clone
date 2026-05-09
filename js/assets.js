@@ -206,6 +206,7 @@ function getRuntimeGroupsForAsset(key, meta = {}) {
     if (key.startsWith('tankSkins.')) return [ASSET_GROUPS.COLLECTION, ASSET_GROUPS.SHOP];
     if (key.startsWith('backgrounds.synthwave')) return [ASSET_GROUPS.TITLE];
     if (key.startsWith('backgrounds.gameplay')) return [ASSET_GROUPS.GAMEPLAY];
+    if (key.startsWith('puzzleObjects.')) return [ASSET_GROUPS.GAMEPLAY];
     if (key.startsWith('weaponIcons.')) return [ASSET_GROUPS.GAMEPLAY, ASSET_GROUPS.SHOP];
     if (key.startsWith('ui.')) return [ASSET_GROUPS.GAMEPLAY, ASSET_GROUPS.SHOP];
     if (

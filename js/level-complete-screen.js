@@ -90,6 +90,9 @@ let lastScoreLineTime = 0;
 /** Button hover state */
 let hoveredButton = null;
 
+/** Optional renderer for the frozen gameplay scene behind the result overlay */
+let backgroundRenderer = null;
+
 /** World unlock celebration state */
 let worldUnlockCelebration = {
     active: false,
@@ -274,6 +277,14 @@ export function onMenu(callback) {
     onMenuCallback = callback;
 }
 
+/**
+ * Register a renderer for the gameplay scene underneath the level result UI.
+ * @param {Function|null} renderer
+ */
+export function setBackgroundRenderer(renderer) {
+    backgroundRenderer = typeof renderer === 'function' ? renderer : null;
+}
+
 // =============================================================================
 // BUTTON LAYOUT
 // =============================================================================
@@ -343,6 +354,7 @@ export function handleClick(pos) {
     if (!contentVisible) return false;
 
     const buttons = getButtonRects();
+    const levelWon = isLevelWon();
 
     // Check Retry button
     if (isInsideRect(pos, buttons.retry)) {
@@ -356,6 +368,11 @@ export function handleClick(pos) {
 
     // Check Next button
     if (isInsideRect(pos, buttons.next)) {
+        if (!levelWon) {
+            Sound.playErrorSound();
+            return true;
+        }
+
         // Check if next level exists and is unlocked
         const nextLevelNum = completionData.levelNum + 1;
         const nextLevelId = `world${completionData.worldNum}-level${nextLevelNum}`;
@@ -782,22 +799,35 @@ function playWorldUnlockSound() {
  * @param {CanvasRenderingContext2D} ctx
  */
 export function render(ctx) {
-    if (!isVisible || !contentVisible) return;
+    if (!isVisible) return;
+
+    if (backgroundRenderer) {
+        backgroundRenderer(ctx);
+    }
 
     const width = Renderer.getWidth();
     const height = Renderer.getHeight();
     const centerX = width / 2;
+    const levelWon = isLevelWon();
 
     // Get theme color from world
     const theme = WORLD_THEMES[completionData.worldNum] || WORLD_THEMES[1];
-    const mainColor = theme.primaryColor;
+    const mainColor = levelWon ? theme.primaryColor : COLORS.NEON_ORANGE;
     const pulseIntensity = (Math.sin(animationTime * CONFIG.PULSE_SPEED) + 1) / 2;
+    const revealProgress = Math.min(1, animationTime / CONFIG.APPEAR_DELAY);
 
     ctx.save();
 
-    // Semi-transparent dark overlay
-    ctx.fillStyle = 'rgba(10, 10, 26, 0.97)';
+    // Semi-transparent dark overlay. During the initial delay this preserves the
+    // explosion/destruction beat instead of cutting to a blank result screen.
+    const overlayAlpha = contentVisible ? 0.9 : 0.18 + revealProgress * 0.42;
+    ctx.fillStyle = `rgba(10, 10, 26, ${overlayAlpha})`;
     ctx.fillRect(0, 0, width, height);
+
+    if (!contentVisible) {
+        ctx.restore();
+        return;
+    }
 
     // Scanlines effect
     ctx.globalAlpha = 0.04;
@@ -867,6 +897,7 @@ export function render(ctx) {
  */
 function renderVictoryHeader(ctx, centerX, mainColor, pulseIntensity) {
     ctx.save();
+    const levelWon = isLevelWon();
 
     // Glow effect
     ctx.shadowColor = mainColor;
@@ -877,15 +908,16 @@ function renderVictoryHeader(ctx, centerX, mainColor, pulseIntensity) {
     ctx.fillStyle = mainColor;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('VICTORY!', centerX, CONFIG.TITLE_Y);
+    ctx.fillText(levelWon ? 'VICTORY!' : 'LEVEL FAILED', centerX, CONFIG.TITLE_Y);
 
     // Decorative stars on sides
     ctx.shadowBlur = 15;
     ctx.font = `24px ${UI.FONT_FAMILY}`;
-    ctx.fillStyle = COLORS.NEON_YELLOW;
-    ctx.shadowColor = COLORS.NEON_YELLOW;
-    ctx.fillText('\u2605 \u2605 \u2605', centerX - 150, CONFIG.TITLE_Y);
-    ctx.fillText('\u2605 \u2605 \u2605', centerX + 150, CONFIG.TITLE_Y);
+    ctx.fillStyle = levelWon ? COLORS.NEON_YELLOW : COLORS.NEON_PINK;
+    ctx.shadowColor = ctx.fillStyle;
+    const accent = levelWon ? '\u2605 \u2605 \u2605' : '\u25c7 \u25c7 \u25c7';
+    ctx.fillText(accent, centerX - 150, CONFIG.TITLE_Y);
+    ctx.fillText(accent, centerX + 150, CONFIG.TITLE_Y);
 
     ctx.restore();
 }
@@ -964,6 +996,7 @@ function renderStars(ctx, centerX, y, pulseIntensity) {
  */
 function renderScoreBreakdown(ctx, centerX, startY) {
     const stats = completionData.stats;
+    const levelWon = isLevelWon();
     const breakdown = completionData.result?.breakdown || {};
     const damageThreshold = breakdown.damageThreshold ?? completionData.level?.star2Damage ?? 0;
     const accuracyThreshold = breakdown.accuracyThreshold ?? Math.round((completionData.level?.star3Accuracy || 0) * 100);
@@ -988,8 +1021,8 @@ function renderScoreBreakdown(ctx, centerX, startY) {
         },
         {
             label: 'Stars:',
-            value: completionData.result?.message || 'Victory!',
-            color: completionData.result?.stars >= 3 ? COLORS.NEON_YELLOW : COLORS.TEXT_LIGHT
+            value: levelWon ? (completionData.result?.message || 'Victory!') : 'Tank destroyed - retry for stars',
+            color: levelWon ? (completionData.result?.stars >= 3 ? COLORS.NEON_YELLOW : COLORS.TEXT_LIGHT) : COLORS.NEON_ORANGE
         },
         { label: '', value: '───────────────', color: COLORS.GRID }, // Separator
         { label: 'Score:', value: formatNumber(calculateScore(stats)), color: COLORS.NEON_YELLOW, bold: true }
@@ -1037,6 +1070,7 @@ function formatTurnThreshold(turnThreshold) {
  */
 function renderCoinReward(ctx, centerX, y) {
     if (scoreLinesRevealed < 6) return;
+    if (!isLevelWon()) return;
 
     const coins = completionData.coinsEarned;
     const isFirstClear = completionData.isFirstClear;
@@ -1088,6 +1122,7 @@ function renderNewBest(ctx, centerX, y, pulseIntensity) {
  */
 function renderButtons(ctx, pulseIntensity) {
     const buttons = getButtonRects();
+    const levelWon = isLevelWon();
 
     // Check if next level is available
     const nextLevelNum = completionData.levelNum + 1;
@@ -1095,13 +1130,13 @@ function renderButtons(ctx, pulseIntensity) {
     const nextLevel = LevelRegistry.getLevel(nextLevelId);
     const nextWorldUnlocked = completionData.worldNum < LEVEL_CONSTANTS.WORLDS &&
         LevelRegistry.isWorldUnlocked(completionData.worldNum + 1, Stars.getTotalStars());
-    const hasNextLevel = nextLevel || nextWorldUnlocked;
+    const hasNextLevel = levelWon && (nextLevel || nextWorldUnlocked);
 
     // Retry button
     renderButton(ctx, buttons.retry, 'RETRY', COLORS.NEON_ORANGE, hoveredButton === 'retry', pulseIntensity, true);
 
     // Next button (may be disabled)
-    renderButton(ctx, buttons.next, hasNextLevel ? 'NEXT \u2192' : 'NEXT', COLORS.NEON_CYAN, hoveredButton === 'next', pulseIntensity, hasNextLevel);
+    renderButton(ctx, buttons.next, levelWon ? (hasNextLevel ? 'NEXT \u2192' : 'NEXT') : 'NO STARS', COLORS.NEON_CYAN, hoveredButton === 'next', pulseIntensity, hasNextLevel);
 
     // Menu button
     renderButton(ctx, buttons.menu, 'MENU', COLORS.NEON_PURPLE, hoveredButton === 'menu', pulseIntensity, true);
@@ -1239,6 +1274,10 @@ function calculateScore(stats) {
     const accuracyBonus = Math.round(stats.accuracy * 1000);
     const turnBonus = Math.max(0, (20 - stats.turnsUsed) * 50);
     return damageScore + accuracyBonus + turnBonus;
+}
+
+function isLevelWon() {
+    return completionData.stats?.won !== false;
 }
 
 // =============================================================================

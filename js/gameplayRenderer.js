@@ -38,6 +38,7 @@ export function renderGameplayScene(ctx, config) {
         renderBackground,
         renderTerrain,
         renderTerrainDerezEffects,
+        renderPuzzleObjects,
         renderFalloutZones,
         renderFireZones,
         renderTanks,
@@ -64,6 +65,9 @@ export function renderGameplayScene(ctx, config) {
     measureRenderSection('background', () => renderBackground(ctx, width, height));
     measureRenderSection('terrain', () => renderTerrain(ctx));
     measureRenderSection('terrainDerezEffects', () => renderTerrainDerezEffects(ctx));
+    if (renderPuzzleObjects) {
+        measureRenderSection('puzzleObjects', () => renderPuzzleObjects(ctx));
+    }
     measureRenderSection('falloutZones', () => renderFalloutZones(ctx));
     measureRenderSection('fireZones', () => renderFireZones(ctx));
     measureRenderSection('tanks', () => renderTanks(ctx));

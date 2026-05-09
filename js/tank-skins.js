@@ -399,6 +399,32 @@ const LEGENDARY_TANKS = [
             color: '#FF00FF',
             explosionOverride: 'synthwave-explosion'
         }
+    }),
+    createTankSkin({
+        id: 'neon-vanguard',
+        name: 'Neon Vanguard',
+        description: 'A flagship command tank with embedded cyan-magenta hardlight plating.',
+        rarity: RARITY.LEGENDARY,
+        glowColor: '#00FFFF',
+        animated: true,
+        specialEffects: {
+            type: 'synthwave',
+            color: '#00FFFF',
+            explosionOverride: 'synthwave-explosion'
+        }
+    }),
+    createTankSkin({
+        id: 'obsidian-judge',
+        name: 'Obsidian Judge',
+        description: 'Black chrome armor with orange reactor lines and a tournament-grade cannon.',
+        rarity: RARITY.LEGENDARY,
+        glowColor: '#FF6600',
+        animated: true,
+        specialEffects: {
+            type: 'cyborg',
+            color: '#FF6600',
+            explosionOverride: 'chrome-explosion'
+        }
     })
 ];
 

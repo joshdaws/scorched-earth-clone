@@ -16,15 +16,15 @@ describe('Tank Forge generated content pack', () => {
     expect(validation.designs).toHaveLength(27);
   });
 
-  it('expands the unlockable tank registry to 60 skins', () => {
+  it('expands the unlockable tank registry to 62 skins', () => {
     expect(GENERATED_TANK_SKINS).toHaveLength(27);
-    expect(getTankCount()).toBe(60);
+    expect(getTankCount()).toBe(62);
     expect(getTankCountByRarity()).toEqual({
       common: 13,
       uncommon: 14,
       rare: 13,
       epic: 11,
-      legendary: 9
+      legendary: 11
     });
   });
 

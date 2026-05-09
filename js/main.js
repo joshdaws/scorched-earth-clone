@@ -46,7 +46,8 @@ import * as LevelCompleteScreen from './level-complete-screen.js';
 import * as LevelEditorScreen from './level-editor-screen.js';
 import * as TankEditorScreen from './tank-editor-screen.js';
 import { LevelRegistry } from './levels.js';
-import { buildTerrainFromSlot, getSpawnForSlot } from './level-layouts.js';
+import { buildTerrainFromSlot, getPuzzleObjectsForSlot, getSpawnForSlot } from './level-layouts.js';
+import { renderPuzzleObjectsWithSprites, resolvePuzzleObjectCollision } from './puzzleObjects.js';
 import { Stars } from './stars.js';
 import * as CombatAchievements from './combat-achievements.js';
 import * as PrecisionAchievements from './precision-achievements.js';
@@ -384,6 +385,12 @@ function clearLevelEditorPlaytestState() {
  * @type {import('./projectile.js').Projectile[]}
  */
 let activeProjectiles = [];
+
+/**
+ * Active level-authored puzzle objects for campaign combat.
+ * @type {object[]}
+ */
+let currentPuzzleObjects = [];
 
 /**
  * Legacy accessor for backwards compatibility (used in some render code)
@@ -2814,6 +2821,26 @@ function handleProjectileExplosion(projectile, pos, directHitTank) {
     });
 }
 
+function triggerPuzzleObjectImpactEffect(puzzleHit) {
+    const pos = puzzleHit.pos || puzzleHit.object;
+    if (!pos) return;
+
+    explosionEffect = {
+        active: true,
+        x: pos.x,
+        y: pos.y,
+        radius: puzzleHit.type === 'bunker-hit' ? 28 : 22,
+        startTime: performance.now(),
+        duration: 260,
+        isNuclear: false,
+        hasMushroomCloud: false
+    };
+
+    screenShakeForBlastRadius(24);
+    Sound.playHitSound();
+    Haptics.hapticExplosion(24);
+}
+
 /**
  * Update all active projectiles - physics, collisions, splitting, rolling, and digging.
  * Called each frame during projectile flight.
@@ -2972,6 +2999,26 @@ function updateProjectile() {
         }
 
         const pos = projectile.getPosition();
+        const puzzleHit = resolvePuzzleObjectCollision(
+            projectile,
+            currentPuzzleObjects,
+            WeaponRegistry.getWeapon(projectile.weaponId)
+        );
+        if (puzzleHit) {
+            if (puzzleHit.continueFlight) {
+                console.log(`[Main] Projectile interacted with ${puzzleHit.type}`);
+                continue;
+            }
+
+            if (puzzleHit.block) {
+                console.log(`[Main] Projectile blocked by ${puzzleHit.type}`);
+                triggerPuzzleObjectImpactEffect(puzzleHit);
+                projectile.deactivate();
+                projectile.clearTrail();
+                toRemove.push(projectile);
+                continue;
+            }
+        }
 
         // Check for tank collision
         // Pass owner info to prevent immediate self-collision at low angles
@@ -3089,6 +3136,11 @@ function checkRoundEnd() {
     // Record onboarding progress once a round reaches a terminal result.
     if (playerDestroyed || enemyDestroyed) {
         markFirstRoundCompleted();
+    }
+
+    if (isLevelMode && currentLevelData && playerDestroyed) {
+        showLevelFailure(enemyDestroyed);
+        return;
     }
 
     // Check for draw condition first (both tanks destroyed)
@@ -3265,6 +3317,38 @@ function checkRoundEnd() {
 
     // No one destroyed - continue to next turn
     Turn.projectileResolved();
+}
+
+/**
+ * Show a campaign level failure result without ending or scoring the survival run.
+ * @param {boolean} mutualDestruction - Whether the enemy was also destroyed.
+ */
+function showLevelFailure(mutualDestruction = false) {
+    console.log(mutualDestruction
+        ? '[Main] Level failed - mutual destruction'
+        : '[Main] Level failed - player destroyed');
+
+    CombatAchievements.onRoundLost();
+    PerformanceTracking.onRoundEnd(false);
+
+    const levelId = currentLevelId;
+    const accuracy = getLevelModeAccuracy();
+    const turnsUsed = levelModeStats.turnsUsed;
+    const damageDealt = levelModeStats.damageDealt;
+
+    LevelCompleteScreen.show({
+        levelId,
+        stats: {
+            damageDealt,
+            accuracy,
+            turnsUsed,
+            won: false
+        },
+        coinsEarned: 0
+    });
+
+    Haptics.hapticDefeat();
+    Game.setState(GAME_STATES.LEVEL_COMPLETE);
 }
 
 // =============================================================================
@@ -5366,6 +5450,7 @@ function renderPlaying(ctx) {
         renderBackground,
         renderTerrain,
         renderTerrainDerezEffects,
+        renderPuzzleObjects: renderLevelPuzzleObjects,
         renderFalloutZones,
         renderFireZones,
         renderTanks,
@@ -5380,6 +5465,15 @@ function renderPlaying(ctx) {
         renderScreenFlash,
         renderDebugOverlays: DebugOverlays.render,
         renderCrtEffects
+    });
+}
+
+function renderLevelPuzzleObjects(ctx) {
+    renderPuzzleObjectsWithSprites(ctx, currentPuzzleObjects, performance.now(), {
+        shieldGenerator: Assets.get('puzzleObjects.shieldGenerator'),
+        ricochetPanel: Assets.get('puzzleObjects.ricochetPanel'),
+        teleportGate: Assets.get('puzzleObjects.teleportGate'),
+        hardlightBunker: Assets.get('puzzleObjects.hardlightBunker')
     });
 }
 
@@ -5702,17 +5796,31 @@ function setupPlayingState() {
                         }
                     );
 
+                    currentPuzzleObjects = getPuzzleObjectsForSlot(
+                        currentLevelId,
+                        Renderer.getWidth(),
+                        Renderer.getHeight(),
+                        {
+                            slotOverride
+                        }
+                    );
+
                     playerTank = createPlayerTank(spawn.player.x, spawn.player.y);
                     enemyTank = createEnemyTank(spawn.enemy.x, spawn.enemy.y);
                     usedLayoutTerrain = true;
 
-                    console.log(`[Main] Level layout loaded for ${currentLevelId}`, spawn.meta);
+                    console.log(`[Main] Level layout loaded for ${currentLevelId}`, {
+                        ...spawn.meta,
+                        puzzleObjects: currentPuzzleObjects.length
+                    });
                 } catch (error) {
                     console.warn(`[Main] Failed to load level layout for ${currentLevelId}, falling back to procedural terrain:`, error);
+                    currentPuzzleObjects = [];
                 }
             }
 
             if (!usedLayoutTerrain) {
+                currentPuzzleObjects = [];
                 // Generate new terrain for this game
                 // Uses midpoint displacement algorithm for natural-looking hills and valleys
                 // Terrain adapts to dynamic screen dimensions (no fixed width/height)
@@ -7389,6 +7497,7 @@ async function init() {
     LevelSelectScreen.setup();
     LevelEditorScreen.setup();
     TankEditorScreen.setup();
+    LevelCompleteScreen.setBackgroundRenderer(renderPlaying);
     LevelCompleteScreen.setup();
     setupPlayingState();
     setupPausedState();
@@ -8394,6 +8503,15 @@ function installAutomationHooks() {
             wind: state.wind,
             player: state.player,
             enemy: state.enemy,
+            puzzleObjects: currentPuzzleObjects
+                .filter(object => object.active)
+                .map(object => ({
+                    id: object.id,
+                    type: object.type,
+                    x: Math.round(object.x),
+                    y: Math.round(object.y),
+                    strength: object.strength ?? null
+                })),
             weaponBar: controls.weaponBar,
             aim: controls.aim
         });
