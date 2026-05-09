@@ -201,6 +201,7 @@ const validTransitions = {
         GAME_STATES.ACHIEVEMENTS,       // View achievements
         GAME_STATES.COLLECTION,         // View tank collection
         GAME_STATES.SUPPLY_DROP,        // Open supply drop crates
+        GAME_STATES.SHOP,               // Debug/testing shop scene
         GAME_STATES.PLAYING,
         GAME_STATES.AIMING,  // Can also start directly into aiming
         GAME_STATES.ROUND_TRANSITION  // For debug/testing
@@ -240,10 +241,13 @@ const validTransitions = {
         GAME_STATES.MENU      // Can go back to menu
     ],
     [GAME_STATES.ACHIEVEMENTS]: [
-        GAME_STATES.MENU      // Can go back to menu
+        GAME_STATES.MENU,           // Can go back to menu
+        GAME_STATES.COLLECTION      // Return to garage/profile surface
     ],
     [GAME_STATES.COLLECTION]: [
         GAME_STATES.MENU,           // Can go back to menu
+        GAME_STATES.ACHIEVEMENTS,   // View medals from garage/profile
+        GAME_STATES.SUPPLY_DROP,    // Open drops from garage/profile
         GAME_STATES.ROUND_TRANSITION, // Return to round end screen
         GAME_STATES.SHOP,           // Go to shop after viewing collection
         GAME_STATES.PLAYING,        // Go directly to next round
@@ -251,6 +255,7 @@ const validTransitions = {
     ],
     [GAME_STATES.SUPPLY_DROP]: [
         GAME_STATES.MENU,           // Can go back to menu
+        GAME_STATES.COLLECTION,     // Return to garage/profile surface
         GAME_STATES.ROUND_TRANSITION, // Return to round end screen
         GAME_STATES.SHOP,           // Go to shop after supply drop
         GAME_STATES.PLAYING,        // Go directly to next round
@@ -304,6 +309,7 @@ const validTransitions = {
     [GAME_STATES.SHOP]: [
         GAME_STATES.PLAYING,
         GAME_STATES.AIMING,
+        GAME_STATES.SUPPLY_DROP,
         GAME_STATES.MENU
     ],
     [GAME_STATES.ROUND_TRANSITION]: [

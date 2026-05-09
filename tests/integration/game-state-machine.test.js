@@ -74,6 +74,22 @@ describe('game state machine integration', () => {
     expect(game.getState()).toBe(GAME_STATES.SUPPLY_DROP);
   });
 
+  it('supports contextual secondary progression navigation', async () => {
+    const { constants, game } = await freshStateModules();
+    const { GAME_STATES } = constants;
+
+    expect(game.setState(GAME_STATES.COLLECTION)).toBe(true);
+    expect(game.setState(GAME_STATES.ACHIEVEMENTS)).toBe(true);
+    expect(game.setState(GAME_STATES.COLLECTION)).toBe(true);
+    expect(game.setState(GAME_STATES.SUPPLY_DROP)).toBe(true);
+    expect(game.setState(GAME_STATES.COLLECTION)).toBe(true);
+
+    game.init();
+    expect(game.setState(GAME_STATES.SHOP)).toBe(true);
+    expect(game.setState(GAME_STATES.SUPPLY_DROP)).toBe(true);
+    expect(game.setState(GAME_STATES.SHOP)).toBe(true);
+  });
+
   it('runs the player and AI gameplay turn flow through projectile resolution', async () => {
     const { constants, game, turn } = await freshStateModules();
     const { GAME_STATES, TURN_PHASES } = constants;

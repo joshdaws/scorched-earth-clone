@@ -28,6 +28,9 @@ import * as Effects from './effects.js';
 import { Stars } from './stars.js';
 import * as Tokens from './tokens.js';
 import * as TankCollection from './tank-collection.js';
+import * as CollectionScreen from './collection-screen.js';
+import * as Shop from './shop.js';
+import * as AchievementScreen from './achievement-screen.js';
 import { DROP_TYPES, processDrop } from './drop-rates.js';
 import * as PitySystem from './pity-system.js';
 import * as SupplyDrop from './supply-drop.js';
@@ -1951,6 +1954,18 @@ export function getCollectionQaState() {
     };
 }
 
+/**
+ * Get secondary progression navigation targets for browser QA.
+ * @returns {Object}
+ */
+export function getSecondaryProgressionNavigationQaState() {
+    return {
+        collection: CollectionScreen.getNavigationQaState(),
+        achievements: AchievementScreen.getNavigationQaState(),
+        shop: Shop.getNavigationQaState()
+    };
+}
+
 // =============================================================================
 // ACHIEVEMENT QA API
 // =============================================================================
@@ -2195,6 +2210,7 @@ const TestAPI = {
     equipTankForQa,
     buildPityForQa,
     getCollectionQaState,
+    getSecondaryProgressionNavigationQaState,
     resetAchievementQaData,
     unlockAchievementForQa,
     unlockAchievementsForQa,

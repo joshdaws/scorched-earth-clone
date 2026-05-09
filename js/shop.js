@@ -289,14 +289,36 @@ const doneButton = new Button({
 });
 
 /**
+ * Secondary entry point into supply drops from the Armory/shop surface.
+ */
+const supplyDropButton = new Button({
+    text: 'DROPS',
+    x: 0,
+    y: 0,
+    width: 140,
+    height: SHOP_LAYOUT.DONE_BUTTON.HEIGHT,
+    fontSize: UI.FONT_SIZE_MEDIUM,
+    bgColor: 'rgba(26, 26, 46, 0.9)',
+    borderColor: COLORS.NEON_YELLOW,
+    textColor: COLORS.NEON_YELLOW,
+    glowColor: COLORS.NEON_YELLOW,
+    autoSize: false
+});
+
+/**
  * Update button positions based on current screen size.
  * Called before rendering and hit testing to ensure positions are current.
  */
 function updateButtonPositions() {
     const width = Renderer.getWidth();
     const height = Renderer.getHeight();
+    const footerY = height / 2 + SHOP_LAYOUT.DONE_BUTTON.Y_OFFSET;
 
-    doneButton.setPosition(width / 2, height / 2 + SHOP_LAYOUT.DONE_BUTTON.Y_OFFSET);
+    doneButton.setPosition(width / 2, footerY);
+    supplyDropButton.setPosition(
+        width / 2 + SHOP_LAYOUT.DONE_BUTTON.WIDTH / 2 + 16 + supplyDropButton.width / 2,
+        footerY
+    );
 }
 
 /**
@@ -725,6 +747,12 @@ export function handlePointerDown(x, y) {
         return true;
     }
 
+    // Check supply drop button
+    if (supplyDropButton.containsPoint(x, y)) {
+        pressedElementId = 'supply_drop';
+        return true;
+    }
+
     // Check tab buttons
     const tabInfo = getTabAtPoint(x, y);
     if (tabInfo) {
@@ -847,6 +875,14 @@ export function handlePointerUp(x, y) {
             onDoneCallback();
         }
         hide();
+        return true;
+    }
+
+    // Check supply drop button release
+    if (wasPressed === 'supply_drop' && supplyDropButton.containsPoint(x, y)) {
+        playClickSound();
+        console.log('[Shop] Supply Drops clicked');
+        Game.setState(GAME_STATES.SUPPLY_DROP);
         return true;
     }
 
@@ -1051,6 +1087,14 @@ export function handleClick(x, y) {
         return true;
     }
 
+    // Check supply drop button
+    if (supplyDropButton.containsPoint(x, y)) {
+        playClickSound();
+        console.log('[Shop] Supply Drops clicked');
+        Game.setState(GAME_STATES.SUPPLY_DROP);
+        return true;
+    }
+
     // Check tab buttons
     const tabInfo = getTabAtPoint(x, y);
     if (tabInfo) {
@@ -1082,6 +1126,22 @@ export function handleClick(x, y) {
     }
 
     return false;
+}
+
+/**
+ * Return Armory navigation state for browser QA.
+ * @returns {Object}
+ */
+export function getNavigationQaState() {
+    updateButtonPositions();
+    return {
+        gameState: Game.getState(),
+        visible: isVisible,
+        actions: {
+            done: doneButton.getBounds(),
+            supplyDrop: supplyDropButton.getBounds()
+        }
+    };
 }
 
 // =============================================================================
@@ -1339,6 +1399,16 @@ function getTabAtPoint(x, y) {
         }
     }
     return null;
+}
+
+/**
+ * Render bottom shop navigation buttons.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {number} pulseIntensity - Glow pulse intensity
+ */
+function renderFooterButtons(ctx, pulseIntensity) {
+    doneButton.render(ctx, pulseIntensity);
+    supplyDropButton.render(ctx, pulseIntensity * 0.75);
 }
 
 /**
@@ -1955,8 +2025,8 @@ export function render(ctx) {
 
         ctx.restore();
 
-        // Render Done button
-        doneButton.render(ctx, pulseIntensity);
+        // Render footer buttons
+        renderFooterButtons(ctx, pulseIntensity);
 
         // Corner accents
         ctx.save();
@@ -2214,8 +2284,8 @@ export function render(ctx) {
     // Restore from crossfade opacity (so Done button and corners render at full opacity)
     ctx.restore();
 
-    // Render Done button using Button component
-    doneButton.render(ctx, pulseIntensity);
+    // Render footer buttons using Button components
+    renderFooterButtons(ctx, pulseIntensity);
 
     // Corner accents (synthwave style)
     ctx.save();

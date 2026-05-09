@@ -739,10 +739,13 @@ export function setup() {
     Game.registerStateHandlers(GAME_STATES.SUPPLY_DROP, {
         onEnter: (fromState) => {
             console.log('Entered SUPPLY_DROP state from', fromState);
-            // Track where we came from to return there on exit
-            // If we came from round transition, go back there; otherwise go to menu
-            returnToState = (fromState === GAME_STATES.ROUND_TRANSITION)
-                ? GAME_STATES.ROUND_TRANSITION
+            // Track contextual secondary surfaces so Back returns to the source.
+            returnToState = [
+                GAME_STATES.COLLECTION,
+                GAME_STATES.SHOP,
+                GAME_STATES.ROUND_TRANSITION
+            ].includes(fromState)
+                ? fromState
                 : GAME_STATES.MENU;
             init();
             Music.playForState(GAME_STATES.MENU);

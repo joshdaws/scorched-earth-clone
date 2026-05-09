@@ -74,6 +74,9 @@ let maxScrollY = 0;
 /** Filtered achievements list */
 let filteredAchievements = [];
 
+/** State to return to when exiting a secondary screen */
+let returnToState = GAME_STATES.MENU;
+
 /** Animation time for effects */
 let animationTime = 0;
 
@@ -145,7 +148,7 @@ function handleClick(pos) {
     // Check back button
     if (isInsideRect(pos, CONFIG.BACK_BUTTON)) {
         Sound.playClickSound();
-        Game.setState(GAME_STATES.MENU);
+        Game.setState(returnToState);
         return;
     }
 
@@ -183,7 +186,7 @@ function handleClick(pos) {
 function handleKeyDown(keyCode) {
     if (keyCode === 'Escape') {
         Sound.playClickSound();
-        Game.setState(GAME_STATES.MENU);
+        Game.setState(returnToState);
     } else if (keyCode === 'ArrowUp') {
         scrollY = Math.max(0, scrollY - CONFIG.SCROLL_SPEED);
     } else if (keyCode === 'ArrowDown') {
@@ -257,6 +260,18 @@ function isInsideRect(pos, rect) {
  */
 export function update(deltaTime) {
     animationTime += deltaTime;
+}
+
+/**
+ * Return achievement screen navigation state for browser QA.
+ * @returns {Object}
+ */
+export function getNavigationQaState() {
+    return {
+        gameState: Game.getState(),
+        returnToState,
+        backButton: { ...CONFIG.BACK_BUTTON }
+    };
 }
 
 // =============================================================================
@@ -780,6 +795,9 @@ export function setup() {
     Game.registerStateHandlers(GAME_STATES.ACHIEVEMENTS, {
         onEnter: (fromState) => {
             console.log('Entered ACHIEVEMENTS state');
+            returnToState = (fromState === GAME_STATES.COLLECTION)
+                ? GAME_STATES.COLLECTION
+                : GAME_STATES.MENU;
             init();
             // Play menu music (reuse)
             Music.playForState(GAME_STATES.MENU);

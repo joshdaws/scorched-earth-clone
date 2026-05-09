@@ -63,9 +63,19 @@ const CONFIG = {
         height: 40
     },
 
-    // Scrap Shop button
+    // Header action buttons
+    HEADER_ACTION_GAP: 12,
+    ACHIEVEMENTS_BUTTON: {
+        y: 30,
+        width: 150,
+        height: 40
+    },
+    SUPPLY_DROP_BUTTON: {
+        y: 30,
+        width: 110,
+        height: 40
+    },
     SCRAP_SHOP_BUTTON: {
-        x: 1020,
         y: 30,
         width: 140,
         height: 40
@@ -88,7 +98,8 @@ const CONFIG = {
     SCROLL_SENSITIVITY: 1.5,
 
     // Animation
-    ANIMATION_SPEED: 0.003
+    ANIMATION_SPEED: 0.003,
+    INPUT_DEBOUNCE_MS: 80
 };;
 
 // =============================================================================
@@ -129,6 +140,9 @@ let shopTanks = [];
 
 /** State to return to when exiting (if came from round transition) */
 let returnToState = GAME_STATES.MENU;
+
+/** Timestamp when the collection screen became active. */
+let enteredAt = 0;
 
 // =============================================================================
 // FILTER CATEGORIES
@@ -232,6 +246,10 @@ function getGridLeft() {
  * @param {{x: number, y: number}} pos - Click position in design coordinates
  */
 function handleClick(pos) {
+    if (performance.now() - enteredAt < CONFIG.INPUT_DEBOUNCE_MS) {
+        return;
+    }
+
     // Check back button (uses dynamic positioning)
     if (isInsideRect(pos, getBackButtonRect())) {
         Sound.playClickSound();
@@ -245,6 +263,19 @@ function handleClick(pos) {
             // Return to the state we came from (menu or round transition)
             Game.setState(returnToState);
         }
+        return;
+    }
+
+    // Check secondary progression buttons (uses dynamic positioning)
+    if (isInsideRect(pos, getAchievementsButtonRect())) {
+        Sound.playClickSound();
+        Game.setState(GAME_STATES.ACHIEVEMENTS);
+        return;
+    }
+
+    if (isInsideRect(pos, getSupplyDropButtonRect())) {
+        Sound.playClickSound();
+        Game.setState(GAME_STATES.SUPPLY_DROP);
         return;
     }
 
@@ -410,16 +441,65 @@ function getBackButtonRect() {
 }
 
 /**
- * Get the scrap shop button rectangle (positioned relative to right edge).
+ * Get the right-aligned header action button rectangles.
+ */
+function getHeaderActionButtonRects() {
+    const margin = 60;
+    const actions = [
+        ['achievements', CONFIG.ACHIEVEMENTS_BUTTON],
+        ['supplyDrop', CONFIG.SUPPLY_DROP_BUTTON],
+        ['scrapShop', CONFIG.SCRAP_SHOP_BUTTON]
+    ];
+    const totalWidth = actions.reduce((sum, [, config]) => sum + config.width, 0) +
+        CONFIG.HEADER_ACTION_GAP * (actions.length - 1);
+    let x = Renderer.getWidth() - margin - totalWidth;
+
+    return actions.reduce((rects, [key, config]) => {
+        rects[key] = {
+            x,
+            y: config.y,
+            width: config.width,
+            height: config.height
+        };
+        x += config.width + CONFIG.HEADER_ACTION_GAP;
+        return rects;
+    }, {});
+}
+
+/**
+ * Get the achievements button rectangle (positioned in the header action group).
+ * @returns {{x: number, y: number, width: number, height: number}}
+ */
+function getAchievementsButtonRect() {
+    return getHeaderActionButtonRects().achievements;
+}
+
+/**
+ * Get the supply drop button rectangle (positioned in the header action group).
+ * @returns {{x: number, y: number, width: number, height: number}}
+ */
+function getSupplyDropButtonRect() {
+    return getHeaderActionButtonRects().supplyDrop;
+}
+
+/**
+ * Get the scrap shop button rectangle (positioned in the header action group).
  * @returns {{x: number, y: number, width: number, height: number}}
  */
 function getScrapShopButtonRect() {
-    const margin = 60; // Same margin as back button from edge
+    return getHeaderActionButtonRects().scrapShop;
+}
+
+/**
+ * Return header navigation state for browser QA.
+ * @returns {Object}
+ */
+export function getNavigationQaState() {
     return {
-        x: Renderer.getWidth() - CONFIG.SCRAP_SHOP_BUTTON.width - margin,
-        y: CONFIG.SCRAP_SHOP_BUTTON.y,
-        width: CONFIG.SCRAP_SHOP_BUTTON.width,
-        height: CONFIG.SCRAP_SHOP_BUTTON.height
+        gameState: Game.getState(),
+        returnToState,
+        isScrapShopMode,
+        actions: getHeaderActionButtonRects()
     };
 }
 
@@ -533,7 +613,7 @@ export function render(ctx) {
     renderTankGrid(ctx);
     renderDetailsPanel(ctx);
     renderBackButton(ctx);
-    renderScrapShopButton(ctx);
+    renderHeaderActionButtons(ctx);
     renderFooter(ctx);
 }
 
@@ -1107,43 +1187,61 @@ function renderBackButton(ctx) {
 
 
 /**
- * Render the scrap shop toggle button (positioned relative to right edge).
+ * Render one header action button.
  */
-function renderScrapShopButton(ctx) {
-    const btn = getScrapShopButtonRect();
-    const scrap = getScrap();
+function renderHeaderActionButton(ctx, btn, options) {
+    const {
+        label,
+        color,
+        active = false,
+        bgColor = 'rgba(10, 10, 26, 0.8)'
+    } = options;
 
     ctx.save();
 
-    // Button background
-    ctx.fillStyle = isScrapShopMode ? 'rgba(255, 140, 0, 0.2)' : 'rgba(10, 10, 26, 0.8)';
+    ctx.fillStyle = active ? `${color}33` : bgColor;
     ctx.beginPath();
     ctx.roundRect(btn.x, btn.y, btn.width, btn.height, 6);
     ctx.fill();
 
-    // Button border
-    ctx.strokeStyle = COLORS.NEON_ORANGE;
-    ctx.lineWidth = isScrapShopMode ? 3 : 2;
-    if (isScrapShopMode) {
-        ctx.shadowColor = COLORS.NEON_ORANGE;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = active ? 3 : 2;
+    if (active) {
+        ctx.shadowColor = color;
         ctx.shadowBlur = 8;
     }
     ctx.stroke();
     ctx.shadowBlur = 0;
 
-    // Button text
-    ctx.fillStyle = COLORS.NEON_ORANGE;
+    ctx.fillStyle = color;
     ctx.font = `bold 14px ${UI.FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-
-    if (isScrapShopMode) {
-        ctx.fillText('COLLECTION', btn.x + btn.width / 2, btn.y + btn.height / 2);
-    } else {
-        ctx.fillText(`SHOP (${scrap})`, btn.x + btn.width / 2, btn.y + btn.height / 2);
-    }
+    ctx.fillText(label, btn.x + btn.width / 2, btn.y + btn.height / 2);
 
     ctx.restore();
+}
+
+/**
+ * Render the header action buttons (positioned relative to right edge).
+ */
+function renderHeaderActionButtons(ctx) {
+    const rects = getHeaderActionButtonRects();
+    const scrap = getScrap();
+
+    renderHeaderActionButton(ctx, rects.achievements, {
+        label: 'MEDALS',
+        color: COLORS.NEON_PINK
+    });
+    renderHeaderActionButton(ctx, rects.supplyDrop, {
+        label: 'DROPS',
+        color: COLORS.NEON_YELLOW
+    });
+    renderHeaderActionButton(ctx, rects.scrapShop, {
+        label: isScrapShopMode ? 'GARAGE' : `SHOP (${scrap})`,
+        color: COLORS.NEON_ORANGE,
+        active: isScrapShopMode
+    });
 }
 
 // =============================================================================
@@ -1205,6 +1303,7 @@ export function setup() {
             returnToState = (fromState === GAME_STATES.ROUND_TRANSITION)
                 ? GAME_STATES.ROUND_TRANSITION
                 : GAME_STATES.MENU;
+            enteredAt = performance.now();
             init();
             // Play menu music (reuse)
             Music.playForState(GAME_STATES.MENU);

@@ -1,6 +1,36 @@
 import { expect, test } from 'playwright/test';
 import { bootGame, bootScene, clearQaStorage, expectCanvasReady, trackConsoleFailures } from './helpers.js';
 
+async function clickDesignPoint(page, x, y) {
+  await page.evaluate(async ({ x, y }) => {
+    const { getDisplayOffset, getGameScale } = await import('/js/screenSize.js');
+    const canvas = document.getElementById('game');
+    const rect = canvas.getBoundingClientRect();
+    const scale = getGameScale();
+    const offset = getDisplayOffset();
+    const clientX = rect.left + offset.x + x * scale;
+    const clientY = rect.top + offset.y + y * scale;
+    const eventInit = {
+      bubbles: true,
+      cancelable: true,
+      clientX,
+      clientY,
+      button: 0,
+      buttons: 1
+    };
+    canvas.dispatchEvent(new MouseEvent('mousemove', eventInit));
+    canvas.dispatchEvent(new MouseEvent('mousedown', eventInit));
+    canvas.dispatchEvent(new MouseEvent('mouseup', { ...eventInit, buttons: 0 }));
+  }, { x, y });
+}
+
+function centerOf(rect) {
+  return {
+    x: rect.x + rect.width / 2,
+    y: rect.y + rect.height / 2
+  };
+}
+
 test.describe('collection and supply drop journey', () => {
   test.beforeEach(async ({ page }) => {
     await clearQaStorage(page);
@@ -20,6 +50,53 @@ test.describe('collection and supply drop journey', () => {
     expect(state.collection.equippedTankId).toBe('standard');
     expect(state.collection.progress.owned).toBe(1);
     expect(state.collection.progress.total).toBeGreaterThan(1);
+    failures.expectNoFailures();
+  });
+
+  test('garage and armory expose secondary progression without adding home choices', async ({ page }) => {
+    const failures = trackConsoleFailures(page);
+    await bootGame(page, '/');
+
+    await page.evaluate(() => window.Game.setState('collection'));
+    await page.waitForTimeout(100);
+    const garageNav = await page.evaluate(() => window.TestAPI.getSecondaryProgressionNavigationQaState().collection);
+
+    expect(garageNav.gameState).toBe('collection');
+    expect(Object.keys(garageNav.actions)).toEqual(['achievements', 'supplyDrop', 'scrapShop']);
+
+    const achievementsButton = centerOf(garageNav.actions.achievements);
+    await clickDesignPoint(page, achievementsButton.x, achievementsButton.y);
+    await expect.poll(() => page.evaluate(() => window.Game.getState())).toBe('achievements');
+    const medalNav = await page.evaluate(() => window.TestAPI.getSecondaryProgressionNavigationQaState().achievements);
+    expect(medalNav.returnToState).toBe('collection');
+    const medalBackButton = centerOf(medalNav.backButton);
+    await clickDesignPoint(page, medalBackButton.x, medalBackButton.y);
+    await expect.poll(() => page.evaluate(() => window.Game.getState())).toBe('collection');
+    await page.waitForTimeout(100);
+
+    const garageDropNav = await page.evaluate(() => window.TestAPI.getSecondaryProgressionNavigationQaState().collection);
+    const garageDropButton = centerOf(garageDropNav.actions.supplyDrop);
+    await clickDesignPoint(page, garageDropButton.x, garageDropButton.y);
+    await expect.poll(() => page.evaluate(() => window.Game.getState())).toBe('supply_drop');
+    await clickDesignPoint(page, 90, 50);
+    await expect.poll(() => page.evaluate(() => window.Game.getState())).toBe('collection');
+    await page.waitForTimeout(100);
+
+    await bootScene(page, '/?scene=physics-sandbox&seed=24680&wind=0');
+    await page.evaluate(() => {
+      window.Game.setState('menu');
+      window.Game.setState('shop');
+    });
+    const armoryNav = await page.evaluate(() => window.TestAPI.getSecondaryProgressionNavigationQaState().shop);
+    expect(armoryNav.gameState).toBe('shop');
+    expect(armoryNav.visible).toBe(true);
+
+    const armoryDropButton = centerOf(armoryNav.actions.supplyDrop);
+    await clickDesignPoint(page, armoryDropButton.x, armoryDropButton.y);
+    await expect.poll(() => page.evaluate(() => window.Game.getState())).toBe('supply_drop');
+    await clickDesignPoint(page, 90, 50);
+    await expect.poll(() => page.evaluate(() => window.Game.getState())).toBe('shop');
+
     failures.expectNoFailures();
   });
 
