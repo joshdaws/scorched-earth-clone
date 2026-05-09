@@ -91,6 +91,11 @@ let contentVisible = false;
 let showStartTime = 0;
 
 /**
+ * Reward count-up animation length in milliseconds.
+ */
+const REWARD_COUNTUP_DURATION_MS = 950;
+
+/**
  * Callback to execute when "Continue" is clicked (skip shop, go to next round).
  * @type {Function|null}
  */
@@ -366,6 +371,7 @@ export function getState() {
         completedRound,
         roundDamage,
         roundMoney,
+        rewardAnimation: getRewardAnimationState(),
         selectedPerkId,
         perks: RUN_PERKS.map(perk => ({ ...perk }))
     };
@@ -527,6 +533,60 @@ function getDifficultyColor(difficulty) {
     }
 }
 
+/**
+ * Ease value out with a strong finish for arcade reward counts.
+ * @param {number} value - Linear 0..1 progress
+ * @returns {number}
+ */
+function easeOutCubic(value) {
+    const clamped = Math.max(0, Math.min(1, value));
+    return 1 - Math.pow(1 - clamped, 3);
+}
+
+/**
+ * Get content-visible elapsed time, excluding the pre-overlay delay.
+ * @returns {number}
+ */
+function getContentElapsedMs() {
+    if (!showStartTime) return 0;
+    return Math.max(0, performance.now() - showStartTime - appearDelay);
+}
+
+/**
+ * Count a numeric reward toward its final value with an optional stagger.
+ * @param {number} finalValue - Target number
+ * @param {number} elapsedMs - Elapsed content-visible time
+ * @param {number} [delayMs=0] - Stagger delay before this value starts
+ * @returns {number}
+ */
+function getAnimatedRewardValue(finalValue, elapsedMs, delayMs = 0) {
+    const target = Math.max(0, Number(finalValue) || 0);
+    const progress = easeOutCubic((elapsedMs - delayMs) / REWARD_COUNTUP_DURATION_MS);
+    return Math.round(target * progress);
+}
+
+/**
+ * Snapshot the reward animation for rendering and QA assertions.
+ * @returns {Object}
+ */
+function getRewardAnimationState() {
+    const elapsedMs = contentVisible ? getContentElapsedMs() : 0;
+    const tokenTotal = tokenResult?.total || 0;
+    const previousBalance = Math.max(0, tokenBalance - tokenTotal);
+    const animatedTokenTotal = getAnimatedRewardValue(tokenTotal, elapsedMs, 420);
+    const balanceDelta = Math.max(0, tokenBalance - previousBalance);
+
+    return {
+        elapsedMs,
+        durationMs: REWARD_COUNTUP_DURATION_MS,
+        isComplete: elapsedMs >= REWARD_COUNTUP_DURATION_MS + 420,
+        damage: getAnimatedRewardValue(roundDamage, elapsedMs, 0),
+        money: getAnimatedRewardValue(roundMoney, elapsedMs, 220),
+        tokenTotal: animatedTokenTotal,
+        tokenBalance: previousBalance + Math.min(balanceDelta, animatedTokenTotal)
+    };
+}
+
 // =============================================================================
 // MAIN RENDER
 // =============================================================================
@@ -574,6 +634,7 @@ export function render(ctx) {
     const nextRound = completedRound + 1;
     const nextDifficulty = getDifficultyName(nextRound);
     const difficultyColor = getDifficultyColor(nextDifficulty);
+    const rewardAnimation = getRewardAnimationState();
 
     ctx.save();
 
@@ -644,7 +705,7 @@ export function render(ctx) {
     ctx.fillStyle = COLORS.NEON_PINK;
     ctx.shadowColor = COLORS.NEON_PINK;
     ctx.shadowBlur = 6;
-    ctx.fillText(roundDamage.toString(), leftColumnX, statY + 20);
+    ctx.fillText(rewardAnimation.damage.toString(), leftColumnX, statY + 20);
 
     statY += statSpacing + 25;
 
@@ -657,7 +718,7 @@ export function render(ctx) {
     ctx.fillStyle = COLORS.NEON_YELLOW;
     ctx.shadowColor = COLORS.NEON_YELLOW;
     ctx.shadowBlur = 6;
-    ctx.fillText(`$${roundMoney.toLocaleString()}`, leftColumnX, statY + 20);
+    ctx.fillText(`$${rewardAnimation.money.toLocaleString()}`, leftColumnX, statY + 20);
 
     ctx.restore();
 
@@ -681,12 +742,15 @@ export function render(ctx) {
 
         for (const item of tokenResult.breakdown) {
             const source = item.source || item.label || 'Run Bonus';
+            const totalTokens = Math.max(1, tokenResult.total || 0);
+            const tokenProgress = Math.min(1, rewardAnimation.tokenTotal / totalTokens);
+            const animatedAmount = tokenProgress >= 1 ? item.amount : Math.floor(item.amount * tokenProgress);
             ctx.fillStyle = COLORS.TEXT_MUTED;
             ctx.textAlign = 'left';
             ctx.fillText(source, rightColumnX - 80, tokenY);
             ctx.fillStyle = COLORS.NEON_CYAN;
             ctx.textAlign = 'right';
-            ctx.fillText(`+${item.amount}`, rightColumnX + 80, tokenY);
+            ctx.fillText(`+${animatedAmount}`, rightColumnX + 80, tokenY);
             tokenY += 22;
         }
 
@@ -706,7 +770,7 @@ export function render(ctx) {
         ctx.fillStyle = COLORS.NEON_CYAN;
         ctx.shadowColor = COLORS.NEON_CYAN;
         ctx.shadowBlur = 8;
-        ctx.fillText(`TOTAL: ${tokenResult.total} tokens`, rightColumnX, tokenY);
+        ctx.fillText(`TOTAL: ${rewardAnimation.tokenTotal} tokens`, rightColumnX, tokenY);
     } else {
         // No tokens earned
         ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
@@ -719,7 +783,7 @@ export function render(ctx) {
     ctx.shadowBlur = 0;
     ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
     ctx.fillStyle = COLORS.TEXT_MUTED;
-    ctx.fillText(`Balance: ${tokenBalance} tokens`, rightColumnX, tokenY);
+    ctx.fillText(`Balance: ${rewardAnimation.tokenBalance} tokens`, rightColumnX, tokenY);
 
     ctx.restore();
 

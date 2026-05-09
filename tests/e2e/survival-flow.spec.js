@@ -69,6 +69,10 @@ test.describe('survival flow', () => {
       window.Game.setState('round_transition');
       await new Promise(resolve => setTimeout(resolve, 50));
 
+      const rewardStart = window.RoundTransition.getState().rewardAnimation;
+      await new Promise(resolve => setTimeout(resolve, 1400));
+      const rewardComplete = window.RoundTransition.getState().rewardAnimation;
+
       window.RoundTransition.handleClick(461, 571);
       const selected = window.RoundTransition.getState().selectedPerkId;
 
@@ -78,11 +82,20 @@ test.describe('survival flow', () => {
       const controls = window.TestAPI.getControlState();
       return {
         selected,
+        rewardStart,
+        rewardComplete,
         gameState: window.Game.getState(),
         player: controls.state.player
       };
     });
 
+    expect(result.rewardStart.isComplete).toBe(false);
+    expect(result.rewardStart.damage).toBeLessThan(140);
+    expect(result.rewardComplete.isComplete).toBe(true);
+    expect(result.rewardComplete.damage).toBe(140);
+    expect(result.rewardComplete.money).toBe(500);
+    expect(result.rewardComplete.tokenTotal).toBe(8);
+    expect(result.rewardComplete.tokenBalance).toBe(18);
     expect(result.selected).toBe('field-repair');
     expect(result.gameState).toBe('playing');
     expect(result.player.health).toBe(125);
