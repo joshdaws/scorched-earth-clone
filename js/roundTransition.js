@@ -61,6 +61,12 @@ let tokenBalance = 0;
 let roundAchievements = [];
 
 /**
+ * Selected run perk for the next round.
+ * @type {string|null}
+ */
+let selectedPerkId = null;
+
+/**
  * Animation time for pulsing and glow effects.
  * @type {number}
  */
@@ -97,6 +103,12 @@ let onContinueCallback = null;
 let onShopCallback = null;
 
 /**
+ * Callback to execute when a run perk is selected.
+ * @type {Function|null}
+ */
+let onPerkCallback = null;
+
+/**
  * Callback to execute when "Collection" is clicked.
  * @type {Function|null}
  */
@@ -116,6 +128,33 @@ let onSupplyDropCallback = null;
  * Standard supply drop cost in tokens.
  */
 const SUPPLY_DROP_COST = 50;
+
+/**
+ * Survival perk cards shown between rounds.
+ */
+export const RUN_PERKS = Object.freeze([
+    {
+        id: 'field-repair',
+        title: 'FIELD REPAIR',
+        effect: '+25 hull next round',
+        description: 'Start the next duel with reinforced armor.',
+        color: COLORS.NEON_CYAN
+    },
+    {
+        id: 'hardlight-shield',
+        title: 'HARDLIGHT SHIELD',
+        effect: '+25 shield',
+        description: 'Absorb the first clean hit before hull damage.',
+        color: COLORS.NEON_YELLOW
+    },
+    {
+        id: 'ammo-cache',
+        title: 'AMMO CACHE',
+        effect: '+2 missiles, +1 bouncer',
+        description: 'Add tactical shots without opening the Armory.',
+        color: COLORS.NEON_PURPLE
+    }
+]);
 
 /**
  * Button styling for round transition screen.
@@ -231,6 +270,7 @@ export function show(options = {}) {
     tokenResult = tokens;
     tokenBalance = balance;
     roundAchievements = achievements;
+    selectedPerkId = null;
     animationTime = 0;
     appearDelay = delay;
     contentVisible = false;
@@ -256,6 +296,7 @@ export function hide() {
     showStartTime = 0;
     tokenResult = null;
     roundAchievements = [];
+    selectedPerkId = null;
 }
 
 /**
@@ -272,6 +313,14 @@ export function onContinue(callback) {
  */
 export function onShop(callback) {
     onShopCallback = callback;
+}
+
+/**
+ * Register callback for run perk selection.
+ * @param {Function} callback - Function to call with the selected perk
+ */
+export function onPerk(callback) {
+    onPerkCallback = callback;
 }
 
 /**
@@ -306,6 +355,22 @@ export function isActive() {
     return isVisible;
 }
 
+/**
+ * Get round-transition state for QA/tests.
+ * @returns {Object}
+ */
+export function getState() {
+    return {
+        isVisible,
+        contentVisible,
+        completedRound,
+        roundDamage,
+        roundMoney,
+        selectedPerkId,
+        perks: RUN_PERKS.map(perk => ({ ...perk }))
+    };
+}
+
 // =============================================================================
 // INPUT HANDLING
 // =============================================================================
@@ -321,6 +386,17 @@ export function handleClick(x, y) {
 
     // Ensure button positions are current for the screen size
     updateButtonPositions();
+
+    const perk = getPerkAtPoint(x, y);
+    if (perk) {
+        selectedPerkId = perk.id;
+        playClickSound();
+        console.log(`[RoundTransition] Run perk selected: ${perk.id}`);
+        if (onPerkCallback) {
+            onPerkCallback(perk);
+        }
+        return true;
+    }
 
     // Check Continue button (skip shop, go directly to next round)
     if (buttons.continue.containsPoint(x, y)) {
@@ -371,6 +447,48 @@ export function handlePointerMove(x, y) {
     } else {
         buttons.supplyDrop.setHovered(false);
     }
+}
+
+/**
+ * Get perk card rectangles.
+ * @returns {Array<{perk:Object, x:number, y:number, width:number, height:number}>}
+ */
+function getPerkRects() {
+    const centerX = Renderer.getWidth() / 2;
+    const cardWidth = 230;
+    const cardHeight = 112;
+    const gap = 24;
+    const startX = centerX - cardWidth - gap;
+    const y = Renderer.getHeight() - 285;
+
+    return RUN_PERKS.map((perk, index) => ({
+        perk,
+        x: startX + index * (cardWidth + gap),
+        y,
+        width: cardWidth,
+        height: cardHeight
+    }));
+}
+
+/**
+ * Return perk at design-coordinate point.
+ * @param {number} x - X coordinate
+ * @param {number} y - Y coordinate
+ * @returns {Object|null}
+ */
+function getPerkAtPoint(x, y) {
+    for (const rect of getPerkRects()) {
+        if (
+            x >= rect.x &&
+            x <= rect.x + rect.width &&
+            y >= rect.y &&
+            y <= rect.y + rect.height
+        ) {
+            return rect.perk;
+        }
+    }
+
+    return null;
 }
 
 // =============================================================================
@@ -562,9 +680,10 @@ export function render(ctx) {
         ctx.font = `${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
 
         for (const item of tokenResult.breakdown) {
+            const source = item.source || item.label || 'Run Bonus';
             ctx.fillStyle = COLORS.TEXT_MUTED;
             ctx.textAlign = 'left';
-            ctx.fillText(item.source, rightColumnX - 80, tokenY);
+            ctx.fillText(source, rightColumnX - 80, tokenY);
             ctx.fillStyle = COLORS.NEON_CYAN;
             ctx.textAlign = 'right';
             ctx.fillText(`+${item.amount}`, rightColumnX + 80, tokenY);
@@ -670,6 +789,11 @@ export function render(ctx) {
     ctx.restore();
 
     // =========================================================================
+    // RUN PERK CHOICE
+    // =========================================================================
+    renderRunPerkChoices(ctx, pulseIntensity);
+
+    // =========================================================================
     // BOTTOM BUTTONS: CONTINUE | ARMORY
     // =========================================================================
     buttons.continue.render(ctx, pulseIntensity);
@@ -721,6 +845,63 @@ export function render(ctx) {
     ctx.stroke();
 
     ctx.restore();
+
+    ctx.restore();
+}
+
+/**
+ * Render the between-round run perk choice cards.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {number} pulseIntensity - Glow intensity
+ */
+function renderRunPerkChoices(ctx, pulseIntensity) {
+    const rects = getPerkRects();
+    const titleY = rects[0].y - 22;
+
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `bold ${UI.FONT_SIZE_MEDIUM}px ${UI.FONT_FAMILY}`;
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.fillText('CHOOSE A RUN PERK', Renderer.getWidth() / 2, titleY);
+
+    for (const rect of rects) {
+        const { perk } = rect;
+        const selected = selectedPerkId === perk.id;
+        const glow = selected ? 16 + pulseIntensity * 12 : 6;
+
+        ctx.save();
+        ctx.fillStyle = selected ? 'rgba(35, 28, 58, 0.98)' : 'rgba(20, 15, 40, 0.92)';
+        ctx.strokeStyle = perk.color;
+        ctx.lineWidth = selected ? 3 : 1.5;
+        ctx.shadowColor = perk.color;
+        ctx.shadowBlur = glow;
+        ctx.beginPath();
+        ctx.roundRect(rect.x, rect.y, rect.width, rect.height, 8);
+        ctx.fill();
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        ctx.fillStyle = perk.color;
+        ctx.font = `bold ${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+        ctx.fillText(perk.title, rect.x + rect.width / 2, rect.y + 24);
+
+        ctx.fillStyle = COLORS.TEXT_LIGHT;
+        ctx.font = `bold ${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+        ctx.fillText(perk.effect, rect.x + rect.width / 2, rect.y + 52);
+
+        ctx.fillStyle = COLORS.TEXT_MUTED;
+        ctx.font = `10px ${UI.FONT_FAMILY}`;
+        ctx.fillText(perk.description, rect.x + rect.width / 2, rect.y + 80);
+
+        if (selected) {
+            ctx.fillStyle = COLORS.NEON_CYAN;
+            ctx.font = `bold 10px ${UI.FONT_FAMILY}`;
+            ctx.fillText('SELECTED', rect.x + rect.width / 2, rect.y + 100);
+        }
+
+        ctx.restore();
+    }
 
     ctx.restore();
 }

@@ -393,6 +393,13 @@ let activeProjectiles = [];
 let currentPuzzleObjects = [];
 
 /**
+ * Pending Endless Neon Run perk selected from the round transition screen.
+ * Applied after the next round's player tank is created.
+ * @type {Object|null}
+ */
+let pendingSurvivalRunPerk = null;
+
+/**
  * Legacy accessor for backwards compatibility (used in some render code)
  * @returns {import('./projectile.js').Projectile|null}
  */
@@ -5882,6 +5889,8 @@ function setupPlayingState() {
             // Endless runs start with only basic-shot; level mode receives a
             // curated practice loadout for its current mechanic.
 
+            applyPendingSurvivalRunPerk(playerTank);
+
             // Hidden achievement: track initial inventory for Minimalist detection
             HiddenAchievements.onInventoryChanged(playerTank.inventory);
 
@@ -6007,6 +6016,30 @@ function startNextRound() {
 }
 
 /**
+ * Apply the selected survival run perk to the freshly-created player tank.
+ * @param {import('./tank.js').Tank|null} tank - Player tank
+ */
+function applyPendingSurvivalRunPerk(tank) {
+    if (!tank || !pendingSurvivalRunPerk || isLevelMode) return;
+
+    const perk = pendingSurvivalRunPerk;
+    pendingSurvivalRunPerk = null;
+
+    if (perk.id === 'field-repair') {
+        tank.maxHealth += 25;
+        tank.health = tank.maxHealth;
+    } else if (perk.id === 'hardlight-shield') {
+        tank.addShield(25);
+    } else if (perk.id === 'ammo-cache') {
+        tank.inventory.missile = (tank.inventory.missile || 0) + 2;
+        tank.inventory.bouncer = (tank.inventory.bouncer || 0) + 1;
+        tank.currentWeapon = 'missile';
+    }
+
+    console.log(`[Main] Applied survival run perk: ${perk.id}`);
+}
+
+/**
  * Return to main menu and reset game state.
  */
 function returnToMenu() {
@@ -6017,6 +6050,7 @@ function returnToMenu() {
     enemyTank = null;
     currentTerrain = null;
     activeProjectiles = [];
+    pendingSurvivalRunPerk = null;
 
     // Reset selected difficulty so player must choose again
     resetSelectedDifficulty();
@@ -6268,6 +6302,13 @@ function setupRoundTransitionState() {
         Game.setState(GAME_STATES.SHOP);
     });
 
+    // Register callback for survival run perk selection
+    RoundTransition.onPerk((perk) => {
+        if (!isLevelMode) {
+            pendingSurvivalRunPerk = perk;
+        }
+    });
+
     // Register click handlers
     Input.onMouseDown((x, y, button) => {
         if (button === 0 && Game.getState() === GAME_STATES.ROUND_TRANSITION) {
@@ -6377,6 +6418,7 @@ function startNewRun() {
     currentLevelData = null;
     activeProjectiles = [];
     currentPuzzleObjects = [];
+    pendingSurvivalRunPerk = null;
     resetLevelModeStats();
     Money.init();
     GameOver.hide();

@@ -50,4 +50,42 @@ test.describe('survival flow', () => {
     expect(result.collection.collection.owned).toContain('standard');
     failures.expectNoFailures();
   });
+
+  test('between-round survival perk choice applies to the next duel', async ({ page }) => {
+    const failures = trackConsoleFailures(page);
+    await bootScene(page, '/?scene=round-start&seed=72004&wind=0&difficulty=easy');
+    await expectCanvasReady(page);
+
+    const result = await page.evaluate(async () => {
+      window.RoundTransition.show({
+        round: 1,
+        damage: 140,
+        money: 500,
+        tokenResult: { total: 8, breakdown: [{ source: 'Round Clear', amount: 8 }] },
+        tokenBalance: 18,
+        achievements: [],
+        delay: 0
+      });
+      window.Game.setState('round_transition');
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      window.RoundTransition.handleClick(461, 571);
+      const selected = window.RoundTransition.getState().selectedPerkId;
+
+      window.RoundTransition.handleClick(485, 700);
+      await new Promise(resolve => setTimeout(resolve, 700));
+
+      const controls = window.TestAPI.getControlState();
+      return {
+        selected,
+        gameState: window.Game.getState(),
+        player: controls.state.player
+      };
+    });
+
+    expect(result.selected).toBe('field-repair');
+    expect(result.gameState).toBe('playing');
+    expect(result.player.health).toBe(125);
+    failures.expectNoFailures();
+  });
 });
