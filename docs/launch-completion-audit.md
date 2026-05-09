@@ -36,7 +36,7 @@ The game is complete only when all of the following are true:
 | Animation where expected | Existing effect systems and level-complete/supply-drop flows are covered by e2e/smoke tests. `npm run audit:visual` passed 90 captures across title/menu, secondary screens, gameplay HUD, aiming, pause, shop, victory/defeat, round transition, level complete, impact effects, tank pivots, and terrain collapse. | Covered in automated visual audit; physical-device feel still needs TestFlight feedback. |
 | No lag / strong performance | `npm run check`, `npm run build`, `npm run ios:check`, browser smoke controls, and expanded browser smokes passed. Latest balanced smoke p95 frame times: idle 16.7ms, projectile 16.7ms with max dropped backlog 50ms under the 80ms cap, terrain 16.7ms with zero dropped backlog, high-scores 9.2ms, visual impact 17.4ms. | Covered for automated smoke paths; physical-device thermal/performance testing remains. |
 | Ready to convert/sync to iOS | `npm run ios:check` passed, including build, release budget, and `npx cap sync ios`. | Covered for local Capacitor readiness. |
-| Ready to upload to App Store | Open/blocked beads remain: `scorched-earth-3fe.4` App Store submission preparation, `scorched-earth-3fe.5` Submit to App Store and launch, `scorched-earth-3fe.2` beta feedback, and deferred monetization epic `scorched-earth-ttk`. | Not complete. |
+| Ready to upload to App Store | Open/blocked beads remain: `scorched-earth-3fe.4` App Store submission preparation, `scorched-earth-3fe.5` Submit to App Store and launch, `scorched-earth-3fe.2` beta feedback, and deferred monetization epic `scorched-earth-ttk`. Local metadata and screenshot inventory draft exists at `docs/release/app-store-materials.md`. | Not complete. |
 
 ## Latest Gate Evidence
 
@@ -55,6 +55,12 @@ npm run smoke:browser -- --scenario high-scores --quality balanced
 npm run smoke:browser -- --scenario visual --scene visual-impact --quality balanced
 npm run audit:visual
 bd ready
+```
+
+Local App Store material preparation now has an in-repo draft:
+
+```text
+docs/release/app-store-materials.md
 ```
 
 `bd ready` reports:
@@ -96,6 +102,7 @@ The objective is not complete because App Store launch readiness cannot be hones
 - `scorched-earth-3fe.5` is still open and depends on `scorched-earth-3fe.4`. It requires uploading the final build, Apple approval, launch date, live App Store release, and post-launch monitoring.
 - `scorched-earth-3fe.2` is blocked pending TestFlight/beta setup and feedback. It requires real beta tester feedback and P0/P1 bug triage.
 - `scorched-earth-ttk` and its monetization children are explicitly deferred by notes: "Do not work on this epic until explicitly unblocked by Josh." This blocks any App Store path that requires ads/IAP products.
+- `docs/release/app-store-materials.md` drafts metadata and a screenshot inventory, but the privacy policy URL, support URL, owner copyright string, final pricing/availability, TestFlight build, and final release screenshots still need owner/account work.
 - Computer Use cannot currently drive Chrome because the plugin returns `cgWindowNotFound`; browser verification is covered through Playwright instead.
 
 ## Conclusion
