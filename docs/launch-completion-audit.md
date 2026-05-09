@@ -90,6 +90,7 @@ Local App Store material preparation now has an in-repo draft:
 
 ```text
 docs/release/app-store-materials.md
+docs/release/app-store-submission-checklist.md
 public/privacy.html
 public/support.html
 scripts/capture-app-store-screenshots.js
@@ -134,7 +135,7 @@ The objective is not complete because App Store launch readiness cannot be hones
 - `scorched-earth-3fe.5` is still open and depends on `scorched-earth-3fe.4`. It requires uploading the final build, Apple approval, launch date, live App Store release, and post-launch monitoring.
 - `scorched-earth-3fe.2` is blocked pending TestFlight/beta setup and feedback. It requires real beta tester feedback and P0/P1 bug triage.
 - `scorched-earth-ttk` and its monetization children are explicitly deferred by notes: "Do not work on this epic until explicitly unblocked by Josh." This blocks any App Store path that requires ads/IAP products.
-- `docs/release/app-store-materials.md` drafts metadata and a screenshot inventory, local privacy/support pages now exist with in-app Settings navigation, and release-build App Store screenshot capture is automated. Deployed public URLs, any region-specific support contact details, owner copyright string, final pricing/availability, TestFlight build, final screenshot selection/upload, and App Store Connect submission still need owner/account work.
+- `docs/release/app-store-materials.md` drafts metadata and a screenshot inventory, `docs/release/app-store-submission-checklist.md` maps the final upload handoff and privacy-label draft, local privacy/support pages now exist with in-app Settings navigation, and release-build App Store screenshot capture is automated. Deployed public URLs, any region-specific support contact details, owner copyright string, final pricing/availability, TestFlight build, final screenshot selection/upload, and App Store Connect submission still need owner/account work.
 
 ## Conclusion
 

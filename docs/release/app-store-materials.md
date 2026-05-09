@@ -6,6 +6,9 @@ This file captures the submission material that can be prepared in-repo without
 Apple Developer account access, TestFlight access, or unblocking monetization.
 It is not a claim that the app is ready to submit.
 
+For the step-by-step upload handoff, privacy label worksheet, and final gate,
+use `docs/release/app-store-submission-checklist.md`.
+
 ## Source References
 
 - App Store Connect app information fields:
@@ -244,3 +247,5 @@ The following remain outside this local documentation task:
 - Final screenshot selection/upload in App Store Connect. Local release-build
   screenshot generation is automated; TestFlight/device recapture may still be
   needed for final submission.
+- Final App Store Connect field entry and submission, following
+  `docs/release/app-store-submission-checklist.md`.
