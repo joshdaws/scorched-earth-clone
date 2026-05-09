@@ -189,7 +189,7 @@ sequence from the built `www` bundle served through Vite preview.
 
 Latest verified local release-build set:
 
-- `artifacts/app-store-screenshots/2026-05-09T20-00-50-710Z/summary.json`
+- `artifacts/app-store-screenshots/2026-05-09T23-12-09-645Z/summary.json`
 - 24 captures passed across iPhone 6.9-inch, iPhone 6.5-inch, iPhone 5.5-inch,
   and iPad 13-inch landscape slots.
 

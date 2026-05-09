@@ -48,7 +48,7 @@ leaderboard privacy disclosure, service availability, and account-review risk.
 | Metadata draft | `docs/release/app-store-materials.md`. | Ready locally; owner fields remain |
 | Privacy page | `public/privacy.html`, bundled by `npm run ios:check`; `https://scorched-earth.vercel.app/privacy.html` returned HTTP 200 on 2026-05-09. | Ready |
 | Support page | `public/support.html`, bundled by `npm run ios:check`; `https://scorched-earth.vercel.app/support.html` returned HTTP 200 on 2026-05-09. | Ready; add direct contact details if release regions require them |
-| Screenshots | `npm run screenshots:app-store` generated 24 accepted-size captures at `artifacts/app-store-screenshots/2026-05-09T20-00-50-710Z/summary.json`. | Ready locally; upload/select final images in App Store Connect |
+| Screenshots | `npm run screenshots:app-store` generated 24 accepted-size captures at `artifacts/app-store-screenshots/2026-05-09T23-12-09-645Z/summary.json`. | Ready locally; upload/select final images in App Store Connect |
 | TestFlight guide | `docs/ios-testflight-setup.md`. | Ready locally; account action required |
 | Device QA guide | `docs/ios-release-readiness.md`. | Ready locally; physical devices required |
 

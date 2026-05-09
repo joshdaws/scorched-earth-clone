@@ -86,7 +86,7 @@ The latest full App Store screenshot capture passed 24 captures across four
 device slots and six recommended scenes:
 
 ```text
-artifacts/app-store-screenshots/2026-05-09T20-00-50-710Z/summary.json
+artifacts/app-store-screenshots/2026-05-09T23-12-09-645Z/summary.json
 ```
 
 The latest public release deployment serves the offline-first build and App
