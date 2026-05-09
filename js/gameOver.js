@@ -283,6 +283,22 @@ export function isActive() {
     return isVisible;
 }
 
+/**
+ * Get game-over state for QA/tests.
+ * @returns {Object}
+ */
+export function getState() {
+    return {
+        isVisible,
+        contentVisible,
+        wasDraw,
+        roundsSurvived,
+        previousBest,
+        runStats: runStats ? { ...runStats } : null,
+        highScoreResult: highScoreResult ? { ...highScoreResult } : null
+    };
+}
+
 // =============================================================================
 // INPUT HANDLING
 // =============================================================================
