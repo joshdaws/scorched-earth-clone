@@ -28,6 +28,7 @@ www/
 # Local smoke artifacts
 artifacts/app-store-screenshots/
 artifacts/browser-smoke/
+artifacts/survival-balance/
 artifacts/visual-audit/
 coverage/
 playwright-report/

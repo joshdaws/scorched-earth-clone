@@ -89,7 +89,7 @@ export function parseUrlParams() {
 
     // Wind value
     const windStr = urlParams.get('wind');
-    if (windStr) {
+    if (windStr !== null) {
         const wind = parseFloat(windStr);
         if (!isNaN(wind)) {
             params.wind = wind;

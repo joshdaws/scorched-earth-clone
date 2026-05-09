@@ -42,6 +42,37 @@ hands-on playtesting.
   nukes and MIRV first so late-game danger ramps instead of spiking abruptly.
 - Purchases are now filtered by the active round pool, so AI budget cannot be
   wasted on locked weapons.
+- `?scene=round-start&wind=0` now preserves fixed zero wind for deterministic
+  survival playtests instead of treating `0` as a missing URL value.
+
+## Browser Playtest Ledger
+
+Generated with Chromium against `round-start` scenes on 2026-05-09. Evidence was
+captured locally in `artifacts/survival-balance/2026-05-09-rounds/`.
+
+| Round | Seed | Enemy HP | Enemy purchased loadout | Read |
+| --- | ---: | ---: | --- | --- |
+| 1 | 73001 | 100 | Basic only | Clean opener. No paid ammo pressure. |
+| 2 | 73002 | 100 | Basic only | Still readable before economy opens. |
+| 3 | 73003 | 100 | 5 missiles | First pressure spike is clear but not nuclear. |
+| 4 | 73004 | 120 | 5 missiles | Health bump plus missiles feels like the first real duel. |
+| 5 | 73005 | 120 | 5 missiles, 3 rollers | Terrain-route tools enter before heavy burst. |
+| 6 | 73006 | 120 | 3 big shots, 5 missiles, 3 rollers | Hard AI starts using burst without adding HP yet. |
+| 7 | 73007 | 140 | 2 heavy rollers, 3 big shots, 5 missiles | Mid-run danger moves to route denial and heavier hits. |
+| 8 | 73008 | 140 | 2 heavy rollers, 3 big shots, 5 missiles | Stable second round at this tier. |
+| 9 | 73009 | 140 | 2 mini-nukes, 3 big shots | Late-game warning shot; no full nuke yet. |
+| 10 | 73010 | 160 | 2 mini-nukes, 2 MIRV, 3 big shots | Hard+ cap looks dangerous without immediate full-nuke access. |
+| 11 | 73011 | 160 | 1 nuke | Full nuke arrives as explicit late-run escalation. |
+| 12 | 73012 | 160 | 1 nuke | Same late tier; needs hands-on survivability tuning. |
+
+## Regression Evidence
+
+- `npm run test:e2e -- tests/e2e/survival-flow.spec.js --project=chromium-desktop`
+  now covers fixed wind, enemy loadout progression, forced survival win, and
+  forced run-over delayed overlays after tuning.
+- `window.render_game_to_text()` now includes the survival round and richer tank
+  state so balance captures can inspect max health, shields, selected weapons,
+  and inventories without relying on console-only state.
 
 ## Remaining Playtest
 

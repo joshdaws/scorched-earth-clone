@@ -104,6 +104,106 @@ test.describe('survival flow', () => {
     failures.expectNoFailures();
   });
 
+  test('round-start tuning honors fixed wind and unlocks enemy loadouts by survival round', async ({ page }) => {
+    const failures = trackConsoleFailures(page);
+    const observed = [];
+
+    for (const round of [1, 3, 5, 7, 9, 10, 11]) {
+      await bootScene(page, `/?scene=round-start&round=${round}&seed=${72000 + round}&wind=0`);
+      await expectCanvasReady(page);
+
+      observed.push(await page.evaluate(() => {
+        const controls = window.TestAPI.getControlState();
+        return {
+          wind: controls.state.wind,
+          enemy: controls.state.enemy,
+          aiPool: window.AI.getCurrentWeaponPool(),
+          money: window.Money.getState()
+        };
+      }));
+    }
+
+    expect(observed[0]).toMatchObject({
+      wind: 0,
+      aiPool: ['basic-shot'],
+      enemy: { health: 100, maxHealth: 100 }
+    });
+    expect(observed[1]).toMatchObject({
+      wind: 0,
+      aiPool: ['basic-shot', 'missile'],
+      enemy: { inventory: { missile: 5 } }
+    });
+    expect(observed[2]).toMatchObject({
+      wind: 0,
+      aiPool: ['basic-shot', 'missile', 'roller', 'big-shot'],
+      enemy: { health: 120, maxHealth: 120, inventory: { missile: 5, roller: 3 } }
+    });
+    expect(observed[3]).toMatchObject({
+      wind: 0,
+      aiPool: ['basic-shot', 'missile', 'roller', 'big-shot', 'digger', 'heavy-roller'],
+      enemy: { health: 140, maxHealth: 140, inventory: { 'heavy-roller': 2, 'big-shot': 3, missile: 5 } }
+    });
+    expect(observed[4].aiPool).toContain('mini-nuke');
+    expect(observed[4].aiPool).not.toContain('nuke');
+    expect(observed[5]).toMatchObject({
+      wind: 0,
+      enemy: { health: 160, maxHealth: 160, inventory: { 'mini-nuke': 2, mirv: 2, 'big-shot': 3 } }
+    });
+    expect(observed[5].aiPool).not.toContain('nuke');
+    expect(observed[6].aiPool).toContain('nuke');
+    expect(observed[6].enemy.inventory).toHaveProperty('nuke');
+    failures.expectNoFailures();
+  });
+
+  test('forced survival win and run-over paths still use delayed mode-specific result overlays', async ({ page }) => {
+    const failures = trackConsoleFailures(page);
+
+    await bootScene(page, '/?scene=round-start&round=10&seed=73110&wind=0&debug=true');
+    await expectCanvasReady(page);
+    const win = await page.evaluate(async () => {
+      window.force_survival_round_result_for_qa('win');
+      await window.advanceTime(80);
+      const duringDelay = {
+        mode: window.Game.getState(),
+        transition: window.RoundTransition.getState(),
+        battlefield: JSON.parse(window.render_game_to_text())
+      };
+      await window.advanceTime(1300);
+      return {
+        duringDelay,
+        afterReveal: window.RoundTransition.getState()
+      };
+    });
+
+    expect(win.duringDelay.mode).toBe('round_transition');
+    expect(win.duringDelay.transition.contentVisible).toBe(false);
+    expect(win.duringDelay.battlefield.enemy.health).toBeLessThanOrEqual(0);
+    expect(win.afterReveal.contentVisible).toBe(true);
+
+    await bootScene(page, '/?scene=round-start&round=10&seed=73111&wind=0&debug=true');
+    await expectCanvasReady(page);
+    const loss = await page.evaluate(async () => {
+      window.force_survival_round_result_for_qa('loss');
+      await window.advanceTime(80);
+      const duringDelay = {
+        mode: window.Game.getState(),
+        gameOver: window.GameOver.getState(),
+        battlefield: JSON.parse(window.render_game_to_text())
+      };
+      await window.advanceTime(1300);
+      return {
+        duringDelay,
+        afterReveal: window.GameOver.getState()
+      };
+    });
+
+    expect(loss.duringDelay.mode).toBe('game_over');
+    expect(loss.duringDelay.gameOver.contentVisible).toBe(false);
+    expect(loss.duringDelay.battlefield.player.health).toBeLessThanOrEqual(0);
+    expect(loss.afterReveal.contentVisible).toBe(true);
+    failures.expectNoFailures();
+  });
+
   test('survival round win preserves the battlefield during delayed round transition reveal', async ({ page }) => {
     const failures = trackConsoleFailures(page);
     await bootScene(page, '/?scene=round-start&seed=72005&wind=0&difficulty=easy');

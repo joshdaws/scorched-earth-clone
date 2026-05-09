@@ -1120,6 +1120,9 @@ export function getState() {
             x: player.x,
             y: player.y,
             health: player.health,
+            maxHealth: player.maxHealth,
+            shield: player.shield || 0,
+            maxShield: player.maxShield || 0,
             angle: player.angle,
             power: player.power,
             weapon: player.currentWeapon,
@@ -1129,6 +1132,13 @@ export function getState() {
             x: enemy.x,
             y: enemy.y,
             health: enemy.health,
+            maxHealth: enemy.maxHealth,
+            shield: enemy.shield || 0,
+            maxShield: enemy.maxShield || 0,
+            angle: enemy.angle,
+            power: enemy.power,
+            weapon: enemy.currentWeapon,
+            inventory: { ...enemy.inventory },
             isDestroyed: enemy.isDestroyed
         } : null
     };

@@ -8283,8 +8283,12 @@ function setupAIDebugScene(scene, params) {
     playerTank = tanks.player;
     enemyTank = tanks.enemy;
 
-    // Generate wind
-    Wind.generateRandomWind();
+    // Set deterministic wind when requested, otherwise generate survival wind normally.
+    if (params.wind !== null) {
+        Wind.setWind(params.wind);
+    } else {
+        Wind.generateRandomWind();
+    }
 
     // URL param values map to AI_DIFFICULTY enum strings
     const difficultyMap = { easy: 'easy', medium: 'medium', hard: 'hard', hard_plus: 'hard_plus' };
@@ -8359,8 +8363,12 @@ function setupRoundStartScene(scene, params) {
         enemyTank.maxHealth = params.enemyHealth;
     }
 
-    // Generate wind
-    Wind.generateRandomWind();
+    // Set deterministic wind when requested, otherwise generate survival wind normally.
+    if (params.wind !== null) {
+        Wind.setWind(params.wind);
+    } else {
+        Wind.generateRandomWind();
+    }
 
     // Determine difficulty from URL or round
     let difficulty;
@@ -8390,6 +8398,9 @@ function setupRoundStartScene(scene, params) {
     // Override AI difficulty AFTER state transition to use URL parameter value
     // This must come after Game.setState() because the PLAYING state handler resets difficulty
     AI.setDifficulty(difficulty);
+    if (params.wind !== null) {
+        Wind.setWind(params.wind);
+    }
 
     console.log('[SceneIsolation] Round start ready');
     console.log(`  - Round: ${currentRound}`);
@@ -8556,6 +8567,7 @@ function installAutomationHooks() {
         return JSON.stringify({
             coordinateSystem: 'Canvas design coordinates, origin top-left, x right, y down.',
             mode: Game.getState(),
+            round: currentRound,
             turnPhase: state.turnPhase,
             canFire: state.canFire,
             isPlayerTurn: state.isPlayerTurn,
@@ -8574,6 +8586,20 @@ function installAutomationHooks() {
             weaponBar: controls.weaponBar,
             aim: controls.aim
         });
+    };
+
+    window.force_survival_round_result_for_qa = (result = 'win') => {
+        if (result === 'win' && enemyTank) {
+            enemyTank.health = 0;
+        } else if (result === 'loss' && playerTank) {
+            playerTank.health = 0;
+        } else if (result === 'draw') {
+            if (playerTank) playerTank.health = 0;
+            if (enemyTank) enemyTank.health = 0;
+        }
+
+        checkRoundEnd();
+        return JSON.parse(window.render_game_to_text());
     };
 
     if (typeof window.advanceTime !== 'function') {
