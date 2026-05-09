@@ -54,10 +54,35 @@ function formatBytes(bytes) {
   return `${bytes} B`;
 }
 
+function checkIndexAssetReferences(violations) {
+  const indexPath = path.join(outputRoot, 'index.html');
+  if (!fs.existsSync(indexPath)) {
+    violations.push('missing release entrypoint: index.html');
+    return;
+  }
+
+  const indexHtml = fs.readFileSync(indexPath, 'utf8');
+  const assetRefs = [...indexHtml.matchAll(/\b(?:src|href)="\.\/(assets\/[^"]+)"/g)]
+    .map(match => match[1]);
+
+  if (assetRefs.length === 0) {
+    violations.push('index.html does not reference any built assets');
+    return;
+  }
+
+  for (const assetRef of assetRefs) {
+    if (!fs.existsSync(path.join(outputRoot, assetRef))) {
+      violations.push(`index.html references missing built asset: ${assetRef}`);
+    }
+  }
+}
+
 function main() {
   const files = walk(outputRoot);
   const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
   const violations = [];
+
+  checkIndexAssetReferences(violations);
 
   if (totalBytes > totalBudget) {
     violations.push(

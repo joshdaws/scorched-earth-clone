@@ -93,11 +93,17 @@ in App Store keywords.
 Required before submission. The URL must include a way for users to contact the
 developer about app issues, feedback, and feature requests.
 
-Draft options:
+Current local target:
 
-- `https://github.com/joshdaws/scorched-earth-clone/issues`
-- A dedicated support page with contact information, if the GitHub issue tracker
-  is not the intended public support channel.
+- `support.html`
+
+Draft public URL after deployment:
+
+- `https://scorched-earth.vercel.app/support.html`
+
+The support page currently routes issue reports and feedback to the public
+GitHub issue tracker. Confirm whether a dedicated support email, telephone
+number, or legal address is required for the release regions before submission.
 
 ### Marketing URL
 
@@ -109,10 +115,20 @@ Optional, but recommended:
 ### Privacy Policy URL
 
 Required before submission. Apple also requires the privacy policy to be
-available from inside the app. There is no privacy policy URL or in-app privacy
-entry point in the repo as of this draft.
+available from inside the app.
 
-Minimum policy topics to resolve before submission:
+Current local target:
+
+- `privacy.html`
+
+Draft public URL after deployment:
+
+- `https://scorched-earth.vercel.app/privacy.html`
+
+The in-app settings panel includes Privacy and Support actions that navigate to
+the local pages bundled into the release build.
+
+Minimum policy topics to confirm before submission:
 
 - Whether the shipped iOS build uses Convex/high-score networking.
 - Whether achievements, scores, supply drops, or tank collection data ever leave
@@ -201,8 +217,8 @@ iOS readiness.
 The following remain outside this local documentation task:
 
 - Apple Developer account membership and App Store Connect app record.
-- App Store privacy policy URL and in-app privacy entry point.
-- Public support URL with contact information.
+- Deployed privacy/support URLs and any additional support contact details
+  required for selected release regions.
 - Final product owner copyright string.
 - Final pricing and availability decision.
 - TestFlight build upload, physical device testing, and beta feedback.

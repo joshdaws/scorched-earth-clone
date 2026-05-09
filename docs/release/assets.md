@@ -4,6 +4,10 @@ The iOS/web release build should include runtime assets only. Source references,
 generation templates, and local editor leftovers should stay in the repository
 but not ship inside `www`.
 
+The runtime asset copy step must preserve Vite-generated application chunks in
+`www/assets`; only the game asset folders and release asset report are cleaned
+and recopied.
+
 ## Runtime Assets
 
 `npm run copy-static` copies:

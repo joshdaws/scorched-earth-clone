@@ -102,6 +102,8 @@ function checkCapacitorConfig(failures) {
 function checkWebOutput(failures) {
   assertDirectory('www', failures);
   assertFile('www/index.html', failures);
+  assertFile('www/privacy.html', failures);
+  assertFile('www/support.html', failures);
   assertFile('www/config.js', failures);
   assertFile('www/assets/manifest.json', failures);
 
@@ -117,6 +119,8 @@ function checkIosProject(failures) {
   assertFile('ios/App/App/Info.plist', failures);
   assertDirectory('ios/App/App/public', failures);
   assertFile('ios/App/App/public/index.html', failures);
+  assertFile('ios/App/App/public/privacy.html', failures);
+  assertFile('ios/App/App/public/support.html', failures);
   assertFile('ios/App/App/capacitor.config.json', failures);
 }
 

@@ -18,6 +18,16 @@ const explicitRuntimeDirs = [
   'tank-designs'
 ];
 
+const managedOutputEntries = [
+  'audio',
+  'icons',
+  'images',
+  'levels',
+  'tank-designs',
+  'manifest.json',
+  'release-assets.json'
+];
+
 const forbiddenSegments = new Set([
   '.DS_Store',
   'references',
@@ -84,8 +94,11 @@ function main() {
     throw new Error(`Missing asset manifest: ${manifestPath}`);
   }
 
-  fs.rmSync(outputRoot, { recursive: true, force: true });
   fs.mkdirSync(outputRoot, { recursive: true });
+
+  for (const entry of managedOutputEntries) {
+    fs.rmSync(path.join(outputRoot, entry), { recursive: true, force: true });
+  }
 
   const copiedFiles = new Set();
   const missingFiles = new Set();

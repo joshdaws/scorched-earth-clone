@@ -24,7 +24,7 @@ import { cycleRenderQuality, getRenderQualityProfile } from './renderQuality.js'
  */
 const VOLUME_PANEL = {
     WIDTH: 340,
-    HEIGHT: 580,               // Increased to fit control and quality settings
+    HEIGHT: 580,               // Fits control, quality, profile, and legal actions
     PADDING: 24,
     SLIDER_HEIGHT: 12,         // Thicker track for easier tapping
     SLIDER_WIDTH: 260,
@@ -48,6 +48,12 @@ let onChangeNameCallback = null;
 /** @type {Function|null} Callback when Close button is clicked */
 let onCloseCallback = null;
 
+/** @type {Function|null} Callback when Privacy button is clicked */
+let onPrivacyCallback = null;
+
+/** @type {Function|null} Callback when Support button is clicked */
+let onSupportCallback = null;
+
 /**
  * Set callback for Change Name button.
  * @param {Function} callback - Function to call when Change Name is clicked
@@ -62,6 +68,22 @@ export function setChangeNameCallback(callback) {
  */
 export function setCloseCallback(callback) {
     onCloseCallback = callback;
+}
+
+/**
+ * Set callback for Privacy button.
+ * @param {Function} callback - Function to call when Privacy is clicked
+ */
+export function setPrivacyCallback(callback) {
+    onPrivacyCallback = callback;
+}
+
+/**
+ * Set callback for Support button.
+ * @param {Function} callback - Function to call when Support is clicked
+ */
+export function setSupportCallback(callback) {
+    onSupportCallback = callback;
 }
 
 // =============================================================================
@@ -225,6 +247,34 @@ function getChangeNameButton(panelX, panelY) {
 }
 
 /**
+ * Get Privacy and Support button bounds.
+ * @param {number} panelX - Panel X position
+ * @param {number} panelY - Panel Y position
+ * @returns {{privacy: Object, support: Object}}
+ */
+function getLegalButtons(panelX, panelY) {
+    const buttonY = panelY + 512;
+    const buttonWidth = (VOLUME_PANEL.WIDTH - VOLUME_PANEL.PADDING * 2 - VOLUME_PANEL.BUTTON_SPACING) / 2;
+    const buttonHeight = 44;
+    const startX = panelX + VOLUME_PANEL.PADDING;
+
+    return {
+        privacy: {
+            x: startX,
+            y: buttonY,
+            width: buttonWidth,
+            height: buttonHeight
+        },
+        support: {
+            x: startX + buttonWidth + VOLUME_PANEL.BUTTON_SPACING,
+            y: buttonY,
+            width: buttonWidth,
+            height: buttonHeight
+        }
+    };
+}
+
+/**
  * Get Close button bounds.
  * Positioned to overlap the top-right corner of the modal (partially outside).
  * Touch-optimized: 44x44px for easy tapping on mobile.
@@ -312,6 +362,11 @@ export function render(ctx, centerX = Renderer.getWidth() / 2, centerY = Rendere
 
     // Render Change Name button
     renderChangeNameButton(ctx, getChangeNameButton(panelX, panelY));
+
+    // Render Privacy and Support buttons
+    const legalButtons = getLegalButtons(panelX, panelY);
+    renderLegalButton(ctx, legalButtons.privacy, 'PRIVACY');
+    renderLegalButton(ctx, legalButtons.support, 'SUPPORT');
 
     ctx.restore();
 
@@ -604,6 +659,33 @@ function renderChangeNameButton(ctx, button) {
 }
 
 /**
+ * Render a secondary legal/support button.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {Object} button - Button bounds
+ * @param {string} label - Button label
+ */
+function renderLegalButton(ctx, button, label) {
+    ctx.save();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+    ctx.beginPath();
+    ctx.roundRect(button.x, button.y, button.width, button.height, 6);
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.fillStyle = COLORS.TEXT_LIGHT;
+    ctx.font = `bold ${UI.FONT_SIZE_SMALL}px ${UI.FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, button.x + button.width / 2, button.y + button.height / 2);
+
+    ctx.restore();
+}
+
+/**
  * Render the Close (X) button.
  * Styled as a circle overlapping the modal corner with white X centered inside.
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
@@ -720,6 +802,24 @@ export function handlePointerDown(x, y) {
         Sound.playClickSound();
         if (onChangeNameCallback) {
             onChangeNameCallback();
+        }
+        return true;
+    }
+
+    // Check Privacy and Support buttons
+    const legalButtons = getLegalButtons(panelPosition.x, panelPosition.y);
+    if (isInsideButton(x, y, legalButtons.privacy)) {
+        Sound.playClickSound();
+        if (onPrivacyCallback) {
+            onPrivacyCallback();
+        }
+        return true;
+    }
+
+    if (isInsideButton(x, y, legalButtons.support)) {
+        Sound.playClickSound();
+        if (onSupportCallback) {
+            onSupportCallback();
         }
         return true;
     }

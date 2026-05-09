@@ -1348,6 +1348,11 @@ function closeOptionsOverlay() {
     console.log('Options overlay closed');
 }
 
+function openReleaseInfoPage(path) {
+    const target = new URL(path, window.location.href);
+    window.location.href = target.href;
+}
+
 /**
  * Render the synthwave background for the menu.
  * Creates a dramatic sunset gradient with grid lines.
@@ -7579,6 +7584,14 @@ async function init() {
     // Set up VolumeControls callback for Close button
     VolumeControls.setCloseCallback(() => {
         closeOptionsOverlay();
+    });
+
+    VolumeControls.setPrivacyCallback(() => {
+        openReleaseInfoPage('privacy.html');
+    });
+
+    VolumeControls.setSupportCallback(() => {
+        openReleaseInfoPage('support.html');
     });
 
     // On initial startup, defer first-time name entry until after first completed round.
