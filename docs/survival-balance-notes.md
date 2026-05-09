@@ -82,10 +82,13 @@ captured locally in `artifacts/survival-balance/2026-05-09-rounds/`.
 - Browser shot probes found at least one basic-shot damage path on the seeded
   round 1-12 scenes. Late rounds intentionally depend on Armory/perk weapons for
   efficient clears rather than basic-shot attrition.
+- Real browser playthrough on `round=1&seed=74001&wind=0` using the actual
+  `TestAPI.fire()` path cleared the opener in three player shots, ending at
+  player 100 HP and transitioning to `round_transition`.
 
 ## Remaining Playtest
 
-- Play rounds 1-10 by hand with the current perk values.
+- Play rounds 2-10 by hand with the current perk values.
 - Verify round 10 Hard+ is dangerous but not a sudden one-shot wall.
 - Verify round 11+ nuke access feels like a late-run escalation.
 - Tune rewards/shop pressure after observing whether players can consistently
