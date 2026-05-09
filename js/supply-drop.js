@@ -8,6 +8,7 @@
 
 import { CANVAS, COLORS, DEBUG } from './constants.js';
 import * as Renderer from './renderer.js';
+import * as Assets from './assets.js';
 import { RARITY, RARITY_COLORS, RARITY_NAMES } from './tank-skins.js';
 import {
     playPlaneApproachSound,
@@ -1058,6 +1059,22 @@ function drawPlatform(ctx) {
  */
 function drawPlane(ctx, x) {
     const y = VISUALS.PLANE_Y;
+    const planeImage = Assets.get('supplyDrop.plane');
+
+    if (planeImage && planeImage.complete && planeImage.naturalWidth > 0) {
+        ctx.save();
+        ctx.shadowColor = COLORS.NEON_CYAN;
+        ctx.shadowBlur = 14;
+        ctx.drawImage(
+            planeImage,
+            x - VISUALS.PLANE_WIDTH / 2,
+            y - VISUALS.PLANE_HEIGHT / 2,
+            VISUALS.PLANE_WIDTH,
+            VISUALS.PLANE_HEIGHT
+        );
+        ctx.restore();
+        return;
+    }
 
     ctx.save();
 
@@ -1143,6 +1160,16 @@ function drawContrail(ctx, planeX) {
 function drawCrate(ctx, x, y, opened = false) {
     const size = VISUALS.CRATE_SIZE;
     const halfSize = size / 2;
+    const crateImage = !opened ? Assets.get('supplyDrop.crate') : null;
+
+    if (crateImage && crateImage.complete && crateImage.naturalWidth > 0) {
+        ctx.save();
+        ctx.shadowColor = COLORS.NEON_ORANGE;
+        ctx.shadowBlur = 12;
+        ctx.drawImage(crateImage, x - halfSize, y - halfSize, size, size);
+        ctx.restore();
+        return;
+    }
 
     ctx.save();
 
@@ -1198,6 +1225,24 @@ function drawCrate(ctx, x, y, opened = false) {
 function drawParachute(ctx, x, y, rarity, sway = 0) {
     const width = VISUALS.PARACHUTE_WIDTH;
     const height = VISUALS.PARACHUTE_HEIGHT;
+    const parachuteImage = Assets.get(`supplyDrop.parachute-${rarity}`);
+
+    if (parachuteImage && parachuteImage.complete && parachuteImage.naturalWidth > 0) {
+        const drawWidth = width * 1.15;
+        const drawHeight = height * 1.15;
+        ctx.save();
+        ctx.shadowColor = PARACHUTE_COLORS[rarity] || '#FFFFFF';
+        ctx.shadowBlur = 12;
+        ctx.drawImage(
+            parachuteImage,
+            x - drawWidth / 2,
+            y - drawHeight,
+            drawWidth,
+            drawHeight
+        );
+        ctx.restore();
+        return;
+    }
 
     ctx.save();
 
@@ -1350,20 +1395,24 @@ function drawRarityBanner(ctx, tank, alpha) {
     const bannerY = 200;
     const rarityColor = RARITY_COLORS[tank.rarity] || '#FFFFFF';
     const rarityName = RARITY_NAMES[tank.rarity] || 'Unknown';
+    const bannerImage = Assets.get(`supplyDrop.banner-${tank.rarity}`);
 
     ctx.save();
     ctx.globalAlpha = alpha;
 
-    // Banner background
-    ctx.fillStyle = '#0a0a1a';
-    ctx.strokeStyle = rarityColor;
-    ctx.lineWidth = 3;
+    const bannerX = centerX - VISUALS.BANNER_WIDTH / 2;
     ctx.shadowColor = rarityColor;
     ctx.shadowBlur = 20;
 
-    const bannerX = centerX - VISUALS.BANNER_WIDTH / 2;
-    ctx.fillRect(bannerX, bannerY, VISUALS.BANNER_WIDTH, VISUALS.BANNER_HEIGHT);
-    ctx.strokeRect(bannerX, bannerY, VISUALS.BANNER_WIDTH, VISUALS.BANNER_HEIGHT);
+    if (bannerImage && bannerImage.complete && bannerImage.naturalWidth > 0) {
+        ctx.drawImage(bannerImage, bannerX, bannerY, VISUALS.BANNER_WIDTH, VISUALS.BANNER_HEIGHT);
+    } else {
+        ctx.fillStyle = '#0a0a1a';
+        ctx.strokeStyle = rarityColor;
+        ctx.lineWidth = 3;
+        ctx.fillRect(bannerX, bannerY, VISUALS.BANNER_WIDTH, VISUALS.BANNER_HEIGHT);
+        ctx.strokeRect(bannerX, bannerY, VISUALS.BANNER_WIDTH, VISUALS.BANNER_HEIGHT);
+    }
 
     // Rarity text
     ctx.fillStyle = rarityColor;

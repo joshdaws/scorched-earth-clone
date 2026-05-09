@@ -1380,6 +1380,29 @@ export function renderWindIndicator(ctx) {
  * @type {Array<{x: number, y: number, size: number, weaponId: string}>}
  */
 let weaponSlotPositions = [];
+let weaponBarWeaponIds = [];
+let weaponBarWeaponCount = 0;
+
+function hasUsableAmmo(playerTank, weaponId) {
+    if (!playerTank || !weaponId) return false;
+    const ammo = playerTank.getAmmo(weaponId);
+    return ammo > 0 || ammo === Infinity;
+}
+
+export function getWeaponBarWeapons(playerTank) {
+    const allWeapons = WeaponRegistry.getAllWeapons();
+    if (!playerTank) {
+        return allWeapons.slice(0, HUD.WEAPON_BAR.VISIBLE_SLOTS);
+    }
+
+    const availableWeapons = allWeapons.filter(weapon => hasUsableAmmo(playerTank, weapon.id));
+    if (availableWeapons.length > 0) {
+        return availableWeapons;
+    }
+
+    const fallback = WeaponRegistry.getDefaultWeapon();
+    return fallback ? [fallback] : [];
+}
 
 /**
  * Render the weapon bar container at bottom-center of the screen.
@@ -1390,11 +1413,15 @@ let weaponSlotPositions = [];
 export function renderWeaponBar(ctx, playerTank) {
     if (!ctx) return;
 
-    // Get all weapons from registry
-    const allWeapons = WeaponRegistry.getAllWeapons();
-    const totalWeapons = allWeapons.length;
+    const displayedWeapons = getWeaponBarWeapons(playerTank);
+    const totalWeapons = displayedWeapons.length;
+    weaponBarWeaponIds = displayedWeapons.map(weapon => weapon.id);
+    weaponBarWeaponCount = totalWeapons;
 
     const bar = HUD.WEAPON_BAR;
+    const maxScrollIndex = Math.max(0, totalWeapons - bar.VISIBLE_SLOTS);
+    weaponBarScrollIndex = Math.max(0, Math.min(weaponBarScrollIndex, maxScrollIndex));
+
     const drawX = bar.X;
     const drawY = bar.Y - bar.HEIGHT / 2;
 
@@ -1464,7 +1491,7 @@ export function renderWeaponBar(ctx, playerTank) {
     const endIndex = Math.min(totalWeapons, weaponBarScrollIndex + bar.VISIBLE_SLOTS + 1);
 
     for (let weaponIndex = startIndex; weaponIndex < endIndex; weaponIndex++) {
-        const weapon = allWeapons[weaponIndex];
+        const weapon = displayedWeapons[weaponIndex];
         const visualIndex = weaponIndex - weaponBarScrollIndex;
         const slotX = slotsStartX + visualIndex * slotStride - pixelOffset;
         const isSelected = weapon.id === currentWeaponId;
@@ -1933,7 +1960,8 @@ export function scrollWeaponBarLeft() {
  */
 export function scrollWeaponBarRight(totalWeapons = 11) {
     const bar = HUD.WEAPON_BAR;
-    if (weaponBarScrollIndex + bar.VISIBLE_SLOTS < totalWeapons) {
+    const itemCount = Math.max(0, totalWeapons);
+    if (weaponBarScrollIndex + bar.VISIBLE_SLOTS < itemCount) {
         weaponBarScrollIndex++;
         return true;
     }
@@ -1962,6 +1990,10 @@ export function setWeaponBarRightPressed(pressed) {
  */
 export function getWeaponBarScrollIndex() {
     return weaponBarScrollIndex;
+}
+
+export function getWeaponBarWeaponCount() {
+    return weaponBarWeaponCount;
 }
 
 /**
@@ -2020,8 +2052,10 @@ export function isInsideWeaponSlot(x, y) {
  * @returns {boolean} True if scroll position changed
  */
 export function scrollToWeapon(weaponId) {
-    const allWeapons = WeaponRegistry.getAllWeapons();
-    const weaponIndex = allWeapons.findIndex(w => w.id === weaponId);
+    const weaponIds = weaponBarWeaponIds.length > 0
+        ? weaponBarWeaponIds
+        : WeaponRegistry.getAllWeapons().map(weapon => weapon.id);
+    const weaponIndex = weaponIds.findIndex(id => id === weaponId);
 
     if (weaponIndex === -1) return false;
 
@@ -2036,7 +2070,7 @@ export function scrollToWeapon(weaponId) {
     // Scroll to make weapon visible (preferably in center)
     const newScrollIndex = Math.max(0, Math.min(
         weaponIndex - Math.floor(bar.VISIBLE_SLOTS / 2),
-        allWeapons.length - bar.VISIBLE_SLOTS
+        Math.max(0, weaponIds.length - bar.VISIBLE_SLOTS)
     ));
 
     if (newScrollIndex !== weaponBarScrollIndex) {
@@ -2473,9 +2507,10 @@ export function handleWeaponBarSwipeEnd(x, y, totalWeapons = 11) {
     const finalSlotsToScroll = roundedSlots * scrollDirection;
 
     // Apply scroll
+    const maxScrollIndex = Math.max(0, totalWeapons - bar.VISIBLE_SLOTS);
     const newScrollIndex = Math.max(0, Math.min(
         weaponBarScrollIndex + finalSlotsToScroll,
-        totalWeapons - bar.VISIBLE_SLOTS
+        maxScrollIndex
     ));
 
     // Animate to new position

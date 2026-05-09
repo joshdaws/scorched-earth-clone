@@ -5408,7 +5408,7 @@ function handlePlayingPointerDown(pos) {
             return;
         }
         if (HUD.isInsideWeaponBarRightArrow(pos.x, pos.y)) {
-            const totalWeapons = WeaponRegistry.getWeaponCount();
+            const totalWeapons = HUD.getWeaponBarWeaponCount();
             HUD.scrollWeaponBarRight(totalWeapons);
             return;
         }
@@ -5452,7 +5452,7 @@ function handlePlayingPointerUp(pos) {
     }
 
     // Handle weapon bar swipe end
-    const totalWeapons = WeaponRegistry.getWeaponCount();
+    const totalWeapons = HUD.getWeaponBarWeaponCount();
     const swipeResult = HUD.handleWeaponBarSwipeEnd(pos.x, pos.y, totalWeapons);
 
     // If it was a tap on a weapon slot, select that weapon
@@ -7454,6 +7454,7 @@ async function init() {
         getDerezFragmentCount: getPixiTerrainFragmentCount,
         playerAim: playerAim
     });
+    installAutomationHooks();
 
     // Set up terrain change callback for TestAPI.generateTerrain()
     TestAPI.setOnTerrainChange((newTerrain) => {
@@ -8342,6 +8343,32 @@ function postRender(ctx) {
     // Render name entry modal (on top of everything)
     if (NameEntry.isOpen()) {
         NameEntry.render(ctx);
+    }
+}
+
+function installAutomationHooks() {
+    if (typeof window === 'undefined') return;
+
+    window.render_game_to_text = () => {
+        const state = TestAPI.getState();
+        const controls = TestAPI.getControlState();
+
+        return JSON.stringify({
+            coordinateSystem: 'Canvas design coordinates, origin top-left, x right, y down.',
+            mode: Game.getState(),
+            turnPhase: state.turnPhase,
+            canFire: state.canFire,
+            isPlayerTurn: state.isPlayerTurn,
+            wind: state.wind,
+            player: state.player,
+            enemy: state.enemy,
+            weaponBar: controls.weaponBar,
+            aim: controls.aim
+        });
+    };
+
+    if (typeof window.advanceTime !== 'function') {
+        window.advanceTime = (ms = 0) => new Promise(resolve => setTimeout(resolve, Math.max(0, ms)));
     }
 }
 

@@ -288,26 +288,28 @@ function getButtonRects() {
     const centerX = width / 2;
     const buttonsY = height - CONFIG.BUTTONS_Y_OFFSET;
 
-    const totalWidth = CONFIG.BUTTON_WIDTH * 3 + CONFIG.BUTTON_GAP * 2;
+    const gap = Math.min(CONFIG.BUTTON_GAP, Math.max(12, width * 0.025));
+    const buttonWidth = Math.min(CONFIG.BUTTON_WIDTH, Math.max(104, (width * 0.92 - gap * 2) / 3));
+    const totalWidth = buttonWidth * 3 + gap * 2;
     const startX = centerX - totalWidth / 2;
 
     return {
         retry: {
             x: startX,
             y: buttonsY - CONFIG.BUTTON_HEIGHT / 2,
-            width: CONFIG.BUTTON_WIDTH,
+            width: buttonWidth,
             height: CONFIG.BUTTON_HEIGHT
         },
         next: {
-            x: startX + CONFIG.BUTTON_WIDTH + CONFIG.BUTTON_GAP,
+            x: startX + buttonWidth + gap,
             y: buttonsY - CONFIG.BUTTON_HEIGHT / 2,
-            width: CONFIG.BUTTON_WIDTH,
+            width: buttonWidth,
             height: CONFIG.BUTTON_HEIGHT
         },
         menu: {
-            x: startX + (CONFIG.BUTTON_WIDTH + CONFIG.BUTTON_GAP) * 2,
+            x: startX + (buttonWidth + gap) * 2,
             y: buttonsY - CONFIG.BUTTON_HEIGHT / 2,
-            width: CONFIG.BUTTON_WIDTH,
+            width: buttonWidth,
             height: CONFIG.BUTTON_HEIGHT
         }
     };
@@ -581,9 +583,10 @@ function renderWorldUnlockCelebration(ctx, pulseIntensity) {
 
     // World number with glow
     ctx.font = `bold 72px ${UI.FONT_FAMILY}`;
-    ctx.shadowColor = worldTheme.color;
+    const worldColor = worldTheme.primaryColor || COLORS.NEON_CYAN;
+    ctx.shadowColor = worldColor;
     ctx.shadowBlur = 20 + pulseIntensity * 15;
-    ctx.fillStyle = worldTheme.color;
+    ctx.fillStyle = worldColor;
     ctx.fillText(worldNum.toString(), 0, 0);
     ctx.shadowBlur = 0;
 
@@ -647,7 +650,7 @@ export function update(deltaTime) {
     }
 
     // Update score line reveals
-    const totalScoreLines = 5; // damage, accuracy, turns, separator, score
+    const totalScoreLines = 6; // damage, accuracy, turns, star message, separator, score
     const starsFullyRevealed = starsRevealed >= earnedStars && starAnimationProgress[Math.max(0, earnedStars - 1)] >= 1;
 
     if (starsFullyRevealed && scoreLinesRevealed < totalScoreLines) {
@@ -832,7 +835,7 @@ export function render(ctx) {
     // ==========================================================================
     // COIN REWARD
     // ==========================================================================
-    renderCoinReward(ctx, centerX, CONFIG.SCORE_START_Y + CONFIG.SCORE_LINE_HEIGHT * 5 + 30);
+    renderCoinReward(ctx, centerX, CONFIG.SCORE_START_Y + CONFIG.SCORE_LINE_HEIGHT * 6 + 30);
 
     // ==========================================================================
     // NEW BEST INDICATOR
@@ -962,11 +965,32 @@ function renderStars(ctx, centerX, y, pulseIntensity) {
 function renderScoreBreakdown(ctx, centerX, startY) {
     const stats = completionData.stats;
     const breakdown = completionData.result?.breakdown || {};
+    const damageThreshold = breakdown.damageThreshold ?? completionData.level?.star2Damage ?? 0;
+    const accuracyThreshold = breakdown.accuracyThreshold ?? Math.round((completionData.level?.star3Accuracy || 0) * 100);
+    const turnThreshold = breakdown.turnThreshold ?? completionData.level?.star3MaxTurns ?? Infinity;
+    const accuracyPct = Math.round(stats.accuracy * 100);
 
     const lines = [
-        { label: 'Damage:', value: formatNumber(stats.damageDealt), color: COLORS.NEON_PINK },
-        { label: 'Accuracy:', value: `${Math.round(stats.accuracy * 100)}%`, color: getAccuracyColor(stats.accuracy) },
-        { label: 'Turns:', value: stats.turnsUsed, color: COLORS.TEXT_LIGHT },
+        {
+            label: 'Damage:',
+            value: `${formatNumber(stats.damageDealt)} / ${formatNumber(damageThreshold)}`,
+            color: breakdown.damageCheck ? COLORS.NEON_CYAN : COLORS.NEON_PINK
+        },
+        {
+            label: 'Accuracy:',
+            value: `${accuracyPct}% / ${accuracyThreshold}%`,
+            color: breakdown.accuracyCheck ? COLORS.NEON_CYAN : getAccuracyColor(stats.accuracy)
+        },
+        {
+            label: 'Turns:',
+            value: `${stats.turnsUsed} / ${formatTurnThreshold(turnThreshold)}`,
+            color: breakdown.turnsCheck ? COLORS.NEON_CYAN : COLORS.TEXT_LIGHT
+        },
+        {
+            label: 'Stars:',
+            value: completionData.result?.message || 'Victory!',
+            color: completionData.result?.stars >= 3 ? COLORS.NEON_YELLOW : COLORS.TEXT_LIGHT
+        },
         { label: '', value: '───────────────', color: COLORS.GRID }, // Separator
         { label: 'Score:', value: formatNumber(calculateScore(stats)), color: COLORS.NEON_YELLOW, bold: true }
     ];
@@ -1004,11 +1028,15 @@ function renderScoreBreakdown(ctx, centerX, startY) {
     ctx.restore();
 }
 
+function formatTurnThreshold(turnThreshold) {
+    return turnThreshold === Infinity ? '--' : String(turnThreshold);
+}
+
 /**
  * Render the coin reward display.
  */
 function renderCoinReward(ctx, centerX, y) {
-    if (scoreLinesRevealed < 5) return;
+    if (scoreLinesRevealed < 6) return;
 
     const coins = completionData.coinsEarned;
     const isFirstClear = completionData.isFirstClear;

@@ -584,33 +584,33 @@
   "audio": {
     "music": {
       "main-theme": {
-        "path": "audio/music/test-loop.wav"
+        "path": "audio/music/synthwave-title-loop.wav"
       },
       "battle": {
-        "path": "audio/music/test-loop.wav"
+        "path": "audio/music/neon-battle-loop.wav"
       },
       "shop": {
-        "path": "audio/music/test-loop.wav"
+        "path": "audio/music/garage-shop-loop.wav"
       }
     },
     "sfx": {
       "shot-fire": {
-        "path": "audio/sfx/test-beep.wav"
+        "path": "audio/sfx/plasma-shot.wav"
       },
       "explosion-small": {
-        "path": "audio/sfx/test-beep.wav"
+        "path": "audio/sfx/impact-small.wav"
       },
       "explosion-large": {
-        "path": "audio/sfx/test-beep.wav"
+        "path": "audio/sfx/impact-large.wav"
       },
       "menu-select": {
-        "path": "audio/sfx/test-beep.wav"
+        "path": "audio/sfx/menu-confirm.wav"
       },
       "purchase": {
-        "path": "audio/sfx/test-beep.wav"
+        "path": "audio/sfx/purchase-chime.wav"
       },
       "tank-hit": {
-        "path": "audio/sfx/test-beep.wav"
+        "path": "audio/sfx/armor-hit.wav"
       }
     }
   }

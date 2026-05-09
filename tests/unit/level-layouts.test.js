@@ -128,4 +128,22 @@ describe('level layouts', () => {
     expect(spawn.player.x).toBeCloseTo(Math.round(0.2 * (width - 1)), 0);
     expect(spawn.enemy.x).toBeGreaterThan(spawn.player.x + 250);
   });
+
+  it('includes authored terrain setpieces for staged ammo lessons', () => {
+    const sampleAt = (slot, xNorm) => slot.terrainSamples[Math.round(xNorm * (slot.terrainSamples.length - 1))];
+
+    const firstShot = getSlotLayout('world1-level1');
+    const roller = getSlotLayout('world1-level5');
+    const bouncer = getSlotLayout('world1-level7');
+    const digger = getSlotLayout('world2-level5');
+    const vertical = getSlotLayout('world5-level7');
+    const nuke = getSlotLayout('world6-level7');
+
+    expect(sampleAt(firstShot, 0.2) - sampleAt(firstShot, 0.55)).toBeLessThan(0.06);
+    expect(sampleAt(roller, 0.2)).toBeGreaterThan(sampleAt(roller, roller.enemyXNorm - 0.1) + 0.12);
+    expect(sampleAt(bouncer, 0.55)).toBeGreaterThan(sampleAt(bouncer, bouncer.enemyXNorm) + 0.16);
+    expect(sampleAt(digger, 0.55)).toBeGreaterThan(sampleAt(digger, digger.enemyXNorm) + 0.18);
+    expect(sampleAt(vertical, vertical.enemyXNorm)).toBeGreaterThan(sampleAt(vertical, 0.2) + 0.08);
+    expect(Math.max(...nuke.terrainSamples)).toBeGreaterThan(0.64);
+  });
 });

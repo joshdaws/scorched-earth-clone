@@ -11,6 +11,7 @@ import * as Renderer from './renderer.js';
 import * as Game from './game.js';
 import * as Input from './input.js';
 import * as Music from './music.js';
+import * as Assets from './assets.js';
 import * as SupplyDrop from './supply-drop.js';
 import * as ExtractionReveal from './extraction-reveal.js';
 import { getTokenBalance, spendTokens, canAfford } from './tokens.js';
@@ -494,22 +495,30 @@ function drawPurchaseCard(ctx, index) {
     ctx.textAlign = 'center';
     ctx.fillText(option.name, pos.x + CONFIG.CARD_WIDTH / 2, pos.y + 40);
 
-    // Crate icon placeholder (simple box)
+    // Crate icon
     const iconSize = 80;
     const iconX = pos.x + (CONFIG.CARD_WIDTH - iconSize) / 2;
     const iconY = pos.y + 60;
+    const crateImage = Assets.get('supplyDrop.crate');
 
-    ctx.strokeStyle = option.glowColor;
-    ctx.lineWidth = 3;
-    ctx.strokeRect(iconX, iconY, iconSize, iconSize);
+    if (crateImage && crateImage.complete && crateImage.naturalWidth > 0) {
+        ctx.save();
+        ctx.shadowColor = option.glowColor;
+        ctx.shadowBlur = 12;
+        ctx.drawImage(crateImage, iconX, iconY, iconSize, iconSize);
+        ctx.restore();
+    } else {
+        ctx.strokeStyle = option.glowColor;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(iconX, iconY, iconSize, iconSize);
 
-    // Cross pattern on crate
-    ctx.beginPath();
-    ctx.moveTo(iconX, iconY + iconSize / 2);
-    ctx.lineTo(iconX + iconSize, iconY + iconSize / 2);
-    ctx.moveTo(iconX + iconSize / 2, iconY);
-    ctx.lineTo(iconX + iconSize / 2, iconY + iconSize);
-    ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(iconX, iconY + iconSize / 2);
+        ctx.lineTo(iconX + iconSize, iconY + iconSize / 2);
+        ctx.moveTo(iconX + iconSize / 2, iconY);
+        ctx.lineTo(iconX + iconSize / 2, iconY + iconSize);
+        ctx.stroke();
+    }
 
     // Description
     ctx.font = '14px "Orbitron", monospace';

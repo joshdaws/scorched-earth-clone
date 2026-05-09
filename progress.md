@@ -71,3 +71,13 @@ Original prompt: Upgrade game graphical assets with ChatGPT Image Gen 2 and impr
 2026-04-28:
 - Continued `scorched-earth-s86`: added a staged level progression curriculum module, enriched all 60 levels with mechanic/loadout metadata, granted curated level-mode practice loadouts on level start, and surfaced current/new ammo focus in level select. Next: play/balance each intro level and tune terrain/enemy setups around the introduced ammo.
 - Filed `scorched-earth-3il` for the remaining playtest/balance pass after the curriculum implementation: tune intro/challenge terrain, enemy health, wind, star targets, and loadout counts around the staged ammo plan.
+
+2026-05-09:
+- Completed `scorched-earth-1ne`: replaced the generic level layout set with authored deterministic terrain setpieces for staged ammo lessons, covering early clear shots, roller lanes, bouncer banks, digger pockets, vertical strike cover, and late nuclear arenas.
+- Tightened the gameplay weapon bar so level mode shows only currently usable ammo instead of the full 40-weapon catalog, with keyboard/swipe cycling clamped to the compact loadout.
+- Polished the level-complete breakdown with explicit star thresholds and fixed theme color usage/responsive button sizing.
+- Replaced temporary supply-drop crate/banner/parachute/vehicle visuals with generated raster assets and wired the supply-drop runtime/screens to prefer those assets with procedural fallbacks.
+- Replaced placeholder audio manifest entries with lightweight synth loops and SFX assets, then removed the old test beep/loop files from the runtime manifest.
+- Added `window.render_game_to_text()` automation hooks for browser/gameplay inspection and covered the weapon bar/layout changes with focused unit tests.
+- Verified with `npm run check`, `npm run build`, `npm run ios:check`, targeted level/collection Playwright journeys, and browser controls smoke.
+- Filed `scorched-earth-3fe.7` for the remaining frame-pacing budget failure seen in headless perf metrics, and `scorched-earth-3fe.6` for final weapon/projectile icon fallback replacement.
