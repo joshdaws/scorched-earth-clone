@@ -17,20 +17,25 @@ git diff --stat main...codex/gameplay-improvements
 
 | Branch | Head | Main relationship | Active branch relationship | Disposition |
 | --- | --- | --- | --- | --- |
-| `codex/gameplay-improvements` / `origin/codex/gameplay-improvements` | `8ef914d` | `0 behind / 37 ahead` | active branch | Keep. This is the current web/Capacitor launch-polish branch. |
-| `feature/game-engine-upgrade` / `origin/feature/game-engine-upgrade` | `6178456` | `396 behind / 9 ahead` | `433 behind / 9 ahead` | Preserve as stale idea archive; do not merge wholesale. |
-| `native` | `5c44d7a` | `96 behind / 129 ahead` | `133 behind / 129 ahead` | Preserve as Unity/native pivot reference; blocked unless product direction changes. |
-| `legacy-v1` / `origin/legacy-v1` | `84b361f` | `380 behind / 0 ahead` | `417 behind / 0 ahead` | Historical branch; fully merged into `main`, no launch action. |
-| `origin/codex/find-and-fix-important-bug` | `42efa06` | `395 behind / 0 ahead` | `432 behind / 0 ahead` | Historical bugfix branch; safe to prune after owner confirmation. |
-| `main` / `origin/main` | `9b33326` | baseline | `37 behind / 0 ahead` from active | Production baseline. Merge active branch only after final launch blockers are resolved or intentionally deferred. |
+| `codex/gameplay-improvements` / `origin/codex/gameplay-improvements` | `9307835` | `0 behind / 42 ahead` | active branch | Keep. This is the current web/Capacitor launch-polish branch. |
+| `feature/game-engine-upgrade` / `origin/feature/game-engine-upgrade` | `6178456` | `396 behind / 9 ahead` | `438 behind / 9 ahead` | Preserve as stale idea archive; do not merge wholesale. |
+| `native` | `5c44d7a` | `96 behind / 129 ahead` | `138 behind / 129 ahead` | Preserve as Unity/native pivot reference; blocked unless product direction changes. |
+| `legacy-v1` / `origin/legacy-v1` | `84b361f` | `380 behind / 0 ahead` | `422 behind / 0 ahead` | Historical branch; fully merged into `main`, no launch action. |
+| `origin/codex/find-and-fix-important-bug` | `42efa06` | `395 behind / 0 ahead` | `437 behind / 0 ahead` | Historical bugfix branch; safe to prune after owner confirmation. |
+| `main` / `origin/main` | `9b33326` | baseline | `42 behind / 0 ahead` from active | Production baseline. Merge active branch only after final launch blockers are resolved or intentionally deferred. |
 
 `origin/HEAD` points to `origin/main`.
 
 ## Active Branch Payload
 
-`codex/gameplay-improvements` currently contains 37 commits on top of `main`:
+`codex/gameplay-improvements` currently contains 42 commits on top of `main`:
 
 ```text
+9307835 Add campaign world visual audit
+63782c0 Add App Store handoff verifier
+5975df6 Document native Xcode handoff blocker
+664f8e6 Refresh App Store screenshot evidence
+6c0554b Refresh launch audit evidence
 8ef914d Polish battlefield and reward visuals
 ddec960 Record public App Store URL check
 77f16c3 Refresh App Store screenshots evidence

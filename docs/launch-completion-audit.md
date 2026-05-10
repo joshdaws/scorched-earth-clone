@@ -124,9 +124,14 @@ No ready work found (all issues have blocking dependencies)
 ```
 
 The pushed branch is up to date with `origin/codex/gameplay-improvements` at
-`8ef914d` after 37 commits on top of `main`, including:
+`9307835` after 42 commits on top of `main`, including:
 
 ```text
+9307835 Add campaign world visual audit
+63782c0 Add App Store handoff verifier
+5975df6 Document native Xcode handoff blocker
+664f8e6 Refresh App Store screenshot evidence
+6c0554b Refresh launch audit evidence
 8ef914d Polish battlefield and reward visuals
 ddec960 Record public App Store URL check
 77f16c3 Refresh App Store screenshots evidence
