@@ -124,10 +124,14 @@ No ready work found (all issues have blocking dependencies)
 ```
 
 The gameplay/content and release-handoff audit covers
-`origin/codex/gameplay-improvements` through `ac43115`, at 48 commits on top of
-`main`. The audited payload includes:
+`origin/codex/gameplay-improvements` through the handoff-verification commit
+`c99ba1c`, at 50 commits on top of `main`. Later audit-documentation commits may
+advance the active branch head without changing this audited gameplay/handoff
+payload. The audited payload includes:
 
 ```text
+c99ba1c Require performance receipts in handoff
+5532801 Refresh launch audit head
 ac43115 Verify native bundle in handoff
 e3d6d81 Verify iOS bundle sync freshness
 28b73cd Check handoff receipt freshness

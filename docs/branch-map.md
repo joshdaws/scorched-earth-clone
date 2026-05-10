@@ -1,7 +1,9 @@
 # Feature Branch Map
 
-Generated on 2026-05-10 from local and `origin/*` refs after the native bundle
-handoff verification push.
+Generated on 2026-05-10 from local and `origin/*` refs after the performance
+receipt handoff verification push. Branch dispositions are audited as of
+`c99ba1c`; later audit-documentation commits may advance the active branch head
+without changing the branch topology or disposition.
 
 ## Audit Commands
 
@@ -17,21 +19,23 @@ git diff --stat main...codex/gameplay-improvements
 
 | Branch | Audited head | Main relationship at audit | Active branch relationship at audit | Disposition |
 | --- | --- | --- | --- | --- |
-| `codex/gameplay-improvements` / `origin/codex/gameplay-improvements` | `ac43115` | `0 behind / 48 ahead` | active branch | Keep. This is the current web/Capacitor launch-polish branch. |
-| `feature/game-engine-upgrade` / `origin/feature/game-engine-upgrade` | `6178456` | `396 behind / 9 ahead` | `444 behind / 9 ahead` | Preserve as stale idea archive; do not merge wholesale. |
-| `native` | `5c44d7a` | `96 behind / 129 ahead` | `144 behind / 129 ahead` | Preserve as Unity/native pivot reference; blocked unless product direction changes. |
-| `legacy-v1` / `origin/legacy-v1` | `84b361f` | `380 behind / 0 ahead` | `428 behind / 0 ahead` | Historical branch; fully merged into `main`, no launch action. |
-| `origin/codex/find-and-fix-important-bug` | `42efa06` | `395 behind / 0 ahead` | `443 behind / 0 ahead` | Historical bugfix branch; safe to prune after owner confirmation. |
-| `main` / `origin/main` | `9b33326` | baseline | `48 behind / 0 ahead` from active | Production baseline. Merge active branch only after final launch blockers are resolved or intentionally deferred. |
+| `codex/gameplay-improvements` / `origin/codex/gameplay-improvements` | `c99ba1c` | `0 behind / 50 ahead` | active branch | Keep. This is the current web/Capacitor launch-polish branch. |
+| `feature/game-engine-upgrade` / `origin/feature/game-engine-upgrade` | `6178456` | `396 behind / 9 ahead` | `446 behind / 9 ahead` | Preserve as stale idea archive; do not merge wholesale. |
+| `native` | `5c44d7a` | `96 behind / 129 ahead` | `146 behind / 129 ahead` | Preserve as Unity/native pivot reference; blocked unless product direction changes. |
+| `legacy-v1` / `origin/legacy-v1` | `84b361f` | `380 behind / 0 ahead` | `430 behind / 0 ahead` | Historical branch; fully merged into `main`, no launch action. |
+| `origin/codex/find-and-fix-important-bug` | `42efa06` | `395 behind / 0 ahead` | `445 behind / 0 ahead` | Historical bugfix branch; safe to prune after owner confirmation. |
+| `main` / `origin/main` | `9b33326` | baseline | `50 behind / 0 ahead` from active | Production baseline. Merge active branch only after final launch blockers are resolved or intentionally deferred. |
 
 `origin/HEAD` points to `origin/main`.
 
 ## Active Branch Payload
 
-At current audited head `ac43115`, `codex/gameplay-improvements` contained 48
-commits on top of `main`:
+At audited handoff-verification head `c99ba1c`, `codex/gameplay-improvements`
+contained 50 commits on top of `main`:
 
 ```text
+c99ba1c Require performance receipts in handoff
+5532801 Refresh launch audit head
 ac43115 Verify native bundle in handoff
 e3d6d81 Verify iOS bundle sync freshness
 28b73cd Check handoff receipt freshness
