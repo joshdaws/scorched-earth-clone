@@ -192,8 +192,9 @@ Expected result:
 - `npm run release:handoff` reports repo-side handoff artifacts are present,
   including the latest App Store screenshot summary and world visual audit
   summary, confirms those receipts are not stale against covered visual/runtime
-  files, confirms the native public bundle still matches `www`, and lists only
-  owner/App Store actions.
+  files, confirms fresh browser performance smoke receipts are within budget
+  for controls/projectile/terrain/impact/high-scores, confirms the native public
+  bundle still matches `www`, and lists only owner/App Store actions.
 - `xcodebuild -list` shows the `App` project/scheme instead of Command Line
   Tools or license errors.
 - Working tree contains only intentional release changes.

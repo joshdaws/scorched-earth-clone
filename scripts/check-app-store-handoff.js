@@ -8,6 +8,7 @@ import crypto from 'node:crypto';
 const root = process.cwd();
 const screenshotRoot = path.join(root, 'artifacts/app-store-screenshots');
 const worldVisualRoot = path.join(root, 'artifacts/world-visual-audit');
+const browserSmokeRoot = path.join(root, 'artifacts/browser-smoke');
 
 const requiredFiles = [
   'docs/release/app-store-materials.md',
@@ -35,6 +36,17 @@ const expectedScreenshotSlots = {
 };
 
 const expectedWorlds = new Set([1, 2, 3, 4, 5, 6]);
+const requiredPerformanceScenarios = ['controls', 'projectile', 'terrain', 'impact', 'high-scores'];
+const performanceBudgets = {
+  frameP95Ms: 24,
+  frameMaxMs: 90,
+  updateP95Ms: 8,
+  droppedBacklogTotalMs: 120,
+  droppedBacklogMaxMs: 50,
+  terrainImpactP95Ms: 28,
+  pixiFragmentsMax: 520,
+  particlesMax: 900
+};
 
 const screenshotFreshnessInputs = [
   'assets/manifest.json',
@@ -60,6 +72,15 @@ const worldVisualFreshnessInputs = [
   'scripts/audit-world-visuals.js'
 ];
 
+const performanceFreshnessInputs = [
+  'assets/manifest.json',
+  'js/effects.js',
+  'js/main.js',
+  'js/performanceMetrics.js',
+  'js/ui.js',
+  'scripts/browser-smoke.js'
+];
+
 function exists(relativePath) {
   return fs.existsSync(path.join(root, relativePath));
 }
@@ -75,6 +96,22 @@ function latestSummaryFile(summaryRoot) {
     .filter(entry => entry.isDirectory())
     .map(entry => path.join(summaryRoot, entry.name, 'summary.json'))
     .filter(file => fs.existsSync(file))
+    .map(file => ({
+      file,
+      mtimeMs: fs.statSync(file).mtimeMs
+    }))
+    .sort((a, b) => b.mtimeMs - a.mtimeMs);
+
+  return candidates[0]?.file || null;
+}
+
+function latestBrowserSmokeMetrics(scenario) {
+  if (!fs.existsSync(browserSmokeRoot)) return null;
+
+  const suffix = `-${scenario}.metrics.json`;
+  const candidates = fs.readdirSync(browserSmokeRoot, { withFileTypes: true })
+    .filter(entry => entry.isFile() && entry.name.endsWith(suffix))
+    .map(entry => path.join(browserSmokeRoot, entry.name))
     .map(file => ({
       file,
       mtimeMs: fs.statSync(file).mtimeMs
@@ -261,6 +298,62 @@ function checkWorldVisualSummary(failures) {
   return path.relative(root, summaryPath);
 }
 
+function checkMetricLimit(failures, scenario, name, actual, limit) {
+  if (!Number.isFinite(limit) || limit <= 0) return;
+  if (!Number.isFinite(actual)) {
+    failures.push(`${scenario} performance metric is missing: ${name}`);
+    return;
+  }
+  if (actual > limit) {
+    failures.push(`${scenario} performance ${name} ${actual.toFixed(2)}ms exceeds ${limit.toFixed(2)}ms.`);
+  }
+}
+
+function checkCountLimit(failures, scenario, name, actual, limit) {
+  if (!Number.isFinite(limit) || limit <= 0) return;
+  if (!Number.isFinite(actual)) return;
+  if (actual > limit) {
+    failures.push(`${scenario} performance ${name} ${actual} exceeds ${limit}.`);
+  }
+}
+
+function checkBrowserPerformanceReceipts(failures) {
+  const latestMetrics = [];
+
+  for (const scenario of requiredPerformanceScenarios) {
+    const metricsPath = latestBrowserSmokeMetrics(scenario);
+    if (!metricsPath) {
+      failures.push(`No browser performance smoke metrics found for ${scenario}. Run npm run smoke:browser -- --scenario ${scenario} --quality balanced.`);
+      continue;
+    }
+
+    checkReceiptFreshness(metricsPath, performanceFreshnessInputs, `${scenario} browser performance`, failures);
+
+    const receipt = JSON.parse(fs.readFileSync(metricsPath, 'utf8'));
+    const metrics = receipt.metrics;
+    if (!metrics) {
+      failures.push(`${scenario} browser performance receipt is missing metrics: ${path.relative(root, metricsPath)}`);
+      continue;
+    }
+
+    checkMetricLimit(failures, scenario, 'frame.p95Ms', metrics.frame?.p95Ms, performanceBudgets.frameP95Ms);
+    checkMetricLimit(failures, scenario, 'frame.maxMs', metrics.frame?.maxMs, performanceBudgets.frameMaxMs);
+    checkMetricLimit(failures, scenario, 'updates.p95Ms', metrics.updates?.p95Ms, performanceBudgets.updateP95Ms);
+    checkMetricLimit(failures, scenario, 'droppedBacklog.totalMs', metrics.droppedBacklog?.totalMs, performanceBudgets.droppedBacklogTotalMs);
+    checkMetricLimit(failures, scenario, 'droppedBacklog.maxMs', metrics.droppedBacklog?.maxMs, performanceBudgets.droppedBacklogMaxMs);
+
+    if (scenario === 'terrain' || scenario === 'impact') {
+      checkMetricLimit(failures, scenario, 'measures.terrainImpact.p95Ms', metrics.measures?.terrainImpact?.p95Ms, performanceBudgets.terrainImpactP95Ms);
+    }
+
+    checkCountLimit(failures, scenario, 'gauges.pixiFragments', metrics.gauges?.pixiFragments, performanceBudgets.pixiFragmentsMax);
+    checkCountLimit(failures, scenario, 'gauges.particles', metrics.gauges?.particles, performanceBudgets.particlesMax);
+    latestMetrics.push(path.relative(root, metricsPath));
+  }
+
+  return latestMetrics;
+}
+
 function checkXcode(ownerActions, warnings) {
   const xcodePath = '/Applications/Xcode.app/Contents/Developer';
   if (!fs.existsSync(xcodePath)) {
@@ -308,12 +401,17 @@ function main() {
   checkNativeWebBundleFreshness(failures);
   const latestSummary = checkScreenshotSummary(failures, warnings);
   const latestWorldSummary = checkWorldVisualSummary(failures);
+  const latestPerformanceMetrics = checkBrowserPerformanceReceipts(failures);
   checkXcode(ownerActions, warnings);
 
   console.log('App Store handoff check');
   console.log('=======================');
   if (latestSummary) console.log(`Latest screenshot summary: ${latestSummary}`);
   if (latestWorldSummary) console.log(`Latest world visual summary: ${latestWorldSummary}`);
+  if (latestPerformanceMetrics.length > 0) {
+    console.log('Latest browser performance metrics:');
+    for (const metricsPath of latestPerformanceMetrics) console.log(`- ${metricsPath}`);
+  }
 
   if (warnings.length > 0) {
     console.log('\nWarnings:');

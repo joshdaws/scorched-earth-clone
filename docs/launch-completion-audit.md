@@ -34,7 +34,7 @@ The game is complete only when all of the following are true:
 | Long weapon scroller fixed | Compact weapon bar changes landed in `js/ui.js`/`js/main.js`; `tests/unit/weapon-bar.test.js` passed. | Covered. |
 | Secondary screens and star earning polished | Level-complete threshold/theme/button polish landed; Garage/Armory secondary progression entry points landed in `c499a26`; survival now uses Run Over/New Run/Garage actions, delayed battlefield-preserving reveals, between-round perks, and animated reward count-ups. `tests/e2e/collection-gacha.spec.js`, `tests/e2e/survival-flow.spec.js`, and `tests/unit/levels-stars.test.js` passed. | Covered in web automation. |
 | Animation where expected | Existing effect systems and level-complete/supply-drop flows are covered by e2e/smoke tests. `npm run audit:visual` passed 90 captures across title/menu, secondary screens, gameplay HUD, aiming, pause, shop, victory/defeat, round transition, level complete, impact effects, tank pivots, and terrain collapse. | Covered in automated visual audit; physical-device feel still needs TestFlight feedback. |
-| No lag / strong performance | `npm run check`, `npm run build`, `npm run ios:check`, browser smoke controls, and expanded browser smokes passed. Latest balanced smoke p95 frame times: idle 16.7ms, projectile 16.7ms with max dropped backlog 50ms under the 80ms cap, terrain 16.7ms with zero dropped backlog, high-scores 9.2ms, visual impact 17.4ms. | Covered for automated smoke paths; physical-device thermal/performance testing remains. |
+| No lag / strong performance | `npm run release:handoff` now requires fresh browser-smoke metrics within budget for controls, projectile, terrain, impact, and high-scores. Latest balanced p95/max frame times: controls 9.30/16.70ms, projectile 9.80/16.90ms, terrain 16.50/25.00ms, impact 16.70/18.40ms, high-scores 9.40/66.50ms. | Covered for automated smoke paths; physical-device thermal/performance testing remains. |
 | Ready to convert/sync to iOS | `npm run ios:check` passed, including build, release budget, and `npx cap sync ios`. | Covered for local Capacitor readiness. |
 | Ready to upload to App Store | Open/blocked beads remain: `scorched-earth-3fe.4` App Store submission preparation, `scorched-earth-3fe.5` Submit to App Store and launch, `scorched-earth-3fe.2` beta feedback, and deferred monetization epic `scorched-earth-ttk`. Local metadata and screenshot inventory draft exists at `docs/release/app-store-materials.md`; local privacy/support pages exist at `public/privacy.html` and `public/support.html`, with in-app Settings actions pointing to them. | Not complete. |
 
@@ -308,9 +308,11 @@ npm run release:handoff
 
 It checks the local App Store evidence package, validates the latest screenshot
 summary shape/freshness, validates the latest campaign world visual audit
-receipt/freshness, rechecks native `ios/App/App/public` bundle hashes against
-`www`, and reports remaining owner/App Store actions without treating those
-account-controlled steps as repo-side failures.
+receipt/freshness, validates fresh browser performance smoke metrics for
+controls/projectile/terrain/impact/high-scores, rechecks native
+`ios/App/App/public` bundle hashes against `www`, and reports remaining
+owner/App Store actions without treating those account-controlled steps as
+repo-side failures.
 
 ## Remaining Blockers
 
