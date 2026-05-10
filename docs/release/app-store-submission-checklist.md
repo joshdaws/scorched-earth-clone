@@ -148,6 +148,7 @@ npm run generate-config:offline
 npm run check
 npm run ios:check
 npm run screenshots:app-store
+npm run release:handoff
 git status --short
 ```
 
@@ -185,6 +186,8 @@ Expected result:
 - `npm run ios:check` passes build, budget, icon/splash checks, and Capacitor
   sync.
 - Screenshot summary reports zero failed captures.
+- `npm run release:handoff` reports repo-side handoff artifacts are present and
+  lists only owner/App Store actions.
 - `xcodebuild -list` shows the `App` project/scheme instead of Command Line
   Tools or license errors.
 - Working tree contains only intentional release changes.

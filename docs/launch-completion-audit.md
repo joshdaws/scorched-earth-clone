@@ -271,6 +271,16 @@ The repo-side Capacitor/iOS checks pass, but native archive validation still
 requires the owner to accept the Xcode license and configure signing/team in
 Xcode.
 
+The owner/release handoff verifier is now available as:
+
+```bash
+npm run release:handoff
+```
+
+It checks the local App Store evidence package, validates the latest screenshot
+summary shape, and reports remaining owner/App Store actions without treating
+those account-controlled steps as repo-side failures.
+
 ## Remaining Blockers
 
 The objective is not complete because App Store launch readiness cannot be honestly verified from the repo alone:

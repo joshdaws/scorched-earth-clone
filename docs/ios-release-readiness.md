@@ -14,6 +14,16 @@ npm run ios:check -- --skip-build --skip-sync
 
 The check verifies release web output and budgets, required Capacitor/iOS files, app icon and splash assets, and Capacitor sync readiness.
 
+After generating App Store screenshots, run the handoff verifier:
+
+```bash
+npm run release:handoff
+```
+
+It checks the local App Store evidence package and reports owner-controlled
+actions that remain, such as Xcode license/signing, TestFlight upload, real
+device validation, and final App Store Connect fields.
+
 Local smoke tests should use an offline generated runtime config from `npm run generate-config:offline`, so high-score/Convex services never block startup or visual captures. Online/TestFlight builds should generate `config.js` with `CONVEX_URL=<deployment-url> npm run generate-config` before building.
 
 ## Device Matrix
