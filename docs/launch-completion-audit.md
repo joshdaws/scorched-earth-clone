@@ -311,9 +311,10 @@ npm run release:handoff
 ```
 
 It checks the local App Store evidence package, validates the latest screenshot
-summary shape/freshness against the screenshot target screen/UI modules,
-validates the latest campaign world visual audit receipt/freshness against
-world art, layout, progression, puzzle-object, and scene-isolation files,
+summary shape, index, per-capture console/page-error state, and freshness
+against the screenshot target screen/UI modules, validates the latest campaign
+world visual audit receipt/freshness against world art, layout, progression,
+puzzle-object, and scene-isolation files,
 scans the runtime asset manifest for missing files and temporary placeholder
 naming, checks that the generated `www` bundle is fresh against source
 JS/config/static assets, validates fresh browser performance smoke metrics,

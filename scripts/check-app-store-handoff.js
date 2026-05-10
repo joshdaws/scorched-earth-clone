@@ -358,9 +358,11 @@ function checkScreenshotSummary(failures, warnings) {
   }
 
   const summary = JSON.parse(fs.readFileSync(summaryPath, 'utf8'));
+  const indexPath = path.join(path.dirname(summaryPath), 'index.md');
   checkReceiptFreshness(summaryPath, screenshotFreshnessInputs, 'App Store screenshot', failures);
   if (summary.failCount !== 0) failures.push(`Latest screenshot summary has failures: ${summaryPath}`);
   if (summary.passCount !== 24) warnings.push(`Latest screenshot summary passCount is ${summary.passCount}, expected 24 for full local set.`);
+  if (!fs.existsSync(indexPath)) failures.push(`Missing App Store screenshot index: ${path.relative(root, indexPath)}`);
 
   const reports = Array.isArray(summary.reports) ? summary.reports : [];
   for (const [device, size] of Object.entries(expectedScreenshotSlots)) {
@@ -376,6 +378,15 @@ function checkScreenshotSummary(failures, warnings) {
       }
       if (report.screenshotPath && !fs.existsSync(path.join(root, report.screenshotPath))) {
         failures.push(`Missing screenshot image from summary: ${report.screenshotPath}`);
+      }
+      if (Array.isArray(report.failures) && report.failures.length > 0) {
+        failures.push(`${device} ${report.target} has screenshot failures: ${report.failures.join('; ')}`);
+      }
+      if (Array.isArray(report.consoleErrors) && report.consoleErrors.length > 0) {
+        failures.push(`${device} ${report.target} has ${report.consoleErrors.length} screenshot console error(s).`);
+      }
+      if (Array.isArray(report.pageErrors) && report.pageErrors.length > 0) {
+        failures.push(`${device} ${report.target} has ${report.pageErrors.length} screenshot page error(s).`);
       }
     }
   }
