@@ -98,6 +98,15 @@ const performanceFreshnessInputs = [
   'scripts/browser-smoke.js'
 ];
 
+const webBuildFreshnessInputs = [
+  'index.html',
+  'config.js',
+  'package.json',
+  'package-lock.json',
+  'tsconfig.json',
+  'vite.config.js'
+];
+
 function exists(relativePath) {
   return fs.existsSync(path.join(root, relativePath));
 }
@@ -269,6 +278,55 @@ function checkRuntimeManifest(failures) {
     .filter(assetPath => !fs.existsSync(path.join(root, 'assets', assetPath)));
   for (const assetPath of missingAssets) {
     failures.push(`Runtime asset manifest points at a missing file: assets/${assetPath}`);
+  }
+}
+
+function checkMatchingFile(sourcePath, builtPath, failures, label) {
+  if (!exists(sourcePath)) {
+    failures.push(`${label} source file is missing: ${sourcePath}`);
+    return;
+  }
+  if (!exists(builtPath)) {
+    failures.push(`${label} built file is missing: ${builtPath}`);
+    return;
+  }
+  if (fileHash(sourcePath) !== fileHash(builtPath)) {
+    failures.push(`${label} built file is stale: ${builtPath} differs from ${sourcePath}. Run npm run ios:check.`);
+  }
+}
+
+function checkWebBundleFreshness(failures) {
+  if (!exists('www/index.html')) {
+    failures.push('Missing www/index.html; run npm run ios:check.');
+    return;
+  }
+
+  const indexMtimeMs = fs.statSync(path.join(root, 'www/index.html')).mtimeMs;
+  const freshnessInputs = [
+    ...webBuildFreshnessInputs,
+    ...collectFiles('js').filter(file => file.endsWith('.js'))
+  ];
+
+  for (const inputPath of freshnessInputs) {
+    if (!exists(inputPath)) {
+      failures.push(`Web bundle freshness input is missing: ${inputPath}`);
+      continue;
+    }
+    if (fs.statSync(path.join(root, inputPath)).mtimeMs > indexMtimeMs) {
+      failures.push(`Generated web bundle is stale; rerun npm run ios:check because ${inputPath} changed after www/index.html.`);
+    }
+  }
+
+  checkMatchingFile('config.js', 'www/config.js', failures, 'Web bundle config');
+  checkMatchingFile('assets/manifest.json', 'www/assets/manifest.json', failures, 'Web bundle asset manifest');
+
+  for (const file of collectFiles('public').sort()) {
+    checkMatchingFile(file, path.join('www', path.relative('public', file)), failures, 'Web bundle public asset');
+  }
+
+  const manifest = readJson('assets/manifest.json');
+  for (const assetPath of collectManifestPaths(manifest)) {
+    checkMatchingFile(path.join('assets', assetPath), path.join('www/assets', assetPath), failures, 'Web bundle runtime asset');
   }
 }
 
@@ -499,6 +557,7 @@ function main() {
   checkRuntimeConfig(failures, warnings);
   checkRequiredFiles(failures);
   checkRuntimeManifest(failures);
+  checkWebBundleFreshness(failures);
   checkNativeWebBundleFreshness(failures);
   const latestSummary = checkScreenshotSummary(failures, warnings);
   const latestWorldSummary = checkWorldVisualSummary(failures);

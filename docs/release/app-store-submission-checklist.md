@@ -193,8 +193,9 @@ Expected result:
   including the latest App Store screenshot summary and world visual audit
   summary, confirms those receipts are not stale against covered screen,
   visual/runtime, and campaign layout/progression files, confirms runtime
-  manifest assets exist without temporary placeholder naming, confirms fresh
-  browser performance smoke receipts are within budget for
+  manifest assets exist without temporary placeholder naming, confirms `www` is
+  fresh against source JS/config/static assets, confirms fresh browser
+  performance smoke receipts are within budget for
   controls/projectile/terrain/impact/high-scores with screenshots and clean
   console receipts, confirms the native public bundle still matches `www`, and
   lists only owner/App Store actions.

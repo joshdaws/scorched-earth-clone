@@ -29,9 +29,10 @@ device validation, and final App Store Connect fields. It also verifies that the
 latest App Store screenshot capture and campaign world visual audit receipts
 exist, passed, and are newer than the screen/UI/runtime/campaign layout files
 they cover. It also scans the runtime asset manifest for missing files and
-temporary placeholder naming, requires fresh browser performance smoke metrics,
-screenshots, and clean console receipts for the controls, projectile, terrain,
-impact, and high-scores scenarios, and rechecks that the native
+temporary placeholder naming, checks that the generated `www` bundle is fresh
+against source JS/config/static assets, requires fresh browser performance smoke
+metrics, screenshots, and clean console receipts for the controls, projectile,
+terrain, impact, and high-scores scenarios, and rechecks that the native
 `ios/App/App/public` web bundle matches `www`, so run `npm run ios:check` first
 if this fails.
 

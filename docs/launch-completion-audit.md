@@ -315,7 +315,8 @@ summary shape/freshness against the screenshot target screen/UI modules,
 validates the latest campaign world visual audit receipt/freshness against
 world art, layout, progression, puzzle-object, and scene-isolation files,
 scans the runtime asset manifest for missing files and temporary placeholder
-naming, validates fresh browser performance smoke metrics,
+naming, checks that the generated `www` bundle is fresh against source
+JS/config/static assets, validates fresh browser performance smoke metrics,
 screenshots, and clean console/page-error receipts for
 controls/projectile/terrain/impact/high-scores, rechecks native
 `ios/App/App/public` bundle hashes against `www`, and reports remaining owner/App
