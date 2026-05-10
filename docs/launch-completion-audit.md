@@ -125,9 +125,12 @@ No ready work found (all issues have blocking dependencies)
 
 The gameplay/content and release-handoff audit covers
 `origin/codex/gameplay-improvements` through the handoff-verification commit
-`95fcfad`, at 64 commits on top of `main`. The audited payload includes:
+`010f5a6`, at 67 commits on top of `main`. The audited payload includes:
 
 ```text
+010f5a6 Polish world and puzzle object art
+9fe38da Check App Store screenshot PNGs
+e73f06e Refresh branch map to image audit head
 95fcfad Check App Store image dimensions
 47d4a60 Refresh branch map to sidecar audit head
 cdffb11 Check visual audit sidecars in handoff
@@ -276,12 +279,12 @@ npm run audit:visual -- --targets gameplay-hud,collection,supply-drop --viewport
 all passed after the visual polish correction.
 
 npm run audit:worlds
-passed after the world background correction and captured one running gameplay
-battlefield from each campaign world. Latest receipt:
-artifacts/world-visual-audit/2026-05-10T02-24-18-874Z/summary.json
+passed after the latest world/puzzle-object art correction and captured one
+running gameplay battlefield from each campaign world. Latest receipt:
+artifacts/world-visual-audit/2026-05-10T03-39-47-666Z/summary.json
 
 Adjacent world image distances were all above the 6.0 minimum threshold:
-W1-W2 16.04, W2-W3 16.92, W3-W4 13.26, W4-W5 12.67, W5-W6 13.54.
+W1-W2 16.06, W2-W3 16.78, W3-W4 15.46, W4-W5 14.65, W5-W6 15.14.
 ```
 
 Current manifest and content checks:
