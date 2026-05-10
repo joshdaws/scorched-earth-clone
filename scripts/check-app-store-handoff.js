@@ -8,6 +8,7 @@ import crypto from 'node:crypto';
 const root = process.cwd();
 const screenshotRoot = path.join(root, 'artifacts/app-store-screenshots');
 const worldVisualRoot = path.join(root, 'artifacts/world-visual-audit');
+const visualAuditRoot = path.join(root, 'artifacts/visual-audit');
 const browserSmokeRoot = path.join(root, 'artifacts/browser-smoke');
 
 const requiredFiles = [
@@ -42,6 +43,35 @@ const expectedScreenshotTargets = new Set([
   '04-level-complete',
   '05-supply-drop',
   '06-shop'
+]);
+
+const expectedVisualAuditViewports = new Set([
+  'iphone-se',
+  'iphone-14',
+  'iphone-plus',
+  'ipad',
+  'desktop'
+]);
+
+const expectedVisualAuditTargets = new Set([
+  'title-menu',
+  'menu-options',
+  'level-select',
+  'high-scores',
+  'achievements',
+  'collection',
+  'supply-drop',
+  'gameplay-hud',
+  'aiming-controls',
+  'pause-menu',
+  'shop',
+  'victory',
+  'defeat',
+  'round-transition',
+  'level-complete',
+  'impact-effects',
+  'tank-pivots',
+  'terrain-collapse'
 ]);
 
 const expectedWorlds = new Set([1, 2, 3, 4, 5, 6]);
@@ -96,6 +126,26 @@ const worldVisualFreshnessInputs = [
   'js/puzzleObjects.js',
   'js/sceneIsolation.js',
   'scripts/audit-world-visuals.js'
+];
+
+const visualAuditFreshnessInputs = [
+  'assets/manifest.json',
+  'js/achievement-screen.js',
+  'js/aimingControls.js',
+  'js/collection-screen.js',
+  'js/effects.js',
+  'js/gameOver.js',
+  'js/level-complete-screen.js',
+  'js/level-select-screen.js',
+  'js/main.js',
+  'js/menuRenderer.js',
+  'js/pauseMenu.js',
+  'js/roundTransition.js',
+  'js/shop.js',
+  'js/supply-drop-screen.js',
+  'js/titleScene/titleScene.js',
+  'js/ui.js',
+  'scripts/visual-audit.js'
 ];
 
 const performanceFreshnessInputs = [
@@ -497,6 +547,68 @@ function checkWorldVisualSummary(failures) {
   return path.relative(root, summaryPath);
 }
 
+function checkVisualAuditSummary(failures) {
+  const summaryPath = latestSummaryFile(visualAuditRoot);
+  if (!summaryPath) {
+    failures.push('No full visual audit summary found. Run npm run audit:visual.');
+    return null;
+  }
+
+  const summary = JSON.parse(fs.readFileSync(summaryPath, 'utf8'));
+  checkReceiptFreshness(summaryPath, visualAuditFreshnessInputs, 'Visual audit', failures);
+
+  if (summary.failCount !== 0) {
+    failures.push(`Latest visual audit has failures: ${summaryPath}`);
+  }
+  if (summary.targetCount !== expectedVisualAuditTargets.size) {
+    failures.push(`Latest visual audit targetCount is ${summary.targetCount}, expected ${expectedVisualAuditTargets.size}.`);
+  }
+  if (summary.viewportCount !== expectedVisualAuditViewports.size) {
+    failures.push(`Latest visual audit viewportCount is ${summary.viewportCount}, expected ${expectedVisualAuditViewports.size}.`);
+  }
+  if (summary.passCount !== expectedVisualAuditTargets.size * expectedVisualAuditViewports.size) {
+    failures.push(`Latest visual audit passCount is ${summary.passCount}, expected ${expectedVisualAuditTargets.size * expectedVisualAuditViewports.size}.`);
+  }
+
+  const reports = Array.isArray(summary.reports) ? summary.reports : [];
+  for (const targetId of expectedVisualAuditTargets) {
+    for (const viewportId of expectedVisualAuditViewports) {
+      const matchingReports = reports.filter(report => report.target === targetId && report.viewport === viewportId);
+      if (matchingReports.length !== 1) {
+        failures.push(`Expected exactly one visual audit capture for ${targetId}/${viewportId}, found ${matchingReports.length}.`);
+        continue;
+      }
+
+      const report = matchingReports[0];
+      if (Array.isArray(report.failures) && report.failures.length > 0) {
+        failures.push(`${targetId}/${viewportId} visual audit has failures: ${report.failures.join('; ')}`);
+      }
+      if (typeof report.screenshotPath !== 'string' || !fs.existsSync(path.join(root, report.screenshotPath))) {
+        failures.push(`Missing visual audit screenshot from summary: ${report.screenshotPath || `${targetId}/${viewportId}`}`);
+      }
+    }
+  }
+
+  const seenPairs = new Set();
+  for (const report of reports) {
+    const targetId = report.target;
+    const viewportId = report.viewport;
+    if (!expectedVisualAuditTargets.has(targetId)) {
+      failures.push(`Latest visual audit contains unexpected target: ${targetId}.`);
+    }
+    if (!expectedVisualAuditViewports.has(viewportId)) {
+      failures.push(`Latest visual audit contains unexpected viewport: ${viewportId}.`);
+    }
+    const pairKey = `${targetId}/${viewportId}`;
+    if (seenPairs.has(pairKey)) {
+      failures.push(`Latest visual audit contains duplicate capture: ${pairKey}.`);
+    }
+    seenPairs.add(pairKey);
+  }
+
+  return path.relative(root, summaryPath);
+}
+
 function checkMetricLimit(failures, scenario, name, actual, limit) {
   if (!Number.isFinite(limit) || limit <= 0) return;
   if (!Number.isFinite(actual)) {
@@ -629,6 +741,7 @@ function main() {
   checkNativeWebBundleFreshness(failures);
   const latestSummary = checkScreenshotSummary(failures, warnings);
   const latestWorldSummary = checkWorldVisualSummary(failures);
+  const latestVisualAuditSummary = checkVisualAuditSummary(failures);
   const latestPerformanceMetrics = checkBrowserPerformanceReceipts(failures);
   checkXcode(ownerActions, warnings);
 
@@ -636,6 +749,7 @@ function main() {
   console.log('=======================');
   if (latestSummary) console.log(`Latest screenshot summary: ${latestSummary}`);
   if (latestWorldSummary) console.log(`Latest world visual summary: ${latestWorldSummary}`);
+  if (latestVisualAuditSummary) console.log(`Latest full visual audit summary: ${latestVisualAuditSummary}`);
   if (latestPerformanceMetrics.length > 0) {
     console.log('Latest browser performance metrics:');
     for (const metricsPath of latestPerformanceMetrics) console.log(`- ${metricsPath}`);
