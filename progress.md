@@ -125,3 +125,4 @@ Original prompt: Upgrade game graphical assets with ChatGPT Image Gen 2 and impr
 - Updated the branch map and launch audit again to treat `c99ba1c` as the audited handoff-verification head, while allowing later audit-documentation commits to advance `HEAD` without changing branch dispositions.
 - Tightened the browser performance handoff gate again so each required smoke receipt must include a matching screenshot and a clean console/page-error JSON sidecar, not only passing frame metrics.
 - Expanded `npm run release:handoff` world visual freshness coverage to include authored level layouts, level progression, puzzle-object runtime, and scene-isolation files, so campaign design changes require a fresh `npm run audit:worlds` receipt.
+- Expanded App Store screenshot freshness coverage in `npm run release:handoff` to include the menu, UI, level-complete, supply-drop, shop, collection/reward portrait, and screen runtime files that feed the six screenshot targets.

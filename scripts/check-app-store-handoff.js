@@ -50,8 +50,19 @@ const performanceBudgets = {
 
 const screenshotFreshnessInputs = [
   'assets/manifest.json',
-  'js/main.js',
+  'assets/images/tanks/portraits/tank-portrait-arctic.png',
+  'assets/images/tanks/portraits/tank-portrait-standard.png',
+  'js/assets.js',
+  'js/collection-screen.js',
   'js/effects.js',
+  'js/gameOver.js',
+  'js/level-complete-screen.js',
+  'js/level-select-screen.js',
+  'js/main.js',
+  'js/menuRenderer.js',
+  'js/shop.js',
+  'js/supply-drop-screen.js',
+  'js/ui.js',
   'scripts/capture-app-store-screenshots.js'
 ];
 
