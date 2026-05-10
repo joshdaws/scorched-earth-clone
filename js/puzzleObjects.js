@@ -328,7 +328,24 @@ function renderShield(ctx, object, pulse, sprite = null) {
     ctx.fill();
     ctx.stroke();
 
-    drawSpriteCentered(ctx, sprite, object.x, object.y, object.radius * 2.05, object.radius * 1.92);
+    if (drawSpriteCentered(ctx, sprite, object.x, object.y, object.radius * 1.35, object.radius * 1.35)) {
+        ctx.restore();
+        return;
+    }
+
+    ctx.strokeStyle = COLORS.NEON_PINK;
+    ctx.lineWidth = 3;
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+        const angle = -Math.PI / 2 + i * Math.PI / 3;
+        const x = object.x + Math.cos(angle) * object.radius * 0.45;
+        const y = object.y + Math.sin(angle) * object.radius * 0.45;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.stroke();
     ctx.restore();
 }
 
@@ -360,6 +377,25 @@ function renderRicochet(ctx, object, pulse, sprite = null) {
 
 function renderTeleport(ctx, object, pulse, sprite = null) {
     ctx.save();
+    if (drawSpriteCentered(ctx, sprite, object.x, object.y, object.radius * 1.72, object.radius * 1.9)) {
+        ctx.shadowColor = COLORS.NEON_PURPLE;
+        ctx.shadowBlur = 10 + pulse * 12;
+        ctx.strokeStyle = `rgba(211, 0, 197, ${0.28 + pulse * 0.14})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+            const angle = -Math.PI / 2 + i * Math.PI / 3;
+            const x = object.x + Math.cos(angle) * object.radius * 0.98;
+            const y = object.y + Math.sin(angle) * object.radius * 1.1;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.stroke();
+        ctx.restore();
+        return;
+    }
+
     ctx.strokeStyle = COLORS.NEON_PURPLE;
     ctx.shadowColor = COLORS.NEON_PURPLE;
     ctx.shadowBlur = 16 + pulse * 18;
@@ -373,7 +409,6 @@ function renderTeleport(ctx, object, pulse, sprite = null) {
     ctx.arc(object.x, object.y, object.radius * (0.45 + pulse * 0.18), 0, Math.PI * 2);
     ctx.stroke();
 
-    drawSpriteCentered(ctx, sprite, object.x, object.y, object.radius * 2.35, object.radius * 2.7);
     ctx.restore();
 }
 

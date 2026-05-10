@@ -42,6 +42,17 @@ function gridLines(color = '#ff2a6d') {
   return `${horizontal}\n${vertical}`;
 }
 
+function sunDisc(color, cx = 768, cy = 524, radius = 132, stripe = '#070412') {
+  const cuts = Array.from({ length: 8 }, (_, i) => {
+    const y = cy - radius + 28 + i * 25;
+    return `<rect x="${cx - radius - 12}" y="${y}" width="${radius * 2 + 24}" height="${7 + i * 0.8}" fill="${stripe}" opacity="${0.24 + i * 0.045}"/>`;
+  }).join('\n');
+  return `
+    <circle cx="${cx}" cy="${cy}" r="${radius}" fill="${color}" opacity="0.82"/>
+    ${cuts}
+  `;
+}
+
 function mountainLayer(points, color, opacity = 1, stroke = '#ff2a6d') {
   return `
     <polygon points="0,560 ${points} 1536,560 1536,1024 0,1024" fill="${color}" opacity="${opacity}"/>
@@ -64,6 +75,89 @@ function buildings(color, accent) {
   }).join('\n');
 }
 
+function dunes(fill, stroke) {
+  return `
+    <path d="M0 560C150 505 300 505 450 560S755 614 930 545S1270 498 1536 560V1024H0Z" fill="${fill}" opacity="0.9"/>
+    <path d="M0 584C190 540 360 536 520 592S850 642 1065 574S1360 534 1536 604" fill="none" stroke="${stroke}" stroke-width="4" stroke-opacity="0.75"/>
+    <path d="M0 650C230 600 430 612 610 668S1020 700 1536 622" fill="none" stroke="#05d9e8" stroke-width="3" stroke-opacity="0.42"/>
+  `;
+}
+
+function canyonSpans(fill, stroke) {
+  return `
+    <path d="M0 560H1536V1024H0Z" fill="${fill}" opacity="0.86"/>
+    <g fill="#08101f" stroke="${stroke}" stroke-width="5" stroke-linejoin="round">
+      <path d="M40 560L170 356L290 560Z"/>
+      <path d="M1250 560L1370 330L1492 560Z"/>
+      <path d="M470 560L585 408L690 560Z" opacity="0.78"/>
+      <path d="M840 560L990 380L1120 560Z" opacity="0.86"/>
+    </g>
+    <path d="M0 560H1536" stroke="${stroke}" stroke-width="5" stroke-opacity="0.85"/>
+  `;
+}
+
+function prismFortress(fill, stroke, accent) {
+  return `
+    <path d="M0 560H1536V1024H0Z" fill="${fill}" opacity="0.9"/>
+    <g fill="#17112f" stroke="${stroke}" stroke-width="5">
+      <polygon points="178,560 300,420 422,560"/>
+      <polygon points="1110,560 1222,392 1340,560"/>
+      <rect x="560" y="438" width="118" height="122"/>
+      <rect x="690" y="384" width="158" height="176"/>
+      <rect x="862" y="452" width="118" height="108"/>
+    </g>
+    <g stroke="${accent}" stroke-width="4" opacity="0.72">
+      <path d="M300 420L300 560M1222 392L1222 560M690 438H848M730 384V560M810 384V560"/>
+    </g>
+  `;
+}
+
+function vectorVortex(fill, stroke, accent) {
+  const rings = Array.from({ length: 7 }, (_, i) => {
+    const r = 64 + i * 44;
+    return `<polygon points="${768},${520 - r} ${768 + r},520 ${768},${520 + r} ${768 - r},520" fill="none" stroke="${i % 2 ? stroke : accent}" stroke-width="${7 - i * 0.55}" opacity="${0.68 - i * 0.07}"/>`;
+  }).join('\n');
+  return `
+    <path d="M0 560H1536V1024H0Z" fill="${fill}" opacity="0.92"/>
+    <g>${rings}</g>
+    <path d="M0 560L280 500L520 570L768 520L1010 574L1280 500L1536 560" fill="none" stroke="${stroke}" stroke-width="6" stroke-linejoin="round"/>
+    <g fill="none" stroke="${accent}" stroke-width="5" opacity="0.8">
+      <path d="M205 455H365V615H205Z"/>
+      <path d="M1160 430L1290 520L1160 610L1030 520Z"/>
+    </g>
+  `;
+}
+
+function pixelWastes(fill, stroke, accent) {
+  const blocks = Array.from({ length: 52 }, (_, i) => {
+    const x = 32 + (i * 137) % 1460;
+    const y = 386 + (i * 61) % 174;
+    const s = 16 + (i % 5) * 10;
+    return `<rect x="${x}" y="${y}" width="${s}" height="${s}" fill="${i % 2 ? stroke : accent}" opacity="${0.34 + (i % 3) * 0.12}"/>`;
+  }).join('\n');
+  return `
+    <path d="M0 560H1536V1024H0Z" fill="${fill}" opacity="0.92"/>
+    <path d="M0 560H180V528H330V560H520V512H690V560H850V536H1030V560H1220V504H1400V560H1536" fill="#111928" stroke="${stroke}" stroke-width="5"/>
+    <g>${blocks}</g>
+    <path d="M0 626H1536" stroke="${accent}" stroke-width="4" stroke-dasharray="20 22" stroke-opacity="0.65"/>
+  `;
+}
+
+function midnightCitadel(fill, stroke, accent) {
+  return `
+    <path d="M0 560H1536V1024H0Z" fill="${fill}" opacity="0.94"/>
+    <g fill="#080914" stroke="${stroke}" stroke-width="5">
+      <path d="M600 560V410H655V350H710V280H768V214H826V280H884V350H938V410H994V560Z"/>
+      <path d="M318 560V465H366V410H430V560Z" opacity="0.82"/>
+      <path d="M1108 560V430H1172V360H1242V560Z" opacity="0.82"/>
+    </g>
+    <g stroke="${accent}" stroke-width="4" opacity="0.74">
+      <path d="M710 350H826M655 410H938M768 214V560M600 500H994"/>
+      <path d="M730 462H806V560H730Z" fill="#050711"/>
+    </g>
+  `;
+}
+
 const worlds = [
   {
     id: 1,
@@ -74,7 +168,10 @@ const worlds = [
     horizon: '#ff7a3d',
     grid: '#ff2a6d',
     accent: '#05d9e8',
-    motif: mountainLayer('120,500 230,536 360,486 510,548 670,505 790,555 930,492 1090,540 1260,503 1420,548', '#170728', 1, '#ff2a6d')
+    motif: `
+      ${sunDisc('#ff7a3d', 768, 510, 126)}
+      ${mountainLayer('90,510 225,545 360,488 520,550 680,506 800,558 945,492 1110,542 1268,506 1438,550', '#170728', 1, '#ff2a6d')}
+      ${dunes('#221036', '#ff7a3d')}`
   },
   {
     id: 2,
@@ -85,7 +182,10 @@ const worlds = [
     horizon: '#05d9e8',
     grid: '#05d9e8',
     accent: '#d300c5',
-    motif: buildings('#0b1b31', '#05d9e8')
+    motif: `
+      ${sunDisc('#05d9e8', 1120, 514, 92)}
+      ${buildings('#08182c', '#05d9e8')}
+      ${canyonSpans('#09172a', '#05d9e8')}`
   },
   {
     id: 3,
@@ -97,12 +197,8 @@ const worlds = [
     grid: '#d300c5',
     accent: '#ff6b35',
     motif: `
-      ${mountainLayer('110,510 220,470 350,530 470,455 610,535 760,462 930,530 1080,470 1260,536 1420,480', '#180a2f', 1, '#d300c5')}
-      <g opacity="0.78" stroke="#ff6b35" stroke-width="4" fill="#201339">
-        <path d="M250 558V500H380V558"/>
-        <path d="M980 558V482H1140V558"/>
-        <path d="M600 558V515H760V558"/>
-      </g>`
+      ${sunDisc('#d300c5', 392, 510, 98)}
+      ${prismFortress('#160b2a', '#d300c5', '#ff6b35')}`
   },
   {
     id: 4,
@@ -114,12 +210,8 @@ const worlds = [
     grid: '#ff6b35',
     accent: '#f9f002',
     motif: `
-      ${mountainLayer('120,535 260,515 390,540 530,500 670,548 820,492 970,540 1120,506 1290,548 1440,518', '#190b23', 1, '#ff6b35')}
-      <g fill="none" stroke="#f9f002" stroke-width="4" opacity="0.72">
-        <polygon points="380,430 450,500 380,570 310,500"/>
-        <polygon points="1080,390 1180,500 1080,610 980,500"/>
-        <path d="M700 450C780 380 855 390 930 468"/>
-      </g>`
+      ${sunDisc('#ff6b35', 768, 520, 90)}
+      ${vectorVortex('#210d1b', '#ff6b35', '#f9f002')}`
   },
   {
     id: 5,
@@ -131,10 +223,8 @@ const worlds = [
     grid: '#f9f002',
     accent: '#05d9e8',
     motif: `
-      ${mountainLayer('80,532 190,508 300,544 410,500 520,548 650,510 760,552 900,505 1040,548 1160,512 1300,550 1460,518', '#101926', 1, '#f9f002')}
-      <g opacity="0.65">
-        ${Array.from({ length: 38 }, (_, i) => `<rect x="${80 + (i * 37) % 1380}" y="${380 + (i * 53) % 160}" width="${12 + (i % 4) * 8}" height="${8 + (i % 3) * 9}" fill="${i % 2 ? '#05d9e8' : '#f9f002'}" opacity="0.45"/>`).join('')}
-      </g>`
+      ${sunDisc('#f9f002', 292, 516, 78)}
+      ${pixelWastes('#0d1821', '#f9f002', '#05d9e8')}`
   },
   {
     id: 6,
@@ -146,12 +236,8 @@ const worlds = [
     grid: '#ff2a6d',
     accent: '#05d9e8',
     motif: `
-      ${mountainLayer('90,532 220,505 350,546 470,498 600,550 735,470 870,550 1010,498 1140,548 1280,510 1430,538', '#070817', 1, '#ff2a6d')}
-      <g stroke="#05d9e8" stroke-width="4" fill="#0d1026" opacity="0.86">
-        <path d="M650 560V385H710V330H762V265H814V330H866V385H926V560Z"/>
-        <path d="M548 560V455H626V560"/>
-        <path d="M950 560V455H1028V560"/>
-      </g>`
+      ${sunDisc('#ff2a6d', 768, 500, 118)}
+      ${midnightCitadel('#050713', '#ff2a6d', '#05d9e8')}`
   }
 ];
 
@@ -174,8 +260,7 @@ function worldSvg(world) {
     <rect width="1536" height="1024" fill="url(#sky)"/>
     <rect width="1536" height="1024" fill="url(#glow)"/>
     ${stars(900 + world.id * 113)}
-    <circle cx="768" cy="560" r="116" fill="${world.horizon}" opacity="0.2" filter="url(#softGlow)"/>
-    <g opacity="0.32">${gridLines(world.grid)}</g>
+    <g opacity="0.24">${gridLines(world.grid)}</g>
     ${world.motif}
     <line x1="0" y1="560" x2="1536" y2="560" stroke="${world.accent}" stroke-width="3" stroke-opacity="0.72"/>
     <g opacity="0.16" stroke="#ffffff" stroke-width="1">
@@ -187,12 +272,10 @@ function worldSvg(world) {
 const puzzleSvgs = {
   'shield-generator.png': `
     <svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160">
-      <defs><filter id="g"><feGaussianBlur stdDeviation="3"/></filter></defs>
-      <circle cx="80" cy="80" r="58" fill="none" stroke="#05d9e8" stroke-width="5" opacity="0.3"/>
-      <circle cx="80" cy="80" r="46" fill="none" stroke="#05d9e8" stroke-width="4"/>
-      <path d="M52 92L80 36L108 92L80 124Z" fill="#11182d" stroke="#05d9e8" stroke-width="5" stroke-linejoin="round"/>
-      <path d="M80 48V112M62 87H98" stroke="#ff2a6d" stroke-width="6" stroke-linecap="round"/>
-      <circle cx="80" cy="80" r="18" fill="#05d9e8" opacity="0.28" filter="url(#g)"/>
+      <circle cx="80" cy="80" r="61" fill="#0b1630" stroke="#05d9e8" stroke-width="6"/>
+      <path d="M80 28L123 55V105L80 132L37 105V55Z" fill="#121d3d" stroke="#05d9e8" stroke-width="5" stroke-linejoin="round"/>
+      <path d="M80 42L109 61V99L80 118L51 99V61Z" fill="#1a1240" stroke="#ff2a6d" stroke-width="5" stroke-linejoin="round"/>
+      <path d="M80 51V109M57 80H103" stroke="#f9f002" stroke-width="7" stroke-linecap="round"/>
     </svg>`,
   'ricochet-panel.png': `
     <svg xmlns="http://www.w3.org/2000/svg" width="192" height="112" viewBox="0 0 192 112">
@@ -203,19 +286,18 @@ const puzzleSvgs = {
     </svg>`,
   'teleport-gate.png': `
     <svg xmlns="http://www.w3.org/2000/svg" width="160" height="176" viewBox="0 0 160 176">
-      <defs><filter id="g"><feGaussianBlur stdDeviation="4"/></filter></defs>
-      <ellipse cx="80" cy="88" rx="46" ry="62" fill="#110b2a" stroke="#d300c5" stroke-width="7"/>
-      <ellipse cx="80" cy="88" rx="27" ry="40" fill="none" stroke="#05d9e8" stroke-width="5"/>
-      <path d="M80 24V6M80 170V152M30 88H8M152 88H130" stroke="#ff2a6d" stroke-width="6" stroke-linecap="round"/>
-      <path d="M56 62C78 42 104 58 98 84C92 112 60 104 64 82" fill="none" stroke="#f9f002" stroke-width="5" stroke-linecap="round"/>
-      <ellipse cx="80" cy="88" rx="58" ry="74" fill="none" stroke="#d300c5" stroke-width="4" opacity="0.25" filter="url(#g)"/>
+      <path d="M80 10L136 44V132L80 166L24 132V44Z" fill="#100b2b" stroke="#d300c5" stroke-width="7" stroke-linejoin="round"/>
+      <path d="M80 34L112 55V121L80 142L48 121V55Z" fill="#071226" stroke="#05d9e8" stroke-width="6" stroke-linejoin="round"/>
+      <path d="M58 72C74 52 105 63 101 88C97 113 65 118 58 96" fill="none" stroke="#f9f002" stroke-width="7" stroke-linecap="round"/>
+      <path d="M101 69L102 92L123 81M58 107L58 84L37 95" fill="none" stroke="#ff2a6d" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>`,
   'hardlight-bunker.png': `
     <svg xmlns="http://www.w3.org/2000/svg" width="224" height="112" viewBox="0 0 224 112">
-      <path d="M18 88V52L54 24H170L206 52V88Z" fill="#12182e" stroke="#ff6b35" stroke-width="6" stroke-linejoin="round"/>
-      <path d="M54 24L72 52H152L170 24M18 52H206M42 88V62M78 88V62M114 88V62M150 88V62M186 88V62" stroke="#05d9e8" stroke-width="4" opacity="0.72"/>
-      <path d="M84 45H140" stroke="#f9f002" stroke-width="7" stroke-linecap="round"/>
-      <rect x="34" y="88" width="156" height="12" fill="#05d9e8" opacity="0.32"/>
+      <rect x="16" y="30" width="192" height="66" rx="0" fill="#12182e" stroke="#ff6b35" stroke-width="7"/>
+      <rect x="32" y="45" width="160" height="35" fill="#172744" stroke="#05d9e8" stroke-width="5"/>
+      <path d="M48 80V48M80 80V48M112 80V48M144 80V48M176 80V48" stroke="#05d9e8" stroke-width="4" opacity="0.82"/>
+      <path d="M78 61H146" stroke="#f9f002" stroke-width="8" stroke-linecap="round"/>
+      <rect x="24" y="92" width="176" height="10" fill="#05d9e8" opacity="0.38"/>
     </svg>`
 };
 
