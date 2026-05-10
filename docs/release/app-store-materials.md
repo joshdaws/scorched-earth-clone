@@ -189,9 +189,10 @@ sequence from the built `www` bundle served through Vite preview.
 
 Latest verified local release-build set:
 
-- `artifacts/app-store-screenshots/2026-05-09T23-12-09-645Z/summary.json`
+- `artifacts/app-store-screenshots/2026-05-10T02-03-38-441Z/summary.json`
 - 24 captures passed across iPhone 6.9-inch, iPhone 6.5-inch, iPhone 5.5-inch,
-  and iPad 13-inch landscape slots.
+  and iPad 13-inch landscape slots after the world-background, puzzle-object,
+  and tank-portrait visual polish pass.
 
 | Slot | Required status | Landscape dimensions | Notes |
 | --- | --- | --- | --- |
