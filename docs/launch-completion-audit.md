@@ -294,8 +294,9 @@ npm run release:handoff
 ```
 
 It checks the local App Store evidence package, validates the latest screenshot
-summary shape, and reports remaining owner/App Store actions without treating
-those account-controlled steps as repo-side failures.
+summary shape, validates the latest campaign world visual audit receipt, and
+reports remaining owner/App Store actions without treating those
+account-controlled steps as repo-side failures.
 
 ## Remaining Blockers
 

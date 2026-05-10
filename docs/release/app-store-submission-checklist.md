@@ -189,8 +189,9 @@ Expected result:
 - Screenshot summary reports zero failed captures.
 - `npm run audit:worlds` captures one running gameplay battlefield per campaign
   world and reports all adjacent world image distances above threshold.
-- `npm run release:handoff` reports repo-side handoff artifacts are present and
-  lists only owner/App Store actions.
+- `npm run release:handoff` reports repo-side handoff artifacts are present,
+  including the latest App Store screenshot summary and world visual audit
+  summary, and lists only owner/App Store actions.
 - `xcodebuild -list` shows the `App` project/scheme instead of Command Line
   Tools or license errors.
 - Working tree contains only intentional release changes.

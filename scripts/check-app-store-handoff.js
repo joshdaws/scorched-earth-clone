@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process';
 
 const root = process.cwd();
 const screenshotRoot = path.join(root, 'artifacts/app-store-screenshots');
+const worldVisualRoot = path.join(root, 'artifacts/world-visual-audit');
 
 const requiredFiles = [
   'docs/release/app-store-materials.md',
@@ -32,6 +33,8 @@ const expectedScreenshotSlots = {
   'ipad-13': { width: 2732, height: 2048 }
 };
 
+const expectedWorlds = new Set([1, 2, 3, 4, 5, 6]);
+
 function exists(relativePath) {
   return fs.existsSync(path.join(root, relativePath));
 }
@@ -40,12 +43,12 @@ function readJson(relativePath) {
   return JSON.parse(fs.readFileSync(path.join(root, relativePath), 'utf8'));
 }
 
-function latestScreenshotSummary() {
-  if (!fs.existsSync(screenshotRoot)) return null;
+function latestSummaryFile(summaryRoot) {
+  if (!fs.existsSync(summaryRoot)) return null;
 
-  const candidates = fs.readdirSync(screenshotRoot, { withFileTypes: true })
+  const candidates = fs.readdirSync(summaryRoot, { withFileTypes: true })
     .filter(entry => entry.isDirectory())
-    .map(entry => path.join(screenshotRoot, entry.name, 'summary.json'))
+    .map(entry => path.join(summaryRoot, entry.name, 'summary.json'))
     .filter(file => fs.existsSync(file))
     .map(file => ({
       file,
@@ -68,7 +71,7 @@ function run(command, args, options = {}) {
 function checkPackageScripts(failures) {
   const pkg = readJson('package.json');
   const scripts = pkg.scripts || {};
-  for (const script of ['check', 'build', 'ios:check', 'screenshots:app-store', 'open:ios']) {
+  for (const script of ['check', 'build', 'ios:check', 'screenshots:app-store', 'audit:worlds', 'open:ios']) {
     if (!scripts[script]) failures.push(`Missing package script: ${script}`);
   }
 }
@@ -92,7 +95,7 @@ function checkRequiredFiles(failures) {
 }
 
 function checkScreenshotSummary(failures, warnings) {
-  const summaryPath = latestScreenshotSummary();
+  const summaryPath = latestSummaryFile(screenshotRoot);
   if (!summaryPath) {
     failures.push('No App Store screenshot summary found. Run npm run screenshots:app-store.');
     return null;
@@ -117,6 +120,51 @@ function checkScreenshotSummary(failures, warnings) {
       if (report.screenshotPath && !fs.existsSync(path.join(root, report.screenshotPath))) {
         failures.push(`Missing screenshot image from summary: ${report.screenshotPath}`);
       }
+    }
+  }
+
+  return path.relative(root, summaryPath);
+}
+
+function checkWorldVisualSummary(failures) {
+  const summaryPath = latestSummaryFile(worldVisualRoot);
+  if (!summaryPath) {
+    failures.push('No world visual audit summary found. Run npm run audit:worlds.');
+    return null;
+  }
+
+  const summary = JSON.parse(fs.readFileSync(summaryPath, 'utf8'));
+  if (summary.pass !== true) {
+    failures.push(`Latest world visual audit did not pass: ${summaryPath}`);
+  }
+
+  if (Array.isArray(summary.failures) && summary.failures.length > 0) {
+    failures.push(`Latest world visual audit has failures: ${summary.failures.join('; ')}`);
+  }
+
+  const worlds = Array.isArray(summary.worlds) ? summary.worlds : [];
+  const seenWorlds = new Set(worlds.map(report => report.world));
+  for (const world of expectedWorlds) {
+    if (!seenWorlds.has(world)) failures.push(`World visual audit is missing world ${world}.`);
+  }
+
+  for (const report of worlds) {
+    if (typeof report.screenshotPath !== 'string' || !fs.existsSync(path.join(root, report.screenshotPath))) {
+      failures.push(`Missing world visual screenshot from summary: ${report.screenshotPath || `world ${report.world}`}`);
+    }
+    if (!Number.isFinite(report.nonBlankRatio) || report.nonBlankRatio < (summary.minNonBlankRatio || 0.02)) {
+      failures.push(`World ${report.world} capture is below nonblank threshold.`);
+    }
+  }
+
+  const minPairDistance = Number.isFinite(summary.minPairDistance) ? summary.minPairDistance : 6;
+  const pairDistances = Array.isArray(summary.pairDistances) ? summary.pairDistances : [];
+  if (pairDistances.length < expectedWorlds.size - 1) {
+    failures.push(`World visual audit has ${pairDistances.length} pair distances, expected at least ${expectedWorlds.size - 1}.`);
+  }
+  for (const pair of pairDistances) {
+    if (!Number.isFinite(pair.distance) || pair.distance < minPairDistance) {
+      failures.push(`World ${pair.from}-${pair.to} visual distance ${pair.distance} is below ${minPairDistance}.`);
     }
   }
 
@@ -168,11 +216,13 @@ function main() {
   checkRuntimeConfig(failures, warnings);
   checkRequiredFiles(failures);
   const latestSummary = checkScreenshotSummary(failures, warnings);
+  const latestWorldSummary = checkWorldVisualSummary(failures);
   checkXcode(ownerActions, warnings);
 
   console.log('App Store handoff check');
   console.log('=======================');
   if (latestSummary) console.log(`Latest screenshot summary: ${latestSummary}`);
+  if (latestWorldSummary) console.log(`Latest world visual summary: ${latestWorldSummary}`);
 
   if (warnings.length > 0) {
     console.log('\nWarnings:');
