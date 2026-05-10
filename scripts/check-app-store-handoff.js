@@ -57,6 +57,7 @@ const screenshotFreshnessInputs = [
 
 const worldVisualFreshnessInputs = [
   'assets/manifest.json',
+  'Assets/levels/layouts.v1.json',
   'assets/images/backgrounds/world-1-neon-dunes.png',
   'assets/images/backgrounds/world-2-chrome-canyons.png',
   'assets/images/backgrounds/world-3-prism-bunkers.png',
@@ -68,7 +69,11 @@ const worldVisualFreshnessInputs = [
   'assets/images/puzzle-objects/shield-generator.png',
   'assets/images/puzzle-objects/teleport-gate.png',
   'js/effects.js',
+  'js/level-progression.js',
+  'js/levels.js',
   'js/main.js',
+  'js/puzzleObjects.js',
+  'js/sceneIsolation.js',
   'scripts/audit-world-visuals.js'
 ];
 
