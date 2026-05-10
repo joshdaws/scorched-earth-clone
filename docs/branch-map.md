@@ -1,9 +1,9 @@
 # Feature Branch Map
 
-Generated on 2026-05-10 from local and `origin/*` refs after the visual-audit
-sidecar handoff verification commit. Branch dispositions are audited as of
-`cdffb11`; the documentation commit containing this refresh may sit above that
-handoff payload without changing branch topology.
+Generated on 2026-05-10 from local and `origin/*` refs after the App Store image
+dimension verification commit. Branch dispositions are audited as of `95fcfad`;
+the documentation commit containing this refresh may sit above that handoff
+payload without changing branch topology.
 
 ## Audit Commands
 
@@ -19,21 +19,23 @@ git diff --stat main...codex/gameplay-improvements
 
 | Branch | Audited head | Main relationship at audit | Active branch relationship at audit | Disposition |
 | --- | --- | --- | --- | --- |
-| `codex/gameplay-improvements` / `origin/codex/gameplay-improvements` | `cdffb11` | `0 behind / 62 ahead` | active branch | Keep. This is the current web/Capacitor launch-polish branch. |
-| `feature/game-engine-upgrade` / `origin/feature/game-engine-upgrade` | `6178456` | `396 behind / 9 ahead` | `458 behind / 9 ahead` | Preserve as stale idea archive; do not merge wholesale. |
-| `native` | `5c44d7a` | `96 behind / 129 ahead` | `158 behind / 129 ahead` | Preserve as Unity/native pivot reference; blocked unless product direction changes. |
-| `legacy-v1` / `origin/legacy-v1` | `84b361f` | `380 behind / 0 ahead` | `442 behind / 0 ahead` | Historical branch; fully merged into `main`, no launch action. |
-| `origin/codex/find-and-fix-important-bug` | `42efa06` | `395 behind / 0 ahead` | `457 behind / 0 ahead` | Historical bugfix branch; safe to prune after owner confirmation. |
-| `main` / `origin/main` | `9b33326` | baseline | `62 behind / 0 ahead` from active | Production baseline. Merge active branch only after final launch blockers are resolved or intentionally deferred. |
+| `codex/gameplay-improvements` / `origin/codex/gameplay-improvements` | `95fcfad` | `0 behind / 64 ahead` | active branch | Keep. This is the current web/Capacitor launch-polish branch. |
+| `feature/game-engine-upgrade` / `origin/feature/game-engine-upgrade` | `6178456` | `396 behind / 9 ahead` | `460 behind / 9 ahead` | Preserve as stale idea archive; do not merge wholesale. |
+| `native` | `5c44d7a` | `96 behind / 129 ahead` | `160 behind / 129 ahead` | Preserve as Unity/native pivot reference; blocked unless product direction changes. |
+| `legacy-v1` / `origin/legacy-v1` | `84b361f` | `380 behind / 0 ahead` | `444 behind / 0 ahead` | Historical branch; fully merged into `main`, no launch action. |
+| `origin/codex/find-and-fix-important-bug` | `42efa06` | `395 behind / 0 ahead` | `459 behind / 0 ahead` | Historical bugfix branch; safe to prune after owner confirmation. |
+| `main` / `origin/main` | `9b33326` | baseline | `64 behind / 0 ahead` from active | Production baseline. Merge active branch only after final launch blockers are resolved or intentionally deferred. |
 
 `origin/HEAD` points to `origin/main`.
 
 ## Active Branch Payload
 
-At audited handoff-verification head `cdffb11`, `codex/gameplay-improvements`
-contained 62 commits on top of `main`:
+At audited handoff-verification head `95fcfad`, `codex/gameplay-improvements`
+contained 64 commits on top of `main`:
 
 ```text
+95fcfad Check App Store image dimensions
+47d4a60 Refresh branch map to sidecar audit head
 cdffb11 Check visual audit sidecars in handoff
 43397bc Refresh branch map to visual audit head
 945189e Gate full visual audit in handoff
@@ -108,7 +110,8 @@ current launch-completion audit receipts. The handoff verifier now gates
 screenshot matrix coverage, runtime asset naming/file existence, generated web
 bundle freshness, native iOS bundle sync, browser-smoke performance sidecars,
 world-specific art audits, and the full 90-capture screen/effect visual audit
-with per-capture detail sidecars.
+with per-capture detail sidecars. It also verifies App Store icon and launch
+image PNG dimensions in both the native iOS readiness check and release handoff.
 
 Recommendation: continue any remaining web/Capacitor launch work here. Do not
 branch-hop for old enhancement or native code unless a new task explicitly

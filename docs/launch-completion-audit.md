@@ -125,9 +125,11 @@ No ready work found (all issues have blocking dependencies)
 
 The gameplay/content and release-handoff audit covers
 `origin/codex/gameplay-improvements` through the handoff-verification commit
-`cdffb11`, at 62 commits on top of `main`. The audited payload includes:
+`95fcfad`, at 64 commits on top of `main`. The audited payload includes:
 
 ```text
+95fcfad Check App Store image dimensions
+47d4a60 Refresh branch map to sidecar audit head
 cdffb11 Check visual audit sidecars in handoff
 43397bc Refresh branch map to visual audit head
 945189e Gate full visual audit in handoff
