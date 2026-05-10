@@ -191,7 +191,8 @@ Expected result:
   world and reports all adjacent world image distances above threshold.
 - `npm run release:handoff` reports repo-side handoff artifacts are present,
   including the latest App Store screenshot summary and world visual audit
-  summary, and lists only owner/App Store actions.
+  summary, confirms those receipts are not stale against covered visual/runtime
+  files, and lists only owner/App Store actions.
 - `xcodebuild -list` shows the `App` project/scheme instead of Command Line
   Tools or license errors.
 - Working tree contains only intentional release changes.

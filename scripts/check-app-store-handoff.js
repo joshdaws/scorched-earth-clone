@@ -35,6 +35,30 @@ const expectedScreenshotSlots = {
 
 const expectedWorlds = new Set([1, 2, 3, 4, 5, 6]);
 
+const screenshotFreshnessInputs = [
+  'assets/manifest.json',
+  'js/main.js',
+  'js/effects.js',
+  'scripts/capture-app-store-screenshots.js'
+];
+
+const worldVisualFreshnessInputs = [
+  'assets/manifest.json',
+  'assets/images/backgrounds/world-1-neon-dunes.png',
+  'assets/images/backgrounds/world-2-chrome-canyons.png',
+  'assets/images/backgrounds/world-3-prism-bunkers.png',
+  'assets/images/backgrounds/world-4-vector-vortex.png',
+  'assets/images/backgrounds/world-5-pixel-wastes.png',
+  'assets/images/backgrounds/world-6-midnight-citadel.png',
+  'assets/images/puzzle-objects/hardlight-bunker.png',
+  'assets/images/puzzle-objects/ricochet-panel.png',
+  'assets/images/puzzle-objects/shield-generator.png',
+  'assets/images/puzzle-objects/teleport-gate.png',
+  'js/effects.js',
+  'js/main.js',
+  'scripts/audit-world-visuals.js'
+];
+
 function exists(relativePath) {
   return fs.existsSync(path.join(root, relativePath));
 }
@@ -66,6 +90,21 @@ function run(command, args, options = {}) {
     shell: false,
     ...options
   });
+}
+
+function checkReceiptFreshness(summaryPath, inputPaths, label, failures) {
+  const summaryMtimeMs = fs.statSync(summaryPath).mtimeMs;
+  for (const inputPath of inputPaths) {
+    const absolutePath = path.join(root, inputPath);
+    if (!fs.existsSync(absolutePath)) {
+      failures.push(`${label} freshness input is missing: ${inputPath}`);
+      continue;
+    }
+
+    if (fs.statSync(absolutePath).mtimeMs > summaryMtimeMs) {
+      failures.push(`${label} receipt is stale; rerun it because ${inputPath} changed after ${path.relative(root, summaryPath)}.`);
+    }
+  }
 }
 
 function checkPackageScripts(failures) {
@@ -102,6 +141,7 @@ function checkScreenshotSummary(failures, warnings) {
   }
 
   const summary = JSON.parse(fs.readFileSync(summaryPath, 'utf8'));
+  checkReceiptFreshness(summaryPath, screenshotFreshnessInputs, 'App Store screenshot', failures);
   if (summary.failCount !== 0) failures.push(`Latest screenshot summary has failures: ${summaryPath}`);
   if (summary.passCount !== 24) warnings.push(`Latest screenshot summary passCount is ${summary.passCount}, expected 24 for full local set.`);
 
@@ -134,6 +174,7 @@ function checkWorldVisualSummary(failures) {
   }
 
   const summary = JSON.parse(fs.readFileSync(summaryPath, 'utf8'));
+  checkReceiptFreshness(summaryPath, worldVisualFreshnessInputs, 'World visual audit', failures);
   if (summary.pass !== true) {
     failures.push(`Latest world visual audit did not pass: ${summaryPath}`);
   }
