@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { spawnSync } from 'node:child_process';
+import crypto from 'node:crypto';
 
 const projectRoot = path.resolve(new URL('..', import.meta.url).pathname);
 
@@ -80,6 +81,13 @@ function collectFiles(relativePath) {
   return results;
 }
 
+function fileHash(relativePath) {
+  return crypto
+    .createHash('sha256')
+    .update(fs.readFileSync(path.join(projectRoot, relativePath)))
+    .digest('hex');
+}
+
 function checkCapacitorConfig(failures) {
   assertFile('capacitor.config.json', failures);
   if (!exists('capacitor.config.json')) return;
@@ -122,6 +130,23 @@ function checkIosProject(failures) {
   assertFile('ios/App/App/public/privacy.html', failures);
   assertFile('ios/App/App/public/support.html', failures);
   assertFile('ios/App/App/capacitor.config.json', failures);
+}
+
+function checkNativeWebBundleFreshness(failures) {
+  if (!exists('www') || !exists('ios/App/App/public')) return;
+
+  const webFiles = collectFiles('www').sort();
+  for (const webFile of webFiles) {
+    const nativeFile = path.join('ios/App/App/public', path.relative('www', webFile));
+    if (!exists(nativeFile)) {
+      failures.push(`Native iOS web bundle is missing synced file: ${nativeFile}`);
+      continue;
+    }
+
+    if (fileHash(webFile) !== fileHash(nativeFile)) {
+      failures.push(`Native iOS web bundle is stale: ${nativeFile} differs from ${webFile}`);
+    }
+  }
 }
 
 function checkIconsAndSplashes(failures) {
@@ -175,6 +200,8 @@ function main() {
   } else {
     console.log('Skipping Capacitor sync by request.');
   }
+
+  checkNativeWebBundleFreshness(failures);
 
   if (failures.length > 0) {
     console.error('\niOS readiness check failed:');

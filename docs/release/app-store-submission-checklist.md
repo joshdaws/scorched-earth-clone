@@ -42,7 +42,7 @@ leaderboard privacy disclosure, service availability, and account-review risk.
 
 | Requirement | Current evidence | Status |
 | --- | --- | --- |
-| Build and iOS sync readiness | `npm run ios:check` passes build, release budget, and `npx cap sync ios`. | Ready locally |
+| Build and iOS sync readiness | `npm run ios:check` passes build, release budget, `npx cap sync ios`, and native public bundle hash checks against `www`. | Ready locally |
 | App icon | `assets/icons/app-icon-1024.png` and `ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png`. | Ready locally |
 | Launch assets | `assets/icons/splash-*.png` and `ios/App/App/Assets.xcassets/Splash.imageset/`. | Ready locally |
 | Metadata draft | `docs/release/app-store-materials.md`. | Ready locally; owner fields remain |
@@ -184,8 +184,8 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 Expected result:
 
 - `npm run check` passes with no errors.
-- `npm run ios:check` passes build, budget, icon/splash checks, and Capacitor
-  sync.
+- `npm run ios:check` passes build, budget, icon/splash checks, Capacitor sync,
+  and native public bundle hash checks against `www`.
 - Screenshot summary reports zero failed captures.
 - `npm run audit:worlds` captures one running gameplay battlefield per campaign
   world and reports all adjacent world image distances above threshold.

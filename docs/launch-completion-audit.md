@@ -242,6 +242,10 @@ artifacts/manual-play/polish-visuals-2026-05-10/collection-portraits-2.png
 npm run check
 npm run build
 npm run ios:check
+passed with native `ios/App/App/public` bundle hash checks against generated
+`www` output, so the Capacitor iOS bundle cannot silently lag behind the web
+release output.
+
 npm run smoke:browser -- --scenario controls --quality balanced
 npm run audit:visual -- --targets gameplay-hud,collection,supply-drop --viewports desktop,iphone-14
 all passed after the visual polish correction.

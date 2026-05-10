@@ -12,7 +12,10 @@ For a fast local validation after a known-good build:
 npm run ios:check -- --skip-build --skip-sync
 ```
 
-The check verifies release web output and budgets, required Capacitor/iOS files, app icon and splash assets, and Capacitor sync readiness.
+The check verifies release web output and budgets, required Capacitor/iOS
+files, app icon and splash assets, Capacitor sync readiness, and that the
+native `ios/App/App/public` web bundle matches the current generated `www`
+bundle file-for-file.
 
 After generating App Store screenshots, run the handoff verifier:
 
