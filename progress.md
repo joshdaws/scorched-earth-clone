@@ -134,3 +134,4 @@ Original prompt: Upgrade game graphical assets with ChatGPT Image Gen 2 and impr
 - Expanded `npm run release:handoff` to require the latest full `npm run audit:visual` receipt across all 18 expected screen/effect targets and five viewport classes, with freshness checks against the screen/UI modules it covers.
 - Refreshed `docs/branch-map.md` and `docs/launch-completion-audit.md` to audited handoff head `945189e`, now 60 commits ahead of `main`, and recorded the latest 90-capture full visual audit summary.
 - Tightened the full visual-audit handoff gate so every expected capture must have its detail JSON sidecar with matching target/viewport/screenshot path, visible nonblank canvas evidence, and zero console/page errors.
+- Refreshed `docs/branch-map.md` and `docs/launch-completion-audit.md` to audited handoff head `cdffb11`, now 62 commits ahead of `main`.

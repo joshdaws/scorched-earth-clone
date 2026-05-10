@@ -125,9 +125,11 @@ No ready work found (all issues have blocking dependencies)
 
 The gameplay/content and release-handoff audit covers
 `origin/codex/gameplay-improvements` through the handoff-verification commit
-`945189e`, at 60 commits on top of `main`. The audited payload includes:
+`cdffb11`, at 62 commits on top of `main`. The audited payload includes:
 
 ```text
+cdffb11 Check visual audit sidecars in handoff
+43397bc Refresh branch map to visual audit head
 945189e Gate full visual audit in handoff
 90cdc3b Check release script surface in handoff
 4e48a5d Check screenshot matrix in handoff
