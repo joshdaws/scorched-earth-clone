@@ -37,6 +37,7 @@ const expectedScreenshotSlots = {
 
 const expectedWorlds = new Set([1, 2, 3, 4, 5, 6]);
 const requiredPerformanceScenarios = ['controls', 'projectile', 'terrain', 'impact', 'high-scores'];
+const bannedRuntimeAssetPattern = /placeholder|temp|test|dummy|sample|fallback|gemini/i;
 const performanceBudgets = {
   frameP95Ms: 24,
   frameMaxMs: 90,
@@ -174,6 +175,40 @@ function fileHash(relativePath) {
     .digest('hex');
 }
 
+function collectManifestEntries(value, pathParts = [], entries = []) {
+  if (typeof value === 'string') {
+    entries.push({ pathParts, value });
+    return entries;
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach((child, index) => collectManifestEntries(child, [...pathParts, index], entries));
+    return entries;
+  }
+
+  if (value && typeof value === 'object') {
+    for (const [key, child] of Object.entries(value)) {
+      collectManifestEntries(child, [...pathParts, key], entries);
+    }
+  }
+
+  return entries;
+}
+
+function collectManifestPaths(value, paths = []) {
+  if (!value || typeof value !== 'object') return paths;
+
+  if (typeof value.path === 'string') {
+    paths.push(value.path);
+  }
+
+  for (const child of Object.values(value)) {
+    collectManifestPaths(child, paths);
+  }
+
+  return paths;
+}
+
 function checkReceiptFreshness(summaryPath, inputPaths, label, failures) {
   const summaryMtimeMs = fs.statSync(summaryPath).mtimeMs;
   for (const inputPath of inputPaths) {
@@ -212,6 +247,28 @@ function checkRuntimeConfig(failures, warnings) {
 function checkRequiredFiles(failures) {
   for (const file of requiredFiles) {
     if (!exists(file)) failures.push(`Missing handoff file: ${file}`);
+  }
+}
+
+function checkRuntimeManifest(failures) {
+  if (!exists('assets/manifest.json')) {
+    failures.push('Missing runtime asset manifest: assets/manifest.json');
+    return;
+  }
+
+  const manifest = readJson('assets/manifest.json');
+  const bannedEntries = collectManifestEntries(manifest)
+    .filter(entry => bannedRuntimeAssetPattern.test(entry.value) || entry.pathParts.some(part => bannedRuntimeAssetPattern.test(String(part))))
+    .map(entry => `${entry.pathParts.join('.')} -> ${entry.value}`);
+
+  for (const entry of bannedEntries) {
+    failures.push(`Runtime asset manifest contains temporary/placeholder naming: ${entry}`);
+  }
+
+  const missingAssets = collectManifestPaths(manifest)
+    .filter(assetPath => !fs.existsSync(path.join(root, 'assets', assetPath)));
+  for (const assetPath of missingAssets) {
+    failures.push(`Runtime asset manifest points at a missing file: assets/${assetPath}`);
   }
 }
 
@@ -441,6 +498,7 @@ function main() {
   checkPackageScripts(failures);
   checkRuntimeConfig(failures, warnings);
   checkRequiredFiles(failures);
+  checkRuntimeManifest(failures);
   checkNativeWebBundleFreshness(failures);
   const latestSummary = checkScreenshotSummary(failures, warnings);
   const latestWorldSummary = checkWorldVisualSummary(failures);
