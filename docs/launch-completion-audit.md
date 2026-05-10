@@ -57,6 +57,7 @@ npm run smoke:browser -- --scenario terrain --quality balanced
 npm run smoke:browser -- --scenario high-scores --quality balanced
 npm run smoke:browser -- --scenario visual --scene visual-impact --quality balanced
 npm run audit:visual
+npm run audit:worlds
 npm run screenshots:app-store -- --skip-build --devices iphone-6-5 --targets 01-title-menu
 npm run screenshots:app-store
 bd ready
@@ -237,6 +238,14 @@ npm run ios:check
 npm run smoke:browser -- --scenario controls --quality balanced
 npm run audit:visual -- --targets gameplay-hud,collection,supply-drop --viewports desktop,iphone-14
 all passed after the visual polish correction.
+
+npm run audit:worlds
+passed after the world background correction and captured one running gameplay
+battlefield from each campaign world. Latest receipt:
+artifacts/world-visual-audit/2026-05-10T02-24-18-874Z/summary.json
+
+Adjacent world image distances were all above the 6.0 minimum threshold:
+W1-W2 16.04, W2-W3 16.92, W3-W4 13.26, W4-W5 12.67, W5-W6 13.54.
 ```
 
 Current manifest and content checks:

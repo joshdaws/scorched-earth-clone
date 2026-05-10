@@ -24,6 +24,15 @@ It checks the local App Store evidence package and reports owner-controlled
 actions that remain, such as Xcode license/signing, TestFlight upload, real
 device validation, and final App Store Connect fields.
 
+For the campaign art pass, also run:
+
+```bash
+npm run audit:worlds
+```
+
+This starts one representative level in each campaign world, captures the
+running battlefield, and fails if captures are blank or too visually similar.
+
 Local smoke tests should use an offline generated runtime config from `npm run generate-config:offline`, so high-score/Convex services never block startup or visual captures. Online/TestFlight builds should generate `config.js` with `CONVEX_URL=<deployment-url> npm run generate-config` before building.
 
 ## Device Matrix

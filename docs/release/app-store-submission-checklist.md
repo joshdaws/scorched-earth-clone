@@ -148,6 +148,7 @@ npm run generate-config:offline
 npm run check
 npm run ios:check
 npm run screenshots:app-store
+npm run audit:worlds
 npm run release:handoff
 git status --short
 ```
@@ -186,6 +187,8 @@ Expected result:
 - `npm run ios:check` passes build, budget, icon/splash checks, and Capacitor
   sync.
 - Screenshot summary reports zero failed captures.
+- `npm run audit:worlds` captures one running gameplay battlefield per campaign
+  world and reports all adjacent world image distances above threshold.
 - `npm run release:handoff` reports repo-side handoff artifacts are present and
   lists only owner/App Store actions.
 - `xcodebuild -list` shows the `App` project/scheme instead of Command Line

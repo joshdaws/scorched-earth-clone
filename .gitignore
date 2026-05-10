@@ -31,6 +31,7 @@ artifacts/browser-smoke/
 artifacts/manual-play/
 artifacts/survival-balance/
 artifacts/visual-audit/
+artifacts/world-visual-audit/
 coverage/
 playwright-report/
 test-results/

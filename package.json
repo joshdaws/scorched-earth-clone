@@ -28,6 +28,7 @@
     "smoke:browser": "node scripts/browser-smoke.js",
     "smoke:browser:install": "playwright install chromium",
     "audit:visual": "node scripts/visual-audit.js",
+    "audit:worlds": "node scripts/audit-world-visuals.js",
     "screenshots:app-store": "node scripts/capture-app-store-screenshots.js",
     "release:handoff": "node scripts/check-app-store-handoff.js",
     "build:ios": "npm run build && npx cap sync ios",
