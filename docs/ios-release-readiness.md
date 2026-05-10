@@ -28,10 +28,10 @@ actions that remain, such as Xcode license/signing, TestFlight upload, real
 device validation, and final App Store Connect fields. It also verifies that the
 latest App Store screenshot capture and campaign world visual audit receipts
 exist, passed, and are newer than the visual/runtime files they cover. It also
-requires fresh browser performance smoke metrics for the controls, projectile,
-terrain, impact, and high-scores scenarios, and rechecks that the native
-`ios/App/App/public` web bundle matches `www`, so run `npm run ios:check` first
-if this fails.
+requires fresh browser performance smoke metrics, screenshots, and clean console
+receipts for the controls, projectile, terrain, impact, and high-scores
+scenarios, and rechecks that the native `ios/App/App/public` web bundle matches
+`www`, so run `npm run ios:check` first if this fails.
 
 For the campaign art pass, also run:
 

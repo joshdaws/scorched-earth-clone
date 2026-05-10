@@ -330,9 +330,36 @@ function checkBrowserPerformanceReceipts(failures) {
     checkReceiptFreshness(metricsPath, performanceFreshnessInputs, `${scenario} browser performance`, failures);
 
     const receipt = JSON.parse(fs.readFileSync(metricsPath, 'utf8'));
+    const relativeMetricsPath = path.relative(root, metricsPath);
+    if (receipt.scenario !== scenario) {
+      failures.push(`${scenario} browser performance receipt has mismatched scenario ${receipt.scenario}: ${relativeMetricsPath}`);
+    }
+    if (receipt.quality !== 'balanced') {
+      failures.push(`${scenario} browser performance receipt used ${receipt.quality || 'unknown'} quality, expected balanced: ${relativeMetricsPath}`);
+    }
+
+    const screenshotPath = metricsPath.replace(/\.metrics\.json$/, '.png');
+    if (!fs.existsSync(screenshotPath) || fs.statSync(screenshotPath).size < 1000) {
+      failures.push(`${scenario} browser performance screenshot is missing or empty: ${path.relative(root, screenshotPath)}`);
+    }
+
+    const consolePath = metricsPath.replace(/\.metrics\.json$/, '.console.json');
+    if (!fs.existsSync(consolePath)) {
+      failures.push(`${scenario} browser performance console receipt is missing: ${path.relative(root, consolePath)}`);
+    } else {
+      const consoleReceipt = JSON.parse(fs.readFileSync(consolePath, 'utf8'));
+      const consoleErrors = Array.isArray(consoleReceipt.console)
+        ? consoleReceipt.console.filter(message => message.type === 'error')
+        : [];
+      const pageErrors = Array.isArray(consoleReceipt.pageErrors) ? consoleReceipt.pageErrors : [];
+      if (consoleErrors.length > 0 || pageErrors.length > 0) {
+        failures.push(`${scenario} browser performance console receipt has ${consoleErrors.length} console errors and ${pageErrors.length} page errors: ${path.relative(root, consolePath)}`);
+      }
+    }
+
     const metrics = receipt.metrics;
     if (!metrics) {
-      failures.push(`${scenario} browser performance receipt is missing metrics: ${path.relative(root, metricsPath)}`);
+      failures.push(`${scenario} browser performance receipt is missing metrics: ${relativeMetricsPath}`);
       continue;
     }
 
