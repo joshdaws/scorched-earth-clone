@@ -123,8 +123,10 @@ scripts/capture-app-store-screenshots.js
 No ready work found (all issues have blocking dependencies)
 ```
 
-The pushed branch is up to date with `origin/codex/gameplay-improvements` at
-`9307835` after 42 commits on top of `main`, including:
+The gameplay/content audit covered `origin/codex/gameplay-improvements` through
+`9307835`, at 42 commits on top of `main`. Later documentation-only receipt
+commits may advance the branch head without changing this gameplay payload.
+The audited payload includes:
 
 ```text
 9307835 Add campaign world visual audit

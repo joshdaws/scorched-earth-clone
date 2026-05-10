@@ -1,7 +1,8 @@
 # Feature Branch Map
 
-Generated on 2026-05-10 from local and `origin/*` refs after the latest visual
-polish push.
+Generated on 2026-05-10 from local and `origin/*` refs after the campaign world
+visual audit push. Later documentation-only receipt commits may advance the
+branch head without changing the audited gameplay payload.
 
 ## Audit Commands
 
@@ -15,7 +16,7 @@ git diff --stat main...codex/gameplay-improvements
 
 ## Summary
 
-| Branch | Head | Main relationship | Active branch relationship | Disposition |
+| Branch | Audited head | Main relationship at audit | Active branch relationship at audit | Disposition |
 | --- | --- | --- | --- | --- |
 | `codex/gameplay-improvements` / `origin/codex/gameplay-improvements` | `9307835` | `0 behind / 42 ahead` | active branch | Keep. This is the current web/Capacitor launch-polish branch. |
 | `feature/game-engine-upgrade` / `origin/feature/game-engine-upgrade` | `6178456` | `396 behind / 9 ahead` | `438 behind / 9 ahead` | Preserve as stale idea archive; do not merge wholesale. |
@@ -28,7 +29,8 @@ git diff --stat main...codex/gameplay-improvements
 
 ## Active Branch Payload
 
-`codex/gameplay-improvements` currently contains 42 commits on top of `main`:
+At audited gameplay/content head `9307835`,
+`codex/gameplay-improvements` contained 42 commits on top of `main`:
 
 ```text
 9307835 Add campaign world visual audit
