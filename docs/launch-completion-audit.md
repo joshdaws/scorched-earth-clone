@@ -123,12 +123,17 @@ scripts/capture-app-store-screenshots.js
 No ready work found (all issues have blocking dependencies)
 ```
 
-The gameplay/content audit covered `origin/codex/gameplay-improvements` through
-`9307835`, at 42 commits on top of `main`. Later documentation-only receipt
-commits may advance the branch head without changing this gameplay payload.
-The audited payload includes:
+The gameplay/content and release-handoff audit covers
+`origin/codex/gameplay-improvements` through `ac43115`, at 48 commits on top of
+`main`. The audited payload includes:
 
 ```text
+ac43115 Verify native bundle in handoff
+e3d6d81 Verify iOS bundle sync freshness
+28b73cd Check handoff receipt freshness
+a8f75c7 Require world audit in handoff check
+dddc878 Clarify branch audit head
+63f6145 Refresh branch audit receipts
 9307835 Add campaign world visual audit
 63782c0 Add App Store handoff verifier
 5975df6 Document native Xcode handoff blocker
@@ -211,6 +216,10 @@ artifacts/manual-play/resume-2026-05-10-space/state-0.json
 npm run smoke:browser -- --scenario controls --quality balanced
 passed with p95 frame time 17ms, max frame time 17.5ms, and zero dropped backlog:
 artifacts/browser-smoke/2026-05-10T01-12-19-262Z-controls.metrics.json
+
+Latest Computer Use retry in the current session failed with macOS automation
+auth state:
+Apple event error -10000: Sender process is not authenticated
 ```
 
 Visual polish correction on 2026-05-10 addressed the screenshot issues raised during

@@ -1,8 +1,7 @@
 # Feature Branch Map
 
-Generated on 2026-05-10 from local and `origin/*` refs after the campaign world
-visual audit push. Later documentation-only receipt commits may advance the
-branch head without changing the audited gameplay payload.
+Generated on 2026-05-10 from local and `origin/*` refs after the native bundle
+handoff verification push.
 
 ## Audit Commands
 
@@ -18,21 +17,27 @@ git diff --stat main...codex/gameplay-improvements
 
 | Branch | Audited head | Main relationship at audit | Active branch relationship at audit | Disposition |
 | --- | --- | --- | --- | --- |
-| `codex/gameplay-improvements` / `origin/codex/gameplay-improvements` | `9307835` | `0 behind / 42 ahead` | active branch | Keep. This is the current web/Capacitor launch-polish branch. |
-| `feature/game-engine-upgrade` / `origin/feature/game-engine-upgrade` | `6178456` | `396 behind / 9 ahead` | `438 behind / 9 ahead` | Preserve as stale idea archive; do not merge wholesale. |
-| `native` | `5c44d7a` | `96 behind / 129 ahead` | `138 behind / 129 ahead` | Preserve as Unity/native pivot reference; blocked unless product direction changes. |
-| `legacy-v1` / `origin/legacy-v1` | `84b361f` | `380 behind / 0 ahead` | `422 behind / 0 ahead` | Historical branch; fully merged into `main`, no launch action. |
-| `origin/codex/find-and-fix-important-bug` | `42efa06` | `395 behind / 0 ahead` | `437 behind / 0 ahead` | Historical bugfix branch; safe to prune after owner confirmation. |
-| `main` / `origin/main` | `9b33326` | baseline | `42 behind / 0 ahead` from active | Production baseline. Merge active branch only after final launch blockers are resolved or intentionally deferred. |
+| `codex/gameplay-improvements` / `origin/codex/gameplay-improvements` | `ac43115` | `0 behind / 48 ahead` | active branch | Keep. This is the current web/Capacitor launch-polish branch. |
+| `feature/game-engine-upgrade` / `origin/feature/game-engine-upgrade` | `6178456` | `396 behind / 9 ahead` | `444 behind / 9 ahead` | Preserve as stale idea archive; do not merge wholesale. |
+| `native` | `5c44d7a` | `96 behind / 129 ahead` | `144 behind / 129 ahead` | Preserve as Unity/native pivot reference; blocked unless product direction changes. |
+| `legacy-v1` / `origin/legacy-v1` | `84b361f` | `380 behind / 0 ahead` | `428 behind / 0 ahead` | Historical branch; fully merged into `main`, no launch action. |
+| `origin/codex/find-and-fix-important-bug` | `42efa06` | `395 behind / 0 ahead` | `443 behind / 0 ahead` | Historical bugfix branch; safe to prune after owner confirmation. |
+| `main` / `origin/main` | `9b33326` | baseline | `48 behind / 0 ahead` from active | Production baseline. Merge active branch only after final launch blockers are resolved or intentionally deferred. |
 
 `origin/HEAD` points to `origin/main`.
 
 ## Active Branch Payload
 
-At audited gameplay/content head `9307835`,
-`codex/gameplay-improvements` contained 42 commits on top of `main`:
+At current audited head `ac43115`, `codex/gameplay-improvements` contained 48
+commits on top of `main`:
 
 ```text
+ac43115 Verify native bundle in handoff
+e3d6d81 Verify iOS bundle sync freshness
+28b73cd Check handoff receipt freshness
+a8f75c7 Require world audit in handoff check
+dddc878 Clarify branch audit head
+63f6145 Refresh branch audit receipts
 9307835 Add campaign world visual audit
 63782c0 Add App Store handoff verifier
 5975df6 Document native Xcode handoff blocker
