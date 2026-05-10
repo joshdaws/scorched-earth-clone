@@ -1,6 +1,7 @@
 # Launch Completion Audit
 
 Generated on 2026-05-09 for the active polish/App Store objective.
+Refreshed on 2026-05-10 against pushed head `35e7543`.
 
 ## Objective Restated As Success Criteria
 
@@ -24,8 +25,8 @@ The game is complete only when all of the following are true:
 | Requirement | Evidence inspected | Status |
 | --- | --- | --- |
 | Use `$imagegen` | Generated supply-drop and weapon-icon raster assets were added under `assets/images/...`; manifest now covers all 40 weapon icons and 40 projectile visual entries; `tests/unit/weapon-visual-assets.test.js` passed in `npm run check`. | Covered for current asset replacement work. |
-| Use `$computer-use` | Computer Use attached to Chrome on 2026-05-10 at `http://127.0.0.1:5173/` and clicked the live canvas `FIRE!` button in a running gameplay scene. Earlier adapter failures were documented, then a later retry succeeded. | Covered. |
-| Open a browser and play/verify the game | `npm run smoke:browser -- --scenario controls --quality balanced` passed and wrote `artifacts/browser-smoke/2026-05-09T19-24-12-185Z-controls.png` plus metrics/console JSON. Expanded browser smokes for idle, projectile, terrain, high-scores, and visual impact also passed. Playwright collection/drop flow passed. | Covered through repo browser automation, not Computer Use. |
+| Use `$computer-use` | Computer Use attached to Chrome on 2026-05-10 at `http://127.0.0.1:5173/` and clicked the live canvas `FIRE!` button in a running gameplay scene. Current retry is blocked by macOS automation auth: `Apple event error -10000`. | Covered historically; current local permissions block repeat use. |
+| Open a browser and play/verify the game | Fresh browser receipts exist for controls, projectile, terrain, impact, high-scores, App Store screenshots, world captures, and the 90-capture full visual audit. Playwright collection/drop flow passed earlier in the same branch. | Covered through repo browser automation. |
 | Map every feature branch | `docs/branch-map.md` was refreshed on 2026-05-10 and maps `codex/gameplay-improvements`, `feature/game-engine-upgrade`, `native`, `legacy-v1`, `origin/codex/find-and-fix-important-bug`, `main`, and origin aliases with current heads, ahead/behind counts, and disposition. | Covered. |
 | Replace temporary assets | `assets/manifest.json` has 155 runtime paths and the manifest scan finds no placeholder/temp/test/dummy/sample/fallback/Gemini runtime entries. `scripts/copy-production-assets.js` copies manifest assets and explicit runtime dirs while excluding `assets/references` and source-only mockups. `rg` still finds fallback code in runtime modules by design for missing-load resilience. | Covered for runtime assets; source/reference files remain outside release output. |
 | Weapon types increase in difficulty | Commits `7796310`, `bf9d30f`, and `6120d80` staged ammo progression and completed visual coverage. `tests/unit/weapon-bar.test.js`, `tests/unit/weapon-visual-assets.test.js`, and `tests/e2e/level-mode-journey.spec.js` passed through `npm run check`. | Covered by progression tests and weapon visual tests. |
@@ -34,9 +35,9 @@ The game is complete only when all of the following are true:
 | Long weapon scroller fixed | Compact weapon bar changes landed in `js/ui.js`/`js/main.js`; `tests/unit/weapon-bar.test.js` passed. | Covered. |
 | Secondary screens and star earning polished | Level-complete threshold/theme/button polish landed; Garage/Armory secondary progression entry points landed in `c499a26`; survival now uses Run Over/New Run/Garage actions, delayed battlefield-preserving reveals, between-round perks, and animated reward count-ups. `tests/e2e/collection-gacha.spec.js`, `tests/e2e/survival-flow.spec.js`, and `tests/unit/levels-stars.test.js` passed. | Covered in web automation. |
 | Animation where expected | Existing effect systems and level-complete/supply-drop flows are covered by e2e/smoke tests. `npm run audit:visual` passed 90 captures across title/menu, secondary screens, gameplay HUD, aiming, pause, shop, victory/defeat, round transition, level complete, impact effects, tank pivots, and terrain collapse. | Covered in automated visual audit; physical-device feel still needs TestFlight feedback. |
-| No lag / strong performance | `npm run release:handoff` now requires fresh browser-smoke metrics within budget for controls, projectile, terrain, impact, and high-scores, plus paired screenshots and clean console/page-error receipts. Latest balanced p95/max frame times: controls 9.30/16.70ms, projectile 9.80/16.90ms, terrain 16.50/25.00ms, impact 16.70/18.40ms, high-scores 9.40/66.50ms. | Covered for automated smoke paths; physical-device thermal/performance testing remains. |
+| No lag / strong performance | `npm run release:handoff` now requires fresh browser-smoke metrics within budget for controls, projectile, terrain, impact, and high-scores, plus paired screenshots and clean console/page-error receipts. Latest balanced p95/max frame times: controls 10.0/17.7ms, projectile 10.0/18.3ms, terrain 16.7/18.3ms, impact 16.7/18.1ms, high-scores 9.9/66.7ms. | Covered for automated smoke paths; high-scores has one headless max spike while p95 stays under budget. Physical-device thermal/performance testing remains. |
 | Ready to convert/sync to iOS | `npm run ios:check` passed, including build, release budget, and `npx cap sync ios`. | Covered for local Capacitor readiness. |
-| Ready to upload to App Store | Open/blocked beads remain: `scorched-earth-3fe.4` App Store submission preparation, `scorched-earth-3fe.5` Submit to App Store and launch, `scorched-earth-3fe.2` beta feedback, and deferred monetization epic `scorched-earth-ttk`. Local metadata and screenshot inventory draft exists at `docs/release/app-store-materials.md`; local privacy/support pages exist at `public/privacy.html` and `public/support.html`, with in-app Settings actions pointing to them. | Not complete. |
+| Ready to upload to App Store | `npm run release:handoff` reports repo-side handoff artifacts are present, but owner/App Store actions remain: App Store Connect app record, signing/profiles, Xcode license acceptance, TestFlight upload/install, final pricing/availability/legal/review fields, and screenshot upload/selection. | Not complete. |
 
 ## Latest Gate Evidence
 
@@ -60,6 +61,7 @@ npm run audit:visual
 npm run audit:worlds
 npm run screenshots:app-store -- --skip-build --devices iphone-6-5 --targets 01-title-menu
 npm run screenshots:app-store
+npm run release:handoff
 bd ready
 ```
 
@@ -87,7 +89,7 @@ The latest full App Store screenshot capture passed 24 captures across four
 device slots and six recommended scenes:
 
 ```text
-artifacts/app-store-screenshots/2026-05-10T02-03-38-441Z/summary.json
+artifacts/app-store-screenshots/2026-05-10T03-45-12-426Z/summary.json
 ```
 
 The latest public release deployment serves the offline-first build and App
@@ -200,7 +202,7 @@ bf9d30f Tune staged ammo progression
 The latest full visual audit passed:
 
 ```text
-Passed 90 captures. Summary: artifacts/visual-audit/2026-05-10T03-18-33-583Z/summary.json
+Passed 90 captures. Summary: artifacts/visual-audit/2026-05-10T03-46-43-106Z/summary.json
 ```
 
 Latest gameplay-polish receipts added after the original audit:
@@ -215,11 +217,11 @@ scorched-earth-k9s closed: all world puzzle-object progression and playable rout
 The latest expanded browser smoke pass wrote these receipts:
 
 ```text
-artifacts/browser-smoke/2026-05-09T19-39-07-669Z-idle.metrics.json
-artifacts/browser-smoke/2026-05-09T19-39-16-357Z-projectile.metrics.json
-artifacts/browser-smoke/2026-05-09T19-39-25-220Z-terrain.metrics.json
-artifacts/browser-smoke/2026-05-09T19-39-30-260Z-high-scores.metrics.json
-artifacts/browser-smoke/2026-05-09T19-39-38-199Z-visual.metrics.json
+artifacts/browser-smoke/2026-05-10T03-50-47-526Z-controls.metrics.json
+artifacts/browser-smoke/2026-05-10T03-51-04-272Z-projectile.metrics.json
+artifacts/browser-smoke/2026-05-10T03-51-20-680Z-terrain.metrics.json
+artifacts/browser-smoke/2026-05-10T03-51-35-864Z-impact.metrics.json
+artifacts/browser-smoke/2026-05-10T03-51-50-054Z-high-scores.metrics.json
 ```
 
 Resume audit on 2026-05-10 verified the current pushed branch state:
@@ -239,6 +241,22 @@ artifacts/browser-smoke/2026-05-10T01-12-19-262Z-controls.metrics.json
 Latest Computer Use retry in the current session failed with macOS automation
 auth state:
 Apple event error -10000: Sender process is not authenticated
+```
+
+Final repo-side handoff verifier on 2026-05-10:
+
+```text
+npm run release:handoff
+Repo-side handoff artifacts are present.
+
+Owner/App Store actions still required:
+- Create/select the App Store Connect app record for bundle ID com.scorched.earth.
+- Configure signing team/profiles in Xcode.
+- Archive and upload the native build to TestFlight.
+- Install from TestFlight on real iPhone and iPad hardware.
+- Enter final App Store Connect price, availability, age rating, review contact, and legal owner fields.
+- Upload/select final screenshots in App Store Connect.
+- Accept the Xcode license: sudo xcodebuild -license
 ```
 
 Visual polish correction on 2026-05-10 addressed the screenshot issues raised during
@@ -346,7 +364,9 @@ failures.
 
 ## Remaining Blockers
 
-The objective is not complete because App Store launch readiness cannot be honestly verified from the repo alone:
+The objective is not complete because App Store launch readiness cannot be
+honestly verified from the repo alone. The completion audit shows all repo-side
+handoff artifacts are present, but these owner/account/device tasks remain:
 
 - `scorched-earth-3fe.4` is still open and depends on beta/launch dependencies. It requires App Store screenshots, metadata, privacy policy URL, support URL, App Store Connect configuration, IAP product readiness, and a final submission checklist.
 - `scorched-earth-3fe.5` is still open and depends on `scorched-earth-3fe.4`. It requires uploading the final build, Apple approval, launch date, live App Store release, and post-launch monitoring.
