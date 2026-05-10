@@ -1,9 +1,8 @@
 # Feature Branch Map
 
-Generated on 2026-05-10 from local and `origin/*` refs after the performance
-receipt handoff verification push. Branch dispositions are audited as of
-`c99ba1c`; later audit-documentation commits may advance the active branch head
-without changing the branch topology or disposition.
+Generated on 2026-05-10 from local and `origin/*` refs after the full visual
+audit handoff verification push. Branch dispositions are audited as of
+`945189e`.
 
 ## Audit Commands
 
@@ -19,21 +18,31 @@ git diff --stat main...codex/gameplay-improvements
 
 | Branch | Audited head | Main relationship at audit | Active branch relationship at audit | Disposition |
 | --- | --- | --- | --- | --- |
-| `codex/gameplay-improvements` / `origin/codex/gameplay-improvements` | `c99ba1c` | `0 behind / 50 ahead` | active branch | Keep. This is the current web/Capacitor launch-polish branch. |
-| `feature/game-engine-upgrade` / `origin/feature/game-engine-upgrade` | `6178456` | `396 behind / 9 ahead` | `446 behind / 9 ahead` | Preserve as stale idea archive; do not merge wholesale. |
-| `native` | `5c44d7a` | `96 behind / 129 ahead` | `146 behind / 129 ahead` | Preserve as Unity/native pivot reference; blocked unless product direction changes. |
-| `legacy-v1` / `origin/legacy-v1` | `84b361f` | `380 behind / 0 ahead` | `430 behind / 0 ahead` | Historical branch; fully merged into `main`, no launch action. |
-| `origin/codex/find-and-fix-important-bug` | `42efa06` | `395 behind / 0 ahead` | `445 behind / 0 ahead` | Historical bugfix branch; safe to prune after owner confirmation. |
-| `main` / `origin/main` | `9b33326` | baseline | `50 behind / 0 ahead` from active | Production baseline. Merge active branch only after final launch blockers are resolved or intentionally deferred. |
+| `codex/gameplay-improvements` / `origin/codex/gameplay-improvements` | `945189e` | `0 behind / 60 ahead` | active branch | Keep. This is the current web/Capacitor launch-polish branch. |
+| `feature/game-engine-upgrade` / `origin/feature/game-engine-upgrade` | `6178456` | `396 behind / 9 ahead` | `456 behind / 9 ahead` | Preserve as stale idea archive; do not merge wholesale. |
+| `native` | `5c44d7a` | `96 behind / 129 ahead` | `156 behind / 129 ahead` | Preserve as Unity/native pivot reference; blocked unless product direction changes. |
+| `legacy-v1` / `origin/legacy-v1` | `84b361f` | `380 behind / 0 ahead` | `440 behind / 0 ahead` | Historical branch; fully merged into `main`, no launch action. |
+| `origin/codex/find-and-fix-important-bug` | `42efa06` | `395 behind / 0 ahead` | `455 behind / 0 ahead` | Historical bugfix branch; safe to prune after owner confirmation. |
+| `main` / `origin/main` | `9b33326` | baseline | `60 behind / 0 ahead` from active | Production baseline. Merge active branch only after final launch blockers are resolved or intentionally deferred. |
 
 `origin/HEAD` points to `origin/main`.
 
 ## Active Branch Payload
 
-At audited handoff-verification head `c99ba1c`, `codex/gameplay-improvements`
-contained 50 commits on top of `main`:
+At audited handoff-verification head `945189e`, `codex/gameplay-improvements`
+contained 60 commits on top of `main`:
 
 ```text
+945189e Gate full visual audit in handoff
+90cdc3b Check release script surface in handoff
+4e48a5d Check screenshot matrix in handoff
+a1e0c6f Check screenshot errors in handoff
+879d513 Check web bundle freshness in handoff
+f6ad9b0 Gate runtime manifest assets in handoff
+f9d402c Track screenshot scene freshness
+8af3d80 Track campaign files in world audit freshness
+c2355ea Check browser smoke sidecars in handoff
+1aa8ce9 Clarify audited branch head
 c99ba1c Require performance receipts in handoff
 5532801 Refresh launch audit head
 ac43115 Verify native bundle in handoff
@@ -92,7 +101,10 @@ survival reward/perk flow, delayed battlefield-preserving result reveals,
 flat puzzle-object art, six distinct world backdrops, upgraded supply-drop and
 collection reward art, performance/frame pacing work, release-build screenshot
 automation, App Store material drafts, public privacy/support pages, and
-current launch-completion audit receipts.
+current launch-completion audit receipts. The handoff verifier now gates
+screenshot matrix coverage, runtime asset naming/file existence, generated web
+bundle freshness, native iOS bundle sync, browser-smoke performance sidecars,
+world-specific art audits, and the full 90-capture screen/effect visual audit.
 
 Recommendation: continue any remaining web/Capacitor launch work here. Do not
 branch-hop for old enhancement or native code unless a new task explicitly

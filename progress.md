@@ -132,3 +132,4 @@ Original prompt: Upgrade game graphical assets with ChatGPT Image Gen 2 and impr
 - Tightened App Store screenshot verification again so `npm run release:handoff` validates the exact expected screenshot device/scene matrix, not just the total count and dimensions.
 - Expanded the handoff package-script presence check so the verifier fails if release, browser-smoke, visual-audit, screenshot, world-audit, build/check, iOS check, or iOS open commands are removed.
 - Expanded `npm run release:handoff` to require the latest full `npm run audit:visual` receipt across all 18 expected screen/effect targets and five viewport classes, with freshness checks against the screen/UI modules it covers.
+- Refreshed `docs/branch-map.md` and `docs/launch-completion-audit.md` to audited handoff head `945189e`, now 60 commits ahead of `main`, and recorded the latest 90-capture full visual audit summary.

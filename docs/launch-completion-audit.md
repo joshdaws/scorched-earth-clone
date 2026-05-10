@@ -125,11 +125,19 @@ No ready work found (all issues have blocking dependencies)
 
 The gameplay/content and release-handoff audit covers
 `origin/codex/gameplay-improvements` through the handoff-verification commit
-`c99ba1c`, at 50 commits on top of `main`. Later audit-documentation commits may
-advance the active branch head without changing this audited gameplay/handoff
-payload. The audited payload includes:
+`945189e`, at 60 commits on top of `main`. The audited payload includes:
 
 ```text
+945189e Gate full visual audit in handoff
+90cdc3b Check release script surface in handoff
+4e48a5d Check screenshot matrix in handoff
+a1e0c6f Check screenshot errors in handoff
+879d513 Check web bundle freshness in handoff
+f6ad9b0 Gate runtime manifest assets in handoff
+f9d402c Track screenshot scene freshness
+8af3d80 Track campaign files in world audit freshness
+c2355ea Check browser smoke sidecars in handoff
+1aa8ce9 Clarify audited branch head
 c99ba1c Require performance receipts in handoff
 5532801 Refresh launch audit head
 ac43115 Verify native bundle in handoff
@@ -185,7 +193,7 @@ bf9d30f Tune staged ammo progression
 The latest full visual audit passed:
 
 ```text
-Passed 90 captures. Summary: artifacts/visual-audit/2026-05-09T19-32-31-161Z/summary.json
+Passed 90 captures. Summary: artifacts/visual-audit/2026-05-10T03-18-33-583Z/summary.json
 ```
 
 Latest gameplay-polish receipts added after the original audit:
