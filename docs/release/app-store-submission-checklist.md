@@ -151,12 +151,42 @@ npm run screenshots:app-store
 git status --short
 ```
 
+If Xcode is installed but `xcodebuild` reports that the active developer
+directory is Command Line Tools, either set the active directory once:
+
+```bash
+sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+```
+
+or run individual checks with:
+
+```bash
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild ...
+```
+
+If `xcodebuild` reports that the Xcode license has not been accepted, the owner
+must run this in Terminal before native archive/build validation can continue:
+
+```bash
+sudo xcodebuild -license
+```
+
+After the license is accepted and signing is configured, run a native project
+sanity check before archiving:
+
+```bash
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+  xcodebuild -list -project ios/App/App.xcodeproj
+```
+
 Expected result:
 
 - `npm run check` passes with no errors.
 - `npm run ios:check` passes build, budget, icon/splash checks, and Capacitor
   sync.
 - Screenshot summary reports zero failed captures.
+- `xcodebuild -list` shows the `App` project/scheme instead of Command Line
+  Tools or license errors.
 - Working tree contains only intentional release changes.
 
 ## Xcode And TestFlight

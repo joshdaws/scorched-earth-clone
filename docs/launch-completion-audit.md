@@ -252,6 +252,25 @@ including W6 final combined teleport/ricochet/shield/bunker route coverage
 bd ready --json: []
 ```
 
+Native Xcode handoff check on 2026-05-10:
+
+```text
+xcode-select -p
+/Library/Developer/CommandLineTools
+
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -version
+Xcode 26.4.1
+Build version 17E202
+
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -list -project ios/App/App.xcodeproj
+blocked by local machine state:
+You have not agreed to the Xcode license agreements.
+```
+
+The repo-side Capacitor/iOS checks pass, but native archive validation still
+requires the owner to accept the Xcode license and configure signing/team in
+Xcode.
+
 ## Remaining Blockers
 
 The objective is not complete because App Store launch readiness cannot be honestly verified from the repo alone:

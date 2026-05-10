@@ -53,6 +53,20 @@ If using Xcode but seeing command line tools errors:
 sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 ```
 
+For a one-command check without changing global machine state:
+
+```bash
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -version
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -list -project ios/App/App.xcodeproj
+```
+
+If the second command reports that Xcode license agreements have not been
+accepted, run this in Terminal and follow the prompt:
+
+```bash
+sudo xcodebuild -license
+```
+
 ### Signing & Capabilities
 
 1. Open Xcode: `npm run open:ios`
