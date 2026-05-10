@@ -24,10 +24,10 @@ The game is complete only when all of the following are true:
 | Requirement | Evidence inspected | Status |
 | --- | --- | --- |
 | Use `$imagegen` | Generated supply-drop and weapon-icon raster assets were added under `assets/images/...`; manifest now covers all 40 weapon icons and 40 projectile visual entries; `tests/unit/weapon-visual-assets.test.js` passed in `npm run check`. | Covered for current asset replacement work. |
-| Use `$computer-use` | Earlier in the polish pass, Computer Use drove Chrome through Play, level select, and the gameplay HUD. Later retries in this session can list apps but `get_app_state` for Google Chrome now fails with `Apple event error -10005: cgWindowNotFound`; current gameplay verification therefore relies on Playwright/browser automation instead of desktop UI control. | Partially covered historically; currently blocked by the Computer Use Chrome window-state adapter. |
+| Use `$computer-use` | Computer Use attached to Chrome on 2026-05-10 at `http://127.0.0.1:5173/` and clicked the live canvas `FIRE!` button in a running gameplay scene. Earlier adapter failures were documented, then a later retry succeeded. | Covered. |
 | Open a browser and play/verify the game | `npm run smoke:browser -- --scenario controls --quality balanced` passed and wrote `artifacts/browser-smoke/2026-05-09T19-24-12-185Z-controls.png` plus metrics/console JSON. Expanded browser smokes for idle, projectile, terrain, high-scores, and visual impact also passed. Playwright collection/drop flow passed. | Covered through repo browser automation, not Computer Use. |
-| Map every feature branch | `docs/branch-map.md` maps `codex/gameplay-improvements`, `feature/game-engine-upgrade`, `native`, `legacy-v1`, `origin/codex/find-and-fix-important-bug`, `main`, and origin aliases with ahead/behind counts and disposition. | Covered. |
-| Replace temporary assets | `find assets -type f` found no files named placeholder/temp/test except reference grid templates. `rg` still finds placeholder fallback code in `js/assets.js`, tank fallback rendering, and historical spec docs. Manifest/file tests passed as part of `npm run check`. | Mostly covered for runtime files; fallback code remains intentionally for missing-load resilience. |
+| Map every feature branch | `docs/branch-map.md` was refreshed on 2026-05-10 and maps `codex/gameplay-improvements`, `feature/game-engine-upgrade`, `native`, `legacy-v1`, `origin/codex/find-and-fix-important-bug`, `main`, and origin aliases with current heads, ahead/behind counts, and disposition. | Covered. |
+| Replace temporary assets | `assets/manifest.json` has 155 runtime paths and the manifest scan finds no placeholder/temp/test/dummy/sample/fallback/Gemini runtime entries. `scripts/copy-production-assets.js` copies manifest assets and explicit runtime dirs while excluding `assets/references` and source-only mockups. `rg` still finds fallback code in runtime modules by design for missing-load resilience. | Covered for runtime assets; source/reference files remain outside release output. |
 | Weapon types increase in difficulty | Commits `7796310`, `bf9d30f`, and `6120d80` staged ammo progression and completed visual coverage. `tests/unit/weapon-bar.test.js`, `tests/unit/weapon-visual-assets.test.js`, and `tests/e2e/level-mode-journey.spec.js` passed through `npm run check`. | Covered by progression tests and weapon visual tests. |
 | Level designs increase in difficulty and feel like synth worlds | `assets/levels/layouts.v1.json`, `js/level-progression.js`, `docs/campaign-puzzle-balance-notes.md`, and level tests cover six synthworlds with ricochet, shield, teleport, and bunker mechanics. `tests/unit/level-layouts.test.js` and `tests/e2e/level-mode-journey.spec.js` now prove authored object coverage and playable browser routes. | Covered by authored layouts/tests; subjective level feel still benefits from real player feedback. |
 | Intuitive controls | Browser smoke controls scenario passed at balanced quality; `tests/e2e/new-player-journey.spec.js` and `tests/e2e/level-mode-journey.spec.js` are part of the test suite. | Covered in automation; needs physical iOS device confirmation. |
@@ -122,13 +122,47 @@ scripts/capture-app-store-screenshots.js
 No ready work found (all issues have blocking dependencies)
 ```
 
-The pushed branch is up to date with `origin/codex/gameplay-improvements` after:
+The pushed branch is up to date with `origin/codex/gameplay-improvements` at
+`8ef914d` after 37 commits on top of `main`, including:
 
 ```text
-c499a26 Rehome progression entry points
-f7aa1f2 Document feature branch map
-a059189 Record launch completion audit
+8ef914d Polish battlefield and reward visuals
+ddec960 Record public App Store URL check
+77f16c3 Refresh App Store screenshots evidence
+7ba9784 Record App Store blocker handoff
+b9c2a20 Correct computer-use audit status
+91fb5d7 Verify campaign puzzle routes
+175cb18 Tune survival perk balance
+8ac2a98 Document survival opener playthrough
+80faec5 Tune survival terrain and shot probes
+c469086 Add survival balance browser evidence
+63ff078 Tune survival AI weapon progression
+e4f5522 Cover survival delayed result reveals
+668467a Animate survival round rewards
+e27da86 Add survival between-round perk choices
+52cf6fa Polish survival run over actions
+5a7acd1 Expand campaign puzzle progression
+d9477ac Start survival runs directly from game over
+de3f5be Add puzzle combat polish slice
+522b24a Deploy App Store support pages
+1cffe2b Add App Store submission checklist
+2dfa3ec Add App Store screenshot capture
+2156e7a Add App Store privacy and support pages
+a58c371 Draft App Store submission materials
+d32caf0 Record expanded browser smoke receipts
+e4f8212 Update audit with visual receipt commit
 450f105 Fix visual audit canvas sampling
+a059189 Record launch completion audit
+f7aa1f2 Document feature branch map
+c499a26 Rehome progression entry points
+6120d80 Complete weapon visual coverage
+9f6c83e Fix terrain frame pacing
+58f1db1 Polish level layouts and runtime assets
+6e2c9ac Update knight rider tank sprite
+bf9d30f Tune staged ammo progression
+7796310 Stage level ammo progression
+3febec1 Simplify game flow entry points
+0abcb4a Add gameplay simplification follow-up issues
 ```
 
 The latest full visual audit passed:
