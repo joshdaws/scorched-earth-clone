@@ -586,6 +586,52 @@ function checkVisualAuditSummary(failures) {
       if (typeof report.screenshotPath !== 'string' || !fs.existsSync(path.join(root, report.screenshotPath))) {
         failures.push(`Missing visual audit screenshot from summary: ${report.screenshotPath || `${targetId}/${viewportId}`}`);
       }
+
+      const detailPath = path.join(path.dirname(summaryPath), `${targetId}-${viewportId}.json`);
+      if (!fs.existsSync(detailPath)) {
+        failures.push(`Missing visual audit detail report: ${path.relative(root, detailPath)}`);
+        continue;
+      }
+
+      const detail = JSON.parse(fs.readFileSync(detailPath, 'utf8'));
+      if (detail.target !== targetId) {
+        failures.push(`${targetId}/${viewportId} visual audit detail has mismatched target ${detail.target}.`);
+      }
+      if (detail.viewport?.id !== viewportId) {
+        failures.push(`${targetId}/${viewportId} visual audit detail has mismatched viewport ${detail.viewport?.id}.`);
+      }
+      if (detail.screenshotPath !== report.screenshotPath) {
+        failures.push(`${targetId}/${viewportId} visual audit detail screenshot path does not match summary.`);
+      }
+      if (Array.isArray(detail.failures) && detail.failures.length > 0) {
+        failures.push(`${targetId}/${viewportId} visual audit detail has failures: ${detail.failures.join('; ')}`);
+      }
+
+      const consoleErrors = Array.isArray(detail.console)
+        ? detail.console.filter(message => message.type === 'error')
+        : [];
+      const pageErrors = Array.isArray(detail.pageErrors) ? detail.pageErrors : [];
+      if (consoleErrors.length > 0 || pageErrors.length > 0) {
+        failures.push(`${targetId}/${viewportId} visual audit detail has ${consoleErrors.length} console errors and ${pageErrors.length} page errors.`);
+      }
+
+      const canvasAudit = Array.isArray(detail.canvasAudit) ? detail.canvasAudit : [];
+      const visibleCanvases = canvasAudit.filter(canvas => canvas.width > 32 && canvas.height > 32);
+      if (visibleCanvases.length === 0) {
+        failures.push(`${targetId}/${viewportId} visual audit detail has no visible canvas.`);
+      }
+      for (const canvas of visibleCanvases) {
+        if (canvas.nonBlankSamples !== null && canvas.nonBlankSamples < 16) {
+          failures.push(`${targetId}/${viewportId} visual audit detail canvas ${canvas.index} appears blank.`);
+        }
+        if (
+          Number.isFinite(detail.viewport?.width) &&
+          Number.isFinite(detail.viewport?.height) &&
+          (canvas.left < -2 || canvas.top < -2 || canvas.right > detail.viewport.width + 2 || canvas.bottom > detail.viewport.height + 2)
+        ) {
+          failures.push(`${targetId}/${viewportId} visual audit detail canvas ${canvas.index} overflows viewport.`);
+        }
+      }
     }
   }
 

@@ -324,7 +324,9 @@ device/scene matrix, per-capture console/page-error state, and freshness
 against the screenshot target screen/UI modules, validates the latest campaign
 world visual audit receipt/freshness against world art, layout, progression,
 puzzle-object, and scene-isolation files, requires a fresh full visual audit
-receipt for all 18 expected screen/effect targets across five viewport classes,
+receipt for all 18 expected screen/effect targets across five viewport classes
+plus per-capture detail reports with visible nonblank canvases and no
+console/page errors,
 scans the runtime asset manifest for missing files and temporary placeholder
 naming, checks that the generated `www` bundle is fresh against source
 JS/config/static assets, validates fresh browser performance smoke metrics,
