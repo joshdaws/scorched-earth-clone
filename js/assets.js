@@ -203,6 +203,7 @@ function getRuntimeGroupsForAsset(key, meta = {}) {
     }
 
     if (key.startsWith('supplyDrop.')) return [ASSET_GROUPS.SUPPLY_DROP];
+    if (key.startsWith('tankPortraits.')) return [ASSET_GROUPS.COLLECTION, ASSET_GROUPS.SUPPLY_DROP];
     if (key.startsWith('tankSkins.')) return [ASSET_GROUPS.COLLECTION, ASSET_GROUPS.SHOP];
     if (key.startsWith('backgrounds.synthwave')) return [ASSET_GROUPS.TITLE];
     if (key.startsWith('backgrounds.gameplay')) return [ASSET_GROUPS.GAMEPLAY];

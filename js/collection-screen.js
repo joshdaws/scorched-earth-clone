@@ -792,52 +792,64 @@ function renderTankCard(ctx, tank, x, y) {
     const visualHeight = 55;
 
     if (isOwned || isShopItem) {
+        const portrait = Assets.get(`tankPortraits.${tank.id}`);
         const runtimeSprite = getCompiledTankCanvasForSkin(tank.id, performance.now());
         const spriteKey = getEquippedSkinAssetKey(tank);
         const sprite = spriteKey ? Assets.get(spriteKey) : null;
 
-        if (runtimeSprite) {
-            const previewWidth = 108;
-            const previewHeight = 54;
-            const previewX = x + (CONFIG.CARD_WIDTH - previewWidth) / 2;
-            const previewY = visualY + 4;
+        const previewWidth = 136;
+        const previewHeight = 58;
+        const previewX = x + (CONFIG.CARD_WIDTH - previewWidth) / 2;
+        const previewY = visualY + 1;
+
+        ctx.fillStyle = 'rgba(5, 217, 232, 0.06)';
+        ctx.strokeStyle = isOwned ? 'rgba(5, 217, 232, 0.22)' : 'rgba(136, 136, 153, 0.18)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(previewX - 6, previewY - 2, previewWidth + 12, previewHeight + 6, 8);
+        ctx.fill();
+        ctx.stroke();
+
+        if (isRealSprite(portrait)) {
+            ctx.globalAlpha = isOwned ? 1 : 0.75;
+            ctx.shadowColor = tank.glowColor || rarityColor;
+            ctx.shadowBlur = isOwned ? 10 : 0;
+            drawImageContain(ctx, portrait, x + CONFIG.CARD_WIDTH / 2, previewY + previewHeight / 2, previewWidth, previewHeight, true);
+            ctx.shadowBlur = 0;
+            ctx.globalAlpha = 1;
+        } else if (runtimeSprite) {
+            const runtimeWidth = 118;
+            const runtimeHeight = 58;
+            const runtimeX = x + (CONFIG.CARD_WIDTH - runtimeWidth) / 2;
+            const runtimeY = visualY + 2;
 
             ctx.globalAlpha = isOwned ? 1 : 0.75;
             ctx.shadowColor = tank.glowColor || rarityColor;
             ctx.shadowBlur = isOwned ? 8 : 0;
             const prevSmoothing = ctx.imageSmoothingEnabled;
             ctx.imageSmoothingEnabled = false;
-            ctx.drawImage(runtimeSprite, previewX, previewY, previewWidth, previewHeight);
+            ctx.drawImage(runtimeSprite, runtimeX, runtimeY, runtimeWidth, runtimeHeight);
             ctx.imageSmoothingEnabled = prevSmoothing;
             ctx.shadowBlur = 0;
             ctx.globalAlpha = 1;
         } else if (isRealSprite(sprite)) {
-            const previewWidth = 108;
-            const previewHeight = 54;
-            const previewX = x + (CONFIG.CARD_WIDTH - previewWidth) / 2;
-            const previewY = visualY + 4;
-
             ctx.globalAlpha = isOwned ? 1 : 0.6;
             ctx.shadowColor = tank.glowColor || rarityColor;
             ctx.shadowBlur = isOwned ? 8 : 0;
-            const prevSmoothing = ctx.imageSmoothingEnabled;
-            ctx.imageSmoothingEnabled = false;
-            ctx.drawImage(sprite, previewX, previewY, previewWidth, previewHeight);
-            ctx.imageSmoothingEnabled = prevSmoothing;
+            drawImageContain(ctx, sprite, x + CONFIG.CARD_WIDTH / 2, previewY + previewHeight / 2, previewWidth, previewHeight, false);
             ctx.shadowBlur = 0;
             ctx.globalAlpha = 1;
         } else {
-            // Fallback placeholder card if sprite is missing.
+            // Fallback silhouette if sprite is missing.
             const tankColor = tank.glowColor || rarityColor;
-            ctx.fillStyle = tankColor;
-            ctx.globalAlpha = isOwned ? 0.6 : 0.4;
-            ctx.fillRect(x + 40, visualY + 10, 100, 35);
-            ctx.globalAlpha = 1;
-
+            ctx.fillStyle = 'rgba(18, 24, 46, 0.9)';
             ctx.strokeStyle = tankColor;
             ctx.lineWidth = 2;
             ctx.globalAlpha = isOwned ? 1 : 0.6;
-            ctx.strokeRect(x + 40, visualY + 10, 100, 35);
+            ctx.beginPath();
+            ctx.roundRect(x + 40, visualY + 18, 100, 28, 8);
+            ctx.fill();
+            ctx.stroke();
             ctx.globalAlpha = 1;
         }
     } else {
@@ -922,6 +934,19 @@ function renderTankCard(ctx, tank, x, y) {
     }
 
     ctx.restore();
+}
+
+function drawImageContain(ctx, image, centerX, centerY, maxWidth, maxHeight, smoothing) {
+    const sourceWidth = image.naturalWidth || image.width || 1;
+    const sourceHeight = image.naturalHeight || image.height || 1;
+    const scale = Math.min(maxWidth / sourceWidth, maxHeight / sourceHeight);
+    const drawWidth = sourceWidth * scale;
+    const drawHeight = sourceHeight * scale;
+    const previousSmoothing = ctx.imageSmoothingEnabled;
+
+    ctx.imageSmoothingEnabled = smoothing;
+    ctx.drawImage(image, centerX - drawWidth / 2, centerY - drawHeight / 2, drawWidth, drawHeight);
+    ctx.imageSmoothingEnabled = previousSmoothing;
 }
 
 /**

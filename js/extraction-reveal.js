@@ -14,7 +14,10 @@
 
 import { CANVAS, COLORS, DEBUG } from './constants.js';
 import * as Renderer from './renderer.js';
+import * as Assets from './assets.js';
 import { RARITY, RARITY_COLORS, RARITY_NAMES } from './tank-skins.js';
+import { getCompiledTankCanvasForSkin } from './tank-design-runtime.js';
+import { getEquippedSkinAssetKey, isRealSprite } from './tank-visuals.js';
 import {
     playRadioStaticSound,
     playHelicopterRotorSound,
@@ -564,26 +567,7 @@ function drawCableAndTank(ctx, heliX, heliY, cableLen, swing, tank, landed) {
     ctx.shadowColor = glowColor;
     ctx.shadowBlur = landed ? 40 : 20;
 
-    // Tank body
-    ctx.fillStyle = '#1a1a2a';
-    ctx.strokeStyle = glowColor;
-    ctx.lineWidth = 3;
-
-    ctx.fillRect(tankX - tankWidth / 2, tankY - tankHeight, tankWidth, tankHeight);
-    ctx.strokeRect(tankX - tankWidth / 2, tankY - tankHeight, tankWidth, tankHeight);
-
-    // Tank turret
-    ctx.beginPath();
-    ctx.arc(tankX, tankY - tankHeight, 12, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // Turret barrel
-    ctx.lineWidth = 5;
-    ctx.beginPath();
-    ctx.moveTo(tankX, tankY - tankHeight);
-    ctx.lineTo(tankX + 35, tankY - tankHeight - 15);
-    ctx.stroke();
+    drawExtractionTankArt(ctx, tank, tankX, tankY - tankHeight / 2, tankWidth * 1.55, tankHeight * 1.45, glowColor);
 
     // Cable attachment point on tank
     if (!landed) {
@@ -594,6 +578,66 @@ function drawCableAndTank(ctx, heliX, heliY, cableLen, swing, tank, landed) {
     }
 
     ctx.restore();
+}
+
+function getExtractionTankArt(tank) {
+    if (!tank) return null;
+
+    const portrait = Assets.get(`tankPortraits.${tank.id}`);
+    if (isRealSprite(portrait)) {
+        return { image: portrait, smoothing: true };
+    }
+
+    const runtimeSprite = getCompiledTankCanvasForSkin(tank.id, performance.now(), {
+        allowPlayerRuntimeFallback: false
+    });
+    if (runtimeSprite) {
+        return { image: runtimeSprite, smoothing: false };
+    }
+
+    const spriteKey = getEquippedSkinAssetKey(tank);
+    const sprite = spriteKey ? Assets.get(spriteKey) : null;
+    if (isRealSprite(sprite)) {
+        return { image: sprite, smoothing: false };
+    }
+
+    return null;
+}
+
+function drawExtractionTankArt(ctx, tank, centerX, centerY, maxWidth, maxHeight, glowColor) {
+    const art = getExtractionTankArt(tank);
+
+    if (art) {
+        const sourceWidth = art.image.naturalWidth || art.image.width || 1;
+        const sourceHeight = art.image.naturalHeight || art.image.height || 1;
+        const scale = Math.min(maxWidth / sourceWidth, maxHeight / sourceHeight);
+        const drawWidth = sourceWidth * scale;
+        const drawHeight = sourceHeight * scale;
+        const previousSmoothing = ctx.imageSmoothingEnabled;
+        ctx.imageSmoothingEnabled = art.smoothing;
+        ctx.drawImage(art.image, centerX - drawWidth / 2, centerY - drawHeight / 2, drawWidth, drawHeight);
+        ctx.imageSmoothingEnabled = previousSmoothing;
+        return;
+    }
+
+    ctx.fillStyle = '#12182e';
+    ctx.strokeStyle = glowColor;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.roundRect(centerX - maxWidth * 0.38, centerY - maxHeight * 0.12, maxWidth * 0.76, maxHeight * 0.32, 8);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.roundRect(centerX - maxWidth * 0.2, centerY - maxHeight * 0.42, maxWidth * 0.4, maxHeight * 0.24, 7);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY - maxHeight * 0.3);
+    ctx.lineTo(centerX + maxWidth * 0.36, centerY - maxHeight * 0.44);
+    ctx.stroke();
 }
 
 /**
@@ -1016,6 +1060,8 @@ export function play(tank, onComplete = null) {
     }
 
     debugLog('Starting extraction animation', { tank: tank.name });
+    void Assets.ensureAssetGroupLoaded(Assets.ASSET_GROUPS.SUPPLY_DROP);
+    void Assets.ensureAssetGroupLoaded(Assets.ASSET_GROUPS.COLLECTION);
 
     revealTank = tank;
     onCompleteCallback = onComplete;

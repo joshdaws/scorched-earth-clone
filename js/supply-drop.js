@@ -10,6 +10,8 @@ import { CANVAS, COLORS, DEBUG } from './constants.js';
 import * as Renderer from './renderer.js';
 import * as Assets from './assets.js';
 import { RARITY, RARITY_COLORS, RARITY_NAMES } from './tank-skins.js';
+import { getCompiledTankCanvasForSkin } from './tank-design-runtime.js';
+import { getEquippedSkinAssetKey, isRealSprite } from './tank-visuals.js';
 import {
     playPlaneApproachSound,
     playPlaneFlyoverSound,
@@ -525,39 +527,15 @@ function drawResultCard(ctx) {
     ctx.textBaseline = 'middle';
     ctx.fillText(rarityName.toUpperCase(), centerX, bannerY);
 
-    // Tank display area (placeholder rectangle)
+    // Tank display area
     const tankY = centerY - 40;
     const tankSize = 160;
     const glowColor = revealTank.glowColor || rarityColor;
 
-    ctx.fillStyle = '#0a0a1a';
-    ctx.strokeStyle = glowColor;
-    ctx.shadowColor = glowColor;
-    ctx.shadowBlur = 20;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.roundRect(centerX - tankSize / 2, tankY - tankSize / 2, tankSize, tankSize * 0.6, 10);
-    ctx.fill();
-    ctx.stroke();
-
-    // Simple tank shape inside
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = '#1a1a2a';
-    ctx.strokeStyle = glowColor;
-    ctx.lineWidth = 2;
-    ctx.fillRect(centerX - 50, tankY - 15, 100, 30);
-    ctx.strokeRect(centerX - 50, tankY - 15, 100, 30);
-
-    // Turret
-    ctx.beginPath();
-    ctx.arc(centerX, tankY - 15, 12, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(centerX, tankY - 15);
-    ctx.lineTo(centerX + 35, tankY - 30);
-    ctx.lineWidth = 5;
-    ctx.stroke();
+    drawTankRewardArt(ctx, revealTank, centerX, tankY - 10, tankSize * 1.75, tankSize * 0.85, {
+        glowColor,
+        stage: true
+    });
 
     // Tank name
     ctx.shadowBlur = 0;
@@ -580,6 +558,112 @@ function drawResultCard(ctx) {
     ctx.fillStyle = '#FFFFFF';
     ctx.font = '14px Arial';
     ctx.fillText('Press SPACE or click to continue', centerX, continueY);
+
+    ctx.restore();
+}
+
+function getTankRewardArt(tank) {
+    const portrait = Assets.get(`tankPortraits.${tank.id}`);
+    if (isRealSprite(portrait)) {
+        return { image: portrait, smoothing: true };
+    }
+
+    const runtimeSprite = getCompiledTankCanvasForSkin(tank.id, performance.now(), {
+        allowPlayerRuntimeFallback: false
+    });
+    if (runtimeSprite) {
+        return { image: runtimeSprite, smoothing: false };
+    }
+
+    const spriteKey = getEquippedSkinAssetKey(tank);
+    const sprite = spriteKey ? Assets.get(spriteKey) : null;
+    if (isRealSprite(sprite)) {
+        return { image: sprite, smoothing: false };
+    }
+
+    return null;
+}
+
+function drawImageContain(ctx, image, centerX, centerY, maxWidth, maxHeight, smoothing = true) {
+    const sourceWidth = image.naturalWidth || image.width || 1;
+    const sourceHeight = image.naturalHeight || image.height || 1;
+    const scale = Math.min(maxWidth / sourceWidth, maxHeight / sourceHeight);
+    const drawWidth = sourceWidth * scale;
+    const drawHeight = sourceHeight * scale;
+    const previousSmoothing = ctx.imageSmoothingEnabled;
+
+    ctx.imageSmoothingEnabled = smoothing;
+    ctx.drawImage(image, centerX - drawWidth / 2, centerY - drawHeight / 2, drawWidth, drawHeight);
+    ctx.imageSmoothingEnabled = previousSmoothing;
+}
+
+function drawTankFallbackSilhouette(ctx, centerX, centerY, width, height, color) {
+    const bodyHeight = height * 0.34;
+    const bodyY = centerY - bodyHeight * 0.1;
+    const bodyWidth = width * 0.78;
+
+    ctx.fillStyle = '#12182e';
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.roundRect(centerX - bodyWidth / 2, bodyY - bodyHeight / 2, bodyWidth, bodyHeight, 10);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.roundRect(centerX - bodyWidth * 0.24, bodyY - bodyHeight * 1.1, bodyWidth * 0.42, bodyHeight * 0.62, 8);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    ctx.moveTo(centerX + bodyWidth * 0.02, bodyY - bodyHeight * 0.88);
+    ctx.lineTo(centerX + bodyWidth * 0.44, bodyY - bodyHeight * 1.2);
+    ctx.stroke();
+}
+
+function drawTankRewardArt(ctx, tank, centerX, centerY, width, height, options = {}) {
+    const glowColor = options.glowColor || tank.glowColor || RARITY_COLORS[tank.rarity] || COLORS.NEON_CYAN;
+    const art = getTankRewardArt(tank);
+
+    ctx.save();
+
+    if (options.stage !== false) {
+        ctx.shadowColor = glowColor;
+        ctx.shadowBlur = 24;
+        ctx.fillStyle = 'rgba(4, 7, 19, 0.84)';
+        ctx.strokeStyle = glowColor;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(centerX - width / 2, centerY - height / 2, width, height, 14);
+        ctx.fill();
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        const gridY = centerY + height * 0.3;
+        ctx.strokeStyle = 'rgba(5, 217, 232, 0.28)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 8; i++) {
+            const x = centerX - width / 2 + (width / 7) * i;
+            ctx.beginPath();
+            ctx.moveTo(x, gridY - 10);
+            ctx.lineTo(x, gridY + 18);
+            ctx.stroke();
+        }
+        ctx.beginPath();
+        ctx.moveTo(centerX - width / 2 + 12, gridY + 14);
+        ctx.lineTo(centerX + width / 2 - 12, gridY + 14);
+        ctx.stroke();
+    }
+
+    ctx.shadowColor = glowColor;
+    ctx.shadowBlur = 18;
+
+    if (art) {
+        drawImageContain(ctx, art.image, centerX, centerY - height * 0.05, width * 0.94, height * 0.72, art.smoothing);
+    } else {
+        drawTankFallbackSilhouette(ctx, centerX, centerY, width * 0.88, height * 0.8, glowColor);
+    }
 
     ctx.restore();
 }
@@ -1333,28 +1417,12 @@ function drawRevealedTank(ctx, tank, riseProgress) {
     ctx.shadowColor = glowColor;
     ctx.shadowBlur = 30 * riseProgress * effects.glowIntensity;
 
-    // Tank placeholder (rectangle with glow)
-    ctx.fillStyle = '#1a1a2a';
-    ctx.strokeStyle = glowColor;
-    ctx.lineWidth = 3;
-
-    const tankWidth = size;
-    const tankHeight = size / 2;
-    ctx.fillRect(centerX - tankWidth / 2, tankY - tankHeight, tankWidth, tankHeight);
-    ctx.strokeRect(centerX - tankWidth / 2, tankY - tankHeight, tankWidth, tankHeight);
-
-    // Tank turret
-    ctx.beginPath();
-    ctx.arc(centerX, tankY - tankHeight, 15, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // Turret barrel
-    ctx.beginPath();
-    ctx.moveTo(centerX, tankY - tankHeight);
-    ctx.lineTo(centerX + 40, tankY - tankHeight - 20);
-    ctx.lineWidth = 6;
-    ctx.stroke();
+    const tankWidth = size * 4.1;
+    const tankHeight = size * 2.0;
+    drawTankRewardArt(ctx, tank, centerX, tankY - tankHeight * 0.28, tankWidth, tankHeight, {
+        glowColor,
+        stage: false
+    });
 
     // Light beams from tank (during reveal) - count based on rarity
     const rayCount = effects.lightRayCount;
@@ -1805,6 +1873,8 @@ export function play(tank, onComplete = null) {
     }
 
     debugLog('Starting supply drop animation', { tank: tank.name, rarity: tank.rarity });
+    void Assets.ensureAssetGroupLoaded(Assets.ASSET_GROUPS.SUPPLY_DROP);
+    void Assets.ensureAssetGroupLoaded(Assets.ASSET_GROUPS.COLLECTION);
 
     revealTank = tank;
     onCompleteCallback = onComplete;

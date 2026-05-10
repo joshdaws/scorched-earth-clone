@@ -453,26 +453,26 @@
   "puzzleObjects": {
     "shieldGenerator": {
       "path": "images/puzzle-objects/shield-generator.png",
-      "width": 128,
-      "height": 120,
+      "width": 160,
+      "height": 160,
       "runtimeGroup": "gameplay"
     },
     "ricochetPanel": {
       "path": "images/puzzle-objects/ricochet-panel.png",
-      "width": 160,
+      "width": 192,
       "height": 112,
       "runtimeGroup": "gameplay"
     },
     "teleportGate": {
       "path": "images/puzzle-objects/teleport-gate.png",
-      "width": 128,
-      "height": 146,
+      "width": 160,
+      "height": 176,
       "runtimeGroup": "gameplay"
     },
     "hardlightBunker": {
       "path": "images/puzzle-objects/hardlight-bunker.png",
-      "width": 192,
-      "height": 92,
+      "width": 224,
+      "height": 112,
       "runtimeGroup": "gameplay"
     }
   },
@@ -799,6 +799,42 @@
       "path": "images/backgrounds/bg-gameplay.png",
       "width": 1536,
       "height": 1024
+    },
+    "world1": {
+      "path": "images/backgrounds/world-1-neon-dunes.png",
+      "width": 1536,
+      "height": 1024,
+      "runtimeGroup": "gameplay"
+    },
+    "world2": {
+      "path": "images/backgrounds/world-2-chrome-canyons.png",
+      "width": 1536,
+      "height": 1024,
+      "runtimeGroup": "gameplay"
+    },
+    "world3": {
+      "path": "images/backgrounds/world-3-prism-bunkers.png",
+      "width": 1536,
+      "height": 1024,
+      "runtimeGroup": "gameplay"
+    },
+    "world4": {
+      "path": "images/backgrounds/world-4-vector-vortex.png",
+      "width": 1536,
+      "height": 1024,
+      "runtimeGroup": "gameplay"
+    },
+    "world5": {
+      "path": "images/backgrounds/world-5-pixel-wastes.png",
+      "width": 1536,
+      "height": 1024,
+      "runtimeGroup": "gameplay"
+    },
+    "world6": {
+      "path": "images/backgrounds/world-6-midnight-citadel.png",
+      "width": 1536,
+      "height": 1024,
+      "runtimeGroup": "gameplay"
     }
   },
   "audio": {
@@ -1042,6 +1078,26 @@
         "assetKey": "weaponIcons.ion-cannon",
         "approved": true
       }
+    }
+  },
+  "tankPortraits": {
+    "standard": {
+      "path": "images/tanks/portraits/tank-portrait-standard.png",
+      "width": 640,
+      "height": 360,
+      "runtimeGroups": [
+        "collection",
+        "supplyDrop"
+      ]
+    },
+    "arctic": {
+      "path": "images/tanks/portraits/tank-portrait-arctic.png",
+      "width": 640,
+      "height": 360,
+      "runtimeGroups": [
+        "collection",
+        "supplyDrop"
+      ]
     }
   }
 }

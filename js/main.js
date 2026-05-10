@@ -23,7 +23,7 @@ import * as AimingControls from './aimingControls.js?v=20260111a';
 import * as VictoryDefeat from './victoryDefeat.js';
 import * as Money from './money.js';
 import * as Shop from './shop.js';
-import { updateParticles, renderParticles, clearParticles, getParticleCount, screenShakeForBlastRadius, getScreenShakeOffset, clearScreenShake, renderScreenFlash, clearScreenFlash, initBackground, updateBackground, renderBackground, clearBackground, renderCrtEffects, setCrtEnabled, isCrtEnabled, toggleCrt } from './effects.js';
+import { updateParticles, renderParticles, clearParticles, getParticleCount, screenShakeForBlastRadius, getScreenShakeOffset, clearScreenShake, renderScreenFlash, clearScreenFlash, initBackground, updateBackground, renderBackground, clearBackground, renderCrtEffects, setCrtEnabled, isCrtEnabled, toggleCrt, setBackgroundWorld } from './effects.js';
 import * as Music from './music.js';
 import * as VolumeControls from './volumeControls.js';
 import * as PauseMenu from './pauseMenu.js';
@@ -5457,6 +5457,8 @@ function renderPhysicsPlaygroundOverlay(ctx) {
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
  */
 function renderPlaying(ctx) {
+    setBackgroundWorld(getActiveBackgroundWorld());
+
     const phase = Turn.getPhase();
     const isPlayerTurn = Turn.canPlayerAim();
 
@@ -5495,6 +5497,18 @@ function renderPlaying(ctx) {
         renderDebugOverlays: DebugOverlays.render,
         renderCrtEffects
     });
+}
+
+function getActiveBackgroundWorld() {
+    if (isLevelMode && currentLevelData?.world) {
+        return currentLevelData.world;
+    }
+
+    if (currentRound > 0) {
+        return Math.max(1, Math.min(6, Math.ceil(currentRound / 2)));
+    }
+
+    return 1;
 }
 
 function renderLevelPuzzleObjects(ctx) {
@@ -6177,10 +6191,31 @@ function setupDefeatState() {
 // =============================================================================
 
 /**
+ * Load level-specific battlefield art before gameplay renders its first frame.
+ * @param {object|null} level
+ * @param {number} [worldNum]
+ */
+async function preloadLevelBattlefieldAssets(level, worldNum) {
+    const world = level?.world || worldNum || LevelRegistry.parseLevelId(level?.id)?.worldNum;
+    const loadout = level?.progression?.loadout || level?.loadout || {};
+    const weaponIconKeys = Object.keys(loadout).map(weaponId => `weaponIcons.${weaponId}`);
+    const assetKeys = [
+        world ? `backgrounds.world${world}` : null,
+        'puzzleObjects.shieldGenerator',
+        'puzzleObjects.ricochetPanel',
+        'puzzleObjects.teleportGate',
+        'puzzleObjects.hardlightBunker',
+        ...weaponIconKeys
+    ].filter(Boolean);
+
+    await Promise.allSettled(assetKeys.map(key => Assets.loadAsset(key)));
+}
+
+/**
  * Handle level selection from Level Select screen.
  * @param {CustomEvent} event - Level selected event with detail
  */
-function handleLevelSelected(event) {
+async function handleLevelSelected(event) {
     const { levelId, level, worldNum, levelNum } = event.detail;
 
     console.log(`[Main] Level selected: ${levelId}`);
@@ -6206,6 +6241,8 @@ function handleLevelSelected(event) {
         terrain: level.terrain
     });
 
+    await preloadLevelBattlefieldAssets(level, worldNum);
+
     // Start the level
     Game.setState(GAME_STATES.PLAYING);
 }
@@ -6215,7 +6252,7 @@ function handleLevelSelected(event) {
  */
 function setupLevelCompleteCallbacks() {
     // Retry button - restart same level
-    LevelCompleteScreen.onRetry((levelId, worldNum, levelNum) => {
+    LevelCompleteScreen.onRetry(async (levelId, worldNum, levelNum) => {
         console.log(`[Main] Retrying level: ${levelId}`);
         LevelCompleteScreen.hide();
 
@@ -6231,12 +6268,14 @@ function setupLevelCompleteCallbacks() {
         // Reset level mode stats for fresh tracking
         resetLevelModeStats();
 
+        await preloadLevelBattlefieldAssets(currentLevelData, worldNum);
+
         // Start the level
         Game.setState(GAME_STATES.PLAYING);
     });
 
     // Next button - advance to next level
-    LevelCompleteScreen.onNext((levelId, worldNum, levelNum) => {
+    LevelCompleteScreen.onNext(async (levelId, worldNum, levelNum) => {
         console.log(`[Main] Starting next level: ${levelId}`);
         LevelCompleteScreen.hide();
 
@@ -6249,6 +6288,8 @@ function setupLevelCompleteCallbacks() {
 
         // Reset level mode stats for fresh tracking
         resetLevelModeStats();
+
+        await preloadLevelBattlefieldAssets(currentLevelData, worldNum);
 
         // Start the next level
         Game.setState(GAME_STATES.PLAYING);

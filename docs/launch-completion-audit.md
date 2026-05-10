@@ -156,6 +156,68 @@ artifacts/browser-smoke/2026-05-09T19-39-30-260Z-high-scores.metrics.json
 artifacts/browser-smoke/2026-05-09T19-39-38-199Z-visual.metrics.json
 ```
 
+Resume audit on 2026-05-10 verified the current pushed branch state:
+
+```text
+computer-use attached to Chrome on http://127.0.0.1:5173/ and fired a live
+gameplay shot through the canvas UI.
+
+develop-web-game Playwright client captured live gameplay screenshots/state:
+artifacts/manual-play/resume-2026-05-10-space/shot-0.png
+artifacts/manual-play/resume-2026-05-10-space/state-0.json
+
+npm run smoke:browser -- --scenario controls --quality balanced
+passed with p95 frame time 17ms, max frame time 17.5ms, and zero dropped backlog:
+artifacts/browser-smoke/2026-05-10T01-12-19-262Z-controls.metrics.json
+```
+
+Visual polish correction on 2026-05-10 addressed the screenshot issues raised during
+review:
+
+```text
+Generated and wired six distinct world battlefield backgrounds:
+assets/images/backgrounds/world-1-neon-dunes.png
+assets/images/backgrounds/world-2-chrome-canyons.png
+assets/images/backgrounds/world-3-prism-bunkers.png
+assets/images/backgrounds/world-4-vector-vortex.png
+assets/images/backgrounds/world-5-pixel-wastes.png
+assets/images/backgrounds/world-6-midnight-citadel.png
+
+Replaced shield, ricochet, teleporter, and bunker puzzle-object art with flat
+2D synthwave PNG assets, and preloaded selected level backdrop/puzzle/loadout
+art before the first gameplay frame to avoid fallback placeholders.
+
+Replaced the most visible supply-drop and collection tank reward placeholders
+with high-resolution generated Standard Issue and Arctic tank portraits.
+
+Manual visual receipts:
+artifacts/manual-play/polish-visuals-2026-05-10/world4-preloaded-entry-loadout.png
+artifacts/manual-play/polish-visuals-2026-05-10/world3-shield-bunker-settled.png
+artifacts/manual-play/polish-visuals-2026-05-10/world5-shield-bunker-settled.png
+artifacts/manual-play/polish-visuals-2026-05-10/supply-drop-arctic-reveal-final.png
+artifacts/manual-play/polish-visuals-2026-05-10/collection-portraits-2.png
+
+npm run check
+npm run build
+npm run ios:check
+npm run smoke:browser -- --scenario controls --quality balanced
+npm run audit:visual -- --targets gameplay-hud,collection,supply-drop --viewports desktop,iphone-14
+all passed after the visual polish correction.
+```
+
+Current manifest and content checks:
+
+```text
+weaponIcons: 40/40 weapon IDs covered by authored assets
+weaponVisuals.projectileCoverage: 40/40 weapon IDs documented as approved
+audio manifest: synthwave-title-loop.wav, neon-battle-loop.wav,
+garage-shop-loop.wav, and production-named SFX WAVs; no runtime test-beep/test-loop
+entries remain
+Assets/levels/layouts.v1.json: authored puzzle objects exist across all worlds,
+including W6 final combined teleport/ricochet/shield/bunker route coverage
+bd ready --json: []
+```
+
 ## Remaining Blockers
 
 The objective is not complete because App Store launch readiness cannot be honestly verified from the repo alone:

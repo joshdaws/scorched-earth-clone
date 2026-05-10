@@ -840,6 +840,23 @@ let mountainCache = null;
 let backgroundAnimTime = 0;
 
 /**
+ * Active campaign/survival world used for gameplay backdrops.
+ * @type {number}
+ */
+let activeBackgroundWorld = 0;
+
+/**
+ * Select the gameplay background family.
+ * @param {number} worldNum
+ */
+export function setBackgroundWorld(worldNum) {
+    const numericWorld = Number(worldNum);
+    activeBackgroundWorld = Number.isFinite(numericWorld)
+        ? Math.max(0, Math.min(6, Math.round(numericWorld)))
+        : 0;
+}
+
+/**
  * Initialize the background with cached star and mountain data.
  * Call this once at game start or when canvas dimensions change.
  *
@@ -1036,7 +1053,12 @@ export function renderBackground(ctx, width, height) {
  * @returns {boolean} Whether the baked background was rendered
  */
 function renderBakedGameplayBackground(ctx, width, height) {
-    const background = getAsset('backgrounds.gameplay');
+    const worldBackground = activeBackgroundWorld > 0
+        ? getAsset(`backgrounds.world${activeBackgroundWorld}`)
+        : null;
+    const background = isRenderableImage(worldBackground)
+        ? worldBackground
+        : getAsset('backgrounds.gameplay');
 
     if (!isRenderableImage(background)) {
         return false;

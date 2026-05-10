@@ -13,13 +13,17 @@ import {
 const manifest = {
   backgrounds: {
     synthwave: { path: 'images/backgrounds/title.png', width: 100, height: 50 },
-    gameplay: { path: 'images/backgrounds/gameplay.png', width: 200, height: 100 }
+    gameplay: { path: 'images/backgrounds/gameplay.png', width: 200, height: 100 },
+    world3: { path: 'images/backgrounds/world-3.png', width: 200, height: 100, runtimeGroup: 'gameplay' }
   },
   tanks: {
     playerBody: { path: 'images/tanks/player-body.png', width: 64, height: 32 }
   },
   tankSkins: {
     'common-test': { path: 'images/tanks/common-test.png', width: 64, height: 32 }
+  },
+  tankPortraits: {
+    standard: { path: 'images/tanks/portraits/standard.png', width: 640, height: 360, runtimeGroups: ['collection', 'supplyDrop'] }
   },
   supplyDrop: {
     crate: { path: 'images/supply-drop/crate.png', width: 64, height: 64 }
@@ -71,7 +75,9 @@ describe('asset runtime groups', () => {
 
     expect(byKey['backgrounds.synthwave'].groups).toEqual([ASSET_GROUPS.TITLE]);
     expect(byKey['backgrounds.gameplay'].groups).toEqual([ASSET_GROUPS.GAMEPLAY]);
+    expect(byKey['backgrounds.world3'].groups).toEqual([ASSET_GROUPS.GAMEPLAY]);
     expect(byKey['tankSkins.common-test'].groups).toEqual([ASSET_GROUPS.COLLECTION, ASSET_GROUPS.SHOP]);
+    expect(byKey['tankPortraits.standard'].groups).toEqual([ASSET_GROUPS.COLLECTION, ASSET_GROUPS.SUPPLY_DROP]);
     expect(byKey['supplyDrop.crate'].groups).toEqual([ASSET_GROUPS.SUPPLY_DROP]);
     expect(byKey['backgrounds.synthwave'].approxMemoryBytes).toBe(100 * 50 * 4);
     expect(entries.some(entry => entry.key.startsWith('audio.'))).toBe(false);
@@ -89,6 +95,6 @@ describe('asset runtime groups', () => {
     const status = getAssetGroupStatus();
     expect(status[ASSET_GROUPS.TITLE].cached).toBe(1);
     expect(status[ASSET_GROUPS.GAMEPLAY].cached).toBe(0);
-    expect(status[ASSET_GROUPS.GAMEPLAY].assets).toBe(2);
+    expect(status[ASSET_GROUPS.GAMEPLAY].assets).toBe(3);
   });
 });
