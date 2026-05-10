@@ -29,7 +29,8 @@ device validation, and final App Store Connect fields. It also verifies that the
 latest App Store screenshot capture and campaign world visual audit receipts
 exist, passed, and are newer than the screen/UI/runtime/campaign layout files
 they cover. The screenshot receipt must include its index, expected capture
-dimensions, and no per-capture console/page errors. It also scans the runtime
+dimensions, the exact expected device/scene matrix, and no per-capture
+console/page errors. It also scans the runtime
 asset manifest for missing files and temporary placeholder naming, checks that
 the generated `www` bundle is fresh against source JS/config/static assets,
 requires fresh browser performance smoke metrics, screenshots, and clean console

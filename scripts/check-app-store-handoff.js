@@ -35,6 +35,15 @@ const expectedScreenshotSlots = {
   'ipad-13': { width: 2732, height: 2048 }
 };
 
+const expectedScreenshotTargets = new Set([
+  '01-title-menu',
+  '02-gameplay-hud',
+  '03-impact-effects',
+  '04-level-complete',
+  '05-supply-drop',
+  '06-shop'
+]);
+
 const expectedWorlds = new Set([1, 2, 3, 4, 5, 6]);
 const requiredPerformanceScenarios = ['controls', 'projectile', 'terrain', 'impact', 'high-scores'];
 const bannedRuntimeAssetPattern = /placeholder|temp|test|dummy|sample|fallback|gemini/i;
@@ -365,11 +374,49 @@ function checkScreenshotSummary(failures, warnings) {
   if (!fs.existsSync(indexPath)) failures.push(`Missing App Store screenshot index: ${path.relative(root, indexPath)}`);
 
   const reports = Array.isArray(summary.reports) ? summary.reports : [];
+  const expectedDevices = new Set(Object.keys(expectedScreenshotSlots));
+  const summaryDevices = Array.isArray(summary.devices) ? summary.devices : [];
+  const summaryTargets = Array.isArray(summary.targets) ? summary.targets : [];
+  const summaryDeviceIds = new Set(summaryDevices.map(device => device.id));
+  const summaryTargetIds = new Set(summaryTargets.map(target => target.id));
+
+  if (summary.deviceCount !== expectedDevices.size) {
+    failures.push(`Latest screenshot summary deviceCount is ${summary.deviceCount}, expected ${expectedDevices.size}.`);
+  }
+  if (summary.targetCount !== expectedScreenshotTargets.size) {
+    failures.push(`Latest screenshot summary targetCount is ${summary.targetCount}, expected ${expectedScreenshotTargets.size}.`);
+  }
+  for (const deviceId of expectedDevices) {
+    if (!summaryDeviceIds.has(deviceId)) failures.push(`Latest screenshot summary is missing device slot: ${deviceId}.`);
+  }
+  for (const deviceId of summaryDeviceIds) {
+    if (!expectedDevices.has(deviceId)) failures.push(`Latest screenshot summary contains unexpected device slot: ${deviceId}.`);
+  }
+  for (const targetId of expectedScreenshotTargets) {
+    if (!summaryTargetIds.has(targetId)) failures.push(`Latest screenshot summary is missing target: ${targetId}.`);
+  }
+  for (const targetId of summaryTargetIds) {
+    if (!expectedScreenshotTargets.has(targetId)) failures.push(`Latest screenshot summary contains unexpected target: ${targetId}.`);
+  }
+
   for (const [device, size] of Object.entries(expectedScreenshotSlots)) {
     const deviceReports = reports.filter(report => report.device === device);
-    if (deviceReports.length !== 6) {
-      failures.push(`Expected 6 screenshots for ${device}, found ${deviceReports.length}.`);
+    if (deviceReports.length !== expectedScreenshotTargets.size) {
+      failures.push(`Expected ${expectedScreenshotTargets.size} screenshots for ${device}, found ${deviceReports.length}.`);
       continue;
+    }
+
+    const deviceTargets = new Set(deviceReports.map(report => report.target));
+    for (const targetId of expectedScreenshotTargets) {
+      const matchingReports = deviceReports.filter(report => report.target === targetId);
+      if (matchingReports.length !== 1) {
+        failures.push(`Expected exactly one ${targetId} screenshot for ${device}, found ${matchingReports.length}.`);
+      }
+    }
+    for (const targetId of deviceTargets) {
+      if (!expectedScreenshotTargets.has(targetId)) {
+        failures.push(`${device} has unexpected screenshot target: ${targetId}.`);
+      }
     }
 
     for (const report of deviceReports) {

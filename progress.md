@@ -129,3 +129,4 @@ Original prompt: Upgrade game graphical assets with ChatGPT Image Gen 2 and impr
 - Added a runtime asset-manifest quality gate to `npm run release:handoff`; it now fails on missing manifest asset files or runtime manifest entries containing placeholder/temp/test/dummy/sample/fallback/Gemini naming.
 - Added generated web-bundle freshness checks to `npm run release:handoff`; it now fails if source JS/config/static assets are newer than `www/index.html` or if copied `www` config/public/manifest runtime assets differ from source.
 - Tightened App Store screenshot verification in `npm run release:handoff`; it now requires the screenshot `index.md` and fails on any per-capture failures, console errors, or page errors recorded in the latest screenshot summary.
+- Tightened App Store screenshot verification again so `npm run release:handoff` validates the exact expected screenshot device/scene matrix, not just the total count and dimensions.
