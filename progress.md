@@ -119,3 +119,4 @@ Original prompt: Upgrade game graphical assets with ChatGPT Image Gen 2 and impr
 - Tightened `npm run release:handoff` so it now requires the latest `npm run audit:worlds` receipt in addition to App Store screenshots before reporting repo-side handoff artifacts as present.
 - Added receipt freshness checks to `npm run release:handoff`; App Store screenshot and world visual audit summaries now fail if the covered visual/runtime files changed after the receipt.
 - Tightened `npm run ios:check` so after build and `npx cap sync ios` it hashes every generated `www` file against the corresponding `ios/App/App/public` file. Latest run passed, proving the native bundle is synced to the release web output.
+- Tightened `npm run release:handoff` again so it independently rechecks native `ios/App/App/public` bundle hashes against `www` before reporting repo-side handoff artifacts as present.

@@ -299,8 +299,9 @@ npm run release:handoff
 
 It checks the local App Store evidence package, validates the latest screenshot
 summary shape/freshness, validates the latest campaign world visual audit
-receipt/freshness, and reports remaining owner/App Store actions without
-treating those account-controlled steps as repo-side failures.
+receipt/freshness, rechecks native `ios/App/App/public` bundle hashes against
+`www`, and reports remaining owner/App Store actions without treating those
+account-controlled steps as repo-side failures.
 
 ## Remaining Blockers
 

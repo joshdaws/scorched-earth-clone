@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import crypto from 'node:crypto';
 
 const root = process.cwd();
 const screenshotRoot = path.join(root, 'artifacts/app-store-screenshots');
@@ -92,6 +93,34 @@ function run(command, args, options = {}) {
   });
 }
 
+function collectFiles(relativePath) {
+  const fullPath = path.join(root, relativePath);
+  if (!fs.existsSync(fullPath)) return [];
+
+  const results = [];
+  const stack = [fullPath];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const child = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(child);
+      } else {
+        results.push(path.relative(root, child));
+      }
+    }
+  }
+
+  return results;
+}
+
+function fileHash(relativePath) {
+  return crypto
+    .createHash('sha256')
+    .update(fs.readFileSync(path.join(root, relativePath)))
+    .digest('hex');
+}
+
 function checkReceiptFreshness(summaryPath, inputPaths, label, failures) {
   const summaryMtimeMs = fs.statSync(summaryPath).mtimeMs;
   for (const inputPath of inputPaths) {
@@ -130,6 +159,26 @@ function checkRuntimeConfig(failures, warnings) {
 function checkRequiredFiles(failures) {
   for (const file of requiredFiles) {
     if (!exists(file)) failures.push(`Missing handoff file: ${file}`);
+  }
+}
+
+function checkNativeWebBundleFreshness(failures) {
+  if (!exists('www') || !exists('ios/App/App/public')) {
+    failures.push('Missing www or ios/App/App/public; run npm run ios:check.');
+    return;
+  }
+
+  const webFiles = collectFiles('www').sort();
+  for (const webFile of webFiles) {
+    const nativeFile = path.join('ios/App/App/public', path.relative('www', webFile));
+    if (!exists(nativeFile)) {
+      failures.push(`Native iOS web bundle is missing synced file: ${nativeFile}`);
+      continue;
+    }
+
+    if (fileHash(webFile) !== fileHash(nativeFile)) {
+      failures.push(`Native iOS web bundle is stale: ${nativeFile} differs from ${webFile}. Run npm run ios:check.`);
+    }
   }
 }
 
@@ -256,6 +305,7 @@ function main() {
   checkPackageScripts(failures);
   checkRuntimeConfig(failures, warnings);
   checkRequiredFiles(failures);
+  checkNativeWebBundleFreshness(failures);
   const latestSummary = checkScreenshotSummary(failures, warnings);
   const latestWorldSummary = checkWorldVisualSummary(failures);
   checkXcode(ownerActions, warnings);

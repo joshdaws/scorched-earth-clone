@@ -27,7 +27,9 @@ It checks the local App Store evidence package and reports owner-controlled
 actions that remain, such as Xcode license/signing, TestFlight upload, real
 device validation, and final App Store Connect fields. It also verifies that the
 latest App Store screenshot capture and campaign world visual audit receipts
-exist, passed, and are newer than the visual/runtime files they cover.
+exist, passed, and are newer than the visual/runtime files they cover. It also
+rechecks that the native `ios/App/App/public` web bundle matches `www`, so run
+`npm run ios:check` first if this fails.
 
 For the campaign art pass, also run:
 
