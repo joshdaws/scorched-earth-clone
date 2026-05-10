@@ -26,6 +26,8 @@ npm run release:handoff
 It checks the local App Store evidence package and reports owner-controlled
 actions that remain, such as Xcode license/signing, TestFlight upload, real
 device validation, and final App Store Connect fields. It also verifies that the
+release, screenshot, smoke, visual-audit, and iOS package scripts exist, then
+checks that the
 latest App Store screenshot capture and campaign world visual audit receipts
 exist, passed, and are newer than the screen/UI/runtime/campaign layout files
 they cover. The screenshot receipt must include its index, expected capture

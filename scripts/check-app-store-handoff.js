@@ -245,7 +245,17 @@ function checkReceiptFreshness(summaryPath, inputPaths, label, failures) {
 function checkPackageScripts(failures) {
   const pkg = readJson('package.json');
   const scripts = pkg.scripts || {};
-  for (const script of ['check', 'build', 'ios:check', 'screenshots:app-store', 'audit:worlds', 'open:ios']) {
+  for (const script of [
+    'check',
+    'build',
+    'ios:check',
+    'screenshots:app-store',
+    'release:handoff',
+    'smoke:browser',
+    'audit:visual',
+    'audit:worlds',
+    'open:ios'
+  ]) {
     if (!scripts[script]) failures.push(`Missing package script: ${script}`);
   }
 }

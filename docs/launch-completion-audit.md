@@ -311,8 +311,8 @@ npm run release:handoff
 ```
 
 It checks the local App Store evidence package, validates the latest screenshot
-summary shape, index, exact device/scene matrix, per-capture
-console/page-error state, and freshness
+script surface, validates the latest screenshot summary shape, index, exact
+device/scene matrix, per-capture console/page-error state, and freshness
 against the screenshot target screen/UI modules, validates the latest campaign
 world visual audit receipt/freshness against world art, layout, progression,
 puzzle-object, and scene-isolation files,
