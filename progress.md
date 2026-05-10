@@ -137,3 +137,4 @@ Original prompt: Upgrade game graphical assets with ChatGPT Image Gen 2 and impr
 - Refreshed `docs/branch-map.md` and `docs/launch-completion-audit.md` to audited handoff head `cdffb11`, now 62 commits ahead of `main`.
 - Added App Store icon and launch-image PNG dimension validation to `npm run ios:check` and `npm run release:handoff`.
 - Refreshed `docs/branch-map.md` and `docs/launch-completion-audit.md` to audited handoff head `95fcfad`, now 64 commits ahead of `main`.
+- Tightened App Store screenshot handoff verification so each summary screenshot path must exist and the actual PNG dimensions must match the required device slot.

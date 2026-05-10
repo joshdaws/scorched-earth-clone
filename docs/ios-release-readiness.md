@@ -31,8 +31,8 @@ checks that the
 latest App Store screenshot capture and campaign world visual audit receipts
 exist, passed, and are newer than the screen/UI/runtime/campaign layout files
 they cover. The screenshot receipt must include its index, expected capture
-dimensions, the exact expected device/scene matrix, and no per-capture
-console/page errors. The full visual audit receipt must cover all 18 expected
+dimensions, actual screenshot PNG dimensions, the exact expected device/scene
+matrix, and no per-capture console/page errors. The full visual audit receipt must cover all 18 expected
 screen/effect targets across five viewport classes, with per-capture detail
 reports, visible nonblank canvases, and no console/page errors. It verifies
 required app icon and launch-image PNG dimensions before upload. It also scans the runtime

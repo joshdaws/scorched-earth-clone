@@ -324,7 +324,8 @@ npm run release:handoff
 
 It checks the local App Store evidence package, validates the latest screenshot
 script surface, validates the latest screenshot summary shape, index, exact
-device/scene matrix, per-capture console/page-error state, and freshness
+device/scene matrix, actual screenshot PNG dimensions, per-capture
+console/page-error state, and freshness
 against the screenshot target screen/UI modules, validates the latest campaign
 world visual audit receipt/freshness against world art, layout, progression,
 puzzle-object, and scene-isolation files, requires a fresh full visual audit

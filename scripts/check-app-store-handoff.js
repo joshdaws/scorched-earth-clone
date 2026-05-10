@@ -550,8 +550,12 @@ function checkScreenshotSummary(failures, warnings) {
       if (report.imageSize?.width !== size.width || report.imageSize?.height !== size.height) {
         failures.push(`${device} ${report.target} has size ${report.imageSize?.width}x${report.imageSize?.height}, expected ${size.width}x${size.height}.`);
       }
-      if (report.screenshotPath && !fs.existsSync(path.join(root, report.screenshotPath))) {
+      if (typeof report.screenshotPath !== 'string') {
+        failures.push(`${device} ${report.target} is missing a screenshot path.`);
+      } else if (!fs.existsSync(path.join(root, report.screenshotPath))) {
         failures.push(`Missing screenshot image from summary: ${report.screenshotPath}`);
+      } else {
+        checkPngDimensions(report.screenshotPath, size.width, size.height, failures);
       }
       if (Array.isArray(report.failures) && report.failures.length > 0) {
         failures.push(`${device} ${report.target} has screenshot failures: ${report.failures.join('; ')}`);
