@@ -88,6 +88,34 @@ function fileHash(relativePath) {
     .digest('hex');
 }
 
+function readPngDimensions(relativePath) {
+  const buffer = fs.readFileSync(path.join(projectRoot, relativePath));
+  const signature = '89504e470d0a1a0a';
+  if (buffer.length < 24 || buffer.subarray(0, 8).toString('hex') !== signature) {
+    throw new Error(`${relativePath} is not a valid PNG file`);
+  }
+
+  return {
+    width: buffer.readUInt32BE(16),
+    height: buffer.readUInt32BE(20)
+  };
+}
+
+function assertPngDimensions(relativePath, expectedWidth, expectedHeight, failures) {
+  if (!exists(relativePath)) return;
+
+  try {
+    const dimensions = readPngDimensions(relativePath);
+    if (dimensions.width !== expectedWidth || dimensions.height !== expectedHeight) {
+      failures.push(
+        `${relativePath} is ${dimensions.width}x${dimensions.height}, expected ${expectedWidth}x${expectedHeight}`
+      );
+    }
+  } catch (error) {
+    failures.push(error.message);
+  }
+}
+
 function checkCapacitorConfig(failures) {
   assertFile('capacitor.config.json', failures);
   if (!exists('capacitor.config.json')) return;
@@ -151,27 +179,32 @@ function checkNativeWebBundleFreshness(failures) {
 
 function checkIconsAndSplashes(failures) {
   const requiredWebIcons = [
-    'assets/icons/app-icon-1024.png',
-    'assets/icons/app-icon-180.png',
-    'assets/icons/app-icon-120.png',
-    'assets/icons/splash-2732x2732.png',
-    'assets/icons/splash-2048x2732.png',
-    'assets/icons/splash-1668x2388.png',
-    'assets/icons/splash-1125x2436.png'
+    ['assets/icons/app-icon-1024.png', 1024, 1024],
+    ['assets/icons/app-icon-180.png', 180, 180],
+    ['assets/icons/app-icon-120.png', 120, 120],
+    ['assets/icons/splash-2732x2732.png', 2732, 2732],
+    ['assets/icons/splash-2048x2732.png', 2048, 2732],
+    ['assets/icons/splash-1668x2388.png', 1668, 2388],
+    ['assets/icons/splash-1125x2436.png', 1125, 2436]
   ];
 
-  for (const file of requiredWebIcons) {
+  for (const [file, width, height] of requiredWebIcons) {
     assertFile(file, failures);
+    assertPngDimensions(file, width, height, failures);
   }
 
   assertFile('ios/App/App/Assets.xcassets/AppIcon.appiconset/Contents.json', failures);
   assertFile('ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png', failures);
+  assertPngDimensions('ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png', 1024, 1024, failures);
   assertFile('ios/App/App/Assets.xcassets/Splash.imageset/Contents.json', failures);
 
   const splashFiles = collectFiles('ios/App/App/Assets.xcassets/Splash.imageset')
     .filter(file => /\.(png|jpg|jpeg)$/i.test(file));
   if (splashFiles.length === 0) {
     failures.push('iOS Splash.imageset has no bitmap splash image');
+  }
+  for (const file of splashFiles) {
+    assertPngDimensions(file, 2732, 2732, failures);
   }
 }
 

@@ -328,7 +328,7 @@ world visual audit receipt/freshness against world art, layout, progression,
 puzzle-object, and scene-isolation files, requires a fresh full visual audit
 receipt for all 18 expected screen/effect targets across five viewport classes
 plus per-capture detail reports with visible nonblank canvases and no
-console/page errors,
+console/page errors, verifies required app icon and launch-image PNG dimensions,
 scans the runtime asset manifest for missing files and temporary placeholder
 naming, checks that the generated `www` bundle is fresh against source
 JS/config/static assets, validates fresh browser performance smoke metrics,

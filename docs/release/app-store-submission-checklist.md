@@ -43,8 +43,8 @@ leaderboard privacy disclosure, service availability, and account-review risk.
 | Requirement | Current evidence | Status |
 | --- | --- | --- |
 | Build and iOS sync readiness | `npm run ios:check` passes build, release budget, `npx cap sync ios`, and native public bundle hash checks against `www`. | Ready locally |
-| App icon | `assets/icons/app-icon-1024.png` and `ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png`. | Ready locally |
-| Launch assets | `assets/icons/splash-*.png` and `ios/App/App/Assets.xcassets/Splash.imageset/`. | Ready locally |
+| App icon | `assets/icons/app-icon-1024.png` and `ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png`; `npm run ios:check` and `npm run release:handoff` verify PNG dimensions. | Ready locally |
+| Launch assets | `assets/icons/splash-*.png` and `ios/App/App/Assets.xcassets/Splash.imageset/`; `npm run ios:check` and `npm run release:handoff` verify PNG dimensions. | Ready locally |
 | Metadata draft | `docs/release/app-store-materials.md`. | Ready locally; owner fields remain |
 | Privacy page | `public/privacy.html`, bundled by `npm run ios:check`; `https://scorched-earth.vercel.app/privacy.html` returned HTTP 200 on 2026-05-09. | Ready |
 | Support page | `public/support.html`, bundled by `npm run ios:check`; `https://scorched-earth.vercel.app/support.html` returned HTTP 200 on 2026-05-09. | Ready; add direct contact details if release regions require them |
