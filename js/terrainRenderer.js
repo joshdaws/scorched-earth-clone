@@ -1,7 +1,39 @@
 import { getTerrainGridSurfaceYAt } from './terrainCells.js';
+import { get as getAsset } from './assets.js';
 
 export const TERRAIN_FILL_COLOR = '#1a0a2e';
 export const TERRAIN_EDGE_COLOR = '#ff2a6d';
+
+let cachedDirtPattern = null;
+let cachedDirtPatternSource = null;
+
+/**
+ * Resolve (and cache) the tileable dirt texture pattern when the generated
+ * terrain texture asset is available. Falls back to null so callers keep the
+ * solid fill.
+ * @param {CanvasRenderingContext2D} ctx
+ * @returns {CanvasPattern|null}
+ */
+function getTerrainFillPattern(ctx) {
+    const tile = getAsset('terrain.dirtTexture');
+    if (!tile || !tile.complete || !(tile.naturalWidth > 0)) {
+        return null;
+    }
+
+    if (cachedDirtPattern && cachedDirtPatternSource === tile) {
+        return cachedDirtPattern;
+    }
+
+    try {
+        cachedDirtPattern = ctx.createPattern(tile, 'repeat');
+        cachedDirtPatternSource = tile;
+    } catch {
+        cachedDirtPattern = null;
+        cachedDirtPatternSource = null;
+    }
+
+    return cachedDirtPattern;
+}
 
 /**
  * Render the active terrain, preferring the GPU-backed Pixi layer when it is available.
@@ -42,8 +74,18 @@ export function renderCanvasTerrain(ctx, terrain) {
     ctx.lineTo(width - 1, screenHeight);
     ctx.closePath();
 
+    // Solid base ensures full coverage; the texture pattern layers detail on
+    // top when the generated tile asset is loaded.
     ctx.fillStyle = TERRAIN_FILL_COLOR;
     ctx.fill();
+
+    const pattern = getTerrainFillPattern(ctx);
+    if (pattern) {
+        ctx.save();
+        ctx.fillStyle = pattern;
+        ctx.fill();
+        ctx.restore();
+    }
 
     ctx.save();
     ctx.shadowColor = TERRAIN_EDGE_COLOR;

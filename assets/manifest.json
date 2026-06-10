@@ -6,14 +6,14 @@
       "height": 32
     },
     "playerBody": {
-      "path": "images/tanks/tank-player-body.png",
-      "width": 64,
-      "height": 32
+      "path": "images/tanks/tank-player-body-hd.png",
+      "width": 256,
+      "height": 128
     },
     "playerTurret": {
-      "path": "images/tanks/tank-player-turret.png",
-      "width": 28,
-      "height": 12,
+      "path": "images/tanks/tank-player-turret-hd.png",
+      "width": 112,
+      "height": 48,
       "scalePolicy": "pixel-perfect",
       "pivot": {
         "x": 6,
@@ -36,14 +36,14 @@
       "height": 32
     },
     "enemyBody": {
-      "path": "images/tanks/tank-enemy-body.png",
-      "width": 64,
-      "height": 32
+      "path": "images/tanks/tank-enemy-body-hd.png",
+      "width": 256,
+      "height": 128
     },
     "enemyTurret": {
-      "path": "images/tanks/tank-enemy-turret.png",
-      "width": 28,
-      "height": 12,
+      "path": "images/tanks/tank-enemy-turret-hd.png",
+      "width": 112,
+      "height": 48,
       "scalePolicy": "pixel-perfect",
       "pivot": {
         "x": 6,
@@ -63,7 +63,7 @@
     "playerPro": {
       "path": "images/tanks/tank-player-pro.png",
       "width": 96,
-      "height": 56
+      "height": 55
     },
     "enemyPro": {
       "path": "images/tanks/tank-enemy-pro.png",
@@ -75,7 +75,7 @@
     "legendary-neon-vanguard": {
       "path": "images/tanks/tank-player-pro.png",
       "width": 96,
-      "height": 56
+      "height": 55
     },
     "legendary-obsidian-judge": {
       "path": "images/tanks/tank-enemy-pro.png",
@@ -392,7 +392,7 @@
     "crate": {
       "path": "images/supply-drop/crate-pro.png",
       "width": 128,
-      "height": 128
+      "height": 107
     },
     "helicopter": {
       "path": "images/supply-drop/helicopter.png",
@@ -453,38 +453,38 @@
   "puzzleObjects": {
     "shieldGenerator": {
       "path": "images/puzzle-objects/shield-generator.png",
-      "width": 160,
-      "height": 160,
+      "width": 320,
+      "height": 320,
       "runtimeGroup": "gameplay"
     },
     "ricochetPanel": {
       "path": "images/puzzle-objects/ricochet-panel.png",
-      "width": 192,
-      "height": 112,
+      "width": 384,
+      "height": 224,
       "runtimeGroup": "gameplay"
     },
     "teleportGate": {
       "path": "images/puzzle-objects/teleport-gate.png",
-      "width": 160,
-      "height": 176,
+      "width": 320,
+      "height": 352,
       "runtimeGroup": "gameplay"
     },
     "hardlightBunker": {
       "path": "images/puzzle-objects/hardlight-bunker.png",
-      "width": 224,
-      "height": 112,
+      "width": 448,
+      "height": 224,
       "runtimeGroup": "gameplay"
     },
     "fuelCell": {
       "path": "images/puzzle-objects/fuel-cell.png",
-      "width": 128,
-      "height": 168,
+      "width": 256,
+      "height": 336,
       "runtimeGroup": "gameplay"
     },
     "collapseNode": {
       "path": "images/puzzle-objects/collapse-node.png",
-      "width": 144,
-      "height": 144,
+      "width": 288,
+      "height": 288,
       "runtimeGroup": "gameplay"
     }
   },
@@ -567,6 +567,36 @@
         "y": 0,
         "width": 512,
         "height": 512
+      }
+    },
+    "explosionSheet": {
+      "path": "images/effects/explosion-sheet.webp",
+      "width": 768,
+      "height": 768,
+      "runtimeGroup": "gameplay",
+      "scalePolicy": "smooth",
+      "frames": {
+        "columns": 4,
+        "rows": 4,
+        "count": 16,
+        "width": 192,
+        "height": 192,
+        "durationMs": 28
+      }
+    },
+    "nukeSheet": {
+      "path": "images/effects/nuke-sheet.webp",
+      "width": 768,
+      "height": 768,
+      "runtimeGroup": "gameplay",
+      "scalePolicy": "smooth",
+      "frames": {
+        "columns": 4,
+        "rows": 4,
+        "count": 16,
+        "width": 192,
+        "height": 192,
+        "durationMs": 28
       }
     }
   },
@@ -808,42 +838,43 @@
       "height": 1365
     },
     "gameplay": {
-      "path": "images/backgrounds/bg-gameplay.png",
+      "path": "images/backgrounds/bg-gameplay.webp",
       "width": 1536,
-      "height": 1024
+      "height": 1024,
+      "runtimeGroup": "gameplay"
     },
     "world1": {
-      "path": "images/backgrounds/world-1-neon-dunes.png",
+      "path": "images/backgrounds/world-1-neon-dunes.webp",
       "width": 1536,
       "height": 1024,
       "runtimeGroup": "gameplay"
     },
     "world2": {
-      "path": "images/backgrounds/world-2-chrome-canyons.png",
+      "path": "images/backgrounds/world-2-chrome-canyons.webp",
       "width": 1536,
       "height": 1024,
       "runtimeGroup": "gameplay"
     },
     "world3": {
-      "path": "images/backgrounds/world-3-prism-bunkers.png",
+      "path": "images/backgrounds/world-3-prism-bunkers.webp",
       "width": 1536,
       "height": 1024,
       "runtimeGroup": "gameplay"
     },
     "world4": {
-      "path": "images/backgrounds/world-4-vector-vortex.png",
+      "path": "images/backgrounds/world-4-vector-vortex.webp",
       "width": 1536,
       "height": 1024,
       "runtimeGroup": "gameplay"
     },
     "world5": {
-      "path": "images/backgrounds/world-5-pixel-wastes.png",
+      "path": "images/backgrounds/world-5-pixel-wastes.webp",
       "width": 1536,
       "height": 1024,
       "runtimeGroup": "gameplay"
     },
     "world6": {
-      "path": "images/backgrounds/world-6-midnight-citadel.png",
+      "path": "images/backgrounds/world-6-midnight-citadel.webp",
       "width": 1536,
       "height": 1024,
       "runtimeGroup": "gameplay"
@@ -1110,6 +1141,14 @@
         "collection",
         "supplyDrop"
       ]
+    }
+  },
+  "terrain": {
+    "dirtTexture": {
+      "path": "images/terrain/dirt-tile.webp",
+      "width": 768,
+      "height": 768,
+      "runtimeGroup": "gameplay"
     }
   }
 }

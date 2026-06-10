@@ -345,6 +345,15 @@ async function writePng(file, svg, options = {}) {
 }
 
 async function main() {
+  // The AAA art pass replaced these SVG-generated backgrounds/puzzle objects
+  // with AI-generated production assets (see scripts/process-aaa-assets.js).
+  // Re-running this generator would clobber them, so it now requires an
+  // explicit opt-in for legacy/fallback regeneration.
+  if (process.env.FORCE_LEGACY_POLISH !== '1') {
+    console.log('Skipped: AAA generated art is authoritative. Set FORCE_LEGACY_POLISH=1 to regenerate legacy SVG assets (this overwrites AAA art and manifest entries).');
+    return;
+  }
+
   ensureDir(backgroundsDir);
   ensureDir(puzzleDir);
 

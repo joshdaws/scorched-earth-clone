@@ -49,6 +49,7 @@ import { LevelRegistry } from './levels.js';
 import { buildTerrainFromSlot, getPuzzleObjectsForSlot, getSpawnForSlot } from './level-layouts.js';
 import { PUZZLE_OBJECT_TYPES, findActiveHazardsInRadius, renderPuzzleObjectsWithSprites, resolvePuzzleObjectCollision } from './puzzleObjects.js';
 import { applyExplosionToAllTanks } from './damage.js';
+import { drawSheetFrameForProgress } from './spriteSheet.js';
 import { Stars } from './stars.js';
 import * as CombatAchievements from './combat-achievements.js';
 import * as PrecisionAchievements from './precision-achievements.js';
@@ -132,7 +133,11 @@ let enemyTank = null;
 
 const TANK_TURRET_SPRITE = {
     PIVOT_X: 6,
-    PIVOT_Y: 6
+    PIVOT_Y: 6,
+    // Display size in design pixels. Source art may be higher resolution
+    // (e.g. 4x) and is scaled down to these dimensions at draw time.
+    DISPLAY_WIDTH: 28,
+    DISPLAY_HEIGHT: 12
 };
 
 /**
@@ -3956,23 +3961,40 @@ function renderTankParts(ctx, tank, bodySprite, turretSprite, renderProfile) {
 
     ctx.save();
 
-    const bodyX = x - bodySprite.width / 2;
-    const bodyY = y - bodySprite.height;
+    // Sprites render into fixed design-space dimensions regardless of source
+    // resolution, so high-resolution art downscales crisply while legacy 1x
+    // pixel sprites keep nearest-neighbor sampling.
+    const bodyWidth = TANK.WIDTH;
+    const bodyHeight = TANK.HEIGHT;
+    const turretWidth = TANK_TURRET_SPRITE.DISPLAY_WIDTH;
+    const turretHeight = TANK_TURRET_SPRITE.DISPLAY_HEIGHT;
+    const hiResBody = bodySprite.width > bodyWidth;
+    const hiResTurret = turretSprite.width > turretWidth;
+
+    const bodyX = x - bodyWidth / 2;
+    const bodyY = y - bodyHeight;
     const prevSmoothing = ctx.imageSmoothingEnabled;
 
-    ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = hiResBody;
     ctx.shadowColor = outlineColor;
     ctx.shadowBlur = team === 'player' ? 7 : 10;
-    ctx.drawImage(bodySprite, bodyX, bodyY);
+    ctx.drawImage(bodySprite, bodyX, bodyY, bodyWidth, bodyHeight);
 
     const pivot = getTurretPivot(tank);
     const radians = (angle * Math.PI) / 180;
 
     ctx.save();
+    ctx.imageSmoothingEnabled = hiResTurret;
     ctx.shadowBlur = team === 'player' ? 10 : 8;
     ctx.translate(pivot.x, pivot.y);
     ctx.rotate(-radians);
-    ctx.drawImage(turretSprite, -TANK_TURRET_SPRITE.PIVOT_X, -TANK_TURRET_SPRITE.PIVOT_Y);
+    ctx.drawImage(
+        turretSprite,
+        -TANK_TURRET_SPRITE.PIVOT_X,
+        -TANK_TURRET_SPRITE.PIVOT_Y,
+        turretWidth,
+        turretHeight
+    );
     ctx.restore();
 
     ctx.imageSmoothingEnabled = prevSmoothing;
@@ -4893,6 +4915,31 @@ function renderExplosionEffect(ctx) {
  * @param {boolean} isNuclear - Whether this is a nuclear explosion
  */
 function renderGeneratedExplosionOverlay(ctx, x, y, radius, progress, isNuclear) {
+    // Prefer animated sheet playback when sheet assets are available.
+    const sheetKey = isNuclear ? 'effects.nukeSheet' : 'effects.explosionSheet';
+    const sheet = Assets.get(sheetKey);
+    const sheetMeta = Assets.getAssetMetadata(sheetKey);
+
+    if (isRealSprite(sheet) && sheetMeta?.frames) {
+        const drawSize = radius * (isNuclear ? 3.6 : 2.8);
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        ctx.globalAlpha = 0.96;
+        drawSheetFrameForProgress(
+            ctx,
+            sheet,
+            sheetMeta.frames,
+            progress,
+            x,
+            // Sheet frames include rising plume headroom; bias upward slightly.
+            y - drawSize * (isNuclear ? 0.16 : 0.08),
+            drawSize,
+            drawSize
+        );
+        ctx.restore();
+        return;
+    }
+
     const assetKey = getExplosionAssetKey(radius, isNuclear);
     const sprite = Assets.get(assetKey);
 
@@ -6404,6 +6451,13 @@ async function preloadLevelBattlefieldAssets(level, worldNum) {
         'puzzleObjects.hardlightBunker',
         'puzzleObjects.fuelCell',
         'puzzleObjects.collapseNode',
+        'terrain.dirtTexture',
+        'effects.explosionSheet',
+        'effects.nukeSheet',
+        'tanks.playerBody',
+        'tanks.playerTurret',
+        'tanks.enemyBody',
+        'tanks.enemyTurret',
         ...weaponIconKeys
     ].filter(Boolean);
 

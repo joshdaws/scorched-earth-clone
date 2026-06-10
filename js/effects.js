@@ -1065,7 +1065,33 @@ function renderBakedGameplayBackground(ctx, width, height) {
     }
 
     drawImageCover(ctx, background, 0, 0, width, height);
+    renderBattlefieldScrim(ctx, width, height);
     return true;
+}
+
+let cachedScrimGradient = null;
+let cachedScrimHeight = 0;
+
+/**
+ * Darken the lower battlefield band so tanks, terrain edges, and projectiles
+ * stay readable against detailed painted backgrounds.
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} width - Canvas width
+ * @param {number} height - Canvas height
+ */
+function renderBattlefieldScrim(ctx, width, height) {
+    if (!cachedScrimGradient || cachedScrimHeight !== height) {
+        cachedScrimGradient = ctx.createLinearGradient(0, height * 0.42, 0, height);
+        cachedScrimGradient.addColorStop(0, 'rgba(13, 2, 33, 0)');
+        cachedScrimGradient.addColorStop(0.55, 'rgba(13, 2, 33, 0.28)');
+        cachedScrimGradient.addColorStop(1, 'rgba(13, 2, 33, 0.5)');
+        cachedScrimHeight = height;
+    }
+
+    ctx.save();
+    ctx.fillStyle = cachedScrimGradient;
+    ctx.fillRect(0, height * 0.42, width, height * 0.58);
+    ctx.restore();
 }
 
 /**
