@@ -288,12 +288,53 @@ async function processPuzzleObjects() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// UI icons: trim + contain into 192x192 boxes.
+// ---------------------------------------------------------------------------
+const UI_ICONS = [
+  { name: 'ui-star-filled', key: 'starFilled', file: 'icon-star-filled.png' },
+  { name: 'ui-star-empty', key: 'starEmpty', file: 'icon-star-empty.png' },
+  { name: 'ui-lock', key: 'lock', file: 'icon-lock.png' }
+];
+
+async function processUiIcons() {
+  for (const icon of UI_ICONS) {
+    if (!wants(icon.name) || !hasStaged(icon.name)) continue;
+
+    const box = 192;
+    const trimmed = await sharp(stagingPath(icon.name)).trim({ threshold: 12 }).png().toBuffer();
+    const meta = await sharp(trimmed).metadata();
+    const scale = Math.min(box / meta.width, box / meta.height);
+    const w = Math.round(meta.width * scale);
+    const h = Math.round(meta.height * scale);
+    const resized = await sharp(trimmed).resize(w, h).png().toBuffer();
+
+    const outRel = `images/ui/${icon.file}`;
+    const outAbs = path.join(root, 'assets', outRel);
+    await sharp({
+      create: { width: box, height: box, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } }
+    })
+      .composite([{ input: resized, left: Math.round((box - w) / 2), top: Math.round((box - h) / 2) }])
+      .png({ compressionLevel: 9 })
+      .toFile(outAbs);
+
+    setManifest('ui', icon.key, {
+      path: outRel,
+      width: box,
+      height: box,
+      runtimeGroup: 'gameplay'
+    });
+    report.push(`ui ${icon.key} -> ${outRel} (${(fs.statSync(outAbs).size / 1024).toFixed(0)} KB)`);
+  }
+}
+
 async function main() {
   await processBackgrounds();
   await processTanks();
   await processTerrainTile();
   await processSheets();
   await processPuzzleObjects();
+  await processUiIcons();
 
   if (manifestDirty) {
     fs.writeFileSync(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);

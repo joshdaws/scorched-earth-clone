@@ -653,36 +653,49 @@ export function renderTrajectoryPreview(ctx, tank, angle, power, terrain) {
 
     ctx.save();
 
-    // Draw trajectory as dotted line with fading opacity
-    let distanceTraveled = 0;
-    let lastPoint = previewPoints[0];
+    // Draw the trajectory as a smooth glowing arc that fades along its
+    // length, banded so alpha can step down without per-segment strokes.
+    const bands = 4;
+    const bandSize = Math.ceil(previewPoints.length / bands);
 
-    for (let i = 1; i < previewPoints.length; i++) {
-        const point = previewPoints[i];
-        const segmentLength = Math.sqrt(
-            Math.pow(point.x - lastPoint.x, 2) +
-            Math.pow(point.y - lastPoint.y, 2)
-        );
-        distanceTraveled += segmentLength;
+    for (let band = 0; band < bands; band++) {
+        const startIndex = band * bandSize;
+        const endIndex = Math.min(previewPoints.length - 1, (band + 1) * bandSize);
+        if (startIndex >= endIndex) break;
 
-        // Calculate fade based on progress through the visible portion
-        const fadeProgress = i / previewPoints.length;
-        const alpha = fadeProgress < traj.FADE_START ?
-            0.8 :
-            0.8 * (1 - (fadeProgress - traj.FADE_START) / (1 - traj.FADE_START));
+        const bandProgress = band / (bands - 1);
+        const alpha = 0.85 * (1 - bandProgress * 0.72);
 
-        // Draw dot at spaced intervals
-        if (distanceTraveled % traj.DOT_SPACING < segmentLength) {
-            ctx.beginPath();
-            ctx.arc(point.x, point.y, traj.DOT_RADIUS, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(249, 240, 2, ${alpha})`;  // Yellow dots
-            ctx.shadowColor = COLORS.NEON_YELLOW;
-            ctx.shadowBlur = 4 * alpha;
-            ctx.fill();
+        // Soft glow underlay.
+        ctx.beginPath();
+        ctx.moveTo(previewPoints[startIndex].x, previewPoints[startIndex].y);
+        for (let i = startIndex + 1; i <= endIndex; i++) {
+            ctx.lineTo(previewPoints[i].x, previewPoints[i].y);
         }
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.setLineDash([]);
+        ctx.strokeStyle = `rgba(249, 240, 2, ${alpha * 0.22})`;
+        ctx.lineWidth = 6;
+        ctx.shadowColor = COLORS.NEON_YELLOW;
+        ctx.shadowBlur = 10 * alpha;
+        ctx.stroke();
 
-        lastPoint = point;
+        // Crisp dashed core reads as a precision instrument.
+        ctx.beginPath();
+        ctx.moveTo(previewPoints[startIndex].x, previewPoints[startIndex].y);
+        for (let i = startIndex + 1; i <= endIndex; i++) {
+            ctx.lineTo(previewPoints[i].x, previewPoints[i].y);
+        }
+        ctx.setLineDash([3, 9]);
+        ctx.lineDashOffset = -(animationTime * 36) % 12;
+        ctx.strokeStyle = `rgba(255, 252, 168, ${alpha})`;
+        ctx.lineWidth = 2.4;
+        ctx.shadowBlur = 5 * alpha;
+        ctx.stroke();
     }
+
+    ctx.setLineDash([]);
 
     // No impact point shown - player must estimate the full trajectory
 

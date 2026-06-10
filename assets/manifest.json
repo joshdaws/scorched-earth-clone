@@ -1150,5 +1150,25 @@
       "height": 768,
       "runtimeGroup": "gameplay"
     }
+  },
+  "ui": {
+    "starFilled": {
+      "path": "images/ui/icon-star-filled.png",
+      "width": 192,
+      "height": 192,
+      "runtimeGroup": "gameplay"
+    },
+    "starEmpty": {
+      "path": "images/ui/icon-star-empty.png",
+      "width": 192,
+      "height": 192,
+      "runtimeGroup": "gameplay"
+    },
+    "lock": {
+      "path": "images/ui/icon-lock.png",
+      "width": 192,
+      "height": 192,
+      "runtimeGroup": "gameplay"
+    }
   }
 }

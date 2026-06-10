@@ -14,6 +14,7 @@ import * as Sound from './sound.js';
 import * as Music from './music.js';
 import { LevelRegistry, LEVEL_CONSTANTS, WORLD_THEMES } from './levels.js';
 import { Stars } from './stars.js';
+import { drawStarIcon } from './uiIcons.js';
 
 // =============================================================================
 // CONFIGURATION
@@ -910,14 +911,22 @@ function renderVictoryHeader(ctx, centerX, mainColor, pulseIntensity) {
     ctx.textBaseline = 'middle';
     ctx.fillText(levelWon ? 'VICTORY!' : 'LEVEL FAILED', centerX, CONFIG.TITLE_Y);
 
-    // Decorative stars on sides
+    // Decorative side accents
     ctx.shadowBlur = 15;
-    ctx.font = `24px ${UI.FONT_FAMILY}`;
-    ctx.fillStyle = levelWon ? COLORS.NEON_YELLOW : COLORS.NEON_PINK;
-    ctx.shadowColor = ctx.fillStyle;
-    const accent = levelWon ? '\u2605 \u2605 \u2605' : '\u25c7 \u25c7 \u25c7';
-    ctx.fillText(accent, centerX - 150, CONFIG.TITLE_Y);
-    ctx.fillText(accent, centerX + 150, CONFIG.TITLE_Y);
+    if (levelWon) {
+        for (const side of [-1, 1]) {
+            for (let i = 0; i < 3; i++) {
+                drawStarIcon(ctx, centerX + side * (118 + i * 32), CONFIG.TITLE_Y, 22, true, { glow: 8 });
+            }
+        }
+    } else {
+        ctx.font = `24px ${UI.FONT_FAMILY}`;
+        ctx.fillStyle = COLORS.NEON_PINK;
+        ctx.shadowColor = ctx.fillStyle;
+        const accent = '\u25c7 \u25c7 \u25c7';
+        ctx.fillText(accent, centerX - 150, CONFIG.TITLE_Y);
+        ctx.fillText(accent, centerX + 150, CONFIG.TITLE_Y);
+    }
 
     ctx.restore();
 }
@@ -933,58 +942,30 @@ function renderStars(ctx, centerX, y, pulseIntensity) {
 
     for (let i = 0; i < 3; i++) {
         const x = startX + i * CONFIG.STAR_SPACING;
-        const isEarned = i < earnedStars;
         const isRevealed = i < starsRevealed;
         const fillProgress = starAnimationProgress[i];
 
-        // Determine star state
         if (isRevealed && fillProgress >= 1) {
-            // Fully filled star
-            ctx.font = `${CONFIG.STAR_SIZE}px ${UI.FONT_FAMILY}`;
-            ctx.fillStyle = COLORS.NEON_YELLOW;
-            ctx.shadowColor = COLORS.NEON_YELLOW;
-            ctx.shadowBlur = 15 + pulseIntensity * 10;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('\u2605', x, y);
+            // Fully earned star with a steady pulse glow.
+            drawStarIcon(ctx, x, y, CONFIG.STAR_SIZE, true, {
+                glow: 15 + pulseIntensity * 10
+            });
         } else if (isRevealed && fillProgress > 0) {
-            // Animating star - scale effect
-            const scale = 0.5 + fillProgress * 0.5;
-            const alpha = fillProgress;
+            // Pop-in: the socket fades out while the gold star scales up with
+            // an overshoot so the reveal lands with weight.
+            drawStarIcon(ctx, x, y, CONFIG.STAR_SIZE, false, {
+                alpha: 1 - fillProgress
+            });
 
-            ctx.save();
-            ctx.translate(x, y);
-            ctx.scale(scale, scale);
-
-            // Glow during animation
-            ctx.font = `${CONFIG.STAR_SIZE}px ${UI.FONT_FAMILY}`;
-            ctx.fillStyle = COLORS.NEON_YELLOW;
-            ctx.globalAlpha = alpha;
-            ctx.shadowColor = COLORS.NEON_YELLOW;
-            ctx.shadowBlur = 30 * fillProgress;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('\u2605', 0, 0);
-
-            ctx.restore();
-
-            // Also draw empty star behind it
-            ctx.font = `${CONFIG.STAR_SIZE}px ${UI.FONT_FAMILY}`;
-            ctx.fillStyle = COLORS.TEXT_MUTED;
-            ctx.globalAlpha = 1 - alpha;
-            ctx.shadowBlur = 0;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('\u2606', x, y);
-            ctx.globalAlpha = 1;
+            const overshoot = fillProgress < 0.8
+                ? 0.45 + fillProgress * 0.85
+                : 1.13 - (fillProgress - 0.8) * 0.65;
+            drawStarIcon(ctx, x, y, CONFIG.STAR_SIZE * overshoot, true, {
+                glow: 30 * fillProgress,
+                alpha: Math.min(1, fillProgress * 1.4)
+            });
         } else {
-            // Empty star
-            ctx.font = `${CONFIG.STAR_SIZE}px ${UI.FONT_FAMILY}`;
-            ctx.fillStyle = 'rgba(136, 136, 153, 0.5)';
-            ctx.shadowBlur = 0;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('\u2606', x, y);
+            drawStarIcon(ctx, x, y, CONFIG.STAR_SIZE, false, { alpha: 0.6 });
         }
     }
 

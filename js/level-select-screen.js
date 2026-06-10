@@ -15,6 +15,8 @@ import * as Music from './music.js';
 import { LevelRegistry, LEVEL_CONSTANTS, WORLD_THEMES } from './levels.js';
 import { Stars } from './stars.js';
 import * as TitleScene from './titleScene/titleScene.js';
+import { get as getAsset, loadAsset } from './assets.js';
+import { drawLockIcon, drawStarIcon } from './uiIcons.js';
 
 // =============================================================================
 // CONFIGURATION
@@ -390,6 +392,8 @@ export function render(ctx) {
     ctx.fillStyle = COLORS.BACKGROUND;
     ctx.fillRect(0, 0, Renderer.getWidth(), Renderer.getHeight());
 
+    renderWorldBackdrop(ctx);
+
     // Render components
     renderHeader(ctx);
     renderLevelGrid(ctx);
@@ -397,6 +401,57 @@ export function render(ctx) {
     renderWorldNavigation(ctx);
     renderBackButton(ctx);
     renderFooter(ctx);
+}
+
+/**
+ * Render the current world's battlefield art as a dimmed backdrop so the
+ * level select feels like part of that world instead of a void.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ */
+function renderWorldBackdrop(ctx) {
+    const width = Renderer.getWidth();
+    const height = Renderer.getHeight();
+    const backdrop = getAsset(`backgrounds.world${currentWorld}`);
+
+    if (!backdrop || !backdrop.complete || !(backdrop.naturalWidth > 0)) {
+        // Kick off the load so world flips fill in within a frame or two.
+        loadAsset?.(`backgrounds.world${currentWorld}`);
+        return;
+    }
+
+    ctx.save();
+
+    // Cover-fit draw.
+    const imgAspect = backdrop.naturalWidth / backdrop.naturalHeight;
+    const targetAspect = width / height;
+    let sx = 0;
+    let sy = 0;
+    let sw = backdrop.naturalWidth;
+    let sh = backdrop.naturalHeight;
+    if (targetAspect > imgAspect) {
+        sh = backdrop.naturalWidth / targetAspect;
+        sy = (backdrop.naturalHeight - sh) / 2;
+    } else {
+        sw = backdrop.naturalHeight * targetAspect;
+        sx = (backdrop.naturalWidth - sw) / 2;
+    }
+    ctx.globalAlpha = 0.45;
+    ctx.drawImage(backdrop, sx, sy, sw, sh, 0, 0, width, height);
+    ctx.globalAlpha = 1;
+
+    // Legibility veil: darken overall and vignette toward the grid area.
+    ctx.fillStyle = 'rgba(7, 2, 18, 0.55)';
+    ctx.fillRect(0, 0, width, height);
+    const vignette = ctx.createRadialGradient(
+        width / 2, height / 2, height * 0.22,
+        width / 2, height / 2, height * 0.85
+    );
+    vignette.addColorStop(0, 'rgba(7, 2, 18, 0)');
+    vignette.addColorStop(1, 'rgba(7, 2, 18, 0.6)');
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.restore();
 }
 
 /**
@@ -455,7 +510,10 @@ function renderHeader(ctx) {
     ctx.fillStyle = COLORS.NEON_YELLOW;
     ctx.font = `bold 24px ${UI.FONT_FAMILY}`;
     ctx.shadowColor = COLORS.NEON_YELLOW;
-    ctx.fillText(`\u2605 ${worldStars.earned}/${worldStars.possible}`, Renderer.getWidth() / 2, 85);
+    const progressText = `${worldStars.earned}/${worldStars.possible}`;
+    const progressWidth = ctx.measureText(progressText).width;
+    drawStarIcon(ctx, Renderer.getWidth() / 2 - progressWidth / 2 - 18, 85, 24, true, { glow: 6 });
+    ctx.fillText(progressText, Renderer.getWidth() / 2 + 13, 85);
 
     ctx.restore();
 }
@@ -507,17 +565,43 @@ function renderLevelButton(ctx, { rect, levelNum, level, stars, unlocked, isHove
 
     ctx.save();
 
-    // Button background
-    if (unlocked) {
-        ctx.fillStyle = isHovered ? 'rgba(30, 30, 60, 0.95)' : 'rgba(20, 20, 40, 0.9)';
-    } else {
-        ctx.fillStyle = 'rgba(10, 10, 26, 0.6)';
-    }
+    // Hovered cards lift slightly for tactile feedback.
+    const lift = unlocked && isHovered ? -3 : 0;
+    const cardY = y + lift;
+
+    // Drop shadow grounds the card against the world backdrop.
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
     ctx.beginPath();
-    ctx.roundRect(x, y, width, height, 12);
+    ctx.roundRect(x + 3, cardY + 6, width, height, 12);
     ctx.fill();
 
-    // Button border
+    // Card body gradient.
+    const bodyGradient = ctx.createLinearGradient(x, cardY, x, cardY + height);
+    if (unlocked) {
+        bodyGradient.addColorStop(0, isHovered ? 'rgba(46, 36, 84, 0.97)' : 'rgba(34, 26, 64, 0.95)');
+        bodyGradient.addColorStop(0.5, 'rgba(18, 14, 40, 0.96)');
+        bodyGradient.addColorStop(1, 'rgba(10, 8, 26, 0.97)');
+    } else {
+        bodyGradient.addColorStop(0, 'rgba(16, 14, 30, 0.82)');
+        bodyGradient.addColorStop(1, 'rgba(8, 7, 18, 0.85)');
+    }
+    ctx.fillStyle = bodyGradient;
+    ctx.beginPath();
+    ctx.roundRect(x, cardY, width, height, 12);
+    ctx.fill();
+
+    // Top sheen highlight sells the chrome card feel.
+    if (unlocked) {
+        const sheen = ctx.createLinearGradient(x, cardY, x, cardY + height * 0.4);
+        sheen.addColorStop(0, 'rgba(255, 255, 255, 0.14)');
+        sheen.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        ctx.fillStyle = sheen;
+        ctx.beginPath();
+        ctx.roundRect(x + 2, cardY + 2, width - 4, height * 0.4, 10);
+        ctx.fill();
+    }
+
+    // Border + glow.
     if (unlocked) {
         ctx.strokeStyle = isHovered ? theme.primaryColor : theme.secondaryColor;
         ctx.lineWidth = isHovered ? 3 : 2;
@@ -532,6 +616,8 @@ function renderLevelButton(ctx, { rect, levelNum, level, stars, unlocked, isHove
         ctx.strokeStyle = 'rgba(136, 136, 153, 0.4)';
         ctx.lineWidth = 1;
     }
+    ctx.beginPath();
+    ctx.roundRect(x, cardY, width, height, 12);
     ctx.stroke();
     ctx.shadowBlur = 0;
 
@@ -545,22 +631,17 @@ function renderLevelButton(ctx, { rect, levelNum, level, stars, unlocked, isHove
             ctx.shadowColor = theme.primaryColor;
             ctx.shadowBlur = 8;
         }
-        ctx.fillText(String(levelNum), centerX, centerY - 12);
+        ctx.fillText(String(levelNum), centerX, cardY + height / 2 - 12);
         ctx.shadowBlur = 0;
 
         if (level?.progression?.isIntroLevel) {
-            renderNewAmmoBadge(ctx, x + width - 42, y + 8, theme, pulseIntensity);
+            renderNewAmmoBadge(ctx, x + width - 42, cardY + 8, theme, pulseIntensity);
         }
 
         // Star display
-        renderStars(ctx, centerX, centerY + 28, stars, isHovered);
+        renderStars(ctx, centerX, cardY + height / 2 + 28, stars, isHovered);
     } else {
-        // Lock icon
-        ctx.fillStyle = COLORS.TEXT_MUTED;
-        ctx.font = `bold 32px ${UI.FONT_FAMILY}`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('\uD83D\uDD12', centerX, centerY); // Lock emoji
+        drawLockIcon(ctx, centerX, centerY, 38, 0.85);
     }
 
     ctx.restore();
@@ -676,26 +757,14 @@ function renderStars(ctx, centerX, y, earnedStars, isHovered) {
     const starSpacing = 22;
     const startX = centerX - starSpacing;
 
-    ctx.font = `18px ${UI.FONT_FAMILY}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
     for (let i = 0; i < 3; i++) {
         const x = startX + i * starSpacing;
         const earned = i < earnedStars;
-
-        if (earned) {
-            ctx.fillStyle = COLORS.NEON_YELLOW;
-            ctx.shadowColor = COLORS.NEON_YELLOW;
-            ctx.shadowBlur = 6;
-            ctx.fillText('\u2605', x, y); // Filled star
-        } else {
-            ctx.fillStyle = isHovered ? COLORS.TEXT_MUTED : 'rgba(136, 136, 153, 0.5)';
-            ctx.shadowBlur = 0;
-            ctx.fillText('\u2606', x, y); // Empty star
-        }
+        drawStarIcon(ctx, x, y, 19, earned, {
+            glow: earned ? 6 : 0,
+            alpha: earned || isHovered ? 1 : 0.55
+        });
     }
-    ctx.shadowBlur = 0;
 }
 
 /**

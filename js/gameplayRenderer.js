@@ -44,6 +44,7 @@ export function renderGameplayScene(ctx, config) {
         renderTanks,
         renderTankShields,
         renderActiveProjectile,
+        renderDamageNumbers,
         renderHud,
         renderPauseButton,
         renderLevelEditorReturnButton,
@@ -73,6 +74,9 @@ export function renderGameplayScene(ctx, config) {
     measureRenderSection('tanks', () => renderTanks(ctx));
     measureRenderSection('tankShields', () => renderTankShields(ctx));
     measureRenderSection('activeProjectile', () => renderActiveProjectile(ctx));
+    if (renderDamageNumbers) {
+        measureRenderSection('damageNumbers', () => renderDamageNumbers(ctx));
+    }
 
     if (playerTank) {
         playerTank.angle = playerAim.angle;

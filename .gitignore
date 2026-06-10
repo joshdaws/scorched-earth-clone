@@ -62,3 +62,6 @@ UserSettings/
 obj/
 Builds/
 Assets/TextMesh Pro/
+
+# AI asset generation intermediates (reproducible via codex + process-aaa-assets)
+assets/staging/

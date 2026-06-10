@@ -50,6 +50,7 @@ import { buildTerrainFromSlot, getPuzzleObjectsForSlot, getSpawnForSlot } from '
 import { PUZZLE_OBJECT_TYPES, findActiveHazardsInRadius, renderPuzzleObjectsWithSprites, resolvePuzzleObjectCollision } from './puzzleObjects.js';
 import { applyExplosionToAllTanks } from './damage.js';
 import { drawSheetFrameForProgress } from './spriteSheet.js';
+import { clearDamageNumbers, initDamageNumbers, renderDamageNumbers } from './damageNumbers.js';
 import { Stars } from './stars.js';
 import * as CombatAchievements from './combat-achievements.js';
 import * as PrecisionAchievements from './precision-achievements.js';
@@ -5389,6 +5390,7 @@ function isInsidePhysicsPlaygroundPanel(x, y) {
 function clearPhysicsPlaygroundTransientState() {
     activeProjectiles = [];
     clearHazardDetonations();
+    clearDamageNumbers();
     persistentTrails = [];
     explosionEffect = null;
     clearParticles();
@@ -5727,6 +5729,7 @@ function renderPlaying(ctx) {
         renderTanks,
         renderTankShields,
         renderActiveProjectile,
+        renderDamageNumbers,
         renderHud: HUD.renderHUD,
         renderPauseButton,
         renderLevelEditorReturnButton,
@@ -6335,6 +6338,7 @@ function returnToMenu() {
     currentTerrain = null;
     activeProjectiles = [];
     clearHazardDetonations();
+    clearDamageNumbers();
     pendingSurvivalRunPerk = null;
 
     // Reset selected difficulty so player must choose again
@@ -6739,6 +6743,7 @@ function startNewRun() {
     currentLevelData = null;
     activeProjectiles = [];
     clearHazardDetonations();
+    clearDamageNumbers();
     currentPuzzleObjects = [];
     pendingSurvivalRunPerk = null;
     resetLevelModeStats();
@@ -7530,6 +7535,7 @@ function quitToMenu() {
     }
     activeProjectiles = [];
     clearHazardDetonations();
+    clearDamageNumbers();
 
     // Clear effects
     clearScreenShake();
@@ -8054,6 +8060,9 @@ async function init() {
 
     // Route terrain destruction events into anchored visual effects.
     registerTerrainDerezEventHandlers();
+
+    // Floating combat damage numbers feed off TANK_DAMAGED events.
+    initDamageNumbers();
 
     // Set up VolumeControls callback for Change Name button
     VolumeControls.setChangeNameCallback(() => {
