@@ -10717,7 +10717,29 @@
         0.387588,
         0.407988
       ],
-      "enemyXNorm": 0.86
+      "enemyXNorm": 0.86,
+      "objects": [
+        {
+          "id": "w5l2-volatile-cell",
+          "type": "fuel-cell",
+          "label": "Volatile Cell",
+          "xNorm": 0.805,
+          "yNorm": 0.5366,
+          "radiusNorm": 0.035,
+          "blastRadiusNorm": 0.11,
+          "damage": 35
+        },
+        {
+          "id": "w5l2-chain-cell",
+          "type": "fuel-cell",
+          "label": "Chain Cell",
+          "xNorm": 0.74,
+          "yNorm": 0.6043,
+          "radiusNorm": 0.035,
+          "blastRadiusNorm": 0.11,
+          "damage": 35
+        }
+      ]
     },
     "world5-level3": {
       "terrainSamples": [
@@ -11228,7 +11250,29 @@
         0.399621,
         0.420012
       ],
-      "enemyXNorm": 0.76
+      "enemyXNorm": 0.76,
+      "objects": [
+        {
+          "id": "w5l4-support-node",
+          "type": "collapse-node",
+          "label": "Support Node",
+          "xNorm": 0.67,
+          "yNorm": 0.493,
+          "radiusNorm": 0.03,
+          "collapseRadiusNorm": 0.085,
+          "damage": 14
+        },
+        {
+          "id": "w5l4-island-cell",
+          "type": "fuel-cell",
+          "label": "Island Cell",
+          "xNorm": 0.725,
+          "yNorm": 0.4469,
+          "radiusNorm": 0.035,
+          "blastRadiusNorm": 0.11,
+          "damage": 35
+        }
+      ]
     },
     "world5-level5": {
       "terrainSamples": [
@@ -11740,7 +11784,39 @@
         0.411613,
         0.432004
       ],
-      "enemyXNorm": 0.81
+      "enemyXNorm": 0.81,
+      "objects": [
+        {
+          "id": "w5l6-chain-start",
+          "type": "fuel-cell",
+          "label": "Chain Start",
+          "xNorm": 0.6525,
+          "yNorm": 0.508,
+          "radiusNorm": 0.035,
+          "blastRadiusNorm": 0.11,
+          "damage": 35
+        },
+        {
+          "id": "w5l6-void-node",
+          "type": "collapse-node",
+          "label": "Void Node",
+          "xNorm": 0.72,
+          "yNorm": 0.4184,
+          "radiusNorm": 0.03,
+          "collapseRadiusNorm": 0.085,
+          "damage": 14
+        },
+        {
+          "id": "w5l6-chain-end",
+          "type": "fuel-cell",
+          "label": "Chain End",
+          "xNorm": 0.765,
+          "yNorm": 0.4969,
+          "radiusNorm": 0.035,
+          "blastRadiusNorm": 0.11,
+          "damage": 35
+        }
+      ]
     },
     "world5-level7": {
       "terrainSamples": [
@@ -12259,7 +12335,39 @@
         0.423604,
         0.444
       ],
-      "enemyXNorm": 0.74
+      "enemyXNorm": 0.74,
+      "objects": [
+        {
+          "id": "w5l8-overflow-a",
+          "type": "fuel-cell",
+          "label": "Overflow Cell A",
+          "xNorm": 0.5625,
+          "yNorm": 0.4819,
+          "radiusNorm": 0.035,
+          "blastRadiusNorm": 0.11,
+          "damage": 35
+        },
+        {
+          "id": "w5l8-oasis-node",
+          "type": "collapse-node",
+          "label": "Oasis Node",
+          "xNorm": 0.65,
+          "yNorm": 0.4441,
+          "radiusNorm": 0.03,
+          "collapseRadiusNorm": 0.085,
+          "damage": 14
+        },
+        {
+          "id": "w5l8-overflow-b",
+          "type": "fuel-cell",
+          "label": "Overflow Cell B",
+          "xNorm": 0.6825,
+          "yNorm": 0.3446,
+          "radiusNorm": 0.035,
+          "blastRadiusNorm": 0.11,
+          "damage": 35
+        }
+      ]
     },
     "world5-level9": {
       "terrainSamples": [

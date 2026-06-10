@@ -86,7 +86,10 @@ test.describe('level mode journey', () => {
       window.dispatchEvent(new CustomEvent('levelSelected', {
         detail: { levelId: level.id, level, worldNum: 1, levelNum: 2 }
       }));
-      await new Promise(resolve => setTimeout(resolve, 600));
+      await new Promise(resolve => setTimeout(resolve, 200));
+      for (let i = 0; i < 80 && window.Game.getState() !== 'playing'; i++) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
 
       const controls = window.TestAPI.getControlState();
       return {
@@ -119,7 +122,10 @@ test.describe('level mode journey', () => {
       window.dispatchEvent(new CustomEvent('levelSelected', {
         detail: { levelId: level.id, level, worldNum: 6, levelNum: 7 }
       }));
-      await new Promise(resolve => setTimeout(resolve, 600));
+      await new Promise(resolve => setTimeout(resolve, 200));
+      for (let i = 0; i < 80 && window.Game.getState() !== 'playing'; i++) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
 
       const controls = window.TestAPI.getControlState();
       return {
@@ -162,7 +168,10 @@ test.describe('level mode journey', () => {
       window.dispatchEvent(new CustomEvent('levelSelected', {
         detail: { levelId: level.id, level, worldNum: 2, levelNum: 4 }
       }));
-      await new Promise(resolve => setTimeout(resolve, 600));
+      await new Promise(resolve => setTimeout(resolve, 200));
+      for (let i = 0; i < 80 && window.Game.getState() !== 'playing'; i++) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
 
       const controls = window.TestAPI.getControlState();
       return {
@@ -193,7 +202,10 @@ test.describe('level mode journey', () => {
       window.dispatchEvent(new CustomEvent('levelSelected', {
         detail: { levelId: level.id, level, worldNum: 4, levelNum: 1 }
       }));
-      await new Promise(resolve => setTimeout(resolve, 700));
+      await new Promise(resolve => setTimeout(resolve, 200));
+      for (let i = 0; i < 80 && window.Game.getState() !== 'playing'; i++) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
 
       return JSON.parse(window.render_game_to_text());
     });
@@ -214,7 +226,10 @@ test.describe('level mode journey', () => {
       window.dispatchEvent(new CustomEvent('levelSelected', {
         detail: { levelId: level.id, level, worldNum: 6, levelNum: 10 }
       }));
-      await new Promise(resolve => setTimeout(resolve, 700));
+      await new Promise(resolve => setTimeout(resolve, 200));
+      for (let i = 0; i < 80 && window.Game.getState() !== 'playing'; i++) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
 
       return JSON.parse(window.render_game_to_text());
     });
@@ -232,6 +247,7 @@ test.describe('level mode journey', () => {
   });
 
   test('campaign puzzle mechanics have at least one playable route', async ({ page }) => {
+    test.setTimeout(120_000);
     const failures = trackConsoleFailures(page);
     await bootGame(page, '/');
 
@@ -272,6 +288,26 @@ test.describe('level mode journey', () => {
         requiredInteraction: 'bunker-hit',
         weaponIds: ['armor-piercer', 'tracer', 'basic-shot'],
         acceptsBlockedInteraction: true
+      },
+      {
+        mechanic: 'fuel-cell hazard',
+        levelId: 'world5-level2',
+        worldNum: 5,
+        levelNum: 2,
+        expectedObjects: ['fuel-cell', 'fuel-cell'],
+        requiredInteraction: 'fuel-cell-detonate',
+        weaponIds: ['basic-shot', 'missile'],
+        acceptsBlockedInteraction: true
+      },
+      {
+        mechanic: 'collapse-node hazard',
+        levelId: 'world5-level4',
+        worldNum: 5,
+        levelNum: 4,
+        expectedObjects: ['collapse-node', 'fuel-cell'],
+        requiredInteraction: 'collapse-node-detonate',
+        weaponIds: ['basic-shot', 'missile'],
+        acceptsBlockedInteraction: true
       }
     ];
 
@@ -291,7 +327,10 @@ test.describe('level mode journey', () => {
             levelNum: testCase.levelNum
           }
         }));
-        await new Promise(resolve => setTimeout(resolve, 700));
+        await new Promise(resolve => setTimeout(resolve, 200));
+        for (let i = 0; i < 80 && window.Game.getState() !== 'playing'; i++) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
 
         const snapshot = JSON.parse(window.render_game_to_text());
         const route = window.TestAPI.findPlayableShotForQa({
@@ -325,6 +364,90 @@ test.describe('level mode journey', () => {
       expect(result.damageRoute.enemyDamage).toBeGreaterThan(0);
     }
 
+    failures.expectNoFailures();
+  });
+
+  test('fuel cell hazards detonate and chain in live gameplay', async ({ page }) => {
+    test.setTimeout(120_000);
+    const failures = trackConsoleFailures(page);
+    await bootGame(page, '/');
+
+    const result = await page.evaluate(async () => {
+      const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+      const snapshot = () => JSON.parse(window.render_game_to_text());
+      const countCells = snap => snap.puzzleObjects.filter(object => object.type === 'fuel-cell').length;
+
+      const { LevelRegistry } = await import('/js/levels.js');
+      const level = LevelRegistry.getLevel('world5-level2');
+      window.dispatchEvent(new CustomEvent('levelSelected', {
+        detail: { levelId: level.id, level, worldNum: 5, levelNum: 2 }
+      }));
+      await sleep(200);
+      for (let i = 0; i < 80 && window.Game.getState() !== 'playing'; i++) {
+        await sleep(100);
+      }
+      await sleep(300);
+
+      const before = snapshot();
+      const cells = before.puzzleObjects.filter(object => object.type === 'fuel-cell');
+      if (cells.length === 0) {
+        return { candidates: 0, cellsBefore: 0 };
+      }
+      const target = cells.reduce((a, b) => (a.x > b.x ? a : b), cells[0]);
+
+      // Rank shots by direct probe detonation first, then landing proximity,
+      // because weapon blasts also cook hazards within their radius.
+      const candidates = [];
+      for (let angle = 5; angle <= 85; angle += 2) {
+        for (let power = 35; power <= 100; power += 5) {
+          const sim = window.TestAPI.simulateProjectile({ angle, power });
+          const direct = (sim.puzzleInteractions || []).some(i => i.type === 'fuel-cell-detonate');
+          if (sim.landingX == null && !direct) continue;
+          const d = direct
+            ? -1
+            : Math.hypot(sim.landingX - target.x, (sim.landingY ?? target.y) - target.y);
+          candidates.push({ angle, power, d });
+        }
+      }
+      candidates.sort((a, b) => a.d - b.d);
+
+      let after = before;
+      let detonated = false;
+      for (const candidate of candidates.slice(0, 2)) {
+        // Wait until the player can fire (AI counterfire may be resolving).
+        for (let i = 0; i < 150; i++) {
+          if (window.TestAPI.getState().canFire) break;
+          await sleep(100);
+        }
+
+        window.TestAPI.aim({ angle: candidate.angle, power: candidate.power });
+        window.TestAPI.fire();
+
+        // Poll for the staggered hazard chain to resolve.
+        for (let i = 0; i < 90; i++) {
+          await sleep(100);
+          after = snapshot();
+          if (countCells(after) < cells.length) {
+            detonated = true;
+            break;
+          }
+        }
+        if (detonated) break;
+      }
+
+      return {
+        candidates: candidates.length,
+        cellsBefore: cells.length,
+        cellsAfter: countCells(after),
+        enemyHealthBefore: before.enemy?.health,
+        enemyHealthAfter: after.enemy?.health
+      };
+    });
+
+    expect(result.candidates).toBeGreaterThan(0);
+    expect(result.cellsBefore).toBe(2);
+    expect(result.cellsAfter).toBeLessThan(result.cellsBefore);
+    expect(result.enemyHealthAfter).toBeLessThan(result.enemyHealthBefore);
     failures.expectNoFailures();
   });
 

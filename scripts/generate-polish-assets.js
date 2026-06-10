@@ -298,6 +298,45 @@ const puzzleSvgs = {
       <path d="M48 80V48M80 80V48M112 80V48M144 80V48M176 80V48" stroke="#05d9e8" stroke-width="4" opacity="0.82"/>
       <path d="M78 61H146" stroke="#f9f002" stroke-width="8" stroke-linecap="round"/>
       <rect x="24" y="92" width="176" height="10" fill="#05d9e8" opacity="0.38"/>
+    </svg>`,
+  'fuel-cell.png': `
+    <svg xmlns="http://www.w3.org/2000/svg" width="128" height="168" viewBox="0 0 128 168">
+      <defs>
+        <linearGradient id="cellCore" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0" stop-color="#fff96b"/>
+          <stop offset="0.5" stop-color="#f9f002"/>
+          <stop offset="1" stop-color="#ff9a3d"/>
+        </linearGradient>
+        <radialGradient id="cellGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0" stop-color="#ff6b35" stop-opacity="0.5"/>
+          <stop offset="1" stop-color="#ff6b35" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <ellipse cx="64" cy="86" rx="60" ry="78" fill="url(#cellGlow)"/>
+      <rect x="46" y="10" width="36" height="14" rx="5" fill="#1c1030" stroke="#ff6b35" stroke-width="4"/>
+      <rect x="24" y="22" width="80" height="124" rx="20" fill="#1c1030" stroke="#ff6b35" stroke-width="6"/>
+      <rect x="40" y="44" width="48" height="80" rx="10" fill="url(#cellCore)" stroke="#ffb14a" stroke-width="3"/>
+      <path d="M70 52L54 86H66L58 116L82 78H68L78 52Z" fill="#1c1030" opacity="0.85"/>
+      <path d="M34 36L64 26L94 36" fill="none" stroke="#05d9e8" stroke-width="4" stroke-linecap="round"/>
+      <path d="M34 134L64 144L94 134" fill="none" stroke="#05d9e8" stroke-width="4" stroke-linecap="round"/>
+      <rect x="30" y="64" width="6" height="40" rx="3" fill="#ff2a6d" opacity="0.85"/>
+      <rect x="92" y="64" width="6" height="40" rx="3" fill="#ff2a6d" opacity="0.85"/>
+    </svg>`,
+  'collapse-node.png': `
+    <svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144">
+      <defs>
+        <radialGradient id="nodeGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0" stop-color="#d300c5" stop-opacity="0.5"/>
+          <stop offset="1" stop-color="#d300c5" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <circle cx="72" cy="72" r="70" fill="url(#nodeGlow)"/>
+      <path d="M44 128L72 96L100 128" fill="none" stroke="#d300c5" stroke-width="6" stroke-linecap="round" opacity="0.8"/>
+      <path d="M72 14L126 72L72 130L18 72Z" fill="#160a2e" stroke="#d300c5" stroke-width="6" stroke-linejoin="round"/>
+      <path d="M72 32L110 72L72 112L34 72Z" fill="#1f1240" stroke="#ff2a6d" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M48 70L62 80L70 62L82 86L96 68" fill="none" stroke="#05d9e8" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M64 44L72 52L80 44" fill="none" stroke="#f9f002" stroke-width="4" stroke-linecap="round"/>
+      <circle cx="72" cy="72" r="7" fill="#f9f002" stroke="#ffffff" stroke-width="2"/>
     </svg>`
 };
 
@@ -335,7 +374,9 @@ async function main() {
     shieldGenerator: { path: 'images/puzzle-objects/shield-generator.png', width: 160, height: 160, runtimeGroup: 'gameplay' },
     ricochetPanel: { path: 'images/puzzle-objects/ricochet-panel.png', width: 192, height: 112, runtimeGroup: 'gameplay' },
     teleportGate: { path: 'images/puzzle-objects/teleport-gate.png', width: 160, height: 176, runtimeGroup: 'gameplay' },
-    hardlightBunker: { path: 'images/puzzle-objects/hardlight-bunker.png', width: 224, height: 112, runtimeGroup: 'gameplay' }
+    hardlightBunker: { path: 'images/puzzle-objects/hardlight-bunker.png', width: 224, height: 112, runtimeGroup: 'gameplay' },
+    fuelCell: { path: 'images/puzzle-objects/fuel-cell.png', width: 128, height: 168, runtimeGroup: 'gameplay' },
+    collapseNode: { path: 'images/puzzle-objects/collapse-node.png', width: 144, height: 144, runtimeGroup: 'gameplay' }
   };
 
   manifest.tankPortraits = {

@@ -474,6 +474,18 @@
       "width": 224,
       "height": 112,
       "runtimeGroup": "gameplay"
+    },
+    "fuelCell": {
+      "path": "images/puzzle-objects/fuel-cell.png",
+      "width": 128,
+      "height": 168,
+      "runtimeGroup": "gameplay"
+    },
+    "collapseNode": {
+      "path": "images/puzzle-objects/collapse-node.png",
+      "width": 144,
+      "height": 144,
+      "runtimeGroup": "gameplay"
     }
   },
   "projectiles": {

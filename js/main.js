@@ -23,7 +23,7 @@ import * as AimingControls from './aimingControls.js?v=20260111a';
 import * as VictoryDefeat from './victoryDefeat.js';
 import * as Money from './money.js';
 import * as Shop from './shop.js';
-import { updateParticles, renderParticles, clearParticles, getParticleCount, screenShakeForBlastRadius, getScreenShakeOffset, clearScreenShake, renderScreenFlash, clearScreenFlash, initBackground, updateBackground, renderBackground, clearBackground, renderCrtEffects, setCrtEnabled, isCrtEnabled, toggleCrt, setBackgroundWorld } from './effects.js';
+import { updateParticles, renderParticles, clearParticles, getParticleCount, screenShakeForBlastRadius, getScreenShakeOffset, clearScreenShake, renderScreenFlash, clearScreenFlash, initBackground, updateBackground, renderBackground, clearBackground, renderCrtEffects, setCrtEnabled, isCrtEnabled, toggleCrt, setBackgroundWorld, spawnExplosionParticles } from './effects.js';
 import * as Music from './music.js';
 import * as VolumeControls from './volumeControls.js';
 import * as PauseMenu from './pauseMenu.js';
@@ -47,7 +47,8 @@ import * as LevelEditorScreen from './level-editor-screen.js';
 import * as TankEditorScreen from './tank-editor-screen.js';
 import { LevelRegistry } from './levels.js';
 import { buildTerrainFromSlot, getPuzzleObjectsForSlot, getSpawnForSlot } from './level-layouts.js';
-import { renderPuzzleObjectsWithSprites, resolvePuzzleObjectCollision } from './puzzleObjects.js';
+import { PUZZLE_OBJECT_TYPES, findActiveHazardsInRadius, renderPuzzleObjectsWithSprites, resolvePuzzleObjectCollision } from './puzzleObjects.js';
+import { applyExplosionToAllTanks } from './damage.js';
 import { Stars } from './stars.js';
 import * as CombatAchievements from './combat-achievements.js';
 import * as PrecisionAchievements from './precision-achievements.js';
@@ -391,6 +392,12 @@ let activeProjectiles = [];
  * @type {object[]}
  */
 let currentPuzzleObjects = [];
+
+/**
+ * Hazard detonations waiting to fire, staggered for readable chain reactions.
+ * @type {Array<{object: object, owner: string, detonateAt: number}>}
+ */
+let pendingHazardDetonations = [];
 
 /**
  * Pending Endless Neon Run perk selected from the round transition screen.
@@ -2822,6 +2829,14 @@ function fireProjectile(tank) {
  * @returns {import('./projectile.js').Projectile[]} Chain reaction projectiles to spawn, or empty array
  */
 function handleProjectileExplosion(projectile, pos, directHitTank) {
+    // Weapon blasts cook off nearby level hazards into staggered chain reactions.
+    const weapon = WeaponRegistry.getWeapon(projectile.weaponId);
+    const blastRadius = weapon ? weapon.blastRadius : 30;
+    const triggeredHazards = findActiveHazardsInRadius(currentPuzzleObjects, pos.x, pos.y, blastRadius);
+    triggeredHazards.forEach((hazard, index) => {
+        queueHazardDetonation(hazard, projectile.owner, 150 + index * 130);
+    });
+
     return resolveProjectileImpact({
         projectile,
         pos,
@@ -2868,6 +2883,170 @@ function triggerPuzzleObjectImpactEffect(puzzleHit) {
     screenShakeForBlastRadius(24);
     Sound.playHitSound();
     Haptics.hapticExplosion(24);
+}
+
+// =============================================================================
+// HAZARD DETONATIONS (fuel cells, collapse nodes)
+// =============================================================================
+
+/**
+ * Queue a hazard object for detonation after a short readable delay.
+ * Marks the object immediately so it cannot be queued twice by chains.
+ * @param {object} object - Runtime puzzle object (fuel-cell / collapse-node)
+ * @param {string} owner - 'player' or 'enemy', for damage/reward attribution
+ * @param {number} delayMs - Delay before detonation
+ */
+function queueHazardDetonation(object, owner, delayMs = 0) {
+    if (!object || object.active === false || object.detonationQueued) return;
+
+    object.detonationQueued = true;
+    pendingHazardDetonations.push({
+        object,
+        owner: owner === 'player' ? 'player' : 'enemy',
+        detonateAt: performance.now() + Math.max(0, delayMs)
+    });
+}
+
+/**
+ * Whether hazard detonations are still pending (chains keep the turn alive).
+ * @returns {boolean}
+ */
+function hasPendingHazardDetonations() {
+    return pendingHazardDetonations.length > 0;
+}
+
+/** Clear queued hazard detonations when combat state resets. */
+function clearHazardDetonations() {
+    pendingHazardDetonations = [];
+}
+
+/**
+ * Fire queued hazard detonations whose delay has elapsed.
+ * Runs every frame during projectile flight; resolves the round once both the
+ * projectile set and the hazard chain have finished.
+ */
+function updateHazardDetonations() {
+    if (pendingHazardDetonations.length === 0) return;
+
+    const now = performance.now();
+    const due = pendingHazardDetonations.filter(entry => entry.detonateAt <= now);
+    if (due.length === 0) return;
+
+    pendingHazardDetonations = pendingHazardDetonations.filter(entry => entry.detonateAt > now);
+
+    for (const entry of due) {
+        detonateHazardObject(entry);
+    }
+
+    if (pendingHazardDetonations.length === 0 && activeProjectiles.length === 0) {
+        checkRoundEnd();
+    }
+}
+
+/**
+ * Apply hazard damage results to tank state tracking and rewards.
+ * Environmental damage triggered by the player still earns hit rewards and
+ * counts toward level-mode star damage.
+ * @param {Array<object>} results - applyExplosionToAllTanks results
+ * @param {string} owner - Shot owner that triggered the hazard
+ * @param {string} source - Gameplay event source label
+ * @param {string} hazardType - Puzzle object type for event payloads
+ */
+function recordHazardDamage(results, owner, source, hazardType) {
+    for (const result of results) {
+        emitGameplayEvent(GAMEPLAY_EVENTS.TANK_DAMAGED, {
+            tank: result.tank,
+            team: result.tank.team,
+            weaponId: hazardType,
+            damage: result.damage,
+            actualDamage: result.actualDamage,
+            shieldDamage: result.shieldDamage,
+            healthDamage: result.healthDamage,
+            isDirectHit: result.isDirectHit,
+            shieldBusted: result.shieldBusted,
+            source
+        });
+
+        if (owner === 'player' && result.tank.team === 'enemy') {
+            Money.awardHitReward(result.actualDamage);
+            recordStat('damageDealt', result.actualDamage);
+            if (isLevelMode && levelModeStats) {
+                levelModeStats.damageDealt += result.actualDamage;
+            }
+        }
+
+        if (result.tank.team === 'player') {
+            recordStat('damageTaken', result.actualDamage);
+        }
+
+        console.log(`[Hazard] ${hazardType} dealt ${result.actualDamage} damage to ${result.tank.team} tank`);
+    }
+}
+
+/**
+ * Detonate a single hazard object: explosion, terrain carving, damage,
+ * and chain triggering of nearby hazards.
+ * @param {{object: object, owner: string}} entry - Queued detonation
+ */
+function detonateHazardObject(entry) {
+    const { object, owner } = entry;
+    if (!object || object.active === false) return;
+
+    object.active = false;
+    object.detonationQueued = false;
+
+    const isFuelCell = object.type === PUZZLE_OBJECT_TYPES.FUEL_CELL;
+    const blastRadius = isFuelCell
+        ? (object.blastRadius || 88)
+        : (object.collapseRadius || 60);
+    const tanks = [playerTank, enemyTank].filter(tank => tank !== null);
+
+    console.log(`[Hazard] ${object.type} ${object.id} detonating at (${object.x.toFixed(0)}, ${object.y.toFixed(0)}), radius ${blastRadius.toFixed(0)}`);
+
+    explosionEffect = {
+        active: true,
+        x: object.x,
+        y: object.y,
+        radius: isFuelCell ? blastRadius : blastRadius * 0.6,
+        startTime: performance.now(),
+        duration: isFuelCell ? 420 : 320,
+        isNuclear: false,
+        hasMushroomCloud: false
+    };
+
+    spawnExplosionParticles(object.x, object.y, blastRadius, false);
+    screenShakeForBlastRadius(blastRadius);
+    Sound.playExplosionSound(isFuelCell ? blastRadius : blastRadius * 0.8);
+    Haptics.hapticExplosion(blastRadius);
+
+    if (isFuelCell) {
+        // Fuel cells blast a wide crater and deal heavy splash damage.
+        destroyTerrainAt(object.x, object.y, Math.round(blastRadius * 0.66));
+        const results = applyExplosionToAllTanks(
+            { x: object.x, y: object.y, blastRadius },
+            tanks,
+            { damage: object.damage || 35, blastRadius }
+        );
+        recordHazardDamage(results, owner, 'fuel-cell', object.type);
+    } else {
+        // Collapse nodes carve out the support under themselves so the
+        // terrain above settles; light damage, big repositioning.
+        destroyTerrainAt(object.x, object.y + blastRadius * 0.35, Math.round(blastRadius));
+        const results = applyExplosionToAllTanks(
+            { x: object.x, y: object.y, blastRadius },
+            tanks,
+            { damage: object.damage || 14, blastRadius }
+        );
+        recordHazardDamage(results, owner, 'collapse-node', object.type);
+    }
+
+    if (playerTank) updateTankTerrainPosition(playerTank, currentTerrain);
+    if (enemyTank) updateTankTerrainPosition(enemyTank, currentTerrain);
+
+    const chained = findActiveHazardsInRadius(currentPuzzleObjects, object.x, object.y, blastRadius);
+    chained.forEach((hazard, index) => {
+        queueHazardDetonation(hazard, owner, 150 + index * 130);
+    });
 }
 
 /**
@@ -3039,6 +3218,17 @@ function updateProjectile() {
                 continue;
             }
 
+            if (puzzleHit.detonate) {
+                console.log(`[Main] Projectile detonated ${puzzleHit.object?.type || puzzleHit.type}`);
+                queueHazardDetonation(puzzleHit.object, projectile.owner, 120);
+                const chainChildren = handleProjectileExplosion(projectile, puzzleHit.pos, null);
+                newChildren.push(...chainChildren);
+                projectile.deactivate();
+                projectile.clearTrail();
+                toRemove.push(projectile);
+                continue;
+            }
+
             if (puzzleHit.block) {
                 console.log(`[Main] Projectile blocked by ${puzzleHit.type}`);
                 triggerPuzzleObjectImpactEffect(puzzleHit);
@@ -3144,8 +3334,9 @@ function updateProjectile() {
     // Add new child projectiles
     activeProjectiles.push(...newChildren);
 
-    // Check if all projectiles are resolved
-    if (activeProjectiles.length === 0) {
+    // Check if all projectiles are resolved.
+    // Pending hazard chains keep the turn alive until they finish detonating.
+    if (activeProjectiles.length === 0 && !hasPendingHazardDetonations()) {
         // Check if a tank was destroyed before transitioning to next turn
         checkRoundEnd();
     }
@@ -3498,6 +3689,7 @@ function updatePlaying(deltaTime) {
 
     // Handle projectile flight - update physics
     if (phase === TURN_PHASES.PROJECTILE_FLIGHT) {
+        updateHazardDetonations();
         updateProjectile();
     }
 }
@@ -5149,6 +5341,7 @@ function isInsidePhysicsPlaygroundPanel(x, y) {
 
 function clearPhysicsPlaygroundTransientState() {
     activeProjectiles = [];
+    clearHazardDetonations();
     persistentTrails = [];
     explosionEffect = null;
     clearParticles();
@@ -5516,7 +5709,9 @@ function renderLevelPuzzleObjects(ctx) {
         shieldGenerator: Assets.get('puzzleObjects.shieldGenerator'),
         ricochetPanel: Assets.get('puzzleObjects.ricochetPanel'),
         teleportGate: Assets.get('puzzleObjects.teleportGate'),
-        hardlightBunker: Assets.get('puzzleObjects.hardlightBunker')
+        hardlightBunker: Assets.get('puzzleObjects.hardlightBunker'),
+        fuelCell: Assets.get('puzzleObjects.fuelCell'),
+        collapseNode: Assets.get('puzzleObjects.collapseNode')
     });
 }
 
@@ -5980,6 +6175,7 @@ function setupPlayingState() {
                 projectile.clearTrail();
             }
             activeProjectiles = [];
+            clearHazardDetonations();
             splitEffect = null;
             // Reset visual effect states
             clearScreenShake();
@@ -6091,6 +6287,7 @@ function returnToMenu() {
     enemyTank = null;
     currentTerrain = null;
     activeProjectiles = [];
+    clearHazardDetonations();
     pendingSurvivalRunPerk = null;
 
     // Reset selected difficulty so player must choose again
@@ -6205,6 +6402,8 @@ async function preloadLevelBattlefieldAssets(level, worldNum) {
         'puzzleObjects.ricochetPanel',
         'puzzleObjects.teleportGate',
         'puzzleObjects.hardlightBunker',
+        'puzzleObjects.fuelCell',
+        'puzzleObjects.collapseNode',
         ...weaponIconKeys
     ].filter(Boolean);
 
@@ -6485,6 +6684,7 @@ function startNewRun() {
     currentLevelId = null;
     currentLevelData = null;
     activeProjectiles = [];
+    clearHazardDetonations();
     currentPuzzleObjects = [];
     pendingSurvivalRunPerk = null;
     resetLevelModeStats();
@@ -7275,6 +7475,7 @@ function quitToMenu() {
         projectile.clearTrail();
     }
     activeProjectiles = [];
+    clearHazardDetonations();
 
     // Clear effects
     clearScreenShake();

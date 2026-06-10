@@ -11,14 +11,28 @@ export const PUZZLE_OBJECT_TYPES = {
     SHIELD: 'shield',
     RICOCHET: 'ricochet',
     TELEPORT: 'teleport',
-    BUNKER: 'bunker'
+    BUNKER: 'bunker',
+    FUEL_CELL: 'fuel-cell',
+    COLLAPSE_NODE: 'collapse-node'
 };
+
+/** Object types that detonate when struck instead of blocking/redirecting. */
+export const HAZARD_OBJECT_TYPES = new Set([
+    PUZZLE_OBJECT_TYPES.FUEL_CELL,
+    PUZZLE_OBJECT_TYPES.COLLAPSE_NODE
+]);
 
 const DEFAULT_OBJECTS = [];
 const DEFAULT_RADIUS_NORM = 0.05;
 const DEFAULT_WIDTH_NORM = 0.12;
 const DEFAULT_HEIGHT_NORM = 0.08;
 const TELEPORT_COOLDOWN_FRAMES = 12;
+const DEFAULT_FUEL_CELL_RADIUS_NORM = 0.035;
+const DEFAULT_FUEL_CELL_BLAST_NORM = 0.11;
+const DEFAULT_FUEL_CELL_DAMAGE = 35;
+const DEFAULT_COLLAPSE_RADIUS_NORM = 0.03;
+const DEFAULT_COLLAPSE_CARVE_NORM = 0.085;
+const DEFAULT_COLLAPSE_DAMAGE = 14;
 
 function clamp01(value, fallback = 0) {
     return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : fallback;
@@ -73,6 +87,24 @@ function normalizeObject(raw, index) {
         };
     }
 
+    if (type === PUZZLE_OBJECT_TYPES.FUEL_CELL) {
+        return {
+            ...base,
+            radiusNorm: clamp01(raw.radiusNorm, DEFAULT_FUEL_CELL_RADIUS_NORM),
+            blastRadiusNorm: clamp01(raw.blastRadiusNorm, DEFAULT_FUEL_CELL_BLAST_NORM),
+            damage: Math.max(1, Math.floor(raw.damage || DEFAULT_FUEL_CELL_DAMAGE))
+        };
+    }
+
+    if (type === PUZZLE_OBJECT_TYPES.COLLAPSE_NODE) {
+        return {
+            ...base,
+            radiusNorm: clamp01(raw.radiusNorm, DEFAULT_COLLAPSE_RADIUS_NORM),
+            collapseRadiusNorm: clamp01(raw.collapseRadiusNorm, DEFAULT_COLLAPSE_CARVE_NORM),
+            damage: Math.max(1, Math.floor(raw.damage || DEFAULT_COLLAPSE_DAMAGE))
+        };
+    }
+
     return {
         ...base,
         widthNorm: clamp01(raw.widthNorm, DEFAULT_WIDTH_NORM),
@@ -119,8 +151,39 @@ export function createPuzzleObjects(objects = DEFAULT_OBJECTS, width = 1200, hei
         radius: object.radiusNorm ? object.radiusNorm * minDimension : 0,
         width: object.widthNorm ? object.widthNorm * safeWidth : 0,
         height: object.heightNorm ? object.heightNorm * safeHeight : 0,
+        blastRadius: object.blastRadiusNorm ? object.blastRadiusNorm * minDimension : 0,
+        collapseRadius: object.collapseRadiusNorm ? object.collapseRadiusNorm * minDimension : 0,
         maxStrength: object.strength || 1
     }));
+}
+
+/**
+ * Check whether an object is a detonating hazard (fuel cell / collapse node).
+ * @param {object|null} object
+ * @returns {boolean}
+ */
+export function isHazardObject(object) {
+    return Boolean(object) && HAZARD_OBJECT_TYPES.has(object.type);
+}
+
+/**
+ * Find active, not-yet-queued hazards within a blast radius of a point.
+ * Used to chain weapon explosions and hazard explosions into nearby hazards.
+ * @param {Array<object>} objects
+ * @param {number} x
+ * @param {number} y
+ * @param {number} radius
+ * @returns {Array<object>}
+ */
+export function findActiveHazardsInRadius(objects, x, y, radius) {
+    if (!Array.isArray(objects) || !(radius > 0)) return [];
+
+    return objects.filter(object =>
+        isHazardObject(object) &&
+        object.active !== false &&
+        !object.detonationQueued &&
+        distance(x, y, object.x, object.y) <= radius + (object.radius || 0)
+    );
 }
 
 function distance(aX, aY, bX, bY) {
@@ -257,6 +320,30 @@ export function resolvePuzzleObjectCollision(projectile, objects = DEFAULT_OBJEC
             return { type: 'shield-block', object, block: true, pos: { x, y } };
         }
 
+        if (HAZARD_OBJECT_TYPES.has(object.type)) {
+            if (object.detonationQueued) continue;
+
+            // Swept check: fast projectiles can cross the hazard circle in one
+            // physics step, so test the segment between previous and current.
+            const sweptDistance = distanceToSegment(
+                object.x,
+                object.y,
+                projectile.previousX ?? x,
+                projectile.previousY ?? y,
+                x,
+                y
+            );
+            if (sweptDistance > object.radius) continue;
+
+            return {
+                type: `${object.type}-detonate`,
+                object,
+                detonate: true,
+                block: true,
+                pos: { x: object.x, y: object.y }
+            };
+        }
+
         if (object.type === PUZZLE_OBJECT_TYPES.BUNKER) {
             const left = object.x - object.width / 2;
             const right = object.x + object.width / 2;
@@ -305,6 +392,10 @@ export function renderPuzzleObjectsWithSprites(ctx, objects = DEFAULT_OBJECTS, t
             renderTeleport(ctx, object, pulse, sprites.teleportGate);
         } else if (object.type === PUZZLE_OBJECT_TYPES.BUNKER) {
             renderBunker(ctx, object, pulse, sprites.hardlightBunker);
+        } else if (object.type === PUZZLE_OBJECT_TYPES.FUEL_CELL) {
+            renderFuelCell(ctx, object, pulse, time, sprites.fuelCell);
+        } else if (object.type === PUZZLE_OBJECT_TYPES.COLLAPSE_NODE) {
+            renderCollapseNode(ctx, object, pulse, time, sprites.collapseNode);
         }
     }
 }
@@ -407,6 +498,112 @@ function renderTeleport(ctx, object, pulse, sprite = null) {
     ctx.strokeStyle = COLORS.NEON_PINK;
     ctx.beginPath();
     ctx.arc(object.x, object.y, object.radius * (0.45 + pulse * 0.18), 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.restore();
+}
+
+function renderFuelCell(ctx, object, pulse, time, sprite = null) {
+    // Queued cells flare white-hot just before detonating so chains read clearly.
+    const primed = object.detonationQueued === true;
+    const primedFlicker = primed ? (Math.sin(time * 0.045) + 1) / 2 : 0;
+    const glow = primed ? 26 + primedFlicker * 22 : 12 + pulse * 14;
+
+    ctx.save();
+
+    ctx.strokeStyle = `rgba(255, 107, 53, ${0.16 + pulse * 0.14})`;
+    ctx.setLineDash([6, 10]);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(object.x, object.y, object.blastRadius || object.radius * 3, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.shadowColor = primed ? '#ffffff' : '#ff6b35';
+    ctx.shadowBlur = glow;
+
+    if (drawSpriteCentered(ctx, sprite, object.x, object.y, object.radius * 2.3, object.radius * 3)) {
+        ctx.restore();
+        return;
+    }
+
+    const w = object.radius * 1.5;
+    const h = object.radius * 2.3;
+    const x = object.x - w / 2;
+    const y = object.y - h / 2;
+
+    ctx.fillStyle = '#1c1030';
+    ctx.strokeStyle = primed ? '#ffffff' : '#ff6b35';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, w * 0.3);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = `rgba(249, 240, 2, ${0.55 + pulse * 0.4})`;
+    ctx.shadowColor = '#f9f002';
+    ctx.shadowBlur = 8 + pulse * 8;
+    const coreW = w * 0.46;
+    ctx.fillRect(object.x - coreW / 2, y + h * 0.22, coreW, h * 0.56);
+
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#ff6b35';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(object.x - w * 0.26, object.y + h * 0.12);
+    ctx.lineTo(object.x, object.y - h * 0.06);
+    ctx.lineTo(object.x + w * 0.26, object.y + h * 0.12);
+    ctx.stroke();
+
+    ctx.restore();
+}
+
+function renderCollapseNode(ctx, object, pulse, time, sprite = null) {
+    const primed = object.detonationQueued === true;
+    const jitter = primed ? Math.sin(time * 0.08) * 2 : 0;
+    const cx = object.x + jitter;
+    const cy = object.y;
+
+    ctx.save();
+    ctx.shadowColor = primed ? '#ffffff' : COLORS.NEON_PURPLE;
+    ctx.shadowBlur = primed ? 30 : 12 + pulse * 14;
+
+    if (drawSpriteCentered(ctx, sprite, cx, cy, object.radius * 2.6, object.radius * 2.6)) {
+        ctx.restore();
+        return;
+    }
+
+    const r = object.radius;
+
+    // Support struts below the node hint that destroying it drops the terrain.
+    ctx.strokeStyle = `rgba(211, 0, 197, ${0.4 + pulse * 0.25})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(cx - r * 0.7, cy + r * 1.6);
+    ctx.lineTo(cx, cy + r * 0.4);
+    ctx.lineTo(cx + r * 0.7, cy + r * 1.6);
+    ctx.stroke();
+
+    ctx.fillStyle = '#160a2e';
+    ctx.strokeStyle = primed ? '#ffffff' : COLORS.NEON_PURPLE;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - r);
+    ctx.lineTo(cx + r, cy);
+    ctx.lineTo(cx, cy + r);
+    ctx.lineTo(cx - r, cy);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Glitch cracks inside the diamond.
+    ctx.strokeStyle = `rgba(5, 217, 232, ${0.6 + pulse * 0.35})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - r * 0.45, cy - r * 0.1);
+    ctx.lineTo(cx - r * 0.1, cy + r * 0.12);
+    ctx.lineTo(cx + r * 0.2, cy - r * 0.18);
+    ctx.lineTo(cx + r * 0.5, cy + r * 0.2);
     ctx.stroke();
 
     ctx.restore();
